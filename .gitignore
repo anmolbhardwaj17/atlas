@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+.next/
+out/
+coverage/
+.turbo/
+
+# Environment & secrets (NEVER commit — see docs/13)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p8
+secrets/
+
+# Logs & temp
+*.log
+logs/
+tmp/
+*.local
+
+# OS / editor
+.DS_Store
+.idea/
+*.swp
