@@ -2,20 +2,25 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { apiUrl } from "@/lib/env";
 import { SignOutButton } from "./sign-out-button";
+import { CreateOrgForm } from "./create-org-form";
+import { OrgPanel } from "./org-panel";
 
 export const dynamic = "force-dynamic";
 
-interface OrgMembership {
-  id: string;
-  slug: string;
-  name: string;
+interface Membership {
+  orgId: string;
+  orgName: string;
+  orgSlug: string;
   role: string;
 }
 interface MeResponse {
-  user: { id: string; email: string; name: string | null; avatarUrl: string | null };
+  id: string;
+  email: string;
+  name: string | null;
+  avatarUrl: string | null;
   emailVerified: boolean;
-  orgs: OrgMembership[];
-  activeOrg: OrgMembership | null;
+  memberships: Membership[];
+  defaultOrgId: string | null;
 }
 
 const page = { fontFamily: "system-ui, sans-serif", color: "#e8eaed", background: "#0b0d12" };
@@ -29,7 +34,8 @@ async function fetchMe(
       cache: "no-store",
     });
     if (!res.ok) return { me: null, error: `API /me responded ${res.status}` };
-    return { me: (await res.json()) as MeResponse, error: null };
+    const body = (await res.json()) as { data: MeResponse };
+    return { me: body.data, error: null };
   } catch (e) {
     return { me: null, error: `Could not reach API: ${(e as Error).message}` };
   }
@@ -79,34 +85,40 @@ export default async function HomePage() {
       <section style={{ marginTop: "2rem" }}>
         <h2 style={{ fontSize: "1rem", color: "#9aa0a6" }}>Signed in as</h2>
         <p style={{ margin: ".25rem 0" }}>
-          <strong>{me?.user.name ?? user.email}</strong> — {me?.user.email ?? user.email}{" "}
+          <strong>{me?.name ?? user.email}</strong> — {me?.email ?? user.email}{" "}
           {me?.emailVerified ? (
             <span style={{ color: "#81c995" }}>✓ verified</span>
           ) : (
             <span style={{ color: "#f28b82" }}>unverified</span>
           )}
         </p>
-        <p style={{ color: "#5f6368", fontSize: ".8rem" }}>user id: {me?.user.id ?? user.id}</p>
+        <p style={{ color: "#5f6368", fontSize: ".8rem" }}>user id: {me?.id ?? user.id}</p>
       </section>
 
       <section style={{ marginTop: "2rem" }}>
         <h2 style={{ fontSize: "1rem", color: "#9aa0a6" }}>Organizations</h2>
         {error ? (
           <p style={{ color: "#f28b82" }}>{error}</p>
-        ) : me && me.orgs.length > 0 ? (
+        ) : me && me.memberships.length > 0 ? (
           <ul>
-            {me.orgs.map((o) => (
-              <li key={o.id}>
-                {o.name} <span style={{ color: "#5f6368" }}>({o.slug})</span> — {o.role}
+            {me.memberships.map((m) => (
+              <li key={m.orgId}>
+                {m.orgName} <span style={{ color: "#5f6368" }}>({m.orgSlug})</span> — {m.role}
               </li>
             ))}
           </ul>
         ) : (
-          <p style={{ color: "#9aa0a6" }}>
-            No organizations yet. Onboarding (create / join an org) arrives in F1.6.
-          </p>
+          <p style={{ color: "#9aa0a6" }}>No organizations yet. Create one to get started:</p>
         )}
+        {me && !error ? <CreateOrgForm /> : null}
       </section>
+
+      {me?.defaultOrgId ? (
+        <section style={{ marginTop: "2rem" }}>
+          <h2 style={{ fontSize: "1rem", color: "#9aa0a6" }}>Manage organization</h2>
+          <OrgPanel orgId={me.defaultOrgId} />
+        </section>
+      ) : null}
     </main>
   );
 }

@@ -155,9 +155,9 @@ So a single request is org-scoped at **three** layers (verified membership → a
 | Transfer ownership | ✓ | – | – |
 
 ### 5.2 Enforcement
-- **NestJS guards** (`02` §3.1, `08` §3) evaluate role from the JWT per endpoint; insufficient role → `403 insufficient_role` (`08` §11).
+- **NestJS guards** (`02` §3.1, `08` §3): `TenantScopeGuard` resolves the active org + the caller's role **live** (from `memberships`, §4 — the role is **not** in the token, DD-2 revised), then `RolesGuard` checks the per-endpoint `@Roles(...)` minimum; insufficient → `403 insufficient_role` (`08` §11).
 - **Invariants** (service-enforced, tested `14`): ≥1 Owner always (BR-ORG-1), no last-Owner removal/demotion (BR-MEM-2), Admin can't modify Owners (BR-MEM-3).
-- Role is part of the access JWT; a role change **revokes/reissues** the session (§3) so stale elevated tokens can't linger.
+- Because role is resolved live per request (not cached in a token), a role change/removal takes effect on the **next request** — no stale-token window to wait out (stronger than the old self-minted-JWT model; §3).
 
 ---
 

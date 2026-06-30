@@ -1,21 +1,31 @@
 import { Controller, Get, Req, UseGuards } from "@nestjs/common";
+import type { Role } from "@atlas/db";
 import { AuthGuard } from "./auth.guard";
 import { UserMirrorService } from "./user-mirror.service";
-import { MembershipService, type OrgMembership } from "./membership.service";
+import { MembershipService } from "./membership.service";
 import type { AuthedRequest } from "./auth.types";
-import type { MirroredUser } from "./user-mirror.service";
 
+interface MeMembership {
+  orgId: string;
+  orgName: string;
+  orgSlug: string;
+  role: Role;
+}
 interface MeResponse {
-  user: MirroredUser;
+  id: string;
+  email: string;
+  name: string | null;
+  avatarUrl: string | null;
   emailVerified: boolean;
-  orgs: OrgMembership[];
-  activeOrg: OrgMembership | null;
+  memberships: MeMembership[];
+  defaultOrgId: string | null;
 }
 
 /**
- * The post-login landing call (docs/12 §2.1). Verifies the session (AuthGuard),
- * mirrors the identity, and returns the user plus their org memberships. A
- * brand-new user has zero orgs (onboarding is F1.6) — this still returns 200.
+ * The post-login landing call (docs/12 §2.1, docs/08 §6). Verifies the session,
+ * mirrors the identity, and returns the user + memberships (docs/08 §6 shape; the
+ * global interceptor wraps it as `{ data }`). A brand-new user has zero memberships
+ * (onboarding = create/accept an org, F1.6) — still 200.
  */
 @Controller("me")
 @UseGuards(AuthGuard)
@@ -32,10 +42,18 @@ export class MeController {
     const user = await this.users.ensureUser(claims);
     const orgs = await this.memberships.listForUser(user.id);
     return {
-      user,
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      avatarUrl: user.avatarUrl,
       emailVerified: claims.emailVerified,
-      orgs,
-      activeOrg: orgs[0] ?? null,
+      memberships: orgs.map((o) => ({
+        orgId: o.id,
+        orgName: o.name,
+        orgSlug: o.slug,
+        role: o.role,
+      })),
+      defaultOrgId: orgs[0]?.id ?? null,
     };
   }
 }

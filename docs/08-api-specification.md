@@ -148,13 +148,15 @@ GET /api/v1/nodes?kind=aws.lambda.function&region=us-east-1&status=active
 
 > **Login is Google OAuth only for MVP** (`12` DD-1). GitHub is **connector** auth (`07`), not login. Email/password is reserved/deferred (`12` §13).
 
+> **⚠️ UPDATE (F1.5, `12` v1.1): login is Supabase-managed.** The OAuth dance, session JWT, refresh, and logout are handled by **Supabase Auth** (Google provider) + `@supabase/ssr` on the client — Atlas exposes **no** `/auth/google/start`, `/auth/google/callback`, `/auth/refresh`, or `/auth/logout` endpoints. The API only **verifies** the Supabase access JWT (JWKS/ES256, `12` §2.1) on each call. The rows below are superseded; the live Atlas-owned endpoints are **`GET /me`** and **`POST /orgs`** (and §7). Sign-out is a client call to Supabase.
+
 | Method | Path | Purpose | Role |
 |---|---|---|---|
-| `GET` | `/auth/google/start` | begin Google OIDC (state, PKCE, nonce) (`12` §2.1) | public |
-| `GET` | `/auth/google/callback` | OIDC callback → verify token, upsert user, issue session | public |
-| `POST` | `/auth/logout` | end session (revoke refresh) | auth |
-| `POST` | `/auth/refresh` | rotate access token (refresh-reuse detection) | auth |
-| `GET` | `/me` | current user + memberships + active org | auth |
+| ~~`GET`~~ | ~~`/auth/google/start`~~ | *(superseded — handled by Supabase + `@supabase/ssr`)* | — |
+| ~~`GET`~~ | ~~`/auth/google/callback`~~ | *(superseded — web `/auth/callback` exchanges the code with Supabase)* | — |
+| ~~`POST`~~ | ~~`/auth/logout`~~ | *(superseded — client calls `supabase.auth.signOut()`)* | — |
+| ~~`POST`~~ | ~~`/auth/refresh`~~ | *(superseded — Supabase rotates refresh tokens)* | — |
+| `GET` | `/me` | current user + memberships + default org (verifies Supabase JWT) | auth |
 | `POST` | `/orgs` | create + name org (caller becomes Owner) — used on first login w/ no membership | auth |
 
 **Phase-1 (`12` §7) — domain-based membership (designed, not MVP):**

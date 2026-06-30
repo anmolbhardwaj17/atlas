@@ -13,6 +13,13 @@ import { AppModule } from "./app.module";
 async function bootstrap(): Promise<void> {
   const env = loadEnv();
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter());
+  // The web app calls the API from the browser (Bearer token) — allow its origin (docs/08 §3).
+  app.enableCors({
+    origin: env.WEB_ORIGIN,
+    methods: ["GET", "POST", "PATCH", "DELETE"],
+    allowedHeaders: ["authorization", "content-type", "x-atlas-org", "idempotency-key"],
+  });
+  app.enableShutdownHooks(); // run OnApplicationShutdown (closes the PG pool)
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
   Logger.log(`API listening on :${env.PORT}`, "Bootstrap");
 }
