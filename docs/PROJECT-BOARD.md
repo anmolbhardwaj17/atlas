@@ -75,7 +75,7 @@
 | ID | Task | Status | Docs | Note |
 |---|---|---|---|---|
 | F1.1 | Monorepo scaffold + shared tooling + `config` package | ✅ | 16 §2/§4, 17 §6 | pnpm workspaces + strict TS + eslint(no-any) + prettier + vitest. `@atlas/config` (Zod env, parse-don't-validate). **All gates green: format/lint/typecheck/6 tests.** |
-| F1.2 | CI gate harness (lint/typecheck/test) | 📋 | 14 §16, 17 §5 | wire pipeline |
+| F1.2 | CI gate harness (lint/typecheck/test) | 🔵 | 14 §16, 17 §5 | GitHub Actions `.github/workflows/ci.yml`: pnpm + Node 22, runs format/lint/typecheck/test on push to main. Heavier stages added in later sprints. |
 | F1 | Google OAuth login + sessions/JWT | 📋 | 12 | sole login method (MVP) |
 | F1 | Org create/RBAC/memberships/invitations | 📋 | 12, 03 | Owner/Admin/Member |
 | F1 | 3-layer tenant isolation incl. RLS | 📋 | 04 §10, 13 §6 | **US-12 test must pass** |

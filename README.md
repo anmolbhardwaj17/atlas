@@ -1,5 +1,7 @@
 # Atlas
 
+[![CI](https://github.com/anmolbhardwaj17/atlas/actions/workflows/ci.yml/badge.svg)](https://github.com/anmolbhardwaj17/atlas/actions/workflows/ci.yml)
+
 **An AI-powered Engineering Intelligence Platform.** Atlas connects to a company's AWS (read-only) and GitHub, builds a continuously-updated **knowledge graph** of their infrastructure, code, deployments, and dependencies, and lets engineers understand it through visualization, search, and a **cited AI interface**.
 
 > The knowledge graph is the product. The AI is the interface.
