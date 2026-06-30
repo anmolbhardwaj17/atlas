@@ -1,6 +1,8 @@
 import { Client } from "pg";
 import { up as up0001 } from "./migrations/0001_init";
 import { up as up0002 } from "./migrations/0002_rls";
+import { up as up0003 } from "./migrations/0003_auth_resolve";
+import { up as up0004 } from "./migrations/0004_identity_rls";
 
 /**
  * Forward-only SQL migration runner (docs/04 §9). Plain `pg`, no ORM. Each
@@ -13,6 +15,8 @@ import { up as up0002 } from "./migrations/0002_rls";
 const MIGRATIONS: ReadonlyArray<{ version: string; statements: string[] }> = [
   { version: "0001_init", statements: up0001 },
   { version: "0002_rls", statements: up0002 },
+  { version: "0003_auth_resolve", statements: up0003 },
+  { version: "0004_identity_rls", statements: up0004 },
 ];
 
 async function main(): Promise<void> {

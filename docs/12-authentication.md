@@ -1,6 +1,6 @@
 # 12 — Authentication & Authorization
 
-> **Document status:** Authoritative · **Version:** 1.0 · **Last updated:** 2026-06-30
+> **Document status:** Authoritative · **Version:** 1.1 · **Last updated:** 2026-07-01
 > **Owner:** Founding Principal Architect · **Audience:** Backend engineers, AI coding agents, security/QA
 > **Document type:** AuthN / AuthZ / Identity Spec
 > **Depends on:** `00` (G4, P2/P6/P8, personas D/E), `01` (FA-7/FR-7.x, US-1/2/3/12, NFR-10/12), `02` (§3.3 tenant scoping, §9.1 multi-tenancy), `03` (User/Org/Membership/Invitation/Connection, BR-x), `04` (auth tables, RLS GUC), `08` (§3/§6 auth contract), `07` (GitHub App — connector auth, distinct from login)
@@ -62,71 +62,74 @@ Inherits `00`–`08`. Auth-specific:
 >
 > **Alternatives:** *Email/password* — rejected for MVP (password storage/reset/breach surface, friction; deferred — §13). *GitHub OAuth login* — rejected as the *primary* (not every engineer's GitHub identity maps to their company; no domain claim like `hd`); GitHub remains **connector** auth (`07`). *SSO/SAML* — Phase-1 enterprise (`01` OOS-6); the `hd`-based domain model is the lighter MVP/Phase-1 on-ramp that doesn't need an IdP integration.
 
-### 2.1 Login flow (OIDC Authorization Code + PKCE)
+> **DD-1a — Supabase Auth is the Google IdP / OAuth orchestrator (implements DD-1).** We do **not** hand-roll the OIDC Authorization-Code+PKCE dance, the Google JWKS fetch, `state`/`nonce` handling, or session minting. **Supabase Auth** (Google provider) runs that flow and issues the user a session JWT. **Why:** it removes the highest-risk, lowest-differentiation code from our surface (token exchange, nonce/replay, refresh rotation), is free at our scale, and keeps Google as the verified-identity source (AU-2). Atlas's job shrinks to (a) *verifying* the Supabase JWT on each API call and (b) *mirroring* the identity into our own model so `03`/`04` and our GUC-RLS isolation (§4) are unchanged. Supabase is a sub-processor (SOC 2) — recorded in `13`/`17`.
+
+### 2.1 Login flow (Supabase-hosted Google OAuth)
 ```mermaid
 sequenceDiagram
     actor User
-    participant Web as Web App (09)
-    participant API as API/BFF (08)
+    participant Web as Web App (09, @supabase/ssr)
+    participant SB as Supabase Auth
     participant G as Google OIDC
+    participant API as Atlas API (08, NestJS)
     User->>Web: "Sign in with Google"
-    Web->>API: GET /auth/google/start
-    API-->>Web: redirect to Google (state, PKCE, nonce, scope=openid email profile)
+    Web->>SB: signInWithOAuth({ provider: 'google' })
+    SB-->>Web: redirect to Google (Supabase owns state/PKCE/nonce/scope)
     User->>G: authenticate + consent
-    G-->>API: GET /auth/google/callback?code&state
-    API->>G: exchange code → ID token + access token
-    G-->>API: ID token (sub, email, email_verified, name, picture, hd?)
-    API->>API: verify token (sig, aud, iss, nonce, exp); require email_verified
-    API->>API: upsert User (by google sub); record domain = hd (if present & not blocklisted)
-    API->>API: resolve memberships → issue session (access JWT + refresh cookie)
-    API-->>Web: set httpOnly session; redirect to app (or org-picker / onboarding)
+    G-->>SB: code → Supabase exchanges for Google tokens (sub, email, email_verified, name, picture, hd?)
+    SB-->>Web: redirect to /auth/callback?code → exchangeCodeForSession → set httpOnly session cookies
+    Web->>API: request with Supabase access JWT (Authorization: Bearer …)
+    API->>API: verify JWT via Supabase JWKS (ES256): sig, iss, aud='authenticated', exp
+    API->>API: mirror identity → upsert public.users (id = auth uid) + auth_identities (google sub, email domain)
+    API->>API: resolve memberships (SECURITY DEFINER fn) → set atlas.current_org GUC for org-scoped calls
+    API-->>Web: /me (user + orgs + active org) — or onboarding when no membership yet
 ```
 
-**Token validation (AU-2, security-critical — `13`):** verify signature against Google's JWKS, `iss`, `aud` (our client id), `exp`, and the **`nonce`** (replay protection); reject if `email_verified` is false. Persist `sub` as the stable Google identity (emails can change; `sub` does not).
+**Token validation (AU-2, security-critical — `13`):** Supabase signs user access tokens with an **asymmetric key (ES256)**; the API verifies the JWT against the **Supabase JWKS** (`<SUPABASE_URL>/auth/v1/.well-known/jwks.json`) and checks `iss` (`<SUPABASE_URL>/auth/v1`), `aud` (`authenticated`), and `exp`. No shared HS256 secret is needed and none is held by Atlas (the `eyJ…` anon/service keys are API-gateway keys, *not* the user-token signing key). `email_verified` and `nonce`/`state` are enforced **inside Supabase's Google exchange** (AU-2 is satisfied upstream); Atlas additionally records `email_verified` from the claims and treats a falsey value as untrusted. The legacy HS256 path (verify with `SUPABASE_JWT_SECRET`) is supported only as a fallback if a project has not enabled asymmetric keys.
 
-### 2.2 Identity model
-- A **User** (`03` §3.2) is keyed by Google `sub` via `auth_identities` (`04`): `provider='google'`, `provider_subject=sub`.
-- `email` is captured/normalized; **`hd`** (or, defensively, the email domain) is recorded for the domain model (§7) — **captured from MVP, acted on in Phase 1** (A50).
-- One human = one User across all their orgs (`03` BR-USER-1); memberships grant org access.
+### 2.2 Identity model (mirror, not source-of-truth-shift)
+Supabase `auth.users` is the **authentication** record; `public.users` (`03` §3.2, `04`) remains Atlas's identity record so the domain model, FKs, and graph provenance are unchanged. They are linked by **id**:
+- **`public.users.id` = the Supabase auth uid** (the JWT `sub`). On first authenticated call we upsert the row (id, email, name, avatar) — idempotent.
+- **`auth_identities`** records `provider='google'`, `provider_subject` = the Google `sub` (from the token's identity claims, stable across email changes), and the **email domain / `hd`** for the domain model (§7) — **captured from MVP, acted on in Phase 1** (A50, A51 blocklist).
+- One human = one User across all their orgs (`03` BR-USER-1); memberships grant org access. Mirroring happens at the post-login `/me` call (the web app's landing request), so a `users` row always exists before any org/membership write (F1.6).
 
 ---
 
 ## 3. Sessions & JWT Strategy (AU-6)
 
-> **DD-2 — Short-lived access JWT + rotating refresh token in an httpOnly cookie; server-side refresh-session store for revocation.**
+> **DD-2 (revised) — Sessions are Supabase-managed; Atlas is a stateless verifier; the active org is resolved server-side, not carried in the token.** Supabase owns the access-token/refresh-token lifecycle. Atlas mints **no** tokens of its own. This deletes our session store, refresh-rotation, and revocation plumbing — and the bugs that come with them — at the cost of one external dependency (DD-1a).
 
-| Token | Lifetime | Storage | Contents |
-|---|---|---|---|
-| **Access JWT** | short (e.g. 15 min) | in-memory / Authorization header (or httpOnly for the BFF) | `sub` (userId), active `orgId`, `role` in that org, `sessionId`, `exp` |
-| **Refresh token** | longer (e.g. 30 days, sliding) | **httpOnly, Secure, SameSite cookie** | opaque; maps to a server-side session row |
+| Token | Issued by | Lifetime | Storage | Atlas's role |
+|---|---|---|---|---|
+| **Access JWT** | Supabase Auth | short (Supabase default ~1 h, configurable) | httpOnly cookie via `@supabase/ssr`; sent as `Authorization: Bearer` to the API | **verify only** (JWKS, ES256) — no DB hit per call (NFR-2) |
+| **Refresh token** | Supabase Auth | long, rotating | **httpOnly, Secure, SameSite cookie** (managed by `@supabase/ssr`) | none — Supabase rotates & detects reuse |
 
-**Why this split:** access JWTs are stateless and fast to verify on every request (no DB hit per call — NFR-2); the refresh token is **opaque and server-tracked** so sessions are **revocable** (logout, role change, security event) — pure stateless JWT can't be revoked, pure session adds a DB hit per request; this hybrid gets both (DD-2, AU-6).
+**Claims Atlas reads** (it does *not* write them): `sub` (= `public.users.id`), `email`, `email_verified`, `user_metadata` (`name`, `avatar_url`/`picture`, Google `sub`, `hd`), `iss`, `aud`, `exp`. **Crucially, the JWT does *not* carry `orgId`/`role`** (Supabase doesn't know our tenancy). The active org is resolved per request (§4) from the user's memberships — so a role change takes effect immediately (no stale token claim to wait out), which is *stronger* than the previous self-minted-JWT model.
 
 ```mermaid
 flowchart LR
-    LOGIN["login / refresh"] --> ISSUE["issue access JWT (15m) + refresh cookie"]
-    REQ["API request"] --> VERIFY["verify access JWT (stateless)"]
-    VERIFY -- expired --> REFRESH["POST /auth/refresh (rotate refresh, new access)"]
-    REFRESH --> REVOKE{"session revoked?"}
-    REVOKE -- yes --> DENY["401 → re-login"]
-    REVOKE -- no --> ISSUE
+    LOGIN["Supabase Google login"] --> COOKIE["@supabase/ssr sets httpOnly session cookies"]
+    REQ["API request (Bearer access JWT)"] --> VERIFY["verify JWT via Supabase JWKS (stateless)"]
+    VERIFY -- valid --> RESOLVE["resolve userId → memberships → active org → set org GUC"]
+    VERIFY -- expired --> REFRESH["@supabase/ssr refreshes via Supabase; retry"]
+    REFRESH --> REQ
 ```
 
-**Revocation triggers (AU-6):** logout, role change/removal (re-issue with new claims), org deletion/suspension, suspected compromise. Refresh rotation detects token reuse (a replayed old refresh token invalidates the session — theft detection, `13`).
+**Revocation (AU-6):** handled by Supabase (sign-out, refresh-reuse detection, admin sign-out). Atlas-side authorization changes (membership revoked, org suspended) take effect on the **next request** because org/role are resolved live from `memberships` (§4), never cached in a token. Supabase refresh rotation provides theft detection (`13`).
 
-**Org switching:** a multi-org user selects an active org; the API verifies membership and issues an access JWT scoped to that `orgId`+`role`. The `X-Atlas-Org` header (`08` §3) must match the JWT's org or trigger a re-scope — the JWT's org claim is the trusted source, not the header alone.
+**Org switching:** a multi-org user picks an active org; the client sends it in the **`X-Atlas-Org`** header (`08` §3). The API treats the header as a *request*, not a grant: it verifies an `active` membership for `(userId, orgId)` before setting the org GUC (§4). With no header, the API uses the user's default/first active org. The trusted source is the **membership row**, not the header.
 
 ---
 
 ## 4. Tenant Context Propagation (AU-5, `04` §10, `02` §3.3)
 
 The bridge from identity to data isolation (defense-in-depth for R8):
-1. **Guard** resolves `(userId, orgId, role)` from the verified access JWT.
-2. **Membership check:** confirms an `active` Membership for `(userId, orgId)` (cached; `03` BR-USER-1) — else `403`/`404`.
-3. **Org GUC set:** the request handler executes `SET LOCAL atlas.current_org = '<orgId>'` so **PostgreSQL RLS** (`04` §10) backstops every query.
-4. **Repository scoping:** the app-layer base repository injects `org_id` (`02` §3.3) — primary mechanism.
+1. **Guard** verifies the Supabase JWT (JWKS, §2.1) → trusted `userId` (= `sub`). The **org is *not* in the token**; it is taken from the `X-Atlas-Org` header (or the user's default org) and treated as untrusted until step 2.
+2. **Membership check:** confirms an `active` Membership for `(userId, orgId)` — via the `app_user_memberships(userId)` resolver (a `SECURITY DEFINER` function: the only sanctioned cross-org read, keyed strictly to the authenticated user, so `atlas_app` stays non-bypass). No active membership → cross-tenant is indistinguishable from non-existent → **`404`, never `403`** (R8, `04` §10, `13` §6). `03` BR-USER-1.
+3. **Org GUC set:** the org-scoped handler runs inside `withOrgScope` (`SET LOCAL atlas.current_org = '<orgId>'`) so **PostgreSQL RLS** (`04` §10) backstops every query in the transaction.
+4. **Repository scoping:** the app-layer query path also filters `org_id` (`02` §3.3) — the primary mechanism; RLS is the backstop.
 
-So a single request is org-scoped at **three** layers (JWT claim → app repository → RLS GUC). A leak requires all three to fail (R8 is existential — this redundancy is the point).
+So a single request is org-scoped at **three** layers (verified membership → app query filter → RLS GUC). A leak requires all three to fail (R8 is existential — this redundancy is the point).
 
 ---
 
@@ -313,3 +316,4 @@ Restated so it's unmistakable: **connecting a source is not logging in.**
 | Version | Date | Author | Change |
 |---|---|---|---|
 | 1.0 | 2026-06-30 | Founding Principal Architect | Initial auth spec: Google-only login, JWT/session, RBAC, invitations (MVP); Google-`hd` domain-based auto-join (Phase 1) |
+| 1.1 | 2026-07-01 | Build (F1.5) | **§2–§4 rewritten for Supabase Auth (docs-before-code).** Supabase-hosted Google OAuth (DD-1a) replaces hand-rolled OIDC; Supabase issues the session JWT (ES256), Atlas verifies via JWKS and mints no tokens (DD-2 revised); identity mirrored into `public.users` (id = auth uid) + `auth_identities`; active org resolved live per request via `app_user_memberships` SECURITY DEFINER fn (org no longer in the token). RBAC (§5), invitations (§6), `hd` domain-join (§7), and GUC-RLS isolation (§4) unchanged. |

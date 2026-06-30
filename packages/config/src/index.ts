@@ -12,13 +12,31 @@ import { z } from "zod";
  * This is the MVP subset; service-specific vars (Google/GitHub/LLM/JWT secret
  * refs, etc.) are added per docs/17 §6.1 as their sprints land.
  */
+// `.env` files (and dotenv) yield "" for a blank `KEY=` line — a *present* empty
+// string, which would fail `.url()`/`.min(1)` on an otherwise-optional var. These
+// helpers coerce blank/whitespace to `undefined` so "unset" and "set to blank" are
+// the same thing (a common, expected operator mistake — fail soft, not at boot).
+const blankToUndefined = (v: unknown): unknown =>
+  typeof v === "string" && v.trim() === "" ? undefined : v;
+const optionalUrl = z.preprocess(blankToUndefined, z.string().url().optional());
+const optionalString = z.preprocess(blankToUndefined, z.string().min(1).optional());
+
 export const EnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().max(65535).default(3000),
   LOG_LEVEL: z.enum(["error", "warn", "info", "debug"]).default("info"),
-  DATABASE_URL: z.string().url().optional(),
-  REDIS_URL: z.string().url().optional(),
-  OPENSEARCH_URL: z.string().url().optional(),
+  DATABASE_URL: optionalUrl,
+  REDIS_URL: optionalUrl,
+  OPENSEARCH_URL: optionalUrl,
+
+  // Supabase Auth (docs/12 §2–3, F1.5). The API verifies user access JWTs against
+  // Supabase's JWKS (ES256) — derived from SUPABASE_URL — and mints no tokens of its
+  // own. SUPABASE_JWT_SECRET is the HS256 fallback only (projects without asymmetric
+  // signing keys). SERVICE_ROLE_KEY is server-only and bypasses RLS (docs/13).
+  SUPABASE_URL: optionalUrl,
+  SUPABASE_ANON_KEY: optionalString,
+  SUPABASE_SERVICE_ROLE_KEY: optionalString,
+  SUPABASE_JWT_SECRET: optionalString,
 });
 
 export type Env = z.infer<typeof EnvSchema>;
