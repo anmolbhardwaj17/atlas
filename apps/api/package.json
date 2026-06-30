@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@atlas/config": "workspace:*",
+    "@atlas/connector-sdk": "workspace:*",
     "@atlas/db": "workspace:*",
+    "@atlas/ingest": "workspace:*",
     "@nestjs/common": "^11.0.1",
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-fastify": "^11.0.1",

@@ -35,9 +35,15 @@ importers:
       '@atlas/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@atlas/connector-sdk':
+        specifier: workspace:*
+        version: link:../../packages/connector-sdk
       '@atlas/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@atlas/ingest':
+        specifier: workspace:*
+        version: link:../../packages/ingest
       '@nestjs/common':
         specifier: ^11.0.1
         version: 11.1.27(reflect-metadata@0.2.2)(rxjs@7.8.2)

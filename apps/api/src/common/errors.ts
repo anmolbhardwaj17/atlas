@@ -13,6 +13,7 @@ export type ApiErrorCode =
   | "validation_failed"
   | "already_exists"
   | "invalid_state_transition"
+  | "connection_verification_failed"
   | "rate_limited"
   | "internal_error";
 

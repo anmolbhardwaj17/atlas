@@ -3,13 +3,14 @@ import { APP_FILTER, APP_INTERCEPTOR } from "@nestjs/core";
 import { CoreModule } from "./core/core.module";
 import { AuthModule } from "./auth/auth.module";
 import { OrgsModule } from "./orgs/orgs.module";
+import { ConnectionsModule } from "./connections/connections.module";
 import { HealthController } from "./health/health.controller";
 import { ResponseInterceptor } from "./common/response.interceptor";
 import { HttpExceptionFilter } from "./common/http-exception.filter";
 
 /** Root module. Feature modules (connections, graph, …) are added per the docs/02 module map. */
 @Module({
-  imports: [CoreModule, AuthModule, OrgsModule],
+  imports: [CoreModule, AuthModule, OrgsModule, ConnectionsModule],
   controllers: [HealthController],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },
