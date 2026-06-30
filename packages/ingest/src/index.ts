@@ -7,3 +7,14 @@ export { InMemorySecretBroker } from "./secret-broker";
 export type { SecretBroker } from "./secret-broker";
 export { MockConnector } from "./mock-connector";
 export type { MockResource, MockScope, MockControl } from "./mock-connector";
+export { InMemoryQueue } from "./queue";
+export type { Job, JobHandler, JobQueue } from "./queue";
+export { BullMQQueue } from "./bullmq-queue";
+export {
+  SYNC_QUEUE,
+  syncJobId,
+  createSyncHandler,
+  registerSyncWorker,
+  enqueueSync,
+} from "./sync-worker";
+export type { SyncJobData, SyncWorkerDeps } from "./sync-worker";

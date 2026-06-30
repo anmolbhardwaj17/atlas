@@ -6,5 +6,8 @@ export default defineConfig({
   test: {
     testTimeout: 30000,
     hookTimeout: 30000,
+    // Integration files share one Postgres + global vocab (node_kinds); run them
+    // sequentially so teardown of one can't race another.
+    fileParallelism: false,
   },
 });
