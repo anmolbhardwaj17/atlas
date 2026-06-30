@@ -16,7 +16,7 @@
 **Progress at a glance**
 - 📘 Blueprint (docs): **19 / 19 ✅ (100%)**
 - 🧰 Project setup: **✅ done** (CLAUDE.md, README, board, skills, memory, git+GitHub)
-- 🏗️ Build: **F1 in progress** — F1.1 scaffold ✅, F1.2 CI ✅, F1.3 app shells ✅; next **F1.4** (Google OAuth login + sessions/JWT)
+- 🏗️ Build: **F1 in progress** — F1.1 ✅, F1.2 CI ✅, F1.3 shells ✅, F1.4 DB+RLS ✅; next **F1.5** (Supabase Auth / Google — rewrite `docs/12` §2–3 first)
 
 ---
 
@@ -76,7 +76,7 @@
 |---|---|---|---|---|
 | F1.1 | Monorepo scaffold + shared tooling + `config` package | ✅ | 16 §2/§4, 17 §6 | pnpm workspaces + strict TS + eslint(no-any) + prettier + vitest. `@atlas/config` (Zod env, parse-don't-validate). **All gates green: format/lint/typecheck/6 tests.** |
 | F1.2 | CI gate harness (lint/typecheck/test) | ✅ | 14 §16, 17 §5 | GitHub Actions `.github/workflows/ci.yml`: pnpm + Node 22, format/lint/typecheck/test on push to main + PRs. **First run green (22s).** Badge on README. Heavier stages (integration/contract/adversarial-QA/E2E/load) added in later sprints. |
-| F1.4 | DB foundation: Postgres + Kysely + migrations + core tables + RLS | 📋 | 04, 13 §6, 17 | **NEXT.** Kysely + SQL migrations; tables organizations/users/auth_identities/memberships/invitations; GUC-RLS (`atlas.current_org`); restricted app role. Standard Postgres → runs on Supabase. Verify isolation vs local/throwaway Postgres. |
+| F1.4 | DB foundation: Postgres + Kysely + migrations + core tables + RLS | ✅ | 04, 13 §6, 17 | `@atlas/db`: Kysely + pg, typed schema, 5 core tables (orgs/users/auth_identities/memberships/invitations), `atlas_app` restricted role + RLS policies, `withOrgScope` GUC helper, migration runner. **RLS isolation test passes (3/3) against real Postgres** (org A↔B + fail-closed). `docker-compose.yml`+`.env.example` added. Caught + fixed a real pooled-connection RLS bug (`NULLIF` empty-string → docs/04 §10 updated). Standard Postgres → Supabase-ready. CI integration job (Postgres service) = follow-up (F1.7). |
 | F1.5 | Supabase Auth (Google) integration + session/JWT verify | 📋 | 12 | Supabase-hosted Google login; NestJS verifies Supabase JWT (JWKS); mirror `users` from `auth.users`. **Rewrite `docs/12` §2–3 first.** |
 | F1.6 | Org / RBAC / memberships / invitations (endpoints + guards) | 📋 | 12, 03, 08 | tenant-scope guard sets the GUC |
 | F1.7 | Tenant-isolation test (US-12 foundation) | 📋 | 04 §10, 13 §6 | RLS cross-org test; expands to graph in G sprints |
@@ -146,6 +146,7 @@
 
 | Date | Who | What |
 |---|---|---|
+| 2026-06-30 | architect | **F1.4 ✅** — `@atlas/db` (Kysely + pg): 5 core tables, `atlas_app` role + RLS, `withOrgScope` GUC helper, migration runner. RLS isolation test 3/3 vs real Postgres. Caught+fixed a pooled-connection RLS bug (`NULLIF`, docs/04 §10). |
 | 2026-06-30 | architect | **Decision: adopt Supabase** (managed Postgres + Auth/Google + Storage). Backend/graph/AI unchanged; keep GUC-RLS isolation. Recorded in CLAUDE.md + memory; banners added to docs 02/04/12/13/17. Reordered F1 to DB-first. |
 | 2026-06-30 | architect | **F1.3 ✅** — NestJS API shell (Fastify, `/health` boots OK) + Next.js 15 web shell + Turborepo build orchestration. `@atlas/config` → CJS dist consumed at runtime. All gates green. |
 | 2026-06-30 | architect | **F1.2 ✅** — GitHub Actions CI (`ci.yml`) running format/lint/typecheck/test on push to main. First run green (22s). README badge added. |

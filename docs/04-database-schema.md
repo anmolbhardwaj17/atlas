@@ -643,9 +643,15 @@ Defense-in-depth, three layers:
 -- RLS backstop (13 details the role/GUC model)
 ALTER TABLE nodes ENABLE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation_nodes ON nodes
-    USING (org_id = current_setting('atlas.current_org', true)::uuid);
+    USING (org_id = NULLIF(current_setting('atlas.current_org', true), '')::uuid);
 -- ...applied identically to edges, provenance, sync_runs, connections, audit_events, raw_snapshots.
 -- The app sets: SET LOCAL atlas.current_org = '<org-uuid>'; at request/job start (12/13).
+--
+-- WHY NULLIF(..., '') and not just ::uuid (verified against Postgres, F1.4):
+-- a custom GUC set via SET LOCAL in one transaction RESETS TO '' (empty string,
+-- not NULL) for the next transaction on a POOLED connection. A bare ''::uuid
+-- throws "invalid input syntax for type uuid". NULLIF maps both unset (NULL) and
+-- reset ('') to NULL → org_id = NULL matches nothing → fail-closed, no error.
 ```
 
 > **DD-7 — RLS as a backstop, not the primary mechanism.** App-layer scoping is the fast, testable primary; RLS guarantees that *any* future missing `WHERE org_id=` still cannot leak data. A leak requires both layers to fail simultaneously (R8 is existential — this redundancy is justified).

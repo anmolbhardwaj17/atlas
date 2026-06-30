@@ -1,0 +1,22 @@
+# Local development infra (docs/17 §2). Postgres for now; Redis/OpenSearch/MinIO
+# are added in their sprints (F2 / search). For hosted dev you can instead point
+# DATABASE_URL at a Supabase project (docs/17).
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: atlas
+    ports:
+      - "5432:5432"
+    volumes:
+      - atlas_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d atlas"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  atlas_pg:
