@@ -168,11 +168,14 @@ flowchart TB
 ### 6.1 Key environment variables (illustrative; full set in `packages/config`)
 | Var | Purpose |
 |---|---|
-| `DATABASE_URL` | Postgres (prod via secret) |
+| `DATABASE_URL` | **Supabase** Postgres connection (pooler for app/workers; direct URL for migrations) |
+| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | Supabase project (Auth + Storage, `12`) |
+| `SUPABASE_SERVICE_ROLE_KEY(ref)` | server-side Supabase admin (Storage, user-mirror); **never** sent to the client |
+| `SUPABASE_JWT_SECRET(ref)` | verify Supabase-issued session JWTs in NestJS (`12`) |
 | `REDIS_URL` | cache + queue |
 | `OPENSEARCH_URL` | search |
 | `S3_BUCKET` / `S3_ENDPOINT` | raw snapshots (MinIO local) |
-| `GOOGLE_OAUTH_CLIENT_ID` / `…_SECRET(ref)` | login (`12`) |
+| Google OAuth client | configured **in the Supabase dashboard** (Auth → Providers → Google), not app env (`12`) |
 | `GITHUB_APP_ID` / `…_PRIVATE_KEY(ref)` / `…_WEBHOOK_SECRET(ref)` | connector (`07`) |
 | `AWS_ATLAS_PRINCIPAL_ARN` | the principal customers trust (`06`/`13`) |
 | `LLM_PROVIDER` / `LLM_API_KEY(ref)` / `LLM_MODEL` | AI (`10`) |
@@ -219,7 +222,8 @@ flowchart TB
 | **webhook-ingress** | small, ≥2 | RPS (thin: verify+enqueue, `07`) |
 | **scheduler** | singleton, leader-elected | n/a (idempotent jobs tolerate double-fire, P7) |
 | **web** | small, ≥2 | RPS |
-| **PostgreSQL** | Aurora/RDS Multi-AZ, read replica for read-heavy traversals (`04` §14) | vertical + replicas; partitioning later (`04` §14) |
+| **PostgreSQL** | **Supabase** managed Postgres (MVP) — Multi-AZ/PITR via Supabase; read replicas later (`04` §14) | Supabase plan tiers → self-managed/Aurora only if we outgrow Supabase (portable; standard Postgres) |
+| **Auth + Storage** | **Supabase** Auth (Google) + Storage (raw snapshots) | managed; sub-processor (`13`) |
 | **Redis** | ElastiCache, HA | memory; cluster mode if queues grow |
 | **OpenSearch** | managed, sharded by org routing (`11`) | shards/nodes per data volume |
 | **S3** | standard | usage |

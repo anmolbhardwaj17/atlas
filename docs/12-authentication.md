@@ -8,6 +8,8 @@
 
 ---
 
+> **⚠️ DECISION UPDATE (2026-06-30): Supabase Auth adopted as the Google IdP.** Login/identity is now handled by **Supabase Auth (Google provider, free tier)** instead of a hand-rolled Google OIDC + JWT/session stack. **What changes:** §2 (the login flow becomes Supabase-hosted OAuth → Supabase issues the session JWT) and §3 (sessions/refresh are Supabase-managed; NestJS *verifies* the Supabase JWT via JWKS rather than minting its own). **What stays:** the RBAC model (§5), org/membership/invitations (§6), the **`hd`-claim domain-join** design (§7, the `hd` flows through Supabase's Google identity), and — critically — **our GUC-based tenant isolation** (`atlas.current_org` + RLS, §4): NestJS connects to Supabase Postgres as a restricted role and sets the org GUC per request/job. We do **not** use Supabase's `auth.uid()`-in-RLS pattern. A local `public.users` row mirrors Supabase `auth.users` (id = auth uid) so `docs/03`/`docs/04` identity model is preserved. This banner records the decision; §2–§3 are rewritten in full when F1.4 is built (docs-before-code).
+
 ## Purpose
 
 This document specifies **how users prove who they are (authentication)** and **what they're allowed to do (authorization)** in Atlas: the Google-OAuth login flow, session/JWT strategy, RBAC, organization membership, invitations, and — designed now, built Phase 1 — **domain-based organization membership** ("company-email auto-join"). It also fixes the boundary between **login identity** (how a human signs in) and **connector identity** (how Atlas reaches a customer's AWS/GitHub — `06`/`07`), which are deliberately separate.

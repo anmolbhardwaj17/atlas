@@ -8,6 +8,8 @@
 
 ---
 
+> **⚠️ DECISION UPDATE (2026-06-30): Supabase for managed Postgres + Auth + Storage.** The Data Plane's PostgreSQL is **Supabase** (standard Postgres — the graph-shaped schema and DD-8 reasoning are unchanged), the login IdP is **Supabase Auth (Google)** (`12`), and raw snapshots use **Supabase Storage** (in place of S3 for MVP). Everything else in this doc — the modular monolith, worker plane, connectors, OpenSearch, Redis/BullMQ, AI engine, the five planes — is **unchanged**. Tenant isolation keeps the app-set `atlas.current_org` GUC + RLS model (§3.3/§9.1), not Supabase `auth.uid()`.
+
 ## Purpose
 
 This document defines the **end-to-end technical architecture** of Atlas: the services, their responsibilities and boundaries, how data flows from a customer's AWS/GitHub into the knowledge graph and back out through exploration and AI, the technology choices and *why* each was made, and the deployment/infrastructure topology.

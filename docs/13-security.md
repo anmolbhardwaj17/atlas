@@ -8,6 +8,8 @@
 
 ---
 
+> **⚠️ DECISION UPDATE (2026-06-30): Supabase is a sub-processor.** Login/identity is **Supabase Auth (Google)**; Postgres + blob storage are Supabase-managed. Security implications: (1) **token validation** (§ STRIDE Spoofing) becomes "verify the Supabase-issued session JWT via Supabase JWKS" instead of validating a Google OIDC token directly — same rigor, different issuer; (2) Supabase joins the **sub-processor list** (§14) — it is SOC 2 Type II, which *helps* Persona E; (3) tenant isolation is **unchanged** — we keep the 3-layer app+FK+RLS model with `atlas.current_org` (§6), not Supabase `auth.uid()`; (4) the `SUPABASE_SERVICE_ROLE_KEY` is a C1 secret (Broker-only, never client-exposed, §7). Read-only-to-customer-cloud (§4/§5) is untouched.
+
 ## Purpose
 
 This document is the **single security source of truth** for Atlas and the document **Persona E (the customer's security/compliance reviewer) reads end-to-end before approving adoption**. Atlas connects to customers' **production cloud accounts and source code** — a single security failure is existential (`00` R2, G4). This document specifies the threat model, the controls that mitigate each threat, and the guarantees we make.

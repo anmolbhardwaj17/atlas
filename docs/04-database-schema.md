@@ -20,6 +20,8 @@ Every table here maps to a `03` entity; every `CHECK`/`UNIQUE`/`FK` enforces a `
 
 **Out of scope (pointers):** Graph *semantics*/traversal algorithms and inference rule logic → `05`; OpenSearch index mappings → `11`; secret *storage* internals → `13`; backup/restore ops and PITR runbook → `17`; provider-specific attribute mapping → `06`/`07`.
 
+> **⚠️ DECISION UPDATE (2026-06-30): Postgres is hosted on Supabase.** This is **standard Postgres** — every table/constraint/index/RLS policy here is unchanged and portable (no Supabase-specific schema). Notes: (1) the app/workers connect as a **restricted role** and set `atlas.current_org` (RLS §10) — we keep this model, not Supabase's `auth.uid()` pattern; (2) `users` mirrors Supabase `auth.users` (`users.id` = the Supabase auth uid), populated on signup — so the identity model (`03`) is preserved while Supabase Auth owns the credential flow (`12`); (3) migrations run via Kysely's migrator against the Supabase connection string (pooler for app, direct for migrations). Local dev verifies against a local/throwaway Postgres (identical).
+
 ## Assumptions
 
 Inherits `00`/`01`/`02`/`03`. Schema-specific:

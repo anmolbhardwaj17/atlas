@@ -76,9 +76,10 @@
 |---|---|---|---|---|
 | F1.1 | Monorepo scaffold + shared tooling + `config` package | ✅ | 16 §2/§4, 17 §6 | pnpm workspaces + strict TS + eslint(no-any) + prettier + vitest. `@atlas/config` (Zod env, parse-don't-validate). **All gates green: format/lint/typecheck/6 tests.** |
 | F1.2 | CI gate harness (lint/typecheck/test) | ✅ | 14 §16, 17 §5 | GitHub Actions `.github/workflows/ci.yml`: pnpm + Node 22, format/lint/typecheck/test on push to main + PRs. **First run green (22s).** Badge on README. Heavier stages (integration/contract/adversarial-QA/E2E/load) added in later sprints. |
-| F1 | Google OAuth login + sessions/JWT | 📋 | 12 | sole login method (MVP) |
-| F1 | Org create/RBAC/memberships/invitations | 📋 | 12, 03 | Owner/Admin/Member |
-| F1 | 3-layer tenant isolation incl. RLS | 📋 | 04 §10, 13 §6 | **US-12 test must pass** |
+| F1.4 | DB foundation: Postgres + Kysely + migrations + core tables + RLS | 📋 | 04, 13 §6, 17 | **NEXT.** Kysely + SQL migrations; tables organizations/users/auth_identities/memberships/invitations; GUC-RLS (`atlas.current_org`); restricted app role. Standard Postgres → runs on Supabase. Verify isolation vs local/throwaway Postgres. |
+| F1.5 | Supabase Auth (Google) integration + session/JWT verify | 📋 | 12 | Supabase-hosted Google login; NestJS verifies Supabase JWT (JWKS); mirror `users` from `auth.users`. **Rewrite `docs/12` §2–3 first.** |
+| F1.6 | Org / RBAC / memberships / invitations (endpoints + guards) | 📋 | 12, 03, 08 | tenant-scope guard sets the GUC |
+| F1.7 | Tenant-isolation test (US-12 foundation) | 📋 | 04 §10, 13 §6 | RLS cross-org test; expands to graph in G sprints |
 | F1.3 | App shells: NestJS API + Next.js web + Turborepo | ✅ | 02, 09, 16, 17 | `apps/api` (Nest+Fastify, `/health` ✅ boots) + `apps/web` (Next 15/React 19 shell) + Turborepo build orchestration. `@atlas/config` now builds to CJS, consumed by API at runtime. All gates green. **Note:** full structured-logging/correlation-id observability package deferred to a follow-up (basic Nest logger for now). |
 | F2 | Connector SDK interface + queue/worker/scheduler | 📋 | 06 §3, 02 §5 | BullMQ, the fork point |
 | F2 | Secrets Broker + Secrets Manager | 📋 | 13 §7 | |
@@ -145,6 +146,7 @@
 
 | Date | Who | What |
 |---|---|---|
+| 2026-06-30 | architect | **Decision: adopt Supabase** (managed Postgres + Auth/Google + Storage). Backend/graph/AI unchanged; keep GUC-RLS isolation. Recorded in CLAUDE.md + memory; banners added to docs 02/04/12/13/17. Reordered F1 to DB-first. |
 | 2026-06-30 | architect | **F1.3 ✅** — NestJS API shell (Fastify, `/health` boots OK) + Next.js 15 web shell + Turborepo build orchestration. `@atlas/config` → CJS dist consumed at runtime. All gates green. |
 | 2026-06-30 | architect | **F1.2 ✅** — GitHub Actions CI (`ci.yml`) running format/lint/typecheck/test on push to main. First run green (22s). README badge added. |
 | 2026-06-30 | architect | Adopted **main-only git workflow** (no branches/PRs yet; `dev` later). Cleaned history to 2 commits, no AI attribution. F1.1 on `main`. |

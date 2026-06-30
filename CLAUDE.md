@@ -54,7 +54,9 @@ Atlas is an **AI-powered Engineering Intelligence Platform**. It connects to a c
 8. **Make illegal states unrepresentable.** Invariants (the `BR-x` rules) as types + DB constraints, not runtime checks (`docs/16` DD-2).
 9. **Definition of Done** (`docs/15` §5) + the `docs/14` quality gates (incl. the **adversarial QA agent**) apply to every unit of work.
 
-**Stack (fixed):** TypeScript everywhere · NestJS (API + worker) · Next.js + shadcn/ui · PostgreSQL (graph-shaped, migration-ready) · OpenSearch (hybrid search) · Redis/BullMQ (queue) · S3 · ECS Fargate · Google OAuth login · Claude (LLM, behind a provider abstraction).
+**Stack (fixed):** TypeScript everywhere · NestJS (API + worker) · Next.js + shadcn/ui · **Supabase Postgres** (graph-shaped, migration-ready; standard Postgres — no data-layer lock-in) · **Supabase Auth (Google)** for login · **Supabase Storage** (raw snapshots) · OpenSearch (hybrid search) · Redis/BullMQ (queue) · ECS Fargate (API/workers) · Claude (LLM, behind a provider abstraction).
+
+**DB/auth access model (important):** we use Supabase for **managed Postgres + Auth + Storage only**; NestJS/workers/connectors/inference/OpenSearch/Redis/AI are unchanged. Tenant isolation keeps **our** model: app connects as a restricted Postgres role and sets `atlas.current_org` GUC per request/job; RLS enforces (`docs/04` §10). We do **not** use Supabase's `auth.uid()`-in-RLS pattern (Atlas data is org-scoped and written by system workers, not per-user). Supabase Auth is for login/identity; our GUC-RLS is for data isolation.
 
 ---
 
@@ -77,6 +79,7 @@ Atlas is an **AI-powered Engineering Intelligence Platform**. It connects to a c
 | **Domain/enterprise join** | **Company-email auto-join via Google Workspace `hd` claim** (no DNS needed) — **Phase 1**, data captured from MVP | `docs/12` §7 |
 | **Frontend kit** | **shadcn/ui** + its **MCP server** for component vendoring (build-time only) | `docs/09` DD-3, `docs/16` §6.1 |
 | **QA philosophy** | Gold-standard coding (`16`) + an **independent adversarial QA agent** in CI that tries to *break* features on every PR | `docs/14` §7–8 |
+| **Supabase** | Adopted for **managed Postgres + Auth (Google, free) + Storage**. Backend/graph/AI unchanged. Keep our GUC-RLS isolation, not Supabase `auth.uid()`. Supabase = a sub-processor (SOC 2). Full `docs/12` auth rewrite happens at F1.4. | `docs/12`, `02/04/13/17` |
 
 ---
 
