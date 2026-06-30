@@ -68,6 +68,15 @@ suite("F1.6 org-scoped RLS + resolvers", () => {
        VALUES ($1, $2, 'Member', $3, now() + interval '7 days')`,
       [orgB, "other@example.com", hash(randomUUID())],
     );
+
+    await admin.query(
+      "INSERT INTO connections (org_id, provider, display_name) VALUES ($1, 'aws', 'A prod')",
+      [orgA],
+    );
+    await admin.query(
+      "INSERT INTO connections (org_id, provider, display_name) VALUES ($1, 'github', 'B repos')",
+      [orgB],
+    );
   });
 
   afterAll(async () => {
@@ -106,6 +115,21 @@ suite("F1.6 org-scoped RLS + resolvers", () => {
     );
     expect(rows.length).toBe(1);
     expect(first(rows).org_id).toBe(orgA);
+  });
+
+  it("connections: the app sees only the scoped org's connections", async () => {
+    const a = await withOrgScope(
+      app,
+      orgA,
+      async (c) => (await c.query<{ provider: string }>("SELECT provider FROM connections")).rows,
+    );
+    expect(a.map((r) => r.provider)).toEqual(["aws"]);
+    const b = await withOrgScope(
+      app,
+      orgB,
+      async (c) => (await c.query<{ provider: string }>("SELECT provider FROM connections")).rows,
+    );
+    expect(b.map((r) => r.provider)).toEqual(["github"]);
   });
 
   it("app_user_memberships resolves a user's orgs across tenants (SECURITY DEFINER)", async () => {

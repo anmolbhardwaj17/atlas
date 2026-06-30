@@ -63,3 +63,43 @@ export interface InvitationRow {
   created_at: Date;
   expires_at: Date;
 }
+
+// Ingest substrate (docs/04 §5.2, F2). `connections` = source links; `sync_runs` =
+// crawl executions (the unit of freshness/history).
+export type ConnectionProvider = "aws" | "github";
+export type ConnectionStatus =
+  "pending" | "verifying" | "connected" | "degraded" | "error" | "disconnected";
+export type SyncRunType = "full" | "incremental" | "webhook";
+export type SyncRunStatus = "queued" | "running" | "succeeded" | "partial" | "failed" | "cancelled";
+export type SyncTrigger = "scheduled" | "manual" | "onboarding" | "webhook";
+
+export interface ConnectionRow {
+  id: string;
+  org_id: string;
+  provider: ConnectionProvider;
+  display_name: string;
+  status: ConnectionStatus;
+  config: Record<string, unknown>;
+  secret_ref: string | null;
+  health: Record<string, unknown>;
+  last_error: string | null;
+  last_synced_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+  deleted_at: Date | null;
+}
+
+export interface SyncRunRow {
+  id: string;
+  org_id: string;
+  connection_id: string;
+  type: SyncRunType;
+  status: SyncRunStatus;
+  trigger: SyncTrigger;
+  checkpoint: Record<string, unknown>;
+  stats: Record<string, unknown>;
+  scope_result: Record<string, unknown>;
+  started_at: Date | null;
+  finished_at: Date | null;
+  created_at: Date;
+}
