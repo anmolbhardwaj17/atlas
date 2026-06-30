@@ -9,6 +9,7 @@ build/
 out/
 coverage/
 .turbo/
+*.tsbuildinfo
 
 # Environment & secrets (NEVER commit — see docs/13)
 .env

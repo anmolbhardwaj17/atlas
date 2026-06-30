@@ -16,7 +16,7 @@
 **Progress at a glance**
 - 📘 Blueprint (docs): **19 / 19 ✅ (100%)**
 - 🧰 Project setup: **✅ done** (CLAUDE.md, README, board, skills, memory, git+GitHub)
-- 🏗️ Build: **F1 in progress** — F1.1 scaffold ✅, F1.2 CI ✅; next **F1.3** (NestJS API + Next.js web shells)
+- 🏗️ Build: **F1 in progress** — F1.1 scaffold ✅, F1.2 CI ✅, F1.3 app shells ✅; next **F1.4** (Google OAuth login + sessions/JWT)
 
 ---
 
@@ -79,7 +79,7 @@
 | F1 | Google OAuth login + sessions/JWT | 📋 | 12 | sole login method (MVP) |
 | F1 | Org create/RBAC/memberships/invitations | 📋 | 12, 03 | Owner/Admin/Member |
 | F1 | 3-layer tenant isolation incl. RLS | 📋 | 04 §10, 13 §6 | **US-12 test must pass** |
-| F1 | App shell (NestJS API + Next.js) + observability baseline | 📋 | 02, 09, 17 | |
+| F1.3 | App shells: NestJS API + Next.js web + Turborepo | ✅ | 02, 09, 16, 17 | `apps/api` (Nest+Fastify, `/health` ✅ boots) + `apps/web` (Next 15/React 19 shell) + Turborepo build orchestration. `@atlas/config` now builds to CJS, consumed by API at runtime. All gates green. **Note:** full structured-logging/correlation-id observability package deferred to a follow-up (basic Nest logger for now). |
 | F2 | Connector SDK interface + queue/worker/scheduler | 📋 | 06 §3, 02 §5 | BullMQ, the fork point |
 | F2 | Secrets Broker + Secrets Manager | 📋 | 13 §7 | |
 | F2 | Connections + sync_runs lifecycle + S3 snapshots | 📋 | 03, 04, 08 §8 | |
@@ -145,6 +145,7 @@
 
 | Date | Who | What |
 |---|---|---|
+| 2026-06-30 | architect | **F1.3 ✅** — NestJS API shell (Fastify, `/health` boots OK) + Next.js 15 web shell + Turborepo build orchestration. `@atlas/config` → CJS dist consumed at runtime. All gates green. |
 | 2026-06-30 | architect | **F1.2 ✅** — GitHub Actions CI (`ci.yml`) running format/lint/typecheck/test on push to main. First run green (22s). README badge added. |
 | 2026-06-30 | architect | Adopted **main-only git workflow** (no branches/PRs yet; `dev` later). Cleaned history to 2 commits, no AI attribution. F1.1 on `main`. |
 | 2026-06-30 | architect | **F1.1 ✅** — monorepo scaffold (pnpm workspaces, strict TS, eslint/prettier, vitest) + `@atlas/config` (Zod env). All gates green. |

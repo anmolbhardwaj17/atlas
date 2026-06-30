@@ -77,6 +77,7 @@ atlas/
 - `api`/`worker` are the **imperative shells** that wire pure logic to IO.
 - `contracts` is the **single source of DTO truth** (api produces, web consumes — `08`/`09`).
 - A package may depend only on packages **below** it (enforced by an import-boundary lint rule, CS-4). No cycles.
+- **Build orchestration:** Turborepo runs tasks in dependency order — `typecheck`/`test`/`build` declare `dependsOn: ["^build"]` so upstream packages build first. Shared `packages/*` compile to **CommonJS `dist`** (consumed by the NestJS backend at runtime); `apps/web` (Next.js) builds via `next`. `pnpm run check` = format + lint + typecheck + test (the local mirror of CI, `17`).
 
 ---
 

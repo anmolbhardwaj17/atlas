@@ -1,7 +1,9 @@
 dist
 node_modules
 .next
+.turbo
 coverage
 pnpm-lock.yaml
+**/next-env.d.ts
 # Prose docs are hand-authored markdown; not Prettier-managed.
 **/*.md
