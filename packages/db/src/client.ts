@@ -1,33 +1,42 @@
-import { Kysely, PostgresDialect, sql, type Transaction } from "kysely";
-import { Pool } from "pg";
-import type { Database } from "./schema";
+import { Pool, type PoolClient } from "pg";
 
-export type Db = Kysely<Database>;
+/**
+ * Postgres access for Atlas — plain `pg`, no ORM/query-builder. Queries are raw
+ * parameterized SQL (docs/16 CS-6). Points at Supabase Postgres (session pooler)
+ * or any Postgres via DATABASE_URL.
+ */
 
-/** Create a Kysely client for the given Postgres connection string. */
-export function createDb(connectionString: string): Db {
-  return new Kysely<Database>({
-    dialect: new PostgresDialect({ pool: new Pool({ connectionString }) }),
-  });
+export type Db = Pool;
+
+export function createPool(connectionString: string): Pool {
+  return new Pool({ connectionString });
 }
 
 /**
- * Run `fn` inside a transaction scoped to a single organization (docs/04 §10,
- * docs/12 §4). Drops to the restricted `atlas_app` role and sets the
- * `atlas.current_org` GUC so PostgreSQL RLS enforces tenant isolation — the
- * backstop beneath app-layer org scoping. Both settings are transaction-local.
+ * Run `fn` inside a transaction scoped to one organization (docs/04 §10, docs/12 §4).
+ * Sets the `atlas.current_org` GUC (transaction-local) so PostgreSQL RLS enforces
+ * tenant isolation. The connection is rolled back on error and always returned.
  *
- * This is our isolation model (org-scoped, system-written), NOT Supabase's
- * `auth.uid()` pattern.
+ * REQUIRES the pool to be connected as the non-bypass `atlas_app` role (see
+ * migration 0002). Connecting as an owner/superuser/BYPASSRLS role would skip RLS.
+ * This is our org-scoped isolation model — NOT Supabase's `auth.uid()` pattern.
  */
 export async function withOrgScope<T>(
-  db: Db,
+  pool: Pool,
   orgId: string,
-  fn: (trx: Transaction<Database>) => Promise<T>,
+  fn: (client: PoolClient) => Promise<T>,
 ): Promise<T> {
-  return db.transaction().execute(async (trx) => {
-    await sql`SET LOCAL ROLE atlas_app`.execute(trx);
-    await sql`SELECT set_config('atlas.current_org', ${orgId}, true)`.execute(trx);
-    return fn(trx);
-  });
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('atlas.current_org', $1, true)", [orgId]);
+    const result = await fn(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
 }

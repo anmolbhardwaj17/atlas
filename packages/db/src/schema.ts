@@ -1,9 +1,7 @@
-import type { Generated } from "kysely";
-
 /**
- * Kysely table types for the core platform tables (docs/04 §5.1).
- * `Generated<T>` marks columns with DB-side defaults (optional on insert).
- * Graph tables (nodes/edges/...) are added in the G sprints.
+ * Row types for the core platform tables (docs/04 §5.1) — plain TypeScript
+ * interfaces describing what a SELECT returns. No ORM/query-builder; queries are
+ * raw parameterized SQL via `pg` (docs/16 CS-6). Graph tables come in the G sprints.
  */
 
 export type OrgStatus = "active" | "suspended" | "deleting";
@@ -13,63 +11,55 @@ export type MembershipStatus = "active" | "invited" | "revoked" | "requested";
 export type InvitationStatus = "pending" | "accepted" | "expired" | "revoked";
 export type AuthProvider = "google" | "password";
 
-export interface OrganizationsTable {
-  id: Generated<string>;
+export interface OrganizationRow {
+  id: string;
   slug: string;
   name: string;
-  plan: Generated<string>;
-  status: Generated<OrgStatus>;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
+  plan: string;
+  status: OrgStatus;
+  created_at: Date;
+  updated_at: Date;
   deleted_at: Date | null;
 }
 
-export interface UsersTable {
-  id: Generated<string>;
+export interface UserRow {
+  id: string;
   email: string;
   name: string | null;
   avatar_url: string | null;
-  status: Generated<UserStatus>;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
+  status: UserStatus;
+  created_at: Date;
+  updated_at: Date;
 }
 
-export interface AuthIdentitiesTable {
-  id: Generated<string>;
+export interface AuthIdentityRow {
+  id: string;
   user_id: string;
   provider: AuthProvider;
   provider_subject: string | null;
   email_domain: string | null;
   password_hash: string | null;
-  created_at: Generated<Date>;
+  created_at: Date;
 }
 
-export interface MembershipsTable {
-  id: Generated<string>;
+export interface MembershipRow {
+  id: string;
   org_id: string;
   user_id: string;
   role: Role;
-  status: Generated<MembershipStatus>;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
+  status: MembershipStatus;
+  created_at: Date;
+  updated_at: Date;
 }
 
-export interface InvitationsTable {
-  id: Generated<string>;
+export interface InvitationRow {
+  id: string;
   org_id: string;
   email: string;
   role: Exclude<Role, "Owner">;
   token_hash: string;
-  status: Generated<InvitationStatus>;
+  status: InvitationStatus;
   invited_by: string | null;
-  created_at: Generated<Date>;
+  created_at: Date;
   expires_at: Date;
-}
-
-export interface Database {
-  organizations: OrganizationsTable;
-  users: UsersTable;
-  auth_identities: AuthIdentitiesTable;
-  memberships: MembershipsTable;
-  invitations: InvitationsTable;
 }
