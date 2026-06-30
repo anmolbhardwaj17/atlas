@@ -1,11 +1,11 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { withOrgScope, type Db, type ConnectionRow } from "@atlas/db";
 import type { Connection } from "@atlas/connector-sdk";
-import type { SecretBroker } from "@atlas/ingest";
+import { enqueueSync, type SecretBroker, type JobQueue } from "@atlas/ingest";
 import { PG_POOL } from "../core/tokens";
 import { ApiException } from "../common/errors";
 import { ConnectorRegistry } from "./connector-registry";
-import { SECRET_BROKER } from "./tokens";
+import { SECRET_BROKER, JOB_QUEUE } from "./tokens";
 import type { ConnectionDto, CreateConnectionBody, VerifyConnectionBody } from "./dto";
 
 const SELECT_COLS = `id, org_id, provider, display_name, status, config, secret_ref, health,
@@ -14,14 +14,18 @@ const SELECT_COLS = `id, org_id, provider, display_name, status, config, secret_
 /**
  * Connection lifecycle (docs/08 §8, docs/03 §5.1). Org-scoped via withOrgScope (RLS).
  * Credentials go to the Secrets Broker (only the opaque secret_ref is stored, BR-CONN-1).
- * `verify` resolves the provider's connector from the registry; provider-specific
- * setup (AWS external-id / GitHub install URL) + initial-sync enqueue arrive in I1/I2/F2.5.
+ * `verify` resolves the provider's connector from the registry; on success it enqueues
+ * an onboarding full sync (docs/06 §11, FR-1.5). One in-flight run per connection
+ * (BR-SYNC-1) — a duplicate enqueue is a no-op.
  */
 @Injectable()
 export class ConnectionService {
+  private readonly logger = new Logger(ConnectionService.name);
+
   constructor(
     @Inject(PG_POOL) private readonly db: Db,
     @Inject(SECRET_BROKER) private readonly secrets: SecretBroker,
+    @Inject(JOB_QUEUE) private readonly queue: JobQueue,
     private readonly registry: ConnectorRegistry,
   ) {}
 
@@ -56,7 +60,7 @@ export class ConnectionService {
       newSecretRef = await this.secrets.put(orgId, body.credentials);
     }
 
-    return withOrgScope(this.db, orgId, async (c) => {
+    const dto = await withOrgScope(this.db, orgId, async (c) => {
       const row = await this.load(c, id);
       const connector = this.registry.get(row.provider);
       if (!connector) {
@@ -107,6 +111,42 @@ export class ConnectionService {
       );
       return toDto(rows[0]);
     });
+
+    // On a usable connection, kick off the onboarding full sync (FR-1.5).
+    if (dto.status === "connected" || dto.status === "degraded") {
+      await this.enqueueInitialSync(orgId, id);
+    }
+    return dto;
+  }
+
+  /**
+   * Create a queued onboarding sync_run and enqueue the job (docs/06 §11). BR-SYNC-1
+   * caps one in-flight run per connection via uq_sync_inflight; a conflicting insert
+   * (a run already queued/running) is swallowed — the existing run covers it.
+   */
+  private async enqueueInitialSync(orgId: string, connectionId: string): Promise<void> {
+    let runId: string | undefined;
+    try {
+      runId = await withOrgScope(this.db, orgId, async (c) => {
+        const { rows } = await c.query<{ id: string }>(
+          `INSERT INTO sync_runs (org_id, connection_id, type, trigger, status)
+           VALUES ($1, $2, 'full', 'onboarding', 'queued') RETURNING id`,
+          [orgId, connectionId],
+        );
+        return rows[0]?.id;
+      });
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      if (code === "23505") return; // BR-SYNC-1: a run is already in flight.
+      this.logger.error(`failed to create onboarding sync_run: ${(err as Error).message}`);
+      return;
+    }
+    if (!runId) return;
+    try {
+      await enqueueSync(this.queue, { orgId, connectionId, runId, type: "full" });
+    } catch (err) {
+      this.logger.error(`failed to enqueue onboarding sync: ${(err as Error).message}`);
+    }
   }
 
   async disconnect(orgId: string, id: string): Promise<ConnectionDto> {

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@atlas/config": "workspace:*",
+    "@atlas/connector-aws": "workspace:*",
     "@atlas/connector-sdk": "workspace:*",
     "@atlas/db": "workspace:*",
     "@atlas/ingest": "workspace:*",

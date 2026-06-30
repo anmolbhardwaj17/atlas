@@ -1,38 +1,51 @@
 import { Module, type Provider } from "@nestjs/common";
-import { InMemorySecretBroker, MockConnector } from "@atlas/ingest";
+import {
+  InMemorySecretBroker,
+  InMemoryQueue,
+  MockConnector,
+  type SecretBroker,
+} from "@atlas/ingest";
+import { createAwsConnector } from "@atlas/connector-aws";
 import { AuthModule } from "../auth/auth.module";
 import { ConnectionService } from "./connection.service";
 import { ConnectionController } from "./connection.controller";
 import { ConnectorRegistry } from "./connector-registry";
-import { SECRET_BROKER } from "./tokens";
+import { SECRET_BROKER, JOB_QUEUE } from "./tokens";
 
 /**
- * Connections (docs/08 §8, F2.8). Imports AuthModule for the guards.
+ * Connections (docs/08 §8). Imports AuthModule for the guards.
  *
  * The Secrets Broker is the in-memory dev impl (F2.6); AWS Secrets Manager is the
- * production impl (docs/13 §7). The ConnectorRegistry is seeded with PLACEHOLDER
- * connectors so the create→verify lifecycle is exercisable now — real AWS/GitHub
- * connectors replace these in I1/I2.
+ * production impl (docs/13 §7). The ConnectorRegistry now holds the REAL AwsConnector
+ * (I1) — verify runs a live AssumeRole + permission probe; GitHub stays a placeholder
+ * until I2. The JobQueue is the in-memory dev impl (F2.5); a BullMQ/Redis queue + a
+ * worker process run jobs in deploy (docs/02 §5) — the API only enqueues.
  */
 const secretBrokerProvider: Provider = {
   provide: SECRET_BROKER,
   useClass: InMemorySecretBroker,
 };
 
+const jobQueueProvider: Provider = {
+  provide: JOB_QUEUE,
+  useFactory: (): InMemoryQueue => new InMemoryQueue(),
+};
+
 const connectorRegistryProvider: Provider = {
   provide: ConnectorRegistry,
-  useFactory: (): ConnectorRegistry => {
+  useFactory: (secrets: SecretBroker): ConnectorRegistry => {
     const registry = new ConnectorRegistry();
-    // PLACEHOLDERS (verify returns "connected") until I1/I2 implement real connectors.
-    registry.register("aws", new MockConnector([]));
+    registry.register("aws", createAwsConnector({ secrets }));
+    // GitHub remains a placeholder (verify returns "connected") until I2.
     registry.register("github", new MockConnector([]));
     return registry;
   },
+  inject: [SECRET_BROKER],
 };
 
 @Module({
   imports: [AuthModule],
   controllers: [ConnectionController],
-  providers: [ConnectionService, secretBrokerProvider, connectorRegistryProvider],
+  providers: [ConnectionService, secretBrokerProvider, jobQueueProvider, connectorRegistryProvider],
 })
 export class ConnectionsModule {}

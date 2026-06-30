@@ -26,6 +26,8 @@ export interface SyncRunRecord {
 export interface SyncStats {
   discovered: number;
   persisted: number;
+  /** Resources whose content hash was unchanged since the last snapshot (docs/06 §6). */
+  unchanged: number;
   edges: number;
   staled: number;
   scopesOk: number;
@@ -74,6 +76,7 @@ export async function runStagedSync(
   const stats: SyncStats = {
     discovered: 0,
     persisted: 0,
+    unchanged: 0,
     edges: 0,
     staled: 0,
     scopesOk: 0,
@@ -127,9 +130,17 @@ export async function runStagedSync(
           stats.discovered++;
           const raw = await connector.fetchDetail(ref, ctx);
           const node = connector.normalize(raw);
-          const nodeId = await persistNode(c, run, connection, node, raw, snapshots);
+          const { id: nodeId, changed } = await persistNode(
+            c,
+            run,
+            connection,
+            node,
+            raw,
+            snapshots,
+          );
           urnToId.set(node.urn, nodeId);
           stats.persisted++;
+          if (!changed) stats.unchanged++;
           pendingEdges.push(...connector.observedEdges(raw));
         }
         for (const edge of pendingEdges) {
@@ -204,7 +215,7 @@ async function persistNode(
   node: NodeUpsert,
   raw: RawResource,
   snapshots: SnapshotStore,
-): Promise<string> {
+): Promise<{ id: string; changed: boolean }> {
   // Self-bootstrap the kind vocabulary so we don't need a separate seed step.
   await c.query(
     `INSERT INTO node_kinds (kind, provider, category, description)
@@ -243,6 +254,19 @@ async function persistNode(
 
   const payload = JSON.stringify(raw.payload);
   const contentHash = sha256(payload);
+
+  // Incremental: if this node already has a snapshot with the same content hash, the
+  // resource is unchanged — the upsert above refreshed last_seen; skip re-snapshot and
+  // re-provenance (and the storage write) and signal "unchanged" so downstream
+  // infer/index can be skipped too (docs/06 §6, §5.3).
+  const existing = await c.query(
+    "SELECT 1 FROM raw_snapshots WHERE org_id = $1 AND node_id = $2 AND content_hash = $3 LIMIT 1",
+    [run.orgId, nodeId, contentHash],
+  );
+  if ((existing.rowCount ?? 0) > 0) {
+    return { id: nodeId, changed: false };
+  }
+
   const storageRef = await snapshots.put(run.orgId, contentHash, payload);
   const snap = await c.query<{ id: string }>(
     `INSERT INTO raw_snapshots (org_id, node_id, storage_ref, content_hash, sync_run_id)
@@ -254,7 +278,7 @@ async function persistNode(
      VALUES ($1,$2,$3,'observed',$4)`,
     [run.orgId, raw.ref.externalId, run.id, snap.rows[0]?.id ?? null],
   );
-  return nodeId;
+  return { id: nodeId, changed: true };
 }
 
 async function persistEdge(

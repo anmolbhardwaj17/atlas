@@ -63,6 +63,13 @@ suite("F2 staged sync runner", () => {
     );
     return one(rows).n;
   };
+  const snapshotCount = async (): Promise<number> => {
+    const { rows } = await admin.query<{ n: number }>(
+      "SELECT count(*)::int AS n FROM raw_snapshots WHERE org_id = $1",
+      [orgId],
+    );
+    return one(rows).n;
+  };
 
   beforeAll(() => {
     admin = new Pool({ connectionString: adminUrl });
@@ -118,6 +125,19 @@ suite("F2 staged sync runner", () => {
     expect(res2.status).toBe("succeeded");
     expect(await count()).toBe(2);
     expect(await edgeCount()).toBe(1);
+  });
+
+  it("incremental: unchanged content hash skips re-snapshot (docs/06 §6)", async () => {
+    const mock = new MockConnector([{ key: "s1", resources: [r1, r2] }]);
+    const res1 = await runStagedSync(deps(), mock, conn(), await newRun());
+    expect(res1.stats.unchanged).toBe(0);
+    expect(await snapshotCount()).toBe(2);
+
+    // Re-run with identical payloads → both unchanged → no new snapshots written.
+    const res2 = await runStagedSync(deps(), mock, conn(), await newRun());
+    expect(res2.stats.persisted).toBe(2);
+    expect(res2.stats.unchanged).toBe(2);
+    expect(await snapshotCount()).toBe(2);
   });
 
   it("reaps resources that disappeared (marks stale on a clean sync)", async () => {
