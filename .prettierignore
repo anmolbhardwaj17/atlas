@@ -1,0 +1,7 @@
+dist
+node_modules
+.next
+coverage
+pnpm-lock.yaml
+# Prose docs are hand-authored markdown; not Prettier-managed.
+**/*.md
