@@ -16,7 +16,7 @@
 **Progress at a glance**
 - 📘 Blueprint (docs): **19 / 19 ✅ (100%)**
 - 🧰 Project setup: **✅ done** (CLAUDE.md, README, board, skills, memory, git+GitHub)
-- 🏗️ Build: **F1 ✅ + F2 ✅ COMPLETE** (Phase F done). F2.1–F2.8 all shipped: connections/sync_runs schema, frozen connector-sdk, graph persist schema, staged sync runner (exit proof), queue/worker runtime, secrets broker, **Supabase Storage snapshots**, connection API. **Next milestone: I1 (AWS crawler) ∥ I2 (GitHub crawler)** — implement the frozen SDK (`docs/06`/`07`).
+- 🏗️ Build: **F1 ✅ + F2 ✅ COMPLETE** (Phase F done). **Now in Phase I (Ingest):** I1 (AWS crawler) ∥ I2 (GitHub crawler) implement the frozen SDK (`docs/06`/`07`). **I1.1 ✅** — AWS connector foundation (`@atlas/connector-aws`: URN grammar + node-kind catalog; migration 0008 seeds vocab). Next: I1.2 (AssumeRole + verify + degraded).
 
 ---
 
@@ -102,11 +102,21 @@
 
 ---
 
-## EPIC I — 📥 Ingest — 📋 TODO  *(fill the graph; I1 ∥ I2 after F2)*
+## EPIC I — 📥 Ingest — 🔵 IN PROGRESS  *(fill the graph; I1 ∥ I2 after F2)*
+
+### Sprint I1 — AWS crawler *(`docs/06`)*
 
 | ID | Task | Status | Docs | Note |
 |---|---|---|---|---|
-| I1 | AWS crawler (AssumeRole, service catalog, full+incremental, degraded) | 📋 | 06, 13 §4 | parallel with I2 |
+| I1.1 | AWS connector foundation: package + URN grammar + node-kind vocab seed | ✅ | 05 §2/§3, 06 §4 | New `@atlas/connector-aws` (CJS, requireable by API). `awsUrn()` builds deterministic 5-segment URNs matching docs/05 §2.2 exactly (region-scoped + literal `global` for S3/Route53/IAM; natural key case-preserved). `AWS_NODE_KINDS` catalog (18 kinds + URN type/scope). Migration 0008 seeds `node_kinds` (24 = 18 AWS + 5 GitHub + 1 atlas) — global vocab needed before any node insert (FK). 9 unit tests; migration applied to live DB (verified counts). |
+| I1.2 | Credential provider (STS AssumeRole + externalId) + verify/health + permission detection → degraded | 📋 | 06 §2/§8, 13 §4 | next |
+| I1.3 | Service discoverers + pure normalize/extractSignals/observedEdges (golden fixtures) | 📋 | 06 §4/§5, 05, 14 §10 | 100% observed-edge precision |
+| I1.4 | Resilience (rate-limit/retry/pagination) + incremental hash-diff + wire into runner/registry/API | 📋 | 06 §7, 02 §5 | replaces MockConnector placeholder; enqueue-on-verify |
+
+### Sprint I2 — GitHub crawler *(`docs/07`)*
+
+| ID | Task | Status | Docs | Note |
+|---|---|---|---|---|
 | I2 | GitHub crawler (App, webhooks, deploy signals, CODEOWNERS, deps) | 📋 | 07, 13 §5 | parallel with I1 |
 
 **Exit (M1):** real AWS+GitHub → nodes + provenance; degraded reports missing perms; no false deletes.
@@ -159,6 +169,7 @@
 
 | Date | Who | What |
 |---|---|---|
+| 2026-07-01 | architect | **I1.1 DONE — AWS connector foundation (Phase I started).** New `@atlas/connector-aws` package (CommonJS so the CJS NestJS API can `require` it). `awsUrn()` builds the deterministic, recomputable 5-segment URN (`aws:<region\|global>:<account>:<type>:<key>`) matching every documented pattern in docs/05 §2.2 — region in scope for multi-account safety, literal `global` for S3/Route53/IAM, natural key case-preserved (Lambda/DynamoDB names are case-significant). `AWS_NODE_KINDS` catalog = the 18 MVP kinds (docs/05 §3.1 / docs/06 §4) with URN type discriminator + region/global scope. Migration **0008_node_kinds_seed** seeds `node_kinds` global vocab (24 rows = 18 AWS + 5 GitHub + 1 `atlas.service`) — required before any node insert (FK `nodes.kind`). Idempotent (ON CONFLICT DO NOTHING). 9 unit tests; applied to live DB (counts verified). Gates green. **Next: I1.2** (STS AssumeRole + verify + degraded permission detection). |
 | 2026-07-01 | architect | **Phase F COMPLETE — F2 (connector framework + secrets + queue) DONE.** F2.1 connections/sync_runs schema · F2.2 `@atlas/connector-sdk` (frozen Connector contract) · F2.3 graph persist schema (nodes/edges/provenance/raw_snapshots, composite-FK same-org edges, uq_edge NULLS NOT DISTINCT) · F2.4 `@atlas/ingest` staged sync runner + MockConnector (idempotent/resumable/BR-SYNC-2, exit proof) · F2.5 JobQueue (InMemory + BullMQ) + sync worker · F2.6 SecretBroker · F2.7 Supabase Storage snapshots (live round-trip) · F2.8 connection API (live create→verify→connected). New packages: `@atlas/connector-sdk`, `@atlas/ingest`. ~18 integration tests on live PG + Storage; CI green (check + integration jobs). **Next: I1 (AWS) ∥ I2 (GitHub) crawlers** implement the frozen SDK. |
 | 2026-07-01 | architect | **F1.7 CI Postgres integration job DONE — F1 Foundation epic COMPLETE.** Added CI `integration` job (postgres:16 service → migrations as owner → grant atlas_app LOGIN via `setup-app-role.ts` → env-gated integration tests with two-role + RLS). Expanded `org-scope.test.ts`: organizations org-scope + fail-closed, invitations cross-org isolation, `app_user_memberships`/`app_invitation_by_token` resolvers, write-guard negative. 9 integration tests pass on live PG; skip in the no-DB job (21 unit tests green). Updated docs/14 ref + ci.yml header. **Next: F2** per docs/15. |
 | 2026-07-01 | architect | **F1.6 Org / RBAC / memberships / invitations DONE — live-verified through the app.** Built `TenantScopeGuard` (active org + live role) + `@Roles`/`RolesGuard` (Owner>Admin>Member); orgs/members/invitations endpoints with BR-ORG-1 / BR-MEM-2/3 invariants; invitation accept by sha256-hashed capability token (never returned). Added `{data}`/`{error}` API envelopes (global interceptor + exception filter), zod validation, CORS. Migration 0005 (organizations org-scope RLS + `app_invitation_by_token` SECURITY DEFINER resolver). Synced docs/12 §5.2 + docs/08 §6. Frontend: create-org + org-management panel (members/invitations/invite). Verified live: real session → create org (Owner), invite (pending, hashed), members RLS-scoped read 200, last-Owner demote rejected (still Owner), cross-tenant 404. Unit tests RolesGuard+slug (api 15 tests). All gates green. |
