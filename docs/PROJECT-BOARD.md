@@ -146,6 +146,7 @@
 
 | Date | Who | What |
 |---|---|---|
+| 2026-07-01 | architect | **Google auth provider configured** (via Chrome): Google Cloud project + Google Auth Platform consent screen + OAuth client "Atlas Web" + redirect URI (Supabase callback) + test user added; **Supabase Google provider enabled** with real Client ID/secret. Prereq for F1.5 done. (Secrets in `.env`/dashboards only, never committed.) |
 | 2026-06-30 | architect | **F1.4 ✅** — `@atlas/db` (plain `pg`, **Kysely removed**): 5 core tables, SQL migration runner, `atlas_app` non-bypass role + RLS, `withOrgScope`. **Verified on live Supabase** (RLS 3/3). Decisions from real testing: session-pooler/IPv4, two-role model (postgres BYPASSRLS), `NULLIF` GUC. |
 | 2026-06-30 | architect | **Supabase project live** — connected, schema + RLS migrated to the real DB. `.env` set (app=atlas_app, migrations=postgres). Google provider + connection-string setup done via browser. |
 | 2026-06-30 | architect | **Decision: adopt Supabase** (managed Postgres + Auth/Google + Storage). Backend/graph/AI unchanged; keep GUC-RLS isolation. Recorded in CLAUDE.md + memory; banners added to docs 02/04/12/13/17. Reordered F1 to DB-first. |
