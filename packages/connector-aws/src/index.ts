@@ -11,3 +11,21 @@ export { awsUrn } from "./urn";
 export type { AwsUrnInput } from "./urn";
 export { AWS_NODE_KINDS, AWS_NODE_KIND_LIST, describeKind } from "./node-kinds";
 export type { AwsNodeKind, AwsKindDescriptor, AwsScopeKind } from "./node-kinds";
+export { AwsConnector } from "./aws-connector";
+export type { AwsConnectorDeps } from "./aws-connector";
+export { parseAwsConfig, accountFromArn } from "./config";
+export type { AwsConnectionConfig } from "./config";
+export {
+  StsCredentialProvider,
+  AssumeRoleError,
+  buildSessionName,
+  assumeRoleMessage,
+} from "./credentials";
+export type {
+  CredentialProvider,
+  AssumedRole,
+  AssumeRoleInput,
+  AwsTempCredentials,
+} from "./credentials";
+export { isAccessDenied } from "./permission-probe";
+export type { PermissionProbe, ProbeInput } from "./permission-probe";

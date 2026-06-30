@@ -16,9 +16,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@atlas/connector-sdk": "workspace:*"
+    "@atlas/connector-sdk": "workspace:*",
+    "@aws-sdk/client-sts": "^3.700.0"
   },
   "devDependencies": {
+    "aws-sdk-client-mock": "^4.1.0",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   }
