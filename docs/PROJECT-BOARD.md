@@ -87,11 +87,12 @@
 |---|---|---|---|---|
 | F2.1 | `connections` + `sync_runs` schema (migration + RLS + types) | ✅ | 04 §5.2, 03 §3.5/3.6 | Migration 0006: both tables with org-scoped RLS (`TO atlas_app`), `updated_at` trigger, **BR-SYNC-1** partial-unique in-flight index. Row types + enums in `@atlas/db`. Integration test: connections cross-org isolation (10 integration tests pass on live PG). |
 | F2.2 | `@atlas/connector-sdk` — frozen Connector contract | ✅ | 06 §3 (DD-1) | New pure-types package: `Connector` interface (verify/health/plan/discover/fetchDetail/normalize/extractSignals/observedEdges) + shared types (Connection, SyncRun, WorkPlan, Scope, ResourceRef, RawResource, NodeUpsert, Signal, EdgeUpsert, CrawlContext, SecretAccessor, VerifyResult). Provider union open (extensible). **Contract frozen in F2 (RMR-6).** |
-| F2.3 | BullMQ queue + worker runtime + scheduler | 📋 | 02 §5 | In-memory driver for tests; BullMQ/Redis driver for prod |
-| F2.4 | Secrets Broker (interface + dev impl) | 📋 | 13 §7 | `secret_ref` indirection; never store raw secrets |
-| F2.5 | Raw-snapshot store (Supabase Storage abstraction) | 📋 | 04 §5.4 | provenance + raw payloads (P4) |
-| F2.6 | Connection API skeleton | 📋 | 08 §8 | create/list/verify connections (Admin+) |
-| F2.7 | Mock connector + staged sync runner (EXIT) | 📋 | 06, 02 §5.2, BR-SYNC-2 | plan→discover→fetch→persist, idempotent/resumable, no false deletes |
+| F2.3 | Graph persist schema (nodes/edges/provenance/raw_snapshots/node_kinds/inference_rules) | ✅ | 04 §5.3–5.4, §6, 05 | Migration 0007: full knowledge schema + indexes + composite FKs (same-org edges, BR-EDGE-1) + provenance-required/inferred-needs-rule constraints; `uq_edge` **NULLS NOT DISTINCT** (observed-edge dedupe, doc synced). Org-scope RLS on nodes/edges/provenance/raw_snapshots; global vocab policy on node_kinds/inference_rules. Row types in `@atlas/db`. **graph-scope.test.ts** (4 tests): node/edge org isolation, cross-tenant edge structurally rejected, observed-edge dedupe. **14 integration tests pass on live PG.** |
+| F2.4 | Mock connector + staged sync runner (EXIT proof) | 📋 | 06, 02 §5.2, BR-SYNC-2 | plan→discover→fetch→persist, idempotent/resumable, no false deletes |
+| F2.5 | BullMQ queue + worker runtime + scheduler | 📋 | 02 §5 | In-memory driver for tests; BullMQ/Redis driver for prod |
+| F2.6 | Secrets Broker (interface + dev impl) | 📋 | 13 §7 | `secret_ref` indirection; never store raw secrets |
+| F2.7 | Raw-snapshot store (Supabase Storage abstraction) | 📋 | 04 §5.4 | provenance + raw payloads (P4) |
+| F2.8 | Connection API skeleton | 📋 | 08 §8 | create/list/verify connections (Admin+) |
 | F1.3 | App shells: NestJS API + Next.js web + Turborepo | ✅ | 02, 09, 16, 17 | `apps/api` (Nest+Fastify, `/health` ✅ boots) + `apps/web` (Next 15/React 19 shell) + Turborepo build orchestration. `@atlas/config` now builds to CJS, consumed by API at runtime. All gates green. **Note:** full structured-logging/correlation-id observability package deferred to a follow-up (basic Nest logger for now). |
 | F2 | Connector SDK interface + queue/worker/scheduler | 📋 | 06 §3, 02 §5 | BullMQ, the fork point |
 | F2 | Secrets Broker + Secrets Manager | 📋 | 13 §7 | |

@@ -5,6 +5,7 @@ import { up as up0003 } from "./migrations/0003_auth_resolve";
 import { up as up0004 } from "./migrations/0004_identity_rls";
 import { up as up0005 } from "./migrations/0005_org_scope";
 import { up as up0006 } from "./migrations/0006_connections";
+import { up as up0007 } from "./migrations/0007_graph";
 
 /**
  * Forward-only SQL migration runner (docs/04 §9). Plain `pg`, no ORM. Each
@@ -21,6 +22,7 @@ const MIGRATIONS: ReadonlyArray<{ version: string; statements: string[] }> = [
   { version: "0004_identity_rls", statements: up0004 },
   { version: "0005_org_scope", statements: up0005 },
   { version: "0006_connections", statements: up0006 },
+  { version: "0007_graph", statements: up0007 },
 ];
 
 async function main(): Promise<void> {

@@ -471,8 +471,11 @@ CREATE TABLE edges (
         origin <> 'inferred' OR inference_rule_id IS NOT NULL),
     CONSTRAINT observed_is_observed_conf CHECK (
         origin <> 'observed' OR confidence = 'observed'),
-    -- edge identity for dedupe/reconcile (03 §7): one edge of a type between two nodes per rule
-    CONSTRAINT uq_edge UNIQUE (org_id, from_node_id, to_node_id, type, inference_rule_id)
+    -- edge identity for dedupe/reconcile (03 §7): one edge of a type between two nodes per rule.
+    -- NULLS NOT DISTINCT (PG15+) so OBSERVED edges (inference_rule_id NULL) also dedupe by
+    -- (org, from, to, type) — without it, NULL rule_ids would be treated as distinct and
+    -- observed edges could duplicate across syncs (added F2.3).
+    CONSTRAINT uq_edge UNIQUE NULLS NOT DISTINCT (org_id, from_node_id, to_node_id, type, inference_rule_id)
 );
 CREATE TRIGGER trg_edges_updated BEFORE UPDATE ON edges
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();

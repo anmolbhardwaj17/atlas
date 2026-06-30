@@ -103,3 +103,91 @@ export interface SyncRunRow {
   finished_at: Date | null;
   created_at: Date;
 }
+
+// Knowledge / graph (docs/04 §5.3–5.4, F2.3). The graph is the product (P1).
+export type Confidence = "observed" | "inferred-high" | "inferred-low";
+export type NodeStatus = "active" | "stale" | "deleted";
+export type EdgeOrigin = "observed" | "inferred";
+export type EdgeStatus = "active" | "retired";
+
+export interface NodeKindRow {
+  kind: string;
+  provider: string;
+  category: string;
+  description: string;
+}
+
+export interface InferenceRuleRow {
+  id: string;
+  key: string;
+  version: number;
+  name: string;
+  description: string;
+  produces_type: string;
+  confidence_tier: "inferred-high" | "inferred-low";
+  enabled: boolean;
+  created_at: Date;
+}
+
+export interface NodeRow {
+  id: string;
+  org_id: string;
+  connection_id: string;
+  urn: string;
+  kind: string;
+  name: string | null;
+  provider: string;
+  region: string | null;
+  account_ref: string | null;
+  tags: Record<string, unknown>;
+  attributes: Record<string, unknown>;
+  status: NodeStatus;
+  confidence: Confidence;
+  first_seen: Date;
+  last_seen: Date;
+  last_sync_run_id: string | null;
+  deleted_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface RawSnapshotRow {
+  id: string;
+  org_id: string;
+  node_id: string | null;
+  storage_ref: string;
+  content_hash: string;
+  sync_run_id: string | null;
+  captured_at: Date;
+}
+
+export interface ProvenanceRow {
+  id: string;
+  org_id: string;
+  source: string;
+  sync_run_id: string | null;
+  observed_at: Date;
+  confidence: Confidence;
+  inference_rule_id: string | null;
+  evidence: Record<string, unknown>;
+  raw_snapshot_id: string | null;
+}
+
+export interface EdgeRow {
+  id: string;
+  org_id: string;
+  from_node_id: string;
+  to_node_id: string;
+  type: string;
+  origin: EdgeOrigin;
+  confidence: Confidence;
+  provenance_id: string;
+  inference_rule_id: string | null;
+  status: EdgeStatus;
+  first_seen: Date;
+  last_seen: Date;
+  last_sync_run_id: string | null;
+  retired_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
