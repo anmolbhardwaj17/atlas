@@ -32,6 +32,8 @@ import {
   type CredentialProvider,
 } from "./credentials";
 import { isAccessDenied, type PermissionProbe, type ProbeInput } from "./permission-probe";
+import { SERVICE_MODULES, MODULE_BY_KIND, type ServiceModule } from "./services";
+import type { AwsRawPayload } from "./services/module";
 
 const NOOP_LOGGER: ConnectorLogger = {
   debug: () => undefined,
@@ -140,10 +142,33 @@ export class AwsConnector implements Connector {
     return { status: "connected" };
   }
 
-  // ── Crawl stages (I1.3) ─────────────────────────────────────────────────────
-  async plan(_conn: Connection, _run: SyncRun): Promise<WorkPlan> {
-    throw notImplemented("plan");
+  // ── Crawl stages ────────────────────────────────────────────────────────────
+
+  /**
+   * Deterministic work plan (docs/06 §5.1): one scope per (region × region-scoped
+   * service) plus one per global service. Each scope is independently queued &
+   * resumable (P7); a throttled scope degrades only itself (BR-SYNC-2).
+   */
+  async plan(conn: Connection, _run: SyncRun): Promise<WorkPlan> {
+    const cfg = parseAwsConfig(conn.config);
+    const scopes: Scope[] = [];
+    for (const m of SERVICE_MODULES) {
+      if (m.scope === "global") {
+        scopes.push({
+          key: `global/${m.service}`,
+          params: { service: m.service, region: "global" },
+        });
+      } else {
+        for (const region of cfg.regions) {
+          scopes.push({ key: `${region}/${m.service}`, params: { service: m.service, region } });
+        }
+      }
+    }
+    return { scopes };
   }
+
+  // discover/fetchDetail issue the AWS SDK describe calls (with pagination, retry and
+  // rate-limiting) — wired in I1.4. The pure transforms below are complete now.
   // eslint-disable-next-line require-yield
   async *discover(_scope: Scope, _ctx: CrawlContext): AsyncIterable<ResourceRef> {
     throw notImplemented("discover");
@@ -151,17 +176,24 @@ export class AwsConnector implements Connector {
   async fetchDetail(_ref: ResourceRef, _ctx: CrawlContext): Promise<RawResource> {
     throw notImplemented("fetchDetail");
   }
-  normalize(_raw: RawResource): NodeUpsert {
-    throw notImplemented("normalize");
+
+  normalize(raw: RawResource): NodeUpsert {
+    return this.moduleFor(raw).normalize(raw.payload as AwsRawPayload);
   }
-  extractSignals(_raw: RawResource): Signal[] {
-    throw notImplemented("extractSignals");
+  extractSignals(raw: RawResource): Signal[] {
+    return this.moduleFor(raw).extractSignals(raw.payload as AwsRawPayload);
   }
-  observedEdges(_raw: RawResource): EdgeUpsert[] {
-    throw notImplemented("observedEdges");
+  observedEdges(raw: RawResource): EdgeUpsert[] {
+    return this.moduleFor(raw).observedEdges(raw.payload as AwsRawPayload);
+  }
+
+  private moduleFor(raw: RawResource): ServiceModule {
+    const module = MODULE_BY_KIND.get(raw.ref.kind);
+    if (!module) throw new Error(`No AWS service module for kind "${raw.ref.kind}".`);
+    return module;
   }
 }
 
 function notImplemented(stage: string): Error {
-  return new Error(`AwsConnector.${stage} is implemented in I1.3 (service discoverers).`);
+  return new Error(`AwsConnector.${stage} issues live AWS calls — wired in I1.4.`);
 }

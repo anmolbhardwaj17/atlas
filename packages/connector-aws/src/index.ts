@@ -29,3 +29,5 @@ export type {
 } from "./credentials";
 export { isAccessDenied } from "./permission-probe";
 export type { PermissionProbe, ProbeInput } from "./permission-probe";
+export { SERVICE_MODULES, MODULE_BY_KIND } from "./services";
+export type { ServiceModule, AwsRawPayload } from "./services/module";
