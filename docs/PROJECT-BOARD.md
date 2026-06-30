@@ -16,7 +16,7 @@
 **Progress at a glance**
 - 📘 Blueprint (docs): **19 / 19 ✅ (100%)**
 - 🧰 Project setup: **✅ done** (CLAUDE.md, README, board, skills, memory, git+GitHub)
-- 🏗️ Build: **F1 Foundation COMPLETE ✅**; **F2 (connector framework + secrets + queue) IN PROGRESS** — F2.1 connections/sync_runs schema ✅, F2.2 `@atlas/connector-sdk` frozen contract ✅; next F2.3+ (queue/worker · secrets broker · snapshot store · connection API · mock connector + staged-sync exit proof).
+- 🏗️ Build: **F1 Foundation COMPLETE ✅**; **F2 IN PROGRESS** — F2.1 connections/sync_runs ✅, F2.2 connector-sdk ✅, F2.3 graph persist schema ✅, **F2.4 mock connector + staged sync runner ✅ (F2 EXIT criterion met)**; remaining F2.5–F2.8 (BullMQ queue/worker · secrets broker · snapshot Storage · connection API) are supporting infra.
 
 ---
 
@@ -88,7 +88,7 @@
 | F2.1 | `connections` + `sync_runs` schema (migration + RLS + types) | ✅ | 04 §5.2, 03 §3.5/3.6 | Migration 0006: both tables with org-scoped RLS (`TO atlas_app`), `updated_at` trigger, **BR-SYNC-1** partial-unique in-flight index. Row types + enums in `@atlas/db`. Integration test: connections cross-org isolation (10 integration tests pass on live PG). |
 | F2.2 | `@atlas/connector-sdk` — frozen Connector contract | ✅ | 06 §3 (DD-1) | New pure-types package: `Connector` interface (verify/health/plan/discover/fetchDetail/normalize/extractSignals/observedEdges) + shared types (Connection, SyncRun, WorkPlan, Scope, ResourceRef, RawResource, NodeUpsert, Signal, EdgeUpsert, CrawlContext, SecretAccessor, VerifyResult). Provider union open (extensible). **Contract frozen in F2 (RMR-6).** |
 | F2.3 | Graph persist schema (nodes/edges/provenance/raw_snapshots/node_kinds/inference_rules) | ✅ | 04 §5.3–5.4, §6, 05 | Migration 0007: full knowledge schema + indexes + composite FKs (same-org edges, BR-EDGE-1) + provenance-required/inferred-needs-rule constraints; `uq_edge` **NULLS NOT DISTINCT** (observed-edge dedupe, doc synced). Org-scope RLS on nodes/edges/provenance/raw_snapshots; global vocab policy on node_kinds/inference_rules. Row types in `@atlas/db`. **graph-scope.test.ts** (4 tests): node/edge org isolation, cross-tenant edge structurally rejected, observed-edge dedupe. **14 integration tests pass on live PG.** |
-| F2.4 | Mock connector + staged sync runner (EXIT proof) | 📋 | 06, 02 §5.2, BR-SYNC-2 | plan→discover→fetch→persist, idempotent/resumable, no false deletes |
+| F2.4 | Mock connector + staged sync runner (EXIT proof) | ✅ | 06, 02 §5.2, BR-SYNC-2 | **F2 exit criterion met.** New `@atlas/ingest`: `runStagedSync` (plan→per-scope discover→fetchDetail→normalize/observedEdges→persist→reconcile; each scope one tx; org-scoped via withOrgScope) + `MockConnector` (in-memory fake provider, failure injection, discover-call tracking) + `InMemorySnapshotStore` + dev SecretAccessor/logger. **4 integration tests on live PG:** idempotent persist (upsert by URN/uq_edge, no dupes), reaping (unseen → stale on clean sync), **BR-SYNC-2** (failed scope → partial → reconcile skipped → no false delete), resumability (checkpoint skips completed scopes). CI integration job now runs all integration tests. |
 | F2.5 | BullMQ queue + worker runtime + scheduler | 📋 | 02 §5 | In-memory driver for tests; BullMQ/Redis driver for prod |
 | F2.6 | Secrets Broker (interface + dev impl) | 📋 | 13 §7 | `secret_ref` indirection; never store raw secrets |
 | F2.7 | Raw-snapshot store (Supabase Storage abstraction) | 📋 | 04 §5.4 | provenance + raw payloads (P4) |

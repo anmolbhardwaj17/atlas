@@ -1,0 +1,289 @@
+import { createHash } from "node:crypto";
+import type { PoolClient } from "pg";
+import { withOrgScope, type Db } from "@atlas/db";
+import type {
+  Connection,
+  Connector,
+  ConnectorLogger,
+  CrawlContext,
+  EdgeUpsert,
+  NodeUpsert,
+  RawResource,
+  SecretAccessor,
+  SyncRunType,
+} from "@atlas/connector-sdk";
+import type { SnapshotStore } from "./snapshot-store";
+import { silentLogger } from "./runtime";
+
+/** The sync_run being executed (the runner reads/writes the DB row by id). */
+export interface SyncRunRecord {
+  id: string;
+  orgId: string;
+  connectionId: string;
+  type: SyncRunType;
+}
+
+export interface SyncStats {
+  discovered: number;
+  persisted: number;
+  edges: number;
+  staled: number;
+  scopesOk: number;
+  scopesFailed: number;
+}
+
+export interface SyncResult {
+  status: "succeeded" | "partial" | "failed";
+  stats: SyncStats;
+  completedScopes: string[];
+  failedScopes: string[];
+}
+
+export interface RunnerDeps {
+  db: Db;
+  snapshots: SnapshotStore;
+  secrets: SecretAccessor;
+  logger?: ConnectorLogger;
+}
+
+const sha256 = (s: string): string => createHash("sha256").update(s).digest("hex");
+
+/**
+ * Run one staged sync (docs/06 §3, docs/02 §5.2): plan → per scope (discover →
+ * fetchDetail → normalize/observedEdges → persist) → reconcile. Properties:
+ *
+ * - **Idempotent** — nodes/edges upsert by URN / uq_edge (re-runs don't duplicate).
+ * - **Resumable** — completed scopes are recorded on `sync_runs.checkpoint`; a
+ *   re-run of the same run skips them (P7).
+ * - **No false deletes (BR-SYNC-2, docs/06 §7.4)** — each scope is one transaction
+ *   (a failed scope rolls back wholly and is skipped, never half-persisted), and the
+ *   reconcile that marks unseen nodes `stale` runs ONLY when every scope succeeded.
+ *   Any scope failure ⇒ status `partial` and reconcile is skipped, so a transient
+ *   provider error can never delete real resources.
+ *
+ * All DB work is org-scoped via `withOrgScope` (RLS-enforced, atlas_app role).
+ */
+export async function runStagedSync(
+  deps: RunnerDeps,
+  connector: Connector,
+  connection: Connection,
+  run: SyncRunRecord,
+): Promise<SyncResult> {
+  const { db, snapshots, secrets } = deps;
+  const logger = deps.logger ?? silentLogger;
+  const stats: SyncStats = {
+    discovered: 0,
+    persisted: 0,
+    edges: 0,
+    staled: 0,
+    scopesOk: 0,
+    scopesFailed: 0,
+  };
+  const failedScopes: string[] = [];
+
+  await withOrgScope(db, run.orgId, (c) =>
+    c.query(
+      "UPDATE sync_runs SET status='running', started_at = COALESCE(started_at, now()) WHERE id = $1",
+      [run.id],
+    ),
+  );
+
+  // Resume: which scopes already completed (persisted to the run's checkpoint)?
+  const completed = new Set<string>(await loadCompletedScopes(db, run));
+
+  const ctx: CrawlContext = {
+    connection,
+    run: {
+      id: run.id,
+      orgId: run.orgId,
+      connectionId: run.connectionId,
+      type: run.type,
+      checkpoint: {},
+    },
+    secrets,
+    log: logger,
+  };
+
+  let plan;
+  try {
+    plan = await connector.plan(connection, ctx.run);
+  } catch (err) {
+    await finalize(db, run, "failed", stats, [...completed], failedScopes);
+    logger.error(`plan failed: ${(err as Error).message}`);
+    return { status: "failed", stats, completedScopes: [...completed], failedScopes };
+  }
+
+  for (const scope of plan.scopes) {
+    if (completed.has(scope.key)) {
+      logger.debug(`skip completed scope ${scope.key}`);
+      continue;
+    }
+    try {
+      // One transaction per scope → a failure rolls the whole scope back (no partial).
+      await withOrgScope(db, run.orgId, async (c) => {
+        const urnToId = new Map<string, string>();
+        const pendingEdges: EdgeUpsert[] = [];
+        for await (const ref of connector.discover(scope, ctx)) {
+          stats.discovered++;
+          const raw = await connector.fetchDetail(ref, ctx);
+          const node = connector.normalize(raw);
+          const nodeId = await persistNode(c, run, connection, node, raw, snapshots);
+          urnToId.set(node.urn, nodeId);
+          stats.persisted++;
+          pendingEdges.push(...connector.observedEdges(raw));
+        }
+        for (const edge of pendingEdges) {
+          if (await persistEdge(c, run, urnToId, edge)) stats.edges++;
+        }
+      });
+      completed.add(scope.key);
+      stats.scopesOk++;
+      await withOrgScope(db, run.orgId, (c) =>
+        c.query("UPDATE sync_runs SET checkpoint = $2 WHERE id = $1", [
+          run.id,
+          JSON.stringify({ completedScopes: [...completed] }),
+        ]),
+      );
+    } catch (err) {
+      logger.error(`scope ${scope.key} failed: ${(err as Error).message}`);
+      failedScopes.push(scope.key);
+      stats.scopesFailed++;
+    }
+  }
+
+  const anyFailed = failedScopes.length > 0;
+  if (!anyFailed) {
+    await withOrgScope(db, run.orgId, async (c) => {
+      const r = await c.query(
+        `UPDATE nodes SET status = 'stale'
+         WHERE connection_id = $1 AND status = 'active' AND last_sync_run_id IS DISTINCT FROM $2`,
+        [run.connectionId, run.id],
+      );
+      stats.staled = r.rowCount ?? 0;
+    });
+  }
+  const status: SyncResult["status"] = anyFailed
+    ? stats.scopesOk > 0
+      ? "partial"
+      : "failed"
+    : "succeeded";
+  await finalize(db, run, status, stats, [...completed], failedScopes);
+  return { status, stats, completedScopes: [...completed], failedScopes };
+}
+
+async function loadCompletedScopes(db: Db, run: SyncRunRecord): Promise<string[]> {
+  return withOrgScope(db, run.orgId, async (c) => {
+    const { rows } = await c.query<{ checkpoint: { completedScopes?: string[] } }>(
+      "SELECT checkpoint FROM sync_runs WHERE id = $1",
+      [run.id],
+    );
+    return rows[0]?.checkpoint?.completedScopes ?? [];
+  });
+}
+
+async function finalize(
+  db: Db,
+  run: SyncRunRecord,
+  status: SyncResult["status"],
+  stats: SyncStats,
+  completedScopes: string[],
+  failedScopes: string[],
+): Promise<void> {
+  await withOrgScope(db, run.orgId, (c) =>
+    c.query(
+      "UPDATE sync_runs SET status = $2, stats = $3, scope_result = $4, finished_at = now() WHERE id = $1",
+      [run.id, status, JSON.stringify(stats), JSON.stringify({ completedScopes, failedScopes })],
+    ),
+  );
+}
+
+async function persistNode(
+  c: PoolClient,
+  run: SyncRunRecord,
+  connection: Connection,
+  node: NodeUpsert,
+  raw: RawResource,
+  snapshots: SnapshotStore,
+): Promise<string> {
+  // Self-bootstrap the kind vocabulary so we don't need a separate seed step.
+  await c.query(
+    `INSERT INTO node_kinds (kind, provider, category, description)
+     VALUES ($1, $2, 'unknown', $1) ON CONFLICT (kind) DO NOTHING`,
+    [node.kind, connection.provider],
+  );
+  const region = typeof node.attributes.region === "string" ? node.attributes.region : null;
+  const accountRef =
+    typeof node.attributes.accountRef === "string" ? node.attributes.accountRef : null;
+
+  const { rows } = await c.query<{ id: string }>(
+    `INSERT INTO nodes
+       (org_id, connection_id, urn, kind, name, provider, region, account_ref, attributes,
+        status, confidence, last_seen, last_sync_run_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'active','observed', now(), $10)
+     ON CONFLICT (org_id, urn) DO UPDATE SET
+       name = EXCLUDED.name, attributes = EXCLUDED.attributes, region = EXCLUDED.region,
+       account_ref = EXCLUDED.account_ref, connection_id = EXCLUDED.connection_id,
+       status = 'active', last_seen = now(), last_sync_run_id = EXCLUDED.last_sync_run_id
+     RETURNING id`,
+    [
+      run.orgId,
+      run.connectionId,
+      node.urn,
+      node.kind,
+      node.displayName,
+      connection.provider,
+      region,
+      accountRef,
+      JSON.stringify(node.attributes),
+      run.id,
+    ],
+  );
+  const nodeId = rows[0]?.id;
+  if (!nodeId) throw new Error("node upsert returned no id");
+
+  const payload = JSON.stringify(raw.payload);
+  const contentHash = sha256(payload);
+  const storageRef = await snapshots.put(run.orgId, contentHash, payload);
+  const snap = await c.query<{ id: string }>(
+    `INSERT INTO raw_snapshots (org_id, node_id, storage_ref, content_hash, sync_run_id)
+     VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+    [run.orgId, nodeId, storageRef, contentHash, run.id],
+  );
+  await c.query(
+    `INSERT INTO provenance (org_id, source, sync_run_id, confidence, raw_snapshot_id)
+     VALUES ($1,$2,$3,'observed',$4)`,
+    [run.orgId, raw.ref.externalId, run.id, snap.rows[0]?.id ?? null],
+  );
+  return nodeId;
+}
+
+async function persistEdge(
+  c: PoolClient,
+  run: SyncRunRecord,
+  urnToId: Map<string, string>,
+  edge: EdgeUpsert,
+): Promise<boolean> {
+  const fromId = urnToId.get(edge.fromUrn) ?? (await lookupNodeId(c, edge.fromUrn));
+  const toId = urnToId.get(edge.toUrn) ?? (await lookupNodeId(c, edge.toUrn));
+  // Skip unresolved endpoints / self-edges (the inference engine handles forward refs, G1).
+  if (!fromId || !toId || fromId === toId) return false;
+
+  const prov = await c.query<{ id: string }>(
+    "INSERT INTO provenance (org_id, source, sync_run_id, confidence) VALUES ($1,$2,$3,'observed') RETURNING id",
+    [run.orgId, `edge:${edge.type}`, run.id],
+  );
+  await c.query(
+    `INSERT INTO edges
+       (org_id, from_node_id, to_node_id, type, origin, confidence, provenance_id, last_seen, last_sync_run_id)
+     VALUES ($1,$2,$3,$4,'observed','observed',$5, now(), $6)
+     ON CONFLICT (org_id, from_node_id, to_node_id, type, inference_rule_id) DO UPDATE SET
+       last_seen = now(), last_sync_run_id = EXCLUDED.last_sync_run_id, status = 'active'`,
+    [run.orgId, fromId, toId, edge.type, prov.rows[0]?.id, run.id],
+  );
+  return true;
+}
+
+async function lookupNodeId(c: PoolClient, urn: string): Promise<string | undefined> {
+  const { rows } = await c.query<{ id: string }>("SELECT id FROM nodes WHERE urn = $1", [urn]);
+  return rows[0]?.id;
+}

@@ -99,5 +99,5 @@ jobs:
       - name: Grant atlas_app LOGIN (CI throwaway password)
         run: pnpm --filter @atlas/db run setup:app-role
 
-      - name: Integration tests (Postgres + RLS)
-        run: pnpm --filter @atlas/db run test
+      - name: Integration tests (Postgres + RLS + staged sync)
+        run: pnpm run test
