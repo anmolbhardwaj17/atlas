@@ -16,7 +16,7 @@
 **Progress at a glance**
 - 📘 Blueprint (docs): **19 / 19 ✅ (100%)**
 - 🧰 Project setup: **✅ done** (CLAUDE.md, README, board, skills, memory, git+GitHub)
-- 🏗️ Build: **F1 in progress** — F1.1 scaffold ✅; next **F1.2** (CI gate harness) / F1.3 (app shells)
+- 🏗️ Build: **F1 in progress** — F1.1 scaffold ✅, F1.2 CI ✅; next **F1.3** (NestJS API + Next.js web shells)
 
 ---
 
@@ -75,7 +75,7 @@
 | ID | Task | Status | Docs | Note |
 |---|---|---|---|---|
 | F1.1 | Monorepo scaffold + shared tooling + `config` package | ✅ | 16 §2/§4, 17 §6 | pnpm workspaces + strict TS + eslint(no-any) + prettier + vitest. `@atlas/config` (Zod env, parse-don't-validate). **All gates green: format/lint/typecheck/6 tests.** |
-| F1.2 | CI gate harness (lint/typecheck/test) | 🔵 | 14 §16, 17 §5 | GitHub Actions `.github/workflows/ci.yml`: pnpm + Node 22, runs format/lint/typecheck/test on push to main. Heavier stages added in later sprints. |
+| F1.2 | CI gate harness (lint/typecheck/test) | ✅ | 14 §16, 17 §5 | GitHub Actions `.github/workflows/ci.yml`: pnpm + Node 22, format/lint/typecheck/test on push to main + PRs. **First run green (22s).** Badge on README. Heavier stages (integration/contract/adversarial-QA/E2E/load) added in later sprints. |
 | F1 | Google OAuth login + sessions/JWT | 📋 | 12 | sole login method (MVP) |
 | F1 | Org create/RBAC/memberships/invitations | 📋 | 12, 03 | Owner/Admin/Member |
 | F1 | 3-layer tenant isolation incl. RLS | 📋 | 04 §10, 13 §6 | **US-12 test must pass** |
@@ -145,6 +145,7 @@
 
 | Date | Who | What |
 |---|---|---|
+| 2026-06-30 | architect | **F1.2 ✅** — GitHub Actions CI (`ci.yml`) running format/lint/typecheck/test on push to main. First run green (22s). README badge added. |
 | 2026-06-30 | architect | Adopted **main-only git workflow** (no branches/PRs yet; `dev` later). Cleaned history to 2 commits, no AI attribution. F1.1 on `main`. |
 | 2026-06-30 | architect | **F1.1 ✅** — monorepo scaffold (pnpm workspaces, strict TS, eslint/prettier, vitest) + `@atlas/config` (Zod env). All gates green. |
 | 2026-06-30 | architect | Pushed to **private** GitHub remote `anmolbhardwaj17/atlas`. |
