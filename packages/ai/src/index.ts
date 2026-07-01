@@ -1,0 +1,28 @@
+/**
+ * @atlas/ai — the AI Engine (docs/10). Turns a natural-language question into a grounded,
+ * cited, confidence-scored answer over the knowledge graph. Per P1, the graph is the
+ * product and the AI is one interface: retrieval over a correct graph is the engine; the
+ * LLM is a constrained narrator/planner (AE-4). NestJS-free — the API wires a RetrievalPort
+ * + an LLMProvider.
+ *
+ * G3.1 lays the foundation: LLM provider abstraction (+ mock/Claude), the versioned system
+ * prompt, and the retrieval port. Planner (G3.2), context+grounding (G3.3), the answer
+ * pipeline + eval (G3.4), and SSE endpoints (G3.5) build on it.
+ */
+export type { LLMProvider, CompleteRequest, LLMEvent, ChatMessage, ToolSpec } from "./llm";
+export { MockLLMProvider, streamText } from "./mock-provider";
+export type { MockResponder } from "./mock-provider";
+export { ClaudeProvider } from "./claude-provider";
+export type { ClaudeConfig } from "./claude-provider";
+export { SYSTEM_PROMPT, PROMPT_VERSION, honestAbsence } from "./prompt";
+export type {
+  RetrievalPort,
+  SearchHit,
+  RetrievedNode,
+  RetrievedEdge,
+  Traversal,
+  TraversalImpacted,
+  TraversalOpts,
+  ViaEdge,
+  TimelineChange,
+} from "./retrieval-port";
