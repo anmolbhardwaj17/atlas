@@ -30,6 +30,15 @@ export interface NodeListResult {
   page: { nextCursor: string | null; hasMore: boolean; limit: number };
 }
 
+export interface OverviewResult {
+  nodeCount: number;
+  edgeCount: number;
+  byKind: Array<{ kind: string; n: number }>;
+  edgesByConfidence: { observed: number; inferredHigh: number; inferredLow: number };
+  connections: Array<{ id: string; provider: string; displayName: string; status: string }>;
+  lastSyncAt: string | null;
+}
+
 export interface EdgeDto {
   id: string;
   type: string;
@@ -127,6 +136,48 @@ export interface TraversalResult {
 @Injectable()
 export class GraphService {
   constructor(@Inject(PG_POOL) private readonly db: Db) {}
+
+  /** Org overview for the dashboard (docs/09 §5.2): counts + tiers + freshness. */
+  async overview(orgId: string): Promise<OverviewResult> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      const [nodes, kinds, edges, conns, lastSync] = await Promise.all([
+        c.query<{ n: number }>("SELECT count(*)::int AS n FROM nodes WHERE status <> 'deleted'"),
+        c.query<{ kind: string; n: number }>(
+          `SELECT kind, count(*)::int AS n FROM nodes WHERE status <> 'deleted'
+           GROUP BY kind ORDER BY n DESC, kind`,
+        ),
+        c.query<{ confidence: string; n: number }>(
+          `SELECT confidence, count(*)::int AS n FROM edges WHERE status = 'active'
+           GROUP BY confidence`,
+        ),
+        c.query<{ id: string; provider: string; display_name: string; status: string }>(
+          `SELECT id, provider, display_name, status FROM connections
+           WHERE deleted_at IS NULL ORDER BY created_at`,
+        ),
+        c.query<{ ts: Date | null }>(
+          "SELECT max(last_synced_at) AS ts FROM connections WHERE deleted_at IS NULL",
+        ),
+      ]);
+      const conf = (t: string): number => edges.rows.find((r) => r.confidence === t)?.n ?? 0;
+      return {
+        nodeCount: nodes.rows[0]?.n ?? 0,
+        edgeCount: edges.rows.reduce((s, r) => s + r.n, 0),
+        byKind: kinds.rows,
+        edgesByConfidence: {
+          observed: conf("observed"),
+          inferredHigh: conf("inferred-high"),
+          inferredLow: conf("inferred-low"),
+        },
+        connections: conns.rows.map((r) => ({
+          id: r.id,
+          provider: r.provider,
+          displayName: r.display_name,
+          status: r.status,
+        })),
+        lastSyncAt: lastSync.rows[0]?.ts?.toISOString() ?? null,
+      };
+    });
+  }
 
   async listNodes(orgId: string, q: NodeListQuery): Promise<NodeListResult> {
     return withOrgScope(this.db, orgId, async (c) => {

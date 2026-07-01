@@ -1,119 +1,210 @@
 import Link from "next/link";
-import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
+import { Boxes, GitBranch, Sparkles, Plug } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FreshnessTag } from "@/components/certainty";
 import { apiGet, type ApiOk } from "@/lib/api";
 
-interface ConnectionDto {
-  id: string;
-  provider: string;
-  displayName: string;
-  status: string;
+interface Overview {
+  nodeCount: number;
+  edgeCount: number;
+  byKind: Array<{ kind: string; n: number }>;
+  edgesByConfidence: { observed: number; inferredHigh: number; inferredLow: number };
+  connections: Array<{ id: string; provider: string; displayName: string; status: string }>;
+  lastSyncAt: string | null;
 }
 interface NodeDto {
   id: string;
   kind: string;
   name: string | null;
-  region: string | null;
   status: string;
 }
 
-const STATUS_COLOR: Record<string, string> = {
-  connected: "text-observed",
-  degraded: "text-inferred-low",
-  error: "text-destructive",
-  verifying: "text-muted-foreground",
-  pending: "text-muted-foreground",
-  disconnected: "text-stale",
-};
-
-/** Dashboard (docs/09 §5.2) — the authenticated home: connections + a recent-nodes preview. */
+/** Dashboard (docs/09 §5.2) — the authenticated home: headline metrics, graph
+ *  composition, certainty mix, and a recent-resources peek. */
 export async function Dashboard({ orgId, token }: { orgId: string; token: string }) {
-  const [conns, nodes] = await Promise.all([
-    apiGet<ApiOk<ConnectionDto[]>>("/connections", { token, orgId }),
-    apiGet<ApiOk<NodeDto[]>>("/nodes?limit=8", { token, orgId }),
+  const [ovRes, nodesRes] = await Promise.all([
+    apiGet<ApiOk<Overview>>("/overview", { token, orgId }),
+    apiGet<ApiOk<NodeDto[]>>("/nodes?limit=6", { token, orgId }),
   ]);
-  const connections = conns.body?.data ?? [];
-  const recentNodes = nodes.body?.data ?? [];
+  const ov = ovRes.body?.data;
+  const recent = nodesRes.body?.data ?? [];
+
+  if (!ov || ov.nodeCount === 0) {
+    return (
+      <div className="space-y-6">
+        <Header />
+        <Card>
+          <CardContent className="py-14 text-center">
+            <p className="text-sm font-medium">Your graph is empty</p>
+            <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+              Connect AWS or GitHub to start building your knowledge graph. Head to Settings to add
+              a source.
+            </p>
+            <Link
+              href="/settings"
+              className="mt-4 inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              Go to Settings
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const inferred = ov.edgesByConfidence.inferredHigh + ov.edgesByConfidence.inferredLow;
+  const inferredPct = ov.edgeCount > 0 ? Math.round((inferred / ov.edgeCount) * 100) : 0;
+  const topKinds = ov.byKind.slice(0, 8);
+  const maxKind = topKinds[0]?.n ?? 1;
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-xl font-semibold">Overview</h1>
-        <p className="text-sm text-muted-foreground">
-          The knowledge graph of your infrastructure and code — continuously updated, cited, and
-          confidence-tiered.
-        </p>
+    <div className="space-y-6">
+      <Header lastSyncAt={ov.lastSyncAt} />
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat icon={<Boxes className="size-4" />} label="Resources" value={ov.nodeCount} />
+        <Stat icon={<GitBranch className="size-4" />} label="Relationships" value={ov.edgeCount} />
+        <Stat
+          icon={<Sparkles className="size-4" />}
+          label="Inferred edges"
+          value={`${inferred}`}
+          sub={`${inferredPct}% of graph`}
+        />
+        <Stat icon={<Plug className="size-4" />} label="Sources" value={ov.connections.length} />
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle>Connections</CardTitle>
-            <Link href="/settings" className="text-xs text-primary hover:underline">
-              Manage
-            </Link>
+          <CardHeader>
+            <CardTitle>Certainty mix</CardTitle>
           </CardHeader>
-          <CardBody>
-            {connections.length === 0 ? (
-              <EmptyState
-                title="No sources connected"
-                hint="Connect AWS or GitHub to start building your graph."
-              />
-            ) : (
-              <ul className="space-y-2">
-                {connections.map((c) => (
-                  <li key={c.id} className="flex items-center justify-between text-sm">
-                    <span>
-                      <span className="text-muted-foreground">{c.provider}</span> · {c.displayName}
-                    </span>
-                    <span className={STATUS_COLOR[c.status] ?? "text-muted-foreground"}>
-                      {c.status}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardBody>
+          <CardContent className="space-y-3">
+            <ConfBar
+              label="Observed"
+              n={ov.edgesByConfidence.observed}
+              total={ov.edgeCount}
+              shade="bg-foreground"
+            />
+            <ConfBar
+              label="Inferred · high"
+              n={ov.edgesByConfidence.inferredHigh}
+              total={ov.edgeCount}
+              shade="bg-foreground/60"
+            />
+            <ConfBar
+              label="Inferred · low"
+              n={ov.edgesByConfidence.inferredLow}
+              total={ov.edgeCount}
+              shade="bg-foreground/30"
+            />
+          </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle>Recent resources</CardTitle>
-            <Link href="/explore" className="text-xs text-primary hover:underline">
+            <CardTitle>Composition</CardTitle>
+            <Link href="/explore" className="text-xs text-muted-foreground hover:text-foreground">
               Explore all
             </Link>
           </CardHeader>
-          <CardBody>
-            {recentNodes.length === 0 ? (
-              <EmptyState
-                title="No resources yet"
-                hint="Once a source is connected and synced, resources appear here."
-              />
-            ) : (
-              <ul className="divide-y divide-border">
-                {recentNodes.map((n) => (
-                  <li key={n.id} className="flex items-center justify-between py-1.5 text-sm">
-                    <Link href={`/explore/${n.id}`} className="truncate hover:text-primary">
-                      <span className="text-muted-foreground">{n.kind}</span> ·{" "}
-                      {n.name ?? n.id.slice(0, 8)}
-                    </Link>
-                    <FreshnessTag status={n.status} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardBody>
+          <CardContent className="space-y-2">
+            {topKinds.map((k) => (
+              <div key={k.kind} className="flex items-center gap-3 text-sm">
+                <span className="w-40 shrink-0 truncate text-muted-foreground">{k.kind}</span>
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-foreground/70"
+                    style={{ width: `${Math.max(6, Math.round((k.n / maxKind) * 100))}%` }}
+                  />
+                </div>
+                <span className="w-6 shrink-0 text-right tabular-nums">{k.n}</span>
+              </div>
+            ))}
+          </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardTitle>Recent resources</CardTitle>
+          <Link href="/explore" className="text-xs text-muted-foreground hover:text-foreground">
+            View all
+          </Link>
+        </CardHeader>
+        <CardContent>
+          <ul className="divide-y divide-border">
+            {recent.map((n) => (
+              <li key={n.id} className="flex items-center justify-between py-2 text-sm">
+                <Link href={`/explore/${n.id}`} className="truncate hover:text-primary">
+                  <span className="text-muted-foreground">{n.kind}</span> ·{" "}
+                  {n.name ?? n.id.slice(0, 8)}
+                </Link>
+                <FreshnessTag status={n.status} />
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-function EmptyState({ title, hint }: { title: string; hint: string }) {
+function Header({ lastSyncAt }: { lastSyncAt?: string | null }) {
   return (
-    <div className="py-6 text-center">
-      <p className="text-sm text-foreground">{title}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+    <div>
+      <h1 className="text-xl font-semibold">Overview</h1>
+      <p className="text-sm text-muted-foreground">
+        Your infrastructure and code as one continuously-updated, cited knowledge graph.
+        {lastSyncAt ? ` Last synced ${new Date(lastSyncAt).toLocaleString()}.` : ""}
+      </p>
+    </div>
+  );
+}
+
+function Stat({
+  icon,
+  label,
+  value,
+  sub,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number | string;
+  sub?: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          {icon}
+          <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
+        </div>
+        <div className="mt-2 text-2xl font-semibold tabular-nums">{value}</div>
+        {sub ? <div className="text-xs text-muted-foreground">{sub}</div> : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ConfBar({
+  label,
+  n,
+  total,
+  shade,
+}: {
+  label: string;
+  n: number;
+  total: number;
+  shade: string;
+}) {
+  const pct = total > 0 ? Math.round((n / total) * 100) : 0;
+  return (
+    <div className="flex items-center gap-3 text-sm">
+      <span className="w-28 shrink-0 text-muted-foreground">{label}</span>
+      <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+        <div className={`h-full rounded-full ${shade}`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className="w-10 shrink-0 text-right tabular-nums">{n}</span>
     </div>
   );
 }

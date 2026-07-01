@@ -24,6 +24,12 @@ import {
 export class GraphController {
   constructor(private readonly graph: GraphService) {}
 
+  @Get("overview")
+  @Roles("Member")
+  async overview(@Req() req: AuthedRequest): Promise<unknown> {
+    return this.graph.overview(org(req).id);
+  }
+
   @Get("nodes")
   @Roles("Member")
   async listNodes(@Req() req: AuthedRequest, @Query() query: unknown): Promise<unknown> {
