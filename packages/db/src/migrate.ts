@@ -8,6 +8,8 @@ import { up as up0006 } from "./migrations/0006_connections";
 import { up as up0007 } from "./migrations/0007_graph";
 import { up as up0008 } from "./migrations/0008_node_kinds_seed";
 import { up as up0009 } from "./migrations/0009_external_package";
+import { up as up0010 } from "./migrations/0010_signals";
+import { up as up0011 } from "./migrations/0011_inference_rules_seed";
 
 /**
  * Forward-only SQL migration runner (docs/04 §9). Plain `pg`, no ORM. Each
@@ -27,6 +29,8 @@ const MIGRATIONS: ReadonlyArray<{ version: string; statements: string[] }> = [
   { version: "0007_graph", statements: up0007 },
   { version: "0008_node_kinds_seed", statements: up0008 },
   { version: "0009_external_package", statements: up0009 },
+  { version: "0010_signals", statements: up0010 },
+  { version: "0011_inference_rules_seed", statements: up0011 },
 ];
 
 async function main(): Promise<void> {

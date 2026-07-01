@@ -10,6 +10,7 @@ import type {
   NodeUpsert,
   RawResource,
   SecretAccessor,
+  Signal,
   SyncRunType,
 } from "@atlas/connector-sdk";
 import type { SnapshotStore } from "./snapshot-store";
@@ -29,6 +30,8 @@ export interface SyncStats {
   /** Resources whose content hash was unchanged since the last snapshot (docs/06 §6). */
   unchanged: number;
   edges: number;
+  /** Inference-input signals persisted (docs/05 §6.3). */
+  signals: number;
   staled: number;
   scopesOk: number;
   scopesFailed: number;
@@ -78,6 +81,7 @@ export async function runStagedSync(
     persisted: 0,
     unchanged: 0,
     edges: 0,
+    signals: 0,
     staled: 0,
     scopesOk: 0,
     scopesFailed: 0,
@@ -142,6 +146,10 @@ export async function runStagedSync(
           stats.persisted++;
           if (!changed) stats.unchanged++;
           pendingEdges.push(...connector.observedEdges(raw));
+          for (const signal of connector.extractSignals(raw)) {
+            await persistSignal(c, run, connection, signal);
+            stats.signals++;
+          }
         }
         for (const edge of pendingEdges) {
           if (await persistEdge(c, run, urnToId, edge)) stats.edges++;
@@ -279,6 +287,30 @@ async function persistNode(
     [run.orgId, raw.ref.externalId, run.id, snap.rows[0]?.id ?? null],
   );
   return { id: nodeId, changed: true };
+}
+
+async function persistSignal(
+  c: PoolClient,
+  run: SyncRunRecord,
+  connection: Connection,
+  signal: Signal,
+): Promise<void> {
+  // Upsert by (org, subject_urn, kind) so re-syncs refresh in place (docs/05 §6.3).
+  await c.query(
+    `INSERT INTO signals (org_id, connection_id, subject_urn, kind, data, last_sync_run_id)
+     VALUES ($1,$2,$3,$4,$5,$6)
+     ON CONFLICT (org_id, subject_urn, kind) DO UPDATE SET
+       data = EXCLUDED.data, connection_id = EXCLUDED.connection_id,
+       last_seen = now(), last_sync_run_id = EXCLUDED.last_sync_run_id`,
+    [
+      run.orgId,
+      run.connectionId,
+      signal.subjectUrn,
+      signal.kind,
+      JSON.stringify(signal.data),
+      run.id,
+    ],
+  );
 }
 
 async function persistEdge(

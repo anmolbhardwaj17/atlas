@@ -493,6 +493,32 @@ ALTER TABLE edges
 -- This makes cross-tenant edges structurally impossible (BR-EDGE-1/BR-TENANT-1, R8).
 ```
 
+### 5.4b Knowledge: signals (inference inputs) *(added G1.1)*
+
+Connectors emit **signals** (docs/05 §6.3) — structured facts alongside nodes (SG rules,
+env vars, endpoints, IAM statements, workflow deploy targets, PR files) — that the
+inference engine consumes to *derive* edges. Persisting them (rather than re-deriving from
+`raw_snapshots` via a connector) lets the **infer stage** and **re-inference on a rule bump**
+run decoupled from the provider SDKs. One signal per `(org_id, subject_urn, kind)` → upsert
+refreshes it; `last_sync_run_id` gates staleness for reconcile (like nodes). Org-scoped (RLS).
+
+```sql
+CREATE TABLE signals (
+    id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id           uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    connection_id    uuid NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
+    subject_urn      text NOT NULL,          -- the node this signal is about
+    kind             text NOT NULL,          -- e.g. github.workflow.deploy, aws.sg.rules
+    data             jsonb NOT NULL DEFAULT '{}'::jsonb,
+    first_seen       timestamptz NOT NULL DEFAULT now(),
+    last_seen        timestamptz NOT NULL DEFAULT now(),
+    last_sync_run_id uuid REFERENCES sync_runs(id),
+    CONSTRAINT uq_signal UNIQUE (org_id, subject_urn, kind)
+);
+CREATE INDEX ix_signals_org_kind ON signals(org_id, kind);
+CREATE INDEX ix_signals_subject  ON signals(org_id, subject_urn);
+```
+
 ### 5.5 Platform: audit_events (append-only)
 
 ```sql
