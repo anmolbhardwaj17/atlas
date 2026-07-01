@@ -160,6 +160,24 @@
 
 ---
 
+## 🧭 Deferred during MVP build (IN-SCOPE — revisit, most in Sprint P2 / deploy)
+
+> These are **intentional deferrals inside completed sprints**, not order violations. The binding dependency order (F1→F2→I1∥I2→G1→G2→G3∥G4→P1→P2→GA, A60) is intact. Tracked here so nothing is silently lost.
+
+| Item | From | Where it lands | Doc |
+|---|---|---|---|
+| **Worker process + Redis/BullMQ** — queue/worker code exists but no running worker; API's `InMemoryQueue` only buffers, so enqueued syncs don't execute yet | F2.5 | deploy wiring (before live sync) | 02 §5, 17 |
+| **Scheduler** — per-connection incremental/nightly cadence, leader-elected singleton, periodic `health()` re-check (FR-1.9), GitHub periodic reconcile (DD-2) | I1/I2 | with worker process | 06 §11, 07 §5, 02 §5.4 |
+| **Live connector verification** — AWS read-only IAM role + GitHub App install | I1/I2 | when customer creds exist | 06 §2, 07 §2, 13 |
+| **AWS additive services** — DynamoDB, ElastiCache, API Gateway, IAM-policy | I1.3 | additive anytime | 06 §9 |
+| **GitHub gaps** — webhook API ingress route (verifier built, endpoint not wired); team→member resolution (US-10); IaC (TF/CFN) ref parsing; more manifest ecosystems (have npm/pypi/go); multi-branch structural parse | I2 | P1/P2 + additive | 07 §5/§7 |
+| **audit_events table + audit log** — RBAC/lifecycle built, but the append-only audit table isn't created | F1 | P2 (security pass) | 13 §8, 04 |
+| **Connection purge-on-delete** — delete soft-deletes; source's nodes not purged | F2.8 | P1/P2 | 03, 04 |
+| **Observability baseline** — structured logging + correlation ids (currently basic Nest logger) | F1.3 | P2 | 02 §9.4 |
+| **Adversarial QA agent + API-contract/E2E/load/mutation CI stages** — CI is format/lint/typecheck/test + PG-RLS integration only today | F1.2 | P2 (+ when PRs start) | 14 §7–13 |
+
+---
+
 ## ⏸️ Backlog (Phase-1+ — deferred, from roadmap `docs/15` §8)
 - v1.1 Trust & Depth: richer inference, culprit-PR ranking (US-6), saved views/deep-links
 - v1.2 Enterprise on-ramp: multi-account AWS, **domain auto-join (`hd`)**, real-time CloudTrail ingestion
