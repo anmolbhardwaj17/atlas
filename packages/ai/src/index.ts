@@ -28,3 +28,9 @@ export type {
 } from "./retrieval-port";
 export { classifyIntent, extractTerms, resolveEntity, plan } from "./planner";
 export type { Intent, RetrievalPlan, ResolvedEntity } from "./planner";
+export { orchestrate } from "./retrieval";
+export type { RetrievalResult } from "./retrieval";
+export { buildContext } from "./context";
+export type { BuiltContext, Cite } from "./context";
+export { groundingGate } from "./grounding";
+export type { Grounding } from "./grounding";
