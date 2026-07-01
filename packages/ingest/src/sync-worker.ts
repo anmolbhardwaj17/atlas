@@ -1,5 +1,7 @@
 import type { Connection, Connector } from "@atlas/connector-sdk";
+import { runInference, ALL_RULES } from "@atlas/inference";
 import { runStagedSync, type RunnerDeps, type SyncRunRecord } from "./sync-runner";
+import { silentLogger } from "./runtime";
 import type { Job, JobQueue } from "./queue";
 
 /** The staged-sync queue (docs/02 §5.1). The API/scheduler enqueue here; workers run
@@ -24,8 +26,11 @@ export interface SyncWorkerDeps extends RunnerDeps {
 }
 
 /** Build the handler that runs one sync job: load connection → resolve connector →
- *  runStagedSync. Errors propagate so the queue can retry (BullMQ) per its policy. */
+ *  runStagedSync → **infer stage** (docs/05 §6.1: inference runs after nodes/signals are
+ *  persisted). Sync errors propagate so the queue can retry; an inference error is logged
+ *  but does NOT fail the job — the next sync's infer pass converges it (P7). */
 export function createSyncHandler(deps: SyncWorkerDeps): (job: Job<SyncJobData>) => Promise<void> {
+  const logger = deps.logger ?? silentLogger;
   return async (job) => {
     const { orgId, connectionId, runId, type = "full" } = job.data;
     const connection = await deps.loadConnection(orgId, connectionId);
@@ -33,7 +38,16 @@ export function createSyncHandler(deps: SyncWorkerDeps): (job: Job<SyncJobData>)
     const connector = deps.resolveConnector(connection.provider);
     if (!connector) throw new Error(`no connector for provider "${connection.provider}"`);
     const run: SyncRunRecord = { id: runId, orgId, connectionId, type };
-    await runStagedSync(deps, connector, connection, run);
+    const result = await runStagedSync(deps, connector, connection, run);
+
+    // Infer stage: derive cross-source edges from the just-persisted nodes/signals.
+    if (result.status !== "failed") {
+      try {
+        await runInference({ db: deps.db }, orgId, ALL_RULES);
+      } catch (err) {
+        logger.error(`inference after sync ${runId} failed: ${(err as Error).message}`);
+      }
+    }
   };
 }
 

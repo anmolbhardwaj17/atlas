@@ -26,6 +26,8 @@ export interface MockResource {
   name: string;
   attributes?: Record<string, unknown>;
   edges?: Array<{ type: string; toUrn: string }>;
+  /** Inference-input signals this resource emits (docs/05 §6.3). */
+  signals?: Signal[];
 }
 
 export interface MockScope {
@@ -79,8 +81,8 @@ export class MockConnector implements Connector {
     return { urn: r.urn, kind: r.kind, displayName: r.name, attributes: r.attributes ?? {} };
   }
 
-  extractSignals(): Signal[] {
-    return [];
+  extractSignals(raw: RawResource): Signal[] {
+    return (raw.payload as MockResource).signals ?? [];
   }
 
   observedEdges(raw: RawResource): EdgeUpsert[] {

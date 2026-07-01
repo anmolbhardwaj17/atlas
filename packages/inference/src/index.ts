@@ -6,6 +6,8 @@
  */
 export { runInference } from "./engine";
 export type { InferenceDeps, InferenceLogger } from "./engine";
+export { evaluateAll } from "./evaluate";
+export type { EvaluatedPlan } from "./evaluate";
 export {
   ALL_RULES,
   repoDeploysToRuntimeRule,

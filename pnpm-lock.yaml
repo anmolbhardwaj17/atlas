@@ -252,6 +252,9 @@ importers:
       '@atlas/db':
         specifier: workspace:*
         version: link:../db
+      '@atlas/inference':
+        specifier: workspace:*
+        version: link:../inference
       '@supabase/supabase-js':
         specifier: ^2.110.0
         version: 2.110.0
