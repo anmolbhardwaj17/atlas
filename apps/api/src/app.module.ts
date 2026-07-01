@@ -10,6 +10,7 @@ import { AiModule } from "./ai/ai.module";
 import { DemoModule } from "./demo/demo.module";
 import { HealthController } from "./health/health.controller";
 import { ResponseInterceptor } from "./common/response.interceptor";
+import { LoggingInterceptor } from "./common/logging.interceptor";
 import { HttpExceptionFilter } from "./common/http-exception.filter";
 
 /** Root module. Feature modules (connections, graph, …) are added per the docs/02 module map. */
@@ -26,6 +27,8 @@ import { HttpExceptionFilter } from "./common/http-exception.filter";
   ],
   controllers: [HealthController],
   providers: [
+    // Outermost first: LoggingInterceptor times + logs the whole request (incl. the envelope).
+    { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
     { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
   ],

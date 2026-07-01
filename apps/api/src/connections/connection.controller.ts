@@ -5,6 +5,7 @@ import { RolesGuard } from "../auth/roles.guard";
 import { Roles } from "../auth/roles.decorator";
 import { ApiException } from "../common/errors";
 import { parseBody } from "../common/validation";
+import { AuditService } from "../core/audit.service";
 import type { AuthedRequest } from "../auth/auth.types";
 import { ConnectionService } from "./connection.service";
 import { CreateConnectionSchema, VerifyConnectionSchema, type ConnectionDto } from "./dto";
@@ -18,7 +19,10 @@ import { CreateConnectionSchema, VerifyConnectionSchema, type ConnectionDto } fr
 @Controller("connections")
 @UseGuards(AuthGuard, TenantScopeGuard, RolesGuard)
 export class ConnectionController {
-  constructor(private readonly connections: ConnectionService) {}
+  constructor(
+    private readonly connections: ConnectionService,
+    private readonly audit: AuditService,
+  ) {}
 
   @Post()
   @Roles("Admin")
@@ -45,13 +49,31 @@ export class ConnectionController {
     @Param("id") id: string,
     @Body() body: unknown,
   ): Promise<ConnectionDto> {
-    return this.connections.verify(org(req).id, id, parseBody(VerifyConnectionSchema, body));
+    const dto = await this.connections.verify(
+      org(req).id,
+      id,
+      parseBody(VerifyConnectionSchema, body),
+    );
+    await this.audit.fromRequest(req, {
+      action: "connection.verify",
+      targetType: "connection",
+      targetId: id,
+      metadata: { provider: dto.provider, status: dto.status },
+    });
+    return dto;
   }
 
   @Delete(":id")
   @Roles("Admin")
   async disconnect(@Req() req: AuthedRequest, @Param("id") id: string): Promise<ConnectionDto> {
-    return this.connections.disconnect(org(req).id, id);
+    const dto = await this.connections.disconnect(org(req).id, id);
+    await this.audit.fromRequest(req, {
+      action: "connection.disconnect",
+      targetType: "connection",
+      targetId: id,
+      metadata: { provider: dto.provider },
+    });
+    return dto;
   }
 }
 

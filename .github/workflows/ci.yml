@@ -1,8 +1,9 @@
 # Atlas CI — runs the quality gates on every push to main (docs/14 §16, docs/17 §5).
 # Gates: format, lint, typecheck, unit test (check job) + integration tests against a
-# real ephemeral Postgres with the two-role setup + RLS (integration job, US-12).
-# Heavier stages still to come (API contract, the adversarial QA agent, E2E, load,
-# AI-eval) land as those capabilities arrive (see docs/14 §16 for the full sequence).
+# real ephemeral Postgres with the two-role setup + RLS incl. the append-only audit log
+# (integration job, US-12) + a production web build (web-build job, catches build/NODE_ENV
+# regressions). Heavier stages still to come (API contract, the adversarial QA agent, E2E,
+# load, AI-eval) land as those capabilities arrive (see docs/14 §16 for the full sequence).
 name: CI
 
 on:
@@ -99,5 +100,36 @@ jobs:
       - name: Grant atlas_app LOGIN (CI throwaway password)
         run: pnpm --filter @atlas/db run setup:app-role
 
-      - name: Integration tests (Postgres + RLS + staged sync)
+      - name: Integration tests (Postgres + RLS + staged sync + audit log)
         run: pnpm run test
+
+  web-build:
+    name: Web · Production build
+    runs-on: ubuntu-latest
+    # Catches build-time regressions the unit gates miss (e.g. an env/NODE_ENV or RSC
+    # boundary break). The build script forces NODE_ENV=production; NEXT_PUBLIC_* are
+    # inlined at build time so placeholders suffice (no network/secrets needed).
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://ci.example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+      NEXT_PUBLIC_API_URL: http://localhost:4290
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web (next build, production)
+        run: pnpm --filter @atlas/web run build

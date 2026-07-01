@@ -1,4 +1,5 @@
 import "reflect-metadata";
+import { randomUUID } from "node:crypto";
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter } from "@nestjs/platform-fastify";
 import type { NestFastifyApplication } from "@nestjs/platform-fastify";
@@ -12,7 +13,19 @@ import { AppModule } from "./app.module";
  */
 async function bootstrap(): Promise<void> {
   const env = loadEnv();
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter());
+  // Correlation id (docs/02 §9.4): reuse an inbound `x-request-id` if the caller/proxy set
+  // one, else generate. Fastify puts it on `request.id`; the logging interceptor + error
+  // filter thread it through so one request is traceable end to end across logs + responses.
+  const adapter = new FastifyAdapter({
+    requestIdHeader: "x-request-id",
+    genReqId: () => randomUUID(),
+  });
+  // Echo the correlation id back so the client (and the browser Network tab) can quote it.
+  adapter.getInstance().addHook("onRequest", (req, reply, done) => {
+    void reply.header("x-request-id", String(req.id));
+    done();
+  });
+  const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter);
   // The web app calls the API from the browser (Bearer token) — allow its origin (docs/08 §3).
   app.enableCors({
     origin: env.WEB_ORIGIN,

@@ -16,6 +16,7 @@ import { RolesGuard } from "../auth/roles.guard";
 import { Roles } from "../auth/roles.decorator";
 import { ApiException } from "../common/errors";
 import { parseBody } from "../common/validation";
+import { AuditService } from "../core/audit.service";
 import type { AuthedRequest } from "../auth/auth.types";
 import { OrgService } from "./org.service";
 import { InvitationService } from "./invitation.service";
@@ -39,12 +40,22 @@ export class OrgController {
   constructor(
     private readonly orgs: OrgService,
     private readonly invitations: InvitationService,
+    private readonly audit: AuditService,
   ) {}
 
   @Post()
   @UseGuards(AuthGuard)
   async create(@Req() req: AuthedRequest, @Body() body: unknown): Promise<OrgDto> {
-    return this.orgs.create(claims(req), parseBody(CreateOrgSchema, body));
+    const dto = await this.orgs.create(claims(req), parseBody(CreateOrgSchema, body));
+    // No req.org yet (create precedes membership) — record against the new org directly.
+    await this.audit.record(dto.id, {
+      action: "org.create",
+      actorUserId: claims(req).userId,
+      targetType: "org",
+      targetId: dto.id,
+      requestId: req.id ?? null,
+    });
+    return dto;
   }
 
   @Get(":orgId")
@@ -77,7 +88,15 @@ export class OrgController {
     @Body() body: unknown,
   ): Promise<MemberDto> {
     const { id, role } = org(req);
-    return this.orgs.changeRole(id, role, userId, parseBody(ChangeRoleSchema, body).role);
+    const newRole = parseBody(ChangeRoleSchema, body).role;
+    const member = await this.orgs.changeRole(id, role, userId, newRole);
+    await this.audit.fromRequest(req, {
+      action: "member.role_change",
+      targetType: "user",
+      targetId: userId,
+      metadata: { newRole },
+    });
+    return member;
   }
 
   @Delete(":orgId/members/:userId")
@@ -87,17 +106,29 @@ export class OrgController {
   async removeMember(@Req() req: AuthedRequest, @Param("userId") userId: string): Promise<void> {
     const { id, role } = org(req);
     await this.orgs.removeMember(id, role, userId);
+    await this.audit.fromRequest(req, {
+      action: "member.remove",
+      targetType: "user",
+      targetId: userId,
+    });
   }
 
   @Post(":orgId/invitations")
   @UseGuards(AuthGuard, TenantScopeGuard, RolesGuard)
   @Roles("Admin")
   async invite(@Req() req: AuthedRequest, @Body() body: unknown): Promise<InvitationDto> {
-    return this.invitations.create(
+    const invite = await this.invitations.create(
       org(req).id,
       claims(req).userId,
       parseBody(CreateInviteSchema, body),
     );
+    await this.audit.fromRequest(req, {
+      action: "invitation.create",
+      targetType: "invitation",
+      targetId: invite.id,
+      metadata: { email: invite.email, role: invite.role },
+    });
+    return invite;
   }
 
   @Get(":orgId/invitations")
@@ -116,6 +147,11 @@ export class OrgController {
     @Param("invitationId") invitationId: string,
   ): Promise<void> {
     await this.invitations.revoke(org(req).id, invitationId);
+    await this.audit.fromRequest(req, {
+      action: "invitation.revoke",
+      targetType: "invitation",
+      targetId: invitationId,
+    });
   }
 }
 

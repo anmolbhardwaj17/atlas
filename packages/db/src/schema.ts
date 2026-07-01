@@ -191,3 +191,16 @@ export interface EdgeRow {
   created_at: Date;
   updated_at: Date;
 }
+
+/** Append-only audit log (docs/13 §8, migration 0014). Org-scoped; INSERT+SELECT only. */
+export interface AuditEventRow {
+  id: string;
+  org_id: string;
+  actor_user_id: string | null;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  metadata: Record<string, unknown>;
+  request_id: string | null;
+  created_at: Date;
+}

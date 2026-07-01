@@ -27,6 +27,8 @@ export interface OrgContext {
 export interface AuthedRequest {
   headers: Record<string, string | string[] | undefined>;
   params?: Record<string, string | undefined>;
+  /** Fastify correlation id (from `x-request-id` or generated) — for audit provenance. */
+  id?: string;
   auth?: AuthClaims;
   org?: OrgContext;
 }

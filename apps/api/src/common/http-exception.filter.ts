@@ -16,6 +16,8 @@ interface HttpReply {
 interface HttpRequest {
   method: string;
   url: string;
+  /** Fastify correlation id (from `x-request-id` or generated) — see main.ts. */
+  id?: string;
 }
 
 /**
@@ -32,7 +34,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const reply = ctx.getResponse<HttpReply>();
     const req = ctx.getRequest<HttpRequest>();
-    const requestId = randomUUID();
+    // Reuse the request-wide correlation id so the error the client sees matches the logs.
+    const requestId = req.id ?? randomUUID();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let code: ApiErrorCode = "internal_error";

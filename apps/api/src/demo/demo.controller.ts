@@ -4,6 +4,7 @@ import { TenantScopeGuard } from "../auth/tenant-scope.guard";
 import { RolesGuard } from "../auth/roles.guard";
 import { Roles } from "../auth/roles.decorator";
 import { ApiException } from "../common/errors";
+import { AuditService } from "../core/audit.service";
 import type { AuthedRequest } from "../auth/auth.types";
 import { DemoService } from "./demo.service";
 
@@ -15,12 +16,22 @@ import { DemoService } from "./demo.service";
 @Controller("demo")
 @UseGuards(AuthGuard, TenantScopeGuard, RolesGuard)
 export class DemoController {
-  constructor(private readonly demo: DemoService) {}
+  constructor(
+    private readonly demo: DemoService,
+    private readonly audit: AuditService,
+  ) {}
 
   @Post("seed")
   @Roles("Admin")
   async seed(@Req() req: AuthedRequest): Promise<unknown> {
-    return this.demo.seed(org(req).id);
+    const result = await this.demo.seed(org(req).id);
+    await this.audit.fromRequest(req, {
+      action: "demo.seed",
+      targetType: "org",
+      targetId: org(req).id,
+      metadata: { nodeCount: result.nodeCount },
+    });
+    return result;
   }
 }
 
