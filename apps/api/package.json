@@ -9,6 +9,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@atlas/ai": "workspace:*",
     "@atlas/config": "workspace:*",
     "@atlas/connector-aws": "workspace:*",
     "@atlas/connector-github": "workspace:*",

@@ -34,5 +34,11 @@ export { buildContext } from "./context";
 export type { BuiltContext, Cite } from "./context";
 export { groundingGate } from "./grounding";
 export type { Grounding } from "./grounding";
-export { answerQuestion, bindCitations, detectUncitedClaims, scoreConfidence } from "./answer";
-export type { Answer, AnswerCitation, AnswerDeps, OverallConfidence } from "./answer";
+export {
+  answerQuestion,
+  answerQuestionStream,
+  bindCitations,
+  detectUncitedClaims,
+  scoreConfidence,
+} from "./answer";
+export type { Answer, AnswerCitation, AnswerDeps, AnswerEvent, OverallConfidence } from "./answer";
