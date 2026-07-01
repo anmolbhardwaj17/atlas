@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { apiUrl } from "@/lib/env";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface Member {
   userId: string;
@@ -19,9 +23,8 @@ interface Invitation {
   expiresAt: string;
 }
 
-/** Org management (docs/08 §7): lists members + pending invitations and creates
- *  invites. Calls the API with the app's Supabase session (Bearer). Admin+ only
- *  endpoints — a Member viewer will see 403s surfaced inline. */
+/** Org members + invitations (docs/08 §7). Client component — reads with the app's
+ *  Supabase session (Bearer); Admin+ invite endpoints surface 403s inline for viewers. */
 export function OrgPanel({ orgId }: { orgId: string }) {
   const [members, setMembers] = useState<Member[]>([]);
   const [invites, setInvites] = useState<Invitation[]>([]);
@@ -36,8 +39,9 @@ export function OrgPanel({ orgId }: { orgId: string }) {
     return {
       "content-type": "application/json",
       Authorization: `Bearer ${session?.access_token ?? ""}`,
+      "X-Atlas-Org": orgId,
     };
-  }, []);
+  }, [orgId]);
 
   const load = useCallback(async () => {
     const h = await authHeaders();
@@ -71,77 +75,81 @@ export function OrgPanel({ orgId }: { orgId: string }) {
     }
   }
 
-  const box = { border: "1px solid #1d212b", borderRadius: 8, padding: "1rem", marginTop: "1rem" };
   return (
-    <div style={box}>
-      <h3 style={{ margin: "0 0 .5rem", fontSize: ".95rem" }}>Members</h3>
-      <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
-        {members.map((m) => (
-          <li key={m.userId}>
-            {m.name ?? m.email} <span style={{ color: "#5f6368" }}>({m.email})</span> — {m.role}
-          </li>
-        ))}
-      </ul>
+    <Card>
+      <CardHeader>
+        <CardTitle>Members &amp; access</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div>
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Members
+          </p>
+          <ul className="divide-y divide-border rounded-md border">
+            {members.length === 0 ? (
+              <li className="px-3 py-2 text-sm text-muted-foreground">No members loaded.</li>
+            ) : (
+              members.map((m) => (
+                <li key={m.userId} className="flex items-center justify-between px-3 py-2 text-sm">
+                  <span>
+                    <span className="font-medium">{m.name ?? m.email}</span>{" "}
+                    <span className="text-muted-foreground">{m.email}</span>
+                  </span>
+                  <Badge variant="secondary">{m.role}</Badge>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
 
-      <h3 style={{ margin: "1rem 0 .5rem", fontSize: ".95rem" }}>Pending invitations</h3>
-      {invites.length ? (
-        <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
-          {invites.map((i) => (
-            <li key={i.id}>
-              {i.email} — {i.role} <span style={{ color: "#5f6368" }}>({i.status})</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p style={{ color: "#9aa0a6", margin: 0 }}>None.</p>
-      )}
+        <div>
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Pending invitations
+          </p>
+          {invites.length ? (
+            <ul className="divide-y divide-border rounded-md border">
+              {invites.map((i) => (
+                <li key={i.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                  <span>
+                    {i.email} <span className="text-muted-foreground">· {i.role}</span>
+                  </span>
+                  <Badge variant="outline">{i.status}</Badge>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">None.</p>
+          )}
+        </div>
 
-      <form onSubmit={invite} style={{ display: "flex", gap: ".5rem", marginTop: ".75rem" }}>
-        <input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="teammate@company.com"
-          type="email"
-          required
-          style={{
-            flex: 1,
-            padding: ".4rem .6rem",
-            borderRadius: 6,
-            border: "1px solid #2a2f3a",
-            background: "#11141b",
-            color: "#e8eaed",
-          }}
-        />
-        <select
-          value={role}
-          onChange={(e) => setRole(e.target.value as "Member" | "Admin")}
-          style={{
-            padding: ".4rem",
-            borderRadius: 6,
-            border: "1px solid #2a2f3a",
-            background: "#11141b",
-            color: "#e8eaed",
-          }}
-        >
-          <option value="Member">Member</option>
-          <option value="Admin">Admin</option>
-        </select>
-        <button
-          type="submit"
-          style={{
-            padding: ".4rem .9rem",
-            borderRadius: 6,
-            border: "1px solid #2a2f3a",
-            background: "#8ab4f8",
-            color: "#0b0d12",
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          Invite
-        </button>
-      </form>
-      {note ? <p style={{ color: "#9aa0a6", marginTop: ".5rem" }}>{note}</p> : null}
-    </div>
+        <form onSubmit={invite} className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Invite a teammate
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="teammate@company.com"
+              type="email"
+              required
+              className="min-w-56 flex-1"
+              aria-label="Invite email"
+            />
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value as "Member" | "Admin")}
+              aria-label="Invite role"
+              className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <option value="Member">Member</option>
+              <option value="Admin">Admin</option>
+            </select>
+            <Button type="submit">Invite</Button>
+          </div>
+          {note ? <p className="text-sm text-muted-foreground">{note}</p> : null}
+        </form>
+      </CardContent>
+    </Card>
   );
 }
