@@ -50,6 +50,8 @@ Inherits `00`–`10`. Search-specific:
 
 > **DD-1 — OpenSearch (BM25 + kNN in one engine), not pgvector-only or a separate vector DB.** Resolves `02` OQ-ARCH-2 / `04` OQ-DB-3.
 
+> **Implementation note (G2.4, added 2026-07-01): search is behind a `SearchProvider` interface (like the Connector/JobQueue/SnapshotStore abstractions), with a Postgres-backed impl shipping first and the OpenSearch driver as the deploy target.** Because search is a *projection, rebuildable from `nodes`* (SE-1), the MVP `PostgresSearchProvider` queries `nodes` directly via `pg_trgm` (identifier/keyword match over name/urn/attributes) — no separate index, no new infra, fully testable in CI. It returns the same `{node,score,match,highlights}` shape (`08` §10.1) with `match.semantic = null` until vectors exist. The **OpenSearch driver (BM25 + kNN hybrid + the index/embedding pipeline of §3–§8) is deferred to deploy** — swapping it in is a provider change, no API/consumer change. Tracked in the board's deferral ledger.
+
 | Option | Verdict | Reasoning |
 |---|---|---|
 | **PostgreSQL `pg_trgm`/`tsvector` only** | insufficient | good keyword/trigram, but no first-class vector kNN at quality/scale; would bolt on `pgvector` and still lack BM25 tuning, analyzers, highlighting |
