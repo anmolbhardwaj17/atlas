@@ -180,6 +180,9 @@ importers:
       '@atlas/connector-sdk':
         specifier: workspace:*
         version: link:../connector-sdk
+      jose:
+        specifier: ^5.9.6
+        version: 5.10.0
     devDependencies:
       typescript:
         specifier: ^5.7.2

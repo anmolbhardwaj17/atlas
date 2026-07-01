@@ -9,3 +9,10 @@
 export { repoUrn, pullRequestUrn, workflowUrn, teamUrn, userUrn, packageUrn } from "./urn";
 export { GITHUB_NODE_KINDS, GITHUB_NODE_KIND_LIST } from "./node-kinds";
 export type { GithubNodeKind, GithubKindDescriptor } from "./node-kinds";
+export { GithubConnector } from "./github-connector";
+export type { GithubConnectorDeps } from "./github-connector";
+export { parseGithubConfig } from "./config";
+export type { GithubAppConfig } from "./config";
+export { GithubAppTokenProvider, InstallationAuthError, buildAppJwt } from "./auth";
+export type { InstallationTokenProvider, InstallationToken, InstallationTokenInput } from "./auth";
+export { REQUIRED_PERMISSIONS, missingPermissions } from "./permissions";
