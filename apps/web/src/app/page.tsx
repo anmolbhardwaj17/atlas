@@ -46,7 +46,7 @@ export default async function HomePage() {
   }
 
   return (
-    <AppShell orgName={active.orgName} email={me.email ?? session.email}>
+    <AppShell orgName={active.orgName} email={me.email ?? session.email} orgId={active.orgId}>
       <Dashboard orgId={active.orgId} token={session.token} />
     </AppShell>
   );

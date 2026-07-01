@@ -52,7 +52,7 @@ export default async function ExplorePage({
   if (page?.nextCursor) nextParams.set("cursor", page.nextCursor);
 
   return (
-    <AppShell orgName={shell.orgName} email={shell.email}>
+    <AppShell orgName={shell.orgName} email={shell.email} orgId={shell.orgId}>
       <div className="space-y-6">
         <div>
           <h1 className="text-xl font-semibold">Explore</h1>

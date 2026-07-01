@@ -24,7 +24,7 @@ export default async function ImpactPage({ params }: { params: Promise<{ id: str
   const node = nodeRes.body?.data ?? null;
 
   return (
-    <AppShell orgName={shell.orgName} email={shell.email}>
+    <AppShell orgName={shell.orgName} email={shell.email} orgId={shell.orgId}>
       <div className="mb-5">
         <Link href={`/explore/${id}`} className="text-sm text-muted hover:text-fg">
           ← Back to node

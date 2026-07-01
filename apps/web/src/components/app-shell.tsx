@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Boxes, Search, MessageSquare, Settings } from "lucide-react";
 import { SignOutButton } from "@/app/sign-out-button";
+import { CommandPalette } from "@/components/command-palette";
+import { CommandTrigger } from "@/components/command-trigger";
 
 /**
  * AppShell (docs/09 §5.1) — the authenticated wrapper: TopBar (brand + org + nav + user)
@@ -17,10 +19,12 @@ const NAV = [
 export function AppShell({
   orgName,
   email,
+  orgId,
   children,
 }: {
   orgName: string;
   email: string;
+  orgId?: string;
   children: ReactNode;
 }) {
   return (
@@ -48,12 +52,14 @@ export function AppShell({
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm text-muted">
+            {orgId && <CommandTrigger />}
             <span className="hidden sm:inline">{email}</span>
             <SignOutButton />
           </div>
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+      {orgId && <CommandPalette orgId={orgId} />}
     </div>
   );
 }

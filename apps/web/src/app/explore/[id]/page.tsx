@@ -19,7 +19,7 @@ export default async function NodePage({ params }: { params: Promise<{ id: strin
   const edges = edgesRes.body?.data ?? [];
 
   return (
-    <AppShell orgName={shell.orgName} email={shell.email}>
+    <AppShell orgName={shell.orgName} email={shell.email} orgId={shell.orgId}>
       <div className="mb-5">
         <Link href="/explore" className="text-sm text-muted hover:text-fg">
           ← Explore

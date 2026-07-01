@@ -23,7 +23,7 @@ export default async function EdgePage({ params }: { params: Promise<{ id: strin
   const edge = res.body?.data ?? null;
 
   return (
-    <AppShell orgName={shell.orgName} email={shell.email}>
+    <AppShell orgName={shell.orgName} email={shell.email} orgId={shell.orgId}>
       {edge ? (
         <div className="space-y-6">
           <div>
