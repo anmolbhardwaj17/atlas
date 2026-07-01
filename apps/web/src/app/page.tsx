@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
-import { apiUrl } from "@/lib/env";
-import { SignOutButton } from "./sign-out-button";
+import { getSession, apiGet, type ApiOk } from "@/lib/api";
+import { AppShell } from "@/components/app-shell";
+import { Dashboard } from "@/components/dashboard";
+import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { CreateOrgForm } from "./create-org-form";
-import { OrgPanel } from "./org-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -14,111 +14,62 @@ interface Membership {
   role: string;
 }
 interface MeResponse {
-  id: string;
   email: string;
   name: string | null;
-  avatarUrl: string | null;
-  emailVerified: boolean;
   memberships: Membership[];
   defaultOrgId: string | null;
 }
 
-const page = { fontFamily: "system-ui, sans-serif", color: "#e8eaed", background: "#0b0d12" };
-
-async function fetchMe(
-  accessToken: string,
-): Promise<{ me: MeResponse | null; error: string | null }> {
-  try {
-    const res = await fetch(`${apiUrl()}/me`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      cache: "no-store",
-    });
-    if (!res.ok) return { me: null, error: `API /me responded ${res.status}` };
-    const body = (await res.json()) as { data: MeResponse };
-    return { me: body.data, error: null };
-  } catch (e) {
-    return { me: null, error: `Could not reach API: ${(e as Error).message}` };
-  }
-}
-
 export default async function HomePage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await getSession();
+  if (!session) return <Landing />;
 
-  if (!user) {
+  const me = (await apiGet<ApiOk<MeResponse>>("/me", { token: session.token })).body?.data;
+  const active = me?.memberships.find((m) => m.orgId === me.defaultOrgId) ?? me?.memberships[0];
+
+  if (!me || !active) {
     return (
-      <main style={{ ...page, minHeight: "100dvh", display: "grid", placeItems: "center" }}>
-        <div style={{ textAlign: "center" }}>
-          <h1>Atlas</h1>
-          <p style={{ color: "#9aa0a6" }}>
-            The knowledge graph is the product. The AI is the interface.
-          </p>
-          <Link
-            href="/login"
-            style={{ color: "#8ab4f8", display: "inline-block", marginTop: "1rem" }}
-          >
-            Sign in →
-          </Link>
-        </div>
-      </main>
+      <div className="mx-auto grid min-h-dvh max-w-md place-items-center px-6">
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle>Welcome to Atlas</CardTitle>
+          </CardHeader>
+          <CardBody className="space-y-3">
+            <p className="text-sm text-muted">
+              Create an organization to start building your graph.
+            </p>
+            <CreateOrgForm />
+          </CardBody>
+        </Card>
+      </div>
     );
   }
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const { me, error } = session?.access_token
-    ? await fetchMe(session.access_token)
-    : { me: null, error: "No access token in session" };
-
   return (
-    <main
-      style={{ ...page, minHeight: "100dvh", padding: "3rem", maxWidth: 720, margin: "0 auto" }}
-    >
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ margin: 0 }}>Atlas</h1>
-        <SignOutButton />
-      </header>
+    <AppShell orgName={active.orgName} email={me.email ?? session.email}>
+      <Dashboard orgId={active.orgId} token={session.token} />
+    </AppShell>
+  );
+}
 
-      <section style={{ marginTop: "2rem" }}>
-        <h2 style={{ fontSize: "1rem", color: "#9aa0a6" }}>Signed in as</h2>
-        <p style={{ margin: ".25rem 0" }}>
-          <strong>{me?.name ?? user.email}</strong> — {me?.email ?? user.email}{" "}
-          {me?.emailVerified ? (
-            <span style={{ color: "#81c995" }}>✓ verified</span>
-          ) : (
-            <span style={{ color: "#f28b82" }}>unverified</span>
-          )}
+function Landing() {
+  return (
+    <main className="grid min-h-dvh place-items-center px-6 text-center">
+      <div>
+        <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-primary/20 text-2xl font-bold text-primary">
+          A
+        </div>
+        <h1 className="text-2xl font-semibold">Atlas</h1>
+        <p className="mt-2 max-w-md text-sm text-muted">
+          The knowledge graph is the product. The AI is the interface.
         </p>
-        <p style={{ color: "#5f6368", fontSize: ".8rem" }}>user id: {me?.id ?? user.id}</p>
-      </section>
-
-      <section style={{ marginTop: "2rem" }}>
-        <h2 style={{ fontSize: "1rem", color: "#9aa0a6" }}>Organizations</h2>
-        {error ? (
-          <p style={{ color: "#f28b82" }}>{error}</p>
-        ) : me && me.memberships.length > 0 ? (
-          <ul>
-            {me.memberships.map((m) => (
-              <li key={m.orgId}>
-                {m.orgName} <span style={{ color: "#5f6368" }}>({m.orgSlug})</span> — {m.role}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p style={{ color: "#9aa0a6" }}>No organizations yet. Create one to get started:</p>
-        )}
-        {me && !error ? <CreateOrgForm /> : null}
-      </section>
-
-      {me?.defaultOrgId ? (
-        <section style={{ marginTop: "2rem" }}>
-          <h2 style={{ fontSize: "1rem", color: "#9aa0a6" }}>Manage organization</h2>
-          <OrgPanel orgId={me.defaultOrgId} />
-        </section>
-      ) : null}
+        <Link
+          href="/login"
+          className="mt-6 inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-bg hover:opacity-90"
+        >
+          Sign in →
+        </Link>
+      </div>
     </main>
   );
 }

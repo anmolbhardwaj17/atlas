@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Atlas certainty visual language (docs/09 §3.1). Dark-first, dense, technical. */
+:root {
+  --bg: 222 24% 6%;
+  --surface: 222 20% 9%;
+  --border: 222 14% 18%;
+  --fg: 210 20% 92%;
+  --muted: 218 10% 60%;
+  --primary: 213 90% 66%;
+  --observed: 145 55% 55%; /* fact — solid green */
+  --inferred-high: 213 90% 66%; /* strong inference — blue */
+  --inferred-low: 38 90% 62%; /* weak inference — amber */
+  --stale: 218 10% 50%; /* stale/degraded — gray */
+  --danger: 4 80% 66%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+body {
+  background: hsl(var(--bg));
+  color: hsl(var(--fg));
+  font-feature-settings: "cv11", "ss01";
+}

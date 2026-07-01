@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import "./globals.css";
 
 export const metadata = {
   title: "Atlas",
@@ -7,7 +8,7 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       {/* suppressHydrationWarning: browser extensions inject attributes on <body>
           (e.g. cz-shortcut-listen) which would otherwise trip a hydration warning. */}
       <body suppressHydrationWarning>{children}</body>
