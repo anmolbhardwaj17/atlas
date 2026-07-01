@@ -17,7 +17,8 @@
   },
   "dependencies": {
     "@atlas/connector-sdk": "workspace:*",
-    "jose": "^5.9.6"
+    "jose": "^5.9.6",
+    "yaml": "^2.6.1"
   },
   "devDependencies": {
     "typescript": "^5.7.2",

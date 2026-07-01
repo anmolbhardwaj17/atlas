@@ -27,6 +27,7 @@ import type {
 import { parseGithubConfig } from "./config";
 import { InstallationAuthError, type InstallationTokenProvider } from "./auth";
 import { missingPermissions } from "./permissions";
+import { MODULE_BY_KIND, type GithubModule } from "./modules";
 
 const NOOP_LOGGER: ConnectorLogger = {
   debug: () => undefined,
@@ -109,7 +110,9 @@ export class GithubConnector implements Connector {
     return { status: "connected" };
   }
 
-  // ── Crawl stages (I2.3 pure transforms, I2.4 live discover) ──────────────────
+  // ── Crawl stages ────────────────────────────────────────────────────────────
+  // plan/discover/fetchDetail (live Octokit) are wired in I2.4; the pure transforms
+  // below dispatch by node kind and are complete now.
   async plan(_conn: Connection, _run: SyncRun): Promise<WorkPlan> {
     throw notImplemented("plan");
   }
@@ -120,17 +123,24 @@ export class GithubConnector implements Connector {
   async fetchDetail(_ref: ResourceRef, _ctx: CrawlContext): Promise<RawResource> {
     throw notImplemented("fetchDetail");
   }
-  normalize(_raw: RawResource): NodeUpsert {
-    throw notImplemented("normalize");
+
+  normalize(raw: RawResource): NodeUpsert {
+    return this.moduleFor(raw).normalize(raw.payload);
   }
-  extractSignals(_raw: RawResource): Signal[] {
-    throw notImplemented("extractSignals");
+  extractSignals(raw: RawResource): Signal[] {
+    return this.moduleFor(raw).extractSignals(raw.payload);
   }
-  observedEdges(_raw: RawResource): EdgeUpsert[] {
-    throw notImplemented("observedEdges");
+  observedEdges(raw: RawResource): EdgeUpsert[] {
+    return this.moduleFor(raw).observedEdges(raw.payload);
+  }
+
+  private moduleFor(raw: RawResource): GithubModule {
+    const module = MODULE_BY_KIND.get(raw.ref.kind);
+    if (!module) throw new Error(`No GitHub module for kind "${raw.ref.kind}".`);
+    return module;
   }
 }
 
 function notImplemented(stage: string): Error {
-  return new Error(`GithubConnector.${stage} is implemented in I2.3/I2.4.`);
+  return new Error(`GithubConnector.${stage} issues live GitHub calls — wired in I2.4.`);
 }
