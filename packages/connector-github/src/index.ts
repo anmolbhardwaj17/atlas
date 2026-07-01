@@ -26,3 +26,10 @@ export { parseCodeowners, classifyOwner, distinctOwners } from "./parsers/codeow
 export { parseManifest } from "./parsers/manifest";
 export { parseWorkflowDeploys } from "./parsers/workflow";
 export type { WorkflowDeploys, DeployTarget } from "./parsers/workflow";
+export { createGithubConnector } from "./factory";
+export { verifyWebhookSignature, parseWebhookEvent } from "./webhook";
+export type { WebhookDescriptor, WebhookEventKind } from "./webhook";
+export { FetchGithubClient, nextLink } from "./github/client";
+export type { GithubClient, GithubResponse, GithubRequestOptions } from "./github/client";
+export { listInstallationRepos, crawlRepo } from "./github/crawl";
+export type { Discovered } from "./github/crawl";

@@ -1,11 +1,7 @@
 import { Module, type Provider } from "@nestjs/common";
-import {
-  InMemorySecretBroker,
-  InMemoryQueue,
-  MockConnector,
-  type SecretBroker,
-} from "@atlas/ingest";
+import { InMemorySecretBroker, InMemoryQueue, type SecretBroker } from "@atlas/ingest";
 import { createAwsConnector } from "@atlas/connector-aws";
+import { createGithubConnector } from "@atlas/connector-github";
 import { AuthModule } from "../auth/auth.module";
 import { ConnectionService } from "./connection.service";
 import { ConnectionController } from "./connection.controller";
@@ -16,10 +12,10 @@ import { SECRET_BROKER, JOB_QUEUE } from "./tokens";
  * Connections (docs/08 §8). Imports AuthModule for the guards.
  *
  * The Secrets Broker is the in-memory dev impl (F2.6); AWS Secrets Manager is the
- * production impl (docs/13 §7). The ConnectorRegistry now holds the REAL AwsConnector
- * (I1) — verify runs a live AssumeRole + permission probe; GitHub stays a placeholder
- * until I2. The JobQueue is the in-memory dev impl (F2.5); a BullMQ/Redis queue + a
- * worker process run jobs in deploy (docs/02 §5) — the API only enqueues.
+ * production impl (docs/13 §7). The ConnectorRegistry holds the REAL AwsConnector (I1)
+ * and GithubConnector (I2) — verify runs a live AssumeRole / installation-token probe.
+ * The JobQueue is the in-memory dev impl (F2.5); a BullMQ/Redis queue + a worker process
+ * run jobs in deploy (docs/02 §5) — the API only enqueues.
  */
 const secretBrokerProvider: Provider = {
   provide: SECRET_BROKER,
@@ -36,8 +32,7 @@ const connectorRegistryProvider: Provider = {
   useFactory: (secrets: SecretBroker): ConnectorRegistry => {
     const registry = new ConnectorRegistry();
     registry.register("aws", createAwsConnector({ secrets }));
-    // GitHub remains a placeholder (verify returns "connected") until I2.
-    registry.register("github", new MockConnector([]));
+    registry.register("github", createGithubConnector({ secrets }));
     return registry;
   },
   inject: [SECRET_BROKER],

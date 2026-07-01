@@ -28,6 +28,8 @@ import { parseGithubConfig } from "./config";
 import { InstallationAuthError, type InstallationTokenProvider } from "./auth";
 import { missingPermissions } from "./permissions";
 import { MODULE_BY_KIND, type GithubModule } from "./modules";
+import { FetchGithubClient, type GithubClient } from "./github/client";
+import { listInstallationRepos, crawlRepo } from "./github/crawl";
 
 const NOOP_LOGGER: ConnectorLogger = {
   debug: () => undefined,
@@ -41,6 +43,8 @@ export interface GithubConnectorDeps {
   auth: InstallationTokenProvider;
   /** Resolves the App private key from the Secrets Broker by `secret_ref`. */
   secrets: SecretAccessor;
+  /** Builds a REST client from an installation token (overridable for tests). */
+  clientFactory?: (token: string) => GithubClient;
   logger?: ConnectorLogger;
 }
 
@@ -48,11 +52,18 @@ export class GithubConnector implements Connector {
   readonly provider = "github" as const;
   private readonly auth: InstallationTokenProvider;
   private readonly secrets: SecretAccessor;
+  private readonly clientFactory: (token: string) => GithubClient;
   private readonly log: ConnectorLogger;
+
+  /** One installation token + client per run (mirrors AWS's one-AssumeRole-per-run). */
+  private readonly runClients = new Map<string, Promise<GithubClient>>();
+  /** Hands a crawled payload from discover() to the immediately-following fetchDetail(). */
+  private readonly pendingPayloads = new Map<string, unknown>();
 
   constructor(deps: GithubConnectorDeps) {
     this.auth = deps.auth;
     this.secrets = deps.secrets;
+    this.clientFactory = deps.clientFactory ?? ((token) => new FetchGithubClient({ token }));
     this.log = deps.logger ?? NOOP_LOGGER;
   }
 
@@ -111,17 +122,60 @@ export class GithubConnector implements Connector {
   }
 
   // ── Crawl stages ────────────────────────────────────────────────────────────
-  // plan/discover/fetchDetail (live Octokit) are wired in I2.4; the pure transforms
-  // below dispatch by node kind and are complete now.
-  async plan(_conn: Connection, _run: SyncRun): Promise<WorkPlan> {
-    throw notImplemented("plan");
+
+  /** One scope per installed repo (bounded, resumable — docs/07 §4). */
+  async plan(conn: Connection, run: SyncRun): Promise<WorkPlan> {
+    const client = await this.clientForRun(conn, run.id);
+    const repos = await listInstallationRepos(client);
+    return {
+      scopes: repos.map((r) => ({
+        key: `repo:${r.owner}/${r.repo}`,
+        params: { owner: r.owner, repo: r.repo },
+      })),
+    };
   }
-  // eslint-disable-next-line require-yield
-  async *discover(_scope: Scope, _ctx: CrawlContext): AsyncIterable<ResourceRef> {
-    throw notImplemented("discover");
+
+  async *discover(scope: Scope, ctx: CrawlContext): AsyncIterable<ResourceRef> {
+    const owner = typeof scope.params?.owner === "string" ? scope.params.owner : undefined;
+    const repo = typeof scope.params?.repo === "string" ? scope.params.repo : undefined;
+    if (!owner || !repo) return;
+    const client = await this.clientForRun(ctx.connection, ctx.run.id);
+    for await (const item of crawlRepo(client, owner, repo, scope.key)) {
+      this.pendingPayloads.set(payloadKey(ctx.run.id, item.ref.externalId), item.payload);
+      yield item.ref;
+    }
   }
-  async fetchDetail(_ref: ResourceRef, _ctx: CrawlContext): Promise<RawResource> {
-    throw notImplemented("fetchDetail");
+
+  async fetchDetail(ref: ResourceRef, ctx: CrawlContext): Promise<RawResource> {
+    const key = payloadKey(ctx.run.id, ref.externalId);
+    const payload = this.pendingPayloads.get(key);
+    if (payload === undefined) {
+      throw new Error(`GithubConnector.fetchDetail: no cached payload for ${ref.externalId}`);
+    }
+    this.pendingPayloads.delete(key);
+    return { ref, payload, fetchedAt: new Date().toISOString() };
+  }
+
+  /** Resolve (and cache) the run's installation-token-backed REST client. */
+  private async clientForRun(conn: Connection, runId: string): Promise<GithubClient> {
+    const existing = this.runClients.get(runId);
+    if (existing) return existing;
+    const promise = (async (): Promise<GithubClient> => {
+      const cfg = parseGithubConfig(conn.config);
+      if (!conn.secretRef)
+        throw new Error("No GitHub App private key configured for this connection.");
+      const secret = await this.secrets.get(conn.secretRef);
+      const privateKey = secret.privateKey ?? "";
+      if (!privateKey) throw new Error("The GitHub App private key is missing or empty.");
+      const token = await this.auth.getInstallationToken({
+        appId: cfg.appId,
+        installationId: cfg.installationId,
+        privateKey,
+      });
+      return this.clientFactory(token.token);
+    })();
+    this.runClients.set(runId, promise);
+    return promise;
   }
 
   normalize(raw: RawResource): NodeUpsert {
@@ -141,6 +195,6 @@ export class GithubConnector implements Connector {
   }
 }
 
-function notImplemented(stage: string): Error {
-  return new Error(`GithubConnector.${stage} issues live GitHub calls — wired in I2.4.`);
+function payloadKey(runId: string, externalId: string): string {
+  return `${runId}::${externalId}`;
 }

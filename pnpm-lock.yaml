@@ -38,6 +38,9 @@ importers:
       '@atlas/connector-aws':
         specifier: workspace:*
         version: link:../../packages/connector-aws
+      '@atlas/connector-github':
+        specifier: workspace:*
+        version: link:../../packages/connector-github
       '@atlas/connector-sdk':
         specifier: workspace:*
         version: link:../../packages/connector-sdk
