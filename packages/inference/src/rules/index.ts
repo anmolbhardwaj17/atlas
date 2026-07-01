@@ -10,8 +10,16 @@ import { repoDeploysToRuntimeRule } from "./r1-deploys";
 import { serviceDerivationRule } from "./r4-service";
 import { ownershipPropagationRule } from "./r5-ownership";
 import { prChangesServiceRule } from "./r6-changed";
+import { sgCorrelationConnectsRule } from "./r2-sg";
+import { configRefConnectsRule } from "./r3-config";
+import { iamAccessConnectsRule } from "./r8-iam";
 
 export const ALL_RULES: readonly Rule[] = [
+  // Connection rules (R2/R3/R8) are independent of R1/R4 and can run first or last.
+  sgCorrelationConnectsRule,
+  configRefConnectsRule,
+  iamAccessConnectsRule,
+  // Deploy → service chain (dependency-ordered).
   repoDeploysToRuntimeRule,
   serviceDerivationRule,
   ownershipPropagationRule,
@@ -22,3 +30,6 @@ export { repoDeploysToRuntimeRule } from "./r1-deploys";
 export { serviceDerivationRule } from "./r4-service";
 export { ownershipPropagationRule } from "./r5-ownership";
 export { prChangesServiceRule } from "./r6-changed";
+export { sgCorrelationConnectsRule } from "./r2-sg";
+export { configRefConnectsRule } from "./r3-config";
+export { iamAccessConnectsRule } from "./r8-iam";

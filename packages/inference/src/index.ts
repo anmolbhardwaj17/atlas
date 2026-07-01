@@ -12,6 +12,9 @@ export {
   serviceDerivationRule,
   ownershipPropagationRule,
   prChangesServiceRule,
+  sgCorrelationConnectsRule,
+  configRefConnectsRule,
+  iamAccessConnectsRule,
 } from "./rules";
 export type {
   Rule,
