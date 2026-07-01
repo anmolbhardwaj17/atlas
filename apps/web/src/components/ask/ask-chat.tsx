@@ -107,7 +107,7 @@ export function AskChat({ orgId }: { orgId: string }) {
           e.preventDefault();
           void ask(input);
         }}
-        className="sticky bottom-0 mt-6 flex items-center gap-2 border-t border-border bg-bg/80 py-4 backdrop-blur"
+        className="sticky bottom-0 mt-6 flex items-center gap-2 border-t border-border bg-background/80 py-4 backdrop-blur"
       >
         <input
           value={input}
@@ -115,12 +115,12 @@ export function AskChat({ orgId }: { orgId: string }) {
           placeholder="Ask about your infrastructure…"
           aria-label="Ask a question"
           disabled={busy}
-          className="flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
+          className="flex-1 rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
         />
         <button
           type="submit"
           disabled={busy || input.trim().length === 0}
-          className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-bg hover:opacity-90 disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
           <Send size={15} /> Ask
         </button>
@@ -162,7 +162,9 @@ function applyEvent(ev: AskEvent, patch: (fn: (m: ChatMessage) => ChatMessage) =
 function UserBubble({ text }: { text: string }) {
   return (
     <div className="flex justify-end">
-      <div className="max-w-[80%] rounded-lg bg-primary/15 px-3.5 py-2 text-sm text-fg">{text}</div>
+      <div className="max-w-[80%] rounded-lg bg-primary/15 px-3.5 py-2 text-sm text-foreground">
+        {text}
+      </div>
     </div>
   );
 }
@@ -171,18 +173,20 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
   const honest = message.confidence === "insufficient";
   return (
     <div className="flex gap-3">
-      <div className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md bg-surface text-primary">
+      <div className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md bg-card text-primary">
         <Sparkles size={14} />
       </div>
       <div className="min-w-0 flex-1 space-y-2">
         {message.error ? (
-          <p className="rounded-md border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger">
+          <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
             {message.error}
           </p>
         ) : message.text.length === 0 && message.streaming ? (
           <TypingDots />
         ) : (
-          <p className={`whitespace-pre-wrap text-sm ${honest ? "text-muted" : "text-fg"}`}>
+          <p
+            className={`whitespace-pre-wrap text-sm ${honest ? "text-muted-foreground" : "text-foreground"}`}
+          >
             {message.text}
             {message.streaming && <span className="ml-0.5 animate-pulse">▌</span>}
           </p>
@@ -231,11 +235,11 @@ function TypingDots() {
 function EmptyState({ onPick }: { onPick: (q: string) => void }) {
   return (
     <div className="py-8">
-      <div className="mb-3 flex items-center gap-2 text-fg">
+      <div className="mb-3 flex items-center gap-2 text-foreground">
         <Sparkles size={18} className="text-primary" />
         <h2 className="text-lg font-semibold">Ask Atlas</h2>
       </div>
-      <p className="max-w-lg text-sm text-muted">
+      <p className="max-w-lg text-sm text-muted-foreground">
         Ask about your infrastructure, dependencies, and deploys. Every answer is grounded in your
         graph — cited, confidence-tiered, and honest when it doesn’t know.
       </p>
@@ -244,7 +248,7 @@ function EmptyState({ onPick }: { onPick: (q: string) => void }) {
           <button
             key={q}
             onClick={() => onPick(q)}
-            className="rounded-md border border-border px-3 py-2 text-left text-sm text-muted hover:border-primary/40 hover:text-fg"
+            className="rounded-md border border-border px-3 py-2 text-left text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground"
           >
             {q}
           </button>

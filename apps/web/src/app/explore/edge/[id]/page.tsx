@@ -35,7 +35,7 @@ export default async function EdgePage({ params }: { params: Promise<{ id: strin
               <Link href={`/explore/${edge.from.id}`} className="hover:text-primary">
                 {edge.from.name ?? edge.from.urn}
               </Link>
-              <span className="text-muted">→</span>
+              <span className="text-muted-foreground">→</span>
               <Link href={`/explore/${edge.to.id}`} className="hover:text-primary">
                 {edge.to.name ?? edge.to.urn}
               </Link>
@@ -73,9 +73,9 @@ export default async function EdgePage({ params }: { params: Promise<{ id: strin
               </CardHeader>
               <CardBody>
                 {Object.keys(edge.evidence ?? {}).length === 0 ? (
-                  <p className="text-sm text-muted">No structured evidence recorded.</p>
+                  <p className="text-sm text-muted-foreground">No structured evidence recorded.</p>
                 ) : (
-                  <pre className="overflow-x-auto rounded-md bg-bg p-3 text-xs text-fg">
+                  <pre className="overflow-x-auto rounded-md bg-background p-3 text-xs text-foreground">
                     {JSON.stringify(edge.evidence, null, 2)}
                   </pre>
                 )}
@@ -85,8 +85,8 @@ export default async function EdgePage({ params }: { params: Promise<{ id: strin
         </div>
       ) : (
         <div className="rounded-lg border border-border py-12 text-center">
-          <p className="text-sm text-fg">Edge not found</p>
-          <p className="mt-1 text-xs text-muted">
+          <p className="text-sm text-foreground">Edge not found</p>
+          <p className="mt-1 text-xs text-muted-foreground">
             It may have been retired, or it belongs to another organization.
           </p>
         </div>
@@ -98,7 +98,7 @@ export default async function EdgePage({ params }: { params: Promise<{ id: strin
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex justify-between gap-4">
-      <dt className="shrink-0 text-muted">{label}</dt>
+      <dt className="shrink-0 text-muted-foreground">{label}</dt>
       <dd className={`min-w-0 break-all text-right ${mono ? "font-mono text-xs" : ""}`}>{value}</dd>
     </div>
   );

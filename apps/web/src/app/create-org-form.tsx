@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { apiUrl } from "@/lib/env";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 /** Minimal onboarding (docs/12 §6.1): create an org → become Owner. Calls the API
  *  with the Supabase access token; refreshes the page to re-render memberships. */
@@ -45,37 +47,20 @@ export function CreateOrgForm() {
   }
 
   return (
-    <form onSubmit={submit} style={{ display: "flex", gap: ".5rem", marginTop: ".75rem" }}>
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Organization name"
-        disabled={busy}
-        style={{
-          flex: 1,
-          padding: ".5rem .75rem",
-          borderRadius: 6,
-          border: "1px solid #2a2f3a",
-          background: "#11141b",
-          color: "#e8eaed",
-        }}
-      />
-      <button
-        type="submit"
-        disabled={busy}
-        style={{
-          padding: ".5rem 1rem",
-          borderRadius: 6,
-          border: "1px solid #2a2f3a",
-          background: busy ? "#1a1e27" : "#8ab4f8",
-          color: busy ? "#9aa0a6" : "#0b0d12",
-          fontWeight: 600,
-          cursor: busy ? "default" : "pointer",
-        }}
-      >
-        {busy ? "Creating…" : "Create"}
-      </button>
-      {error ? <span style={{ color: "#f28b82", alignSelf: "center" }}>{error}</span> : null}
+    <form onSubmit={submit} className="space-y-3">
+      <div className="flex gap-2">
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Organization name"
+          disabled={busy}
+          aria-label="Organization name"
+        />
+        <Button type="submit" disabled={busy}>
+          {busy ? "Creating…" : "Create"}
+        </Button>
+      </div>
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
     </form>
   );
 }

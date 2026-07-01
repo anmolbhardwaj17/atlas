@@ -21,7 +21,7 @@ export default async function NodePage({ params }: { params: Promise<{ id: strin
   return (
     <AppShell orgName={shell.orgName} email={shell.email} orgId={shell.orgId}>
       <div className="mb-5">
-        <Link href="/explore" className="text-sm text-muted hover:text-fg">
+        <Link href="/explore" className="text-sm text-muted-foreground hover:text-foreground">
           ← Explore
         </Link>
       </div>
@@ -29,8 +29,8 @@ export default async function NodePage({ params }: { params: Promise<{ id: strin
         <NodeDetailView node={node} edges={edges} />
       ) : (
         <div className="rounded-lg border border-border py-12 text-center">
-          <p className="text-sm text-fg">Resource not found</p>
-          <p className="mt-1 text-xs text-muted">
+          <p className="text-sm text-foreground">Resource not found</p>
+          <p className="mt-1 text-xs text-muted-foreground">
             It may have been removed, or it belongs to another organization.
           </p>
         </div>

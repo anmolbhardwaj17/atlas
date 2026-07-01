@@ -11,38 +11,55 @@ interface Style {
   className: string;
 }
 const TIER: Record<string, Style> = {
-  observed: { label: "observed", className: "border-observed/40 text-observed" },
+  observed: { label: "observed", className: "border-observed/30 bg-observed/10 text-observed" },
   "inferred-high": {
     label: "inferred · high",
-    className: "border-inferred-high/40 text-inferred-high",
+    className: "border-inferred-high/30 bg-inferred-high/10 text-inferred-high",
   },
   "inferred-low": {
     label: "inferred · low",
-    className: "border-inferred-low/40 text-inferred-low",
+    className: "border-inferred-low/30 bg-inferred-low/10 text-inferred-low",
   },
-  insufficient: { label: "no data", className: "border-stale/40 text-stale" },
+  insufficient: { label: "no data", className: "border-stale/30 bg-stale/10 text-stale" },
 };
-const TIER_FALLBACK: Style = { label: "no data", className: "border-stale/40 text-stale" };
+const TIER_FALLBACK: Style = {
+  label: "no data",
+  className: "border-stale/30 bg-stale/10 text-stale",
+};
 
 export function ConfidenceBadge({ tier, evidence }: { tier: string; evidence?: string }) {
   const t = TIER[tier] ?? TIER_FALLBACK;
   return (
-    <Badge className={t.className} title={evidence ? `${t.label} — ${evidence}` : t.label}>
+    <Badge
+      variant="outline"
+      className={t.className}
+      title={evidence ? `${t.label} — ${evidence}` : t.label}
+    >
       {t.label}
     </Badge>
   );
 }
 
 const FRESH: Record<string, Style> = {
-  active: { label: "fresh", className: "border-observed/40 text-observed" },
-  stale: { label: "stale", className: "border-stale/50 text-stale" },
-  deleted: { label: "removed", className: "border-danger/40 text-danger" },
+  active: { label: "fresh", className: "border-observed/30 bg-observed/10 text-observed" },
+  stale: { label: "stale", className: "border-stale/40 bg-stale/10 text-stale" },
+  deleted: {
+    label: "removed",
+    className: "border-destructive/30 bg-destructive/10 text-destructive",
+  },
 };
-const FRESH_FALLBACK: Style = { label: "unknown", className: "border-stale/50 text-stale" };
+const FRESH_FALLBACK: Style = {
+  label: "unknown",
+  className: "border-stale/40 bg-stale/10 text-stale",
+};
 
 export function FreshnessTag({ status }: { status: string }) {
   const f = FRESH[status] ?? FRESH_FALLBACK;
-  return <Badge className={f.className}>{f.label}</Badge>;
+  return (
+    <Badge variant="outline" className={f.className}>
+      {f.label}
+    </Badge>
+  );
 }
 
 /** Numbered, clickable source → provenance (P4). Opens the raw evidence in a new tab. */

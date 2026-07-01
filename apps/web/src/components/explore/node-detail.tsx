@@ -18,13 +18,13 @@ export function NodeDetailView({ node, edges }: { node: NodeDetail; edges: EdgeD
           <FreshnessTag status={node.status} />
           <Link
             href={`/explore/${node.id}/impact`}
-            className="ml-auto flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted hover:text-fg"
+            className="ml-auto flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground"
           >
             <Zap size={13} /> Impact analysis
           </Link>
         </div>
-        <p className="mt-1 break-all font-mono text-xs text-muted">{node.urn}</p>
-        <p className="mt-1 text-sm text-muted">
+        <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{node.urn}</p>
+        <p className="mt-1 text-sm text-muted-foreground">
           {node.kind} · {node.provider}
           {node.region ? ` · ${node.region}` : ""} · seen {new Date(node.lastSeen).toLocaleString()}
         </p>
@@ -63,7 +63,7 @@ export function NodeDetailView({ node, edges }: { node: NodeDetail; edges: EdgeD
                 )}
               </dl>
             ) : (
-              <p className="text-sm text-muted">
+              <p className="text-sm text-muted-foreground">
                 No provenance recorded — this node was derived, not directly observed.
               </p>
             )}
@@ -72,9 +72,9 @@ export function NodeDetailView({ node, edges }: { node: NodeDetail; edges: EdgeD
       </div>
 
       <Card>
-        <CardHeader className="flex items-center justify-between">
+        <CardHeader className="flex-row items-center justify-between space-y-0">
           <CardTitle>Connections</CardTitle>
-          <span className="text-xs text-muted">
+          <span className="text-xs text-muted-foreground">
             {edges.length} edge{edges.length === 1 ? "" : "s"}
           </span>
         </CardHeader>
@@ -114,11 +114,11 @@ function EdgeGroup({
 }) {
   return (
     <div>
-      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted">
+      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {icon} {title}
       </p>
       {edges.length === 0 ? (
-        <p className="text-sm text-muted">{emptyText}</p>
+        <p className="text-sm text-muted-foreground">{emptyText}</p>
       ) : (
         <ul className="divide-y divide-border">
           {edges.map((e) => {
@@ -126,7 +126,7 @@ function EdgeGroup({
             return (
               <li key={e.id} className="flex items-center justify-between gap-3 py-2 text-sm">
                 <span className="flex min-w-0 items-center gap-2">
-                  <span className="rounded-sm border border-border px-1.5 py-0.5 text-xs text-muted">
+                  <span className="rounded-sm border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
                     {e.type}
                   </span>
                   <Link href={`/explore/${other.id}`} className="truncate hover:text-primary">
@@ -153,7 +153,7 @@ function EdgeGroup({
 
 function KeyValues({ data, empty }: { data: Record<string, unknown>; empty: string }) {
   const entries = Object.entries(data ?? {});
-  if (entries.length === 0) return <p className="text-sm text-muted">{empty}</p>;
+  if (entries.length === 0) return <p className="text-sm text-muted-foreground">{empty}</p>;
   return (
     <dl className="space-y-1.5 text-sm">
       {entries.map(([k, v]) => (
@@ -166,7 +166,7 @@ function KeyValues({ data, empty }: { data: Record<string, unknown>; empty: stri
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex justify-between gap-4">
-      <dt className="shrink-0 text-muted">{label}</dt>
+      <dt className="shrink-0 text-muted-foreground">{label}</dt>
       <dd className={`min-w-0 break-all text-right ${mono ? "font-mono text-xs" : ""}`}>{value}</dd>
     </div>
   );

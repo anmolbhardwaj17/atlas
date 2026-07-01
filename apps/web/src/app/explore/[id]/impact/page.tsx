@@ -26,7 +26,10 @@ export default async function ImpactPage({ params }: { params: Promise<{ id: str
   return (
     <AppShell orgName={shell.orgName} email={shell.email} orgId={shell.orgId}>
       <div className="mb-5">
-        <Link href={`/explore/${id}`} className="text-sm text-muted hover:text-fg">
+        <Link
+          href={`/explore/${id}`}
+          className="text-sm text-muted-foreground hover:text-foreground"
+        >
           ← Back to node
         </Link>
       </div>
@@ -35,7 +38,7 @@ export default async function ImpactPage({ params }: { params: Promise<{ id: str
         <div className="space-y-6">
           <div>
             <h1 className="text-xl font-semibold">Impact · {node.name ?? node.urn}</h1>
-            <p className="text-sm text-muted">
+            <p className="text-sm text-muted-foreground">
               What changes if this resource does — and what it depends on. Every path shows its
               weakest-link confidence and the evidence behind each hop.
             </p>
@@ -56,8 +59,8 @@ export default async function ImpactPage({ params }: { params: Promise<{ id: str
         </div>
       ) : (
         <div className="rounded-lg border border-border py-12 text-center">
-          <p className="text-sm text-fg">Resource not found</p>
-          <p className="mt-1 text-xs text-muted">
+          <p className="text-sm text-foreground">Resource not found</p>
+          <p className="mt-1 text-xs text-muted-foreground">
             It may have been removed, or it belongs to another organization.
           </p>
         </div>

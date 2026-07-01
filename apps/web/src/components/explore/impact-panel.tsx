@@ -26,7 +26,7 @@ export function ImpactPanel({
           <CardTitle>{title}</CardTitle>
         </CardHeader>
         <CardBody>
-          <p className="text-sm text-muted">Couldn’t compute this traversal.</p>
+          <p className="text-sm text-muted-foreground">Couldn’t compute this traversal.</p>
         </CardBody>
       </Card>
     );
@@ -42,12 +42,12 @@ export function ImpactPanel({
 
   return (
     <Card>
-      <CardHeader className="flex items-center justify-between">
+      <CardHeader className="flex-row items-center justify-between space-y-0">
         <CardTitle>{title}</CardTitle>
-        <span className="text-xs text-muted">{result.impacted.length} nodes</span>
+        <span className="text-xs text-muted-foreground">{result.impacted.length} nodes</span>
       </CardHeader>
       <CardBody className="space-y-4">
-        <p className="text-sm text-muted">{subtitle}</p>
+        <p className="text-sm text-muted-foreground">{subtitle}</p>
 
         {(result.truncated || result.warnings.length > 0) && (
           <div className="flex items-start gap-2 rounded-md border border-inferred-low/40 bg-inferred-low/5 px-3 py-2 text-xs text-inferred-low">
@@ -66,7 +66,7 @@ export function ImpactPanel({
         )}
 
         {result.impacted.length === 0 ? (
-          <p className="text-sm text-muted">
+          <p className="text-sm text-muted-foreground">
             Nothing found within depth {result.depthUsed} — this is a truthful empty result, not a
             failure.
           </p>
@@ -74,7 +74,7 @@ export function ImpactPanel({
           <div className="space-y-4">
             {distances.map((d) => (
               <div key={d}>
-                <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted">
+                <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   {d} hop{d === 1 ? "" : "s"} away
                 </p>
                 <ul className="space-y-1.5">
@@ -86,20 +86,22 @@ export function ImpactPanel({
                             href={`/explore/${item.node.id}`}
                             className="min-w-0 truncate hover:text-primary"
                           >
-                            <span className="text-muted">{item.node.kind}</span> ·{" "}
+                            <span className="text-muted-foreground">{item.node.kind}</span> ·{" "}
                             {item.node.name ?? item.node.urn}
                           </Link>
                           <span className="flex shrink-0 items-center gap-2">
                             <ConfidenceBadge tier={item.pathConfidence} />
-                            <span className="text-xs text-muted group-open:hidden">why?</span>
+                            <span className="text-xs text-muted-foreground group-open:hidden">
+                              why?
+                            </span>
                           </span>
                         </summary>
                         <div className="border-t border-border px-3 py-2">
-                          <p className="mb-1 text-xs text-muted">Path back to root:</p>
+                          <p className="mb-1 text-xs text-muted-foreground">Path back to root:</p>
                           <ol className="space-y-1">
                             {item.via.map((v) => (
                               <li key={v.edgeId} className="flex items-center gap-2 text-xs">
-                                <span className="rounded-sm border border-border px-1.5 py-0.5 text-muted">
+                                <span className="rounded-sm border border-border px-1.5 py-0.5 text-muted-foreground">
                                   {v.type}
                                 </span>
                                 <ConfidenceBadge tier={v.confidence} />

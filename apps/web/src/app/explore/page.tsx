@@ -56,7 +56,7 @@ export default async function ExplorePage({
       <div className="space-y-6">
         <div>
           <h1 className="text-xl font-semibold">Explore</h1>
-          <p className="text-sm text-muted">
+          <p className="text-sm text-muted-foreground">
             Every node in your graph — filter by kind, status, or confidence. Click through for
             provenance and connections.
           </p>
@@ -65,7 +65,7 @@ export default async function ExplorePage({
         <NodeFilters values={{ q, kind, status, confidence }} />
 
         {res.status !== 0 && res.body === null ? (
-          <div className="rounded-lg border border-danger/40 bg-danger/5 px-4 py-3 text-sm text-danger">
+          <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
             Couldn’t load nodes (status {res.status}).
           </div>
         ) : (
@@ -76,7 +76,7 @@ export default async function ExplorePage({
           <div className="flex justify-end">
             <Link
               href={`/explore?${nextParams.toString()}`}
-              className="rounded-md border border-border px-3 py-1.5 text-sm text-muted hover:text-fg"
+              className="rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground"
             >
               Next page →
             </Link>

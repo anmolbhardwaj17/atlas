@@ -20,9 +20,9 @@ interface NodeDto {
 const STATUS_COLOR: Record<string, string> = {
   connected: "text-observed",
   degraded: "text-inferred-low",
-  error: "text-danger",
-  verifying: "text-muted",
-  pending: "text-muted",
+  error: "text-destructive",
+  verifying: "text-muted-foreground",
+  pending: "text-muted-foreground",
   disconnected: "text-stale",
 };
 
@@ -39,7 +39,7 @@ export async function Dashboard({ orgId, token }: { orgId: string; token: string
     <div className="space-y-8">
       <div>
         <h1 className="text-xl font-semibold">Overview</h1>
-        <p className="text-sm text-muted">
+        <p className="text-sm text-muted-foreground">
           The knowledge graph of your infrastructure and code — continuously updated, cited, and
           confidence-tiered.
         </p>
@@ -47,7 +47,7 @@ export async function Dashboard({ orgId, token }: { orgId: string; token: string
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
-          <CardHeader className="flex items-center justify-between">
+          <CardHeader className="flex-row items-center justify-between space-y-0">
             <CardTitle>Connections</CardTitle>
             <Link href="/settings" className="text-xs text-primary hover:underline">
               Manage
@@ -64,9 +64,11 @@ export async function Dashboard({ orgId, token }: { orgId: string; token: string
                 {connections.map((c) => (
                   <li key={c.id} className="flex items-center justify-between text-sm">
                     <span>
-                      <span className="text-muted">{c.provider}</span> · {c.displayName}
+                      <span className="text-muted-foreground">{c.provider}</span> · {c.displayName}
                     </span>
-                    <span className={STATUS_COLOR[c.status] ?? "text-muted"}>{c.status}</span>
+                    <span className={STATUS_COLOR[c.status] ?? "text-muted-foreground"}>
+                      {c.status}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -75,7 +77,7 @@ export async function Dashboard({ orgId, token }: { orgId: string; token: string
         </Card>
 
         <Card>
-          <CardHeader className="flex items-center justify-between">
+          <CardHeader className="flex-row items-center justify-between space-y-0">
             <CardTitle>Recent resources</CardTitle>
             <Link href="/explore" className="text-xs text-primary hover:underline">
               Explore all
@@ -92,7 +94,8 @@ export async function Dashboard({ orgId, token }: { orgId: string; token: string
                 {recentNodes.map((n) => (
                   <li key={n.id} className="flex items-center justify-between py-1.5 text-sm">
                     <Link href={`/explore/${n.id}`} className="truncate hover:text-primary">
-                      <span className="text-muted">{n.kind}</span> · {n.name ?? n.id.slice(0, 8)}
+                      <span className="text-muted-foreground">{n.kind}</span> ·{" "}
+                      {n.name ?? n.id.slice(0, 8)}
                     </Link>
                     <FreshnessTag status={n.status} />
                   </li>
@@ -109,8 +112,8 @@ export async function Dashboard({ orgId, token }: { orgId: string; token: string
 function EmptyState({ title, hint }: { title: string; hint: string }) {
   return (
     <div className="py-6 text-center">
-      <p className="text-sm text-fg">{title}</p>
-      <p className="mt-1 text-xs text-muted">{hint}</p>
+      <p className="text-sm text-foreground">{title}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
     </div>
   );
 }

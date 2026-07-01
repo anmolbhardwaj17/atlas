@@ -85,11 +85,11 @@ export function CommandPalette({ orgId }: { orgId: string }) {
       aria-label="Search resources"
     >
       <div
-        className="w-full max-w-xl overflow-hidden rounded-lg border border-border bg-surface shadow-xl"
+        className="w-full max-w-xl overflow-hidden rounded-lg border border-border bg-card shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 border-b border-border px-3">
-          <Search size={16} className="text-muted" />
+          <Search size={16} className="text-muted-foreground" />
           <input
             ref={inputRef}
             value={q}
@@ -107,12 +107,12 @@ export function CommandPalette({ orgId }: { orgId: string }) {
               }
             }}
             placeholder="Search resources…"
-            className="w-full bg-transparent py-3 text-sm text-fg placeholder:text-muted focus:outline-none"
+            className="w-full bg-transparent py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
           />
         </div>
         <ul className="max-h-80 overflow-y-auto py-1">
           {q.trim().length >= 2 && hits.length === 0 ? (
-            <li className="px-3 py-6 text-center text-sm text-muted">No matches</li>
+            <li className="px-3 py-6 text-center text-sm text-muted-foreground">No matches</li>
           ) : (
             hits.map((h, i) => (
               <li key={h.node.id}>
@@ -120,11 +120,11 @@ export function CommandPalette({ orgId }: { orgId: string }) {
                   onMouseEnter={() => setActive(i)}
                   onClick={() => go(h)}
                   className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm ${
-                    i === active ? "bg-primary/15 text-fg" : "text-muted"
+                    i === active ? "bg-primary/15 text-foreground" : "text-muted-foreground"
                   }`}
                 >
                   <span className="min-w-0 truncate">{h.node.name ?? h.node.id.slice(0, 8)}</span>
-                  <span className="shrink-0 text-xs text-muted">{h.node.kind}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">{h.node.kind}</span>
                 </button>
               </li>
             ))

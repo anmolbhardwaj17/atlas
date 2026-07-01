@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 /**
  * Node-list filters (docs/09 §5.3). A plain GET form — fully server-rendered, works
@@ -14,34 +16,34 @@ export interface NodeFilterValues {
 const STATUS = ["active", "stale", "deleted"];
 const CONFIDENCE = ["observed", "inferred-high", "inferred-low"];
 
-const field =
-  "rounded-md border border-border bg-bg px-2.5 py-1.5 text-sm text-fg placeholder:text-muted";
+const select =
+  "h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
 export function NodeFilters({ values }: { values: NodeFilterValues }) {
   const hasFilters = Boolean(values.q || values.kind || values.status || values.confidence);
   return (
     <form method="get" className="flex flex-wrap items-center gap-2">
-      <input
+      <Input
         type="search"
         name="q"
         defaultValue={values.q ?? ""}
         placeholder="Search by name…"
         aria-label="Search nodes by name"
-        className={`${field} min-w-48 flex-1`}
+        className="min-w-48 flex-1"
       />
-      <input
+      <Input
         type="text"
         name="kind"
         defaultValue={values.kind ?? ""}
         placeholder="kind (e.g. ecs.service)"
         aria-label="Filter by kind"
-        className={`${field} w-44`}
+        className="w-44"
       />
       <select
         name="status"
         defaultValue={values.status ?? ""}
         aria-label="Filter by status"
-        className={field}
+        className={select}
       >
         <option value="">any status</option>
         {STATUS.map((s) => (
@@ -54,7 +56,7 @@ export function NodeFilters({ values }: { values: NodeFilterValues }) {
         name="confidence"
         defaultValue={values.confidence ?? ""}
         aria-label="Filter by confidence"
-        className={field}
+        className={select}
       >
         <option value="">any confidence</option>
         {CONFIDENCE.map((c) => (
@@ -63,16 +65,11 @@ export function NodeFilters({ values }: { values: NodeFilterValues }) {
           </option>
         ))}
       </select>
-      <button
-        type="submit"
-        className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-bg hover:opacity-90"
-      >
-        Apply
-      </button>
+      <Button type="submit">Apply</Button>
       {hasFilters && (
-        <Link href="/explore" className="px-2 text-sm text-muted hover:text-fg">
-          Clear
-        </Link>
+        <Button asChild variant="ghost">
+          <Link href="/explore">Clear</Link>
+        </Button>
       )}
     </form>
   );

@@ -7,8 +7,8 @@ export function NodesList({ nodes }: { nodes: NodeDto[] }) {
   if (nodes.length === 0) {
     return (
       <div className="rounded-lg border border-border py-12 text-center">
-        <p className="text-sm text-fg">No resources match these filters</p>
-        <p className="mt-1 text-xs text-muted">
+        <p className="text-sm text-foreground">No resources match these filters</p>
+        <p className="mt-1 text-xs text-muted-foreground">
           Try clearing filters, or connect a source and let it sync.
         </p>
       </div>
@@ -17,7 +17,7 @@ export function NodesList({ nodes }: { nodes: NodeDto[] }) {
   return (
     <div className="overflow-hidden rounded-lg border border-border">
       <table className="w-full text-sm">
-        <thead className="border-b border-border bg-surface text-left text-xs uppercase tracking-wide text-muted">
+        <thead className="border-b border-border bg-card text-left text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
             <th className="px-4 py-2.5 font-medium">Resource</th>
             <th className="px-4 py-2.5 font-medium">Kind</th>
@@ -28,15 +28,15 @@ export function NodesList({ nodes }: { nodes: NodeDto[] }) {
         </thead>
         <tbody className="divide-y divide-border">
           {nodes.map((n) => (
-            <tr key={n.id} className="hover:bg-surface/60">
+            <tr key={n.id} className="hover:bg-card/60">
               <td className="px-4 py-2.5">
                 <Link href={`/explore/${n.id}`} className="font-medium hover:text-primary">
-                  {n.name ?? <span className="text-muted">unnamed</span>}
+                  {n.name ?? <span className="text-muted-foreground">unnamed</span>}
                 </Link>
-                <div className="max-w-md truncate text-xs text-muted">{n.urn}</div>
+                <div className="max-w-md truncate text-xs text-muted-foreground">{n.urn}</div>
               </td>
-              <td className="px-4 py-2.5 text-muted">{n.kind}</td>
-              <td className="px-4 py-2.5 text-muted">{n.region ?? "—"}</td>
+              <td className="px-4 py-2.5 text-muted-foreground">{n.kind}</td>
+              <td className="px-4 py-2.5 text-muted-foreground">{n.region ?? "—"}</td>
               <td className="px-4 py-2.5">
                 <ConfidenceBadge tier={n.confidence} />
               </td>
