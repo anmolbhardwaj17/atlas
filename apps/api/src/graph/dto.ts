@@ -78,6 +78,37 @@ export const NeighborsQuerySchema = z
   .strict();
 export type NeighborsQuery = z.infer<typeof NeighborsQuerySchema>;
 
+/** Traversal (blast-radius / dependencies). Over-limit values are clamped + warned
+ *  (never rejected, A21); `edgeTypes` optionally overrides the impact set. */
+export const TraversalQuerySchema = z
+  .object({
+    depth: z.coerce.number().int().min(1).max(50).default(5),
+    nodeBudget: z.coerce.number().int().min(1).max(5000).default(500),
+    minConfidence: z.enum(["observed", "inferred-high", "inferred-low"]).optional(),
+    edgeTypes: z.string().min(1).optional(),
+  })
+  .strict();
+export type TraversalQuery = z.infer<typeof TraversalQuerySchema>;
+
+/** Impact-bearing edge types traversed for blast-radius/dependencies (docs/05 §7.2). */
+export const IMPACT_EDGE_TYPES = [
+  "CONNECTS_TO",
+  "DEPENDS_ON",
+  "ROUTES_TO",
+  "STORES_IN",
+  "DEPLOYS_TO",
+] as const;
+
+const RANK: Record<string, number> = { observed: 3, "inferred-high": 2, "inferred-low": 1 };
+/** Confidence → numeric rank (higher = more trustworthy). */
+export function confidenceRank(confidence: string | undefined): number {
+  return confidence ? (RANK[confidence] ?? 1) : 1;
+}
+/** Numeric rank → confidence tier (for pathConfidence = weakest edge, docs/05 §8). */
+export function rankToConfidence(rank: number): string {
+  return rank >= 3 ? "observed" : rank === 2 ? "inferred-high" : "inferred-low";
+}
+
 /** Opaque keyset cursor over (last_seen desc, id desc) — stable under concurrent writes. */
 export interface NodeCursor {
   lastSeen: string;

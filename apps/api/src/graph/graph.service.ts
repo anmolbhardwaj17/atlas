@@ -4,15 +4,22 @@ import type { PoolClient } from "pg";
 import { PG_POOL } from "../core/tokens";
 import { ApiException } from "../common/errors";
 import {
+  confidenceRank,
   decodeCursor,
   encodeCursor,
+  IMPACT_EDGE_TYPES,
+  rankToConfidence,
   toNodeDto,
   type EdgesQuery,
   type NeighborsQuery,
   type NodeDto,
   type NodeListQuery,
   type NodeRowish,
+  type TraversalQuery,
 } from "./dto";
+
+const MAX_DEPTH = 6;
+const MAX_NODE_BUDGET = 500;
 
 const NODE_COLS = `id, urn, kind, name, provider, region, status, confidence, attributes, tags,
   first_seen, last_seen`;
@@ -30,6 +37,34 @@ export interface EdgeDto {
   status: string;
   from: { id: string; urn: string; kind: string; name: string | null };
   to: { id: string; urn: string; kind: string; name: string | null };
+}
+
+export interface NodeSummary {
+  id: string;
+  urn: string;
+  kind: string;
+  name: string | null;
+}
+export interface EdgeVia {
+  edgeId: string;
+  type: string;
+  confidence: string;
+  evidence: Record<string, unknown>;
+  rule: string | null;
+  provenanceId: string;
+}
+export interface TraversalResult {
+  root: NodeSummary;
+  impacted: Array<{
+    node: NodeSummary;
+    distance: number;
+    via: EdgeVia[];
+    pathConfidence: string;
+  }>;
+  warnings: string[];
+  depthUsed: number;
+  nodeBudget: number;
+  truncated: boolean;
 }
 
 /**
@@ -183,6 +218,149 @@ export class GraphService {
           : [];
       return { nodes: [toNodeDto(root), ...neighbors], edges };
     });
+  }
+
+  /** Inbound impact closure — "what breaks if this is deleted" (US-4, docs/08 §9). */
+  async blastRadius(orgId: string, id: string, q: TraversalQuery): Promise<TraversalResult> {
+    return this.traverse(orgId, id, "inbound", q);
+  }
+  /** Outbound dependency closure — "what this depends on" (US-9). */
+  async dependencies(orgId: string, id: string, q: TraversalQuery): Promise<TraversalResult> {
+    return this.traverse(orgId, id, "outbound", q);
+  }
+
+  /**
+   * Bounded, cycle-guarded recursive-CTE traversal over impact-bearing edges (docs/05
+   * §7.2). Carries the edge path (why-chain) and a running weakest confidence
+   * (pathConfidence = weakest edge, §8). Inbound = who points at the target (blast
+   * radius); outbound = what the target points at (dependencies). Depth/nodeBudget are
+   * clamped with warnings, never unbounded (A21).
+   */
+  private async traverse(
+    orgId: string,
+    id: string,
+    dir: "inbound" | "outbound",
+    q: TraversalQuery,
+  ): Promise<TraversalResult> {
+    const depth = Math.min(q.depth, MAX_DEPTH);
+    const budget = Math.min(q.nodeBudget, MAX_NODE_BUDGET);
+    const warnings: string[] = [];
+    if (q.depth > MAX_DEPTH) warnings.push(`depth clamped to ${MAX_DEPTH}`);
+    if (q.nodeBudget > MAX_NODE_BUDGET) warnings.push(`nodeBudget clamped to ${MAX_NODE_BUDGET}`);
+    const types = q.edgeTypes
+      ? q.edgeTypes
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean)
+      : [...IMPACT_EDGE_TYPES];
+    const minRank = confidenceRank(q.minConfidence);
+
+    // Inbound: start at edges INTO the target, walk toward `from`. Outbound: mirror.
+    const startCol = dir === "inbound" ? "to_node_id" : "from_node_id";
+    const collectCol = dir === "inbound" ? "from_node_id" : "to_node_id";
+    const joinCol = startCol;
+    const rankExpr = `CASE e.confidence WHEN 'observed' THEN 3 WHEN 'inferred-high' THEN 2 ELSE 1 END`;
+
+    return withOrgScope(this.db, orgId, async (c) => {
+      const root = await this.loadNode(c, id);
+      const { rows } = await c.query<{
+        node_id: string;
+        depth: number;
+        edge_path: string[];
+        weakest: number;
+      }>(
+        `WITH RECURSIVE trav AS (
+           SELECT e.${collectCol} AS node_id, 1 AS depth, ARRAY[e.id] AS edge_path,
+                  ${rankExpr} AS weakest
+             FROM edges e
+            WHERE e.${startCol} = $1 AND e.status='active' AND e.type = ANY($2)
+              AND ${rankExpr} >= $3 AND e.${collectCol} <> $1
+           UNION ALL
+           SELECT e.${collectCol}, t.depth + 1, t.edge_path || e.id,
+                  LEAST(t.weakest, ${rankExpr})
+             FROM edges e JOIN trav t ON e.${joinCol} = t.node_id
+            WHERE e.status='active' AND e.type = ANY($2) AND ${rankExpr} >= $3
+              AND t.depth < $4 AND e.id <> ALL(t.edge_path) AND e.${collectCol} <> $1
+         )
+         SELECT DISTINCT ON (node_id) node_id, depth, edge_path, weakest
+           FROM trav ORDER BY node_id, depth ASC, weakest DESC`,
+        [id, types, minRank, depth],
+      );
+
+      // Order by distance, apply the node budget (truncate the tail).
+      rows.sort((a, b) => a.depth - b.depth);
+      const truncated = rows.length > budget;
+      const kept = truncated ? rows.slice(0, budget) : rows;
+
+      // Resolve node summaries + edge (why-chain) details in two batched lookups.
+      const nodeIds = [...new Set(kept.map((r) => r.node_id))];
+      const edgeIds = [...new Set(kept.flatMap((r) => r.edge_path))];
+      const nodeSummaries = await this.loadNodeSummaries(c, nodeIds);
+      const edgeDetails = await this.loadEdgeDetails(c, edgeIds);
+
+      const impacted = kept
+        .map((r) => {
+          const node = nodeSummaries.get(r.node_id);
+          if (!node) return null;
+          const via = r.edge_path
+            .map((eid) => edgeDetails.get(eid))
+            .filter((v): v is EdgeVia => v !== undefined);
+          return { node, distance: r.depth, via, pathConfidence: rankToConfidence(r.weakest) };
+        })
+        .filter((x): x is TraversalResult["impacted"][number] => x !== null);
+
+      return {
+        root: { id: root.id, urn: root.urn, kind: root.kind, name: root.name },
+        impacted,
+        warnings,
+        depthUsed: depth,
+        nodeBudget: budget,
+        truncated,
+      };
+    });
+  }
+
+  private async loadNodeSummaries(c: PoolClient, ids: string[]): Promise<Map<string, NodeSummary>> {
+    if (ids.length === 0) return new Map();
+    const { rows } = await c.query<NodeSummary>(
+      `SELECT id, urn, kind, name FROM nodes WHERE id = ANY($1::uuid[])`,
+      [ids],
+    );
+    return new Map(rows.map((r) => [r.id, r]));
+  }
+
+  private async loadEdgeDetails(c: PoolClient, ids: string[]): Promise<Map<string, EdgeVia>> {
+    if (ids.length === 0) return new Map();
+    const { rows } = await c.query<{
+      id: string;
+      type: string;
+      confidence: string;
+      provenance_id: string;
+      evidence: Record<string, unknown> | null;
+      rule_key: string | null;
+      rule_version: number | null;
+    }>(
+      `SELECT e.id, e.type, e.confidence, e.provenance_id, p.evidence,
+              ir.key AS rule_key, ir.version AS rule_version
+         FROM edges e
+         LEFT JOIN provenance p ON p.id = e.provenance_id
+         LEFT JOIN inference_rules ir ON ir.id = e.inference_rule_id
+        WHERE e.id = ANY($1::uuid[])`,
+      [ids],
+    );
+    return new Map(
+      rows.map((r) => [
+        r.id,
+        {
+          edgeId: r.id,
+          type: r.type,
+          confidence: r.confidence,
+          evidence: r.evidence ?? {},
+          rule: r.rule_key ? `${r.rule_key}@${r.rule_version}` : null,
+          provenanceId: r.provenance_id,
+        },
+      ]),
+    );
   }
 
   private async loadNode(c: PoolClient, id: string): Promise<NodeRowish> {

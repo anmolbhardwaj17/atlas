@@ -173,4 +173,56 @@ suite("G2.1 GraphService", () => {
     expect((await graph.listNodes(otherOrgId, { limit: 50 })).data).toHaveLength(0);
     await expect(graph.getNode(otherOrgId, lambdaId)).rejects.toBeInstanceOf(ApiException);
   });
+
+  it("blast-radius + dependencies with why-chains, pathConfidence, minConfidence", async () => {
+    // Add repo -DEPLOYS_TO(inferred-high)-> lambda, forming repo → lambda → rds.
+    const REPO = "github:acme/orders-svc";
+    const repoId = await insertNode(orgId, connId, REPO, "github.repository", null, "orders-svc");
+    const ruleId = one(
+      (
+        await admin.query<{ id: string }>(
+          "SELECT id FROM inference_rules WHERE key='repo_deploys_to_runtime' AND version=1",
+        )
+      ).rows,
+    ).id;
+    const prov = one(
+      (
+        await admin.query<{ id: string }>(
+          "INSERT INTO provenance (org_id, source, confidence, inference_rule_id) VALUES ($1,'rule:repo_deploys_to_runtime','inferred-high',$2) RETURNING id",
+          [orgId, ruleId],
+        )
+      ).rows,
+    ).id;
+    await admin.query(
+      `INSERT INTO edges (org_id, from_node_id, to_node_id, type, origin, confidence, provenance_id, inference_rule_id)
+       VALUES ($1,$2,$3,'DEPLOYS_TO','inferred','inferred-high',$4,$5)`,
+      [orgId, repoId, lambdaId, prov, ruleId],
+    );
+
+    // Blast-radius on rds (inbound): lambda@1 (observed edge), repo@2 (weakest = high).
+    const blast = await graph.blastRadius(orgId, rdsId, { depth: 5, nodeBudget: 500 });
+    const byUrn = new Map(blast.impacted.map((i) => [i.node.urn, i]));
+    expect(byUrn.get(LAMBDA)?.distance).toBe(1);
+    expect(byUrn.get(LAMBDA)?.pathConfidence).toBe("observed");
+    expect(byUrn.get(LAMBDA)?.via[0]).toMatchObject({ type: "CONNECTS_TO" });
+    expect(byUrn.get(REPO)?.distance).toBe(2);
+    expect(byUrn.get(REPO)?.pathConfidence).toBe("inferred-high"); // weakest edge on the path
+
+    // minConfidence=observed excludes the inferred DEPLOYS_TO → repo unreachable (P3 view).
+    const highOnly = await graph.blastRadius(orgId, rdsId, {
+      depth: 5,
+      nodeBudget: 500,
+      minConfidence: "observed",
+    });
+    expect(highOnly.impacted.map((i) => i.node.urn)).toEqual([LAMBDA]);
+
+    // Dependencies on repo (outbound): lambda@1, rds@2.
+    const deps = await graph.dependencies(orgId, repoId, { depth: 5, nodeBudget: 500 });
+    expect(deps.impacted.map((i) => i.node.urn).sort()).toEqual([LAMBDA, RDS].sort());
+
+    // Over-limit depth is clamped with a warning (A21).
+    const clamped = await graph.blastRadius(orgId, rdsId, { depth: 50, nodeBudget: 500 });
+    expect(clamped.depthUsed).toBe(6);
+    expect(clamped.warnings.some((w) => /depth clamped/.test(w))).toBe(true);
+  });
 });

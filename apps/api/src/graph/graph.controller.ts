@@ -7,7 +7,12 @@ import { ApiException } from "../common/errors";
 import { parseBody } from "../common/validation";
 import type { AuthedRequest } from "../auth/auth.types";
 import { GraphService } from "./graph.service";
-import { EdgesQuerySchema, NeighborsQuerySchema, NodeListQuerySchema } from "./dto";
+import {
+  EdgesQuerySchema,
+  NeighborsQuerySchema,
+  NodeListQuerySchema,
+  TraversalQuerySchema,
+} from "./dto";
 
 /**
  * Graph read API (docs/08 §9). Org selected via `X-Atlas-Org` (TenantScopeGuard); all
@@ -48,6 +53,26 @@ export class GraphController {
     @Query() query: unknown,
   ): Promise<unknown> {
     return this.graph.nodeNeighbors(org(req).id, id, parseBody(NeighborsQuerySchema, query));
+  }
+
+  @Get("nodes/:id/blast-radius")
+  @Roles("Member")
+  async blastRadius(
+    @Req() req: AuthedRequest,
+    @Param("id") id: string,
+    @Query() query: unknown,
+  ): Promise<unknown> {
+    return this.graph.blastRadius(org(req).id, id, parseBody(TraversalQuerySchema, query));
+  }
+
+  @Get("nodes/:id/dependencies")
+  @Roles("Member")
+  async dependencies(
+    @Req() req: AuthedRequest,
+    @Param("id") id: string,
+    @Query() query: unknown,
+  ): Promise<unknown> {
+    return this.graph.dependencies(org(req).id, id, parseBody(TraversalQuerySchema, query));
   }
 }
 
