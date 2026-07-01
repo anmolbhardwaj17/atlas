@@ -17,7 +17,15 @@ function buildInput(nodes: NodeLite[], signals: SignalLite[]): InferenceInput {
     if (l) l.push(s);
     else signalsByKind.set(s.kind, [s]);
   }
-  return { nodesByUrn, nodesByKind, signals, signalsByKind, observedEdges: [] };
+  return {
+    orgSlug: "acme",
+    nodesByUrn,
+    nodesByKind,
+    signals,
+    signalsByKind,
+    observedEdges: [],
+    inferredEdges: [],
+  };
 }
 
 const ecs = (urn: string, serviceName: string, cluster: string): NodeLite => ({
@@ -51,7 +59,7 @@ describe("R1 repo_deploys_to_runtime", () => {
         ]),
       ],
     );
-    const edges = repoDeploysToRuntimeRule.evaluate(input);
+    const edges = repoDeploysToRuntimeRule.evaluate(input).edges;
     expect(edges).toHaveLength(1);
     expect(edges[0]).toMatchObject({
       type: "DEPLOYS_TO",
@@ -67,7 +75,7 @@ describe("R1 repo_deploys_to_runtime", () => {
       [ecs(ORDERS_ECS, "orders", "prod")],
       [deploySignal(REPO, [{ kind: "ecs", cluster: "prod", service: "orders" }])],
     );
-    expect(repoDeploysToRuntimeRule.evaluate(input)[0]).toMatchObject({
+    expect(repoDeploysToRuntimeRule.evaluate(input).edges[0]).toMatchObject({
       toUrn: ORDERS_ECS,
       tier: "inferred-high",
     });
@@ -80,7 +88,7 @@ describe("R1 repo_deploys_to_runtime", () => {
       [a, b],
       [deploySignal(REPO, [{ kind: "ecs", cluster: null, service: "orders" }])],
     );
-    const edges = repoDeploysToRuntimeRule.evaluate(input);
+    const edges = repoDeploysToRuntimeRule.evaluate(input).edges;
     expect(edges).toHaveLength(2);
     expect(edges.every((e) => e.tier === "inferred-low")).toBe(true);
     expect(edges.map((e) => e.toUrn).sort()).toEqual([a.urn, b.urn].sort());
@@ -89,12 +97,12 @@ describe("R1 repo_deploys_to_runtime", () => {
   it("lambda name → high; unresolvable target → nothing", () => {
     const fn = lambda("aws:us-east-1:123456789012:lambda:resize", "resize");
     const hit = buildInput([fn], [deploySignal(REPO, [{ kind: "lambda", function: "resize" }])]);
-    expect(repoDeploysToRuntimeRule.evaluate(hit)[0]).toMatchObject({
+    expect(repoDeploysToRuntimeRule.evaluate(hit).edges[0]).toMatchObject({
       toUrn: fn.urn,
       tier: "inferred-high",
     });
 
     const miss = buildInput([fn], [deploySignal(REPO, [{ kind: "lambda", function: "ghost" }])]);
-    expect(repoDeploysToRuntimeRule.evaluate(miss)).toEqual([]);
+    expect(repoDeploysToRuntimeRule.evaluate(miss).edges).toEqual([]);
   });
 });

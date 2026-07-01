@@ -22,20 +22,28 @@ export interface SignalLite {
   data: Record<string, unknown>;
 }
 
-/** An observed edge a rule may build on (e.g. R8 reads ASSUMES_ROLE). */
-export interface ObservedEdgeLite {
+/** An edge a rule may build on. Observed edges + earlier rules' inferred edges (this run). */
+export interface EdgeLite {
   fromUrn: string;
   toUrn: string;
   type: string;
+  tier?: ConfidenceTier;
 }
+/** @deprecated alias — kept for readability where only observed edges are meant. */
+export type ObservedEdgeLite = EdgeLite;
 
 /** Everything a rule reads, pre-indexed for cheap lookup. */
 export interface InferenceInput {
+  /** Org slug — for derived URNs like `atlas:<slug>:service:<key>` (docs/05 §2.2). */
+  orgSlug: string;
   nodesByUrn: Map<string, NodeLite>;
   nodesByKind: Map<string, NodeLite[]>;
   signals: SignalLite[];
   signalsByKind: Map<string, SignalLite[]>;
-  observedEdges: ObservedEdgeLite[];
+  observedEdges: EdgeLite[];
+  /** Inferred edges produced by EARLIER rules this run (dependency-ordered; e.g. R4
+   *  reads R1's DEPLOYS_TO). The engine appends each rule's kept edges as it runs. */
+  inferredEdges: EdgeLite[];
 }
 
 /** A candidate edge a rule proposes (URNs; the engine resolves to node ids). */
@@ -48,16 +56,32 @@ export interface InferredEdge {
   evidence: Record<string, unknown>;
 }
 
+/** A node a rule synthesizes (docs/05 §3.3, e.g. `atlas.service`). Upserted by URN. */
+export interface DerivedNode {
+  urn: string;
+  kind: string;
+  displayName: string;
+  attributes: Record<string, unknown>;
+  tier: ConfidenceTier;
+}
+
+/** What a rule produces: derived nodes (upserted first, so its edges resolve) + edges. */
+export interface RuleOutput {
+  nodes: DerivedNode[];
+  edges: InferredEdge[];
+}
+
 /** A registered, versioned inference rule (docs/05 §6.2). */
 export interface Rule {
   readonly key: string;
   readonly version: number;
-  /** Pure: current graph state → candidate edges. */
-  evaluate(input: InferenceInput): InferredEdge[];
+  /** Pure: current graph state → derived nodes + candidate edges. */
+  evaluate(input: InferenceInput): RuleOutput;
 }
 
 export interface InferenceStats {
   candidates: number;
   upserted: number;
   retired: number;
+  derivedNodes: number;
 }

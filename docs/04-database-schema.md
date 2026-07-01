@@ -389,7 +389,7 @@ CREATE TABLE inference_rules (
 CREATE TABLE nodes (
     id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id        uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,         -- SP-1
-    connection_id uuid NOT NULL REFERENCES connections(id) ON DELETE CASCADE,           -- BR-NODE-1
+    connection_id uuid REFERENCES connections(id) ON DELETE CASCADE,                    -- BR-NODE-1; NULL for derived nodes (atlas.service, G1) — made nullable in migration 0012
     urn           text NOT NULL,                          -- deterministic identity (03 §7, SP-3)
     kind          text NOT NULL REFERENCES node_kinds(kind),                            -- 03 DD-2
     name          text,

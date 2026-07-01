@@ -2,7 +2,10 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { runInference } from "./engine";
-import { ALL_RULES } from "./rules";
+import { ALL_RULES, repoDeploysToRuntimeRule } from "./rules";
+
+// The first three tests exercise R1 + engine mechanics in isolation.
+const R1_ONLY = [repoDeploysToRuntimeRule];
 
 /**
  * G1 engine integration (docs/05 §6.5): R1 derives a DEPLOYS_TO edge from a
@@ -22,11 +25,14 @@ function one<T>(rows: T[]): T {
 
 const REPO = "github:acme/orders";
 const ECS = "aws:us-east-1:123456789012:ecs-service:prod/orders";
+const TEAM = "github:acme:team:payments";
+const PR = "github:acme/orders:pr:482";
 
 suite("G1 inference engine (R1)", () => {
   let admin: Pool;
   let app: Pool;
   let orgId: string;
+  let orgSlug: string;
   let connId: string;
 
   const insertNode = async (
@@ -77,11 +83,12 @@ suite("G1 inference engine (R1)", () => {
     await app.end();
   });
   beforeEach(async () => {
+    orgSlug = `inf-${randomUUID().slice(0, 8)}`;
     orgId = one(
       (
         await admin.query<{ id: string }>(
           "INSERT INTO organizations (slug, name) VALUES ($1, 'Org') RETURNING id",
-          [`inf-${randomUUID().slice(0, 8)}`],
+          [orgSlug],
         )
       ).rows,
     ).id;
@@ -106,7 +113,7 @@ suite("G1 inference engine (R1)", () => {
       targets: [{ kind: "ecs", cluster: "prod", service: "orders" }],
     });
 
-    const stats = await runInference({ db: app }, orgId, ALL_RULES);
+    const stats = await runInference({ db: app }, orgId, R1_ONLY);
     expect(stats.upserted).toBe(1);
 
     const edges = await inferredEdges();
@@ -127,8 +134,8 @@ suite("G1 inference engine (R1)", () => {
       repo: REPO,
       targets: [{ kind: "ecs", cluster: "prod", service: "orders" }],
     });
-    await runInference({ db: app }, orgId, ALL_RULES);
-    const second = await runInference({ db: app }, orgId, ALL_RULES);
+    await runInference({ db: app }, orgId, R1_ONLY);
+    const second = await runInference({ db: app }, orgId, R1_ONLY);
     expect(second.upserted).toBe(0);
     expect(second.retired).toBe(0);
     expect(await inferredEdges()).toHaveLength(1);
@@ -139,13 +146,77 @@ suite("G1 inference engine (R1)", () => {
       repo: REPO,
       targets: [{ kind: "ecs", cluster: "prod", service: "orders" }],
     });
-    await runInference({ db: app }, orgId, ALL_RULES);
+    await runInference({ db: app }, orgId, R1_ONLY);
     expect(await inferredEdges("active")).toHaveLength(1);
 
     await admin.query("DELETE FROM signals WHERE org_id=$1", [orgId]);
-    const stats = await runInference({ db: app }, orgId, ALL_RULES);
+    const stats = await runInference({ db: app }, orgId, R1_ONLY);
     expect(stats.retired).toBe(1);
     expect(await inferredEdges("active")).toHaveLength(0);
     expect(await inferredEdges("retired")).toHaveLength(1); // history kept (P4)
+  });
+
+  it("R4/R5/R6: derives atlas.service + IMPLEMENTS/RUNS + service OWNED_BY + CHANGED_BY", async () => {
+    await insertNode(TEAM, "github.team", "github", { slug: "payments" });
+    await insertNode(PR, "github.pull_request", "github", { number: 482 });
+
+    // Observed OWNED_BY(repo→team) — needs a provenance row + node ids.
+    const nodeId = async (urn: string): Promise<string> =>
+      one(
+        (
+          await admin.query<{ id: string }>("SELECT id FROM nodes WHERE org_id=$1 AND urn=$2", [
+            orgId,
+            urn,
+          ])
+        ).rows,
+      ).id;
+    const provId = one(
+      (
+        await admin.query<{ id: string }>(
+          "INSERT INTO provenance (org_id, source, confidence) VALUES ($1,'edge:OWNED_BY','observed') RETURNING id",
+          [orgId],
+        )
+      ).rows,
+    ).id;
+    await admin.query(
+      `INSERT INTO edges (org_id, from_node_id, to_node_id, type, origin, confidence, provenance_id)
+       VALUES ($1,$2,$3,'OWNED_BY','observed','observed',$4)`,
+      [orgId, await nodeId(REPO), await nodeId(TEAM), provId],
+    );
+
+    await insertSignal(`${REPO}:workflow:deploy.yml`, "github.workflow.deploy", {
+      repo: REPO,
+      targets: [{ kind: "ecs", cluster: "prod", service: "orders" }],
+    });
+    await insertSignal(PR, "github.pr.files", {
+      files: ["src/a.ts"],
+      mergedAt: "2026-06-30T00:00:00Z",
+    });
+
+    await runInference({ db: app }, orgId, ALL_RULES);
+
+    const SERVICE = `atlas:${orgSlug}:service:orders`;
+    const svc = await admin.query<{ kind: string; provider: string; connection_id: string | null }>(
+      "SELECT kind, provider, connection_id FROM nodes WHERE org_id=$1 AND urn=$2",
+      [orgId, SERVICE],
+    );
+    expect(svc.rows[0]).toMatchObject({
+      kind: "atlas.service",
+      provider: "atlas",
+      connection_id: null,
+    });
+
+    const edges = await inferredEdges();
+    const byType = (t: string): Array<{ from_urn: string; to_urn: string; confidence: string }> =>
+      edges.filter((e) => e.type === t);
+    expect(byType("DEPLOYS_TO")).toHaveLength(1);
+    expect(byType("IMPLEMENTS")[0]).toMatchObject({ from_urn: REPO, to_urn: SERVICE });
+    expect(byType("RUNS")[0]).toMatchObject({ from_urn: ECS, to_urn: SERVICE });
+    expect(byType("OWNED_BY")[0]).toMatchObject({ from_urn: SERVICE, to_urn: TEAM });
+    expect(byType("CHANGED_BY")[0]).toMatchObject({
+      from_urn: SERVICE,
+      to_urn: PR,
+      confidence: "inferred-high",
+    });
   });
 });

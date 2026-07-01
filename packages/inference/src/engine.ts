@@ -11,11 +11,12 @@
 import type { PoolClient } from "pg";
 import { withOrgScope, type Db } from "@atlas/db";
 import type {
+  DerivedNode,
+  EdgeLite,
   InferenceInput,
   InferenceStats,
   InferredEdge,
   NodeLite,
-  ObservedEdgeLite,
   Rule,
   SignalLite,
 } from "./types";
@@ -39,19 +40,33 @@ export async function runInference(
   return withOrgScope(deps.db, orgId, async (c) => {
     const input = await buildInput(c);
     const ruleIdByKey = await loadRuleIds(c);
-    const stats: InferenceStats = { candidates: 0, upserted: 0, retired: 0 };
+    const stats: InferenceStats = { candidates: 0, upserted: 0, retired: 0, derivedNodes: 0 };
     const keptByRule = new Map<string, string[]>();
 
+    // Rules run in dependency order (R1 → R4 → R5/R6); each rule's derived nodes and kept
+    // edges are folded back into `input` so later rules see them (single-pass convergence).
     for (const rule of rules) {
       const ruleId = ruleIdByKey.get(rule.key);
       if (!ruleId) {
         logger.warn(`inference: no inference_rules row for "${rule.key}" (skipped)`);
         continue;
       }
-      const candidates = rule.evaluate(input);
-      stats.candidates += candidates.length;
+      const output = rule.evaluate(input);
+
+      for (const node of output.nodes) {
+        const id = await upsertDerivedNode(c, orgId, node);
+        input.nodesByUrn.set(node.urn, {
+          id,
+          urn: node.urn,
+          kind: node.kind,
+          attributes: node.attributes,
+        });
+        stats.derivedNodes++;
+      }
+
+      stats.candidates += output.edges.length;
       const kept: string[] = [];
-      for (const cand of candidates) {
+      for (const cand of output.edges) {
         const from = input.nodesByUrn.get(cand.fromUrn);
         const to = input.nodesByUrn.get(cand.toUrn);
         if (!from || !to || from.id === to.id) continue; // unresolved endpoint / self-edge
@@ -66,6 +81,13 @@ export async function runInference(
         );
         kept.push(id);
         if (wrote) stats.upserted++;
+        // Expose to later rules (converged edges included, so R4 sees R1's DEPLOYS_TO).
+        input.inferredEdges.push({
+          type: cand.type,
+          fromUrn: cand.fromUrn,
+          toUrn: cand.toUrn,
+          tier: cand.tier,
+        });
       }
       keptByRule.set(ruleId, kept);
     }
@@ -85,6 +107,10 @@ export async function runInference(
 }
 
 async function buildInput(c: PoolClient): Promise<InferenceInput> {
+  // Org slug for derived URNs — RLS scopes `organizations` to the current org.
+  const orgSlug =
+    (await c.query<{ slug: string }>(`SELECT slug FROM organizations LIMIT 1`)).rows[0]?.slug ?? "";
+
   const nodes = (
     await c.query<{ id: string; urn: string; kind: string; attributes: Record<string, unknown> }>(
       `SELECT id, urn, kind, attributes FROM nodes WHERE status <> 'deleted'`,
@@ -112,7 +138,7 @@ async function buildInput(c: PoolClient): Promise<InferenceInput> {
     else signalsByKind.set(s.kind, [s]);
   }
 
-  const observedEdges: ObservedEdgeLite[] = (
+  const observedEdges: EdgeLite[] = (
     await c.query<{ type: string; from_urn: string; to_urn: string }>(
       `SELECT e.type, nf.urn AS from_urn, nt.urn AS to_urn
          FROM edges e
@@ -122,7 +148,40 @@ async function buildInput(c: PoolClient): Promise<InferenceInput> {
     )
   ).rows.map((e) => ({ type: e.type, fromUrn: e.from_urn, toUrn: e.to_urn }));
 
-  return { nodesByUrn, nodesByKind, signals, signalsByKind, observedEdges };
+  return {
+    orgSlug,
+    nodesByUrn,
+    nodesByKind,
+    signals,
+    signalsByKind,
+    observedEdges,
+    inferredEdges: [],
+  };
+}
+
+/** Upsert a rule-derived node (e.g. atlas.service) by URN. No connection_id (derived). */
+async function upsertDerivedNode(c: PoolClient, orgId: string, node: DerivedNode): Promise<string> {
+  const provider = node.kind.split(".")[0] ?? "atlas";
+  const { rows } = await c.query<{ id: string }>(
+    `INSERT INTO nodes (org_id, urn, kind, name, provider, attributes, status, confidence, last_seen)
+     VALUES ($1,$2,$3,$4,$5,$6,'active',$7, now())
+     ON CONFLICT (org_id, urn) DO UPDATE SET
+       name = EXCLUDED.name, attributes = EXCLUDED.attributes,
+       status = 'active', confidence = EXCLUDED.confidence, last_seen = now()
+     RETURNING id`,
+    [
+      orgId,
+      node.urn,
+      node.kind,
+      node.displayName,
+      provider,
+      JSON.stringify(node.attributes),
+      node.tier,
+    ],
+  );
+  const id = rows[0]?.id;
+  if (!id) throw new Error("derived node upsert returned no id");
+  return id;
 }
 
 async function loadRuleIds(c: PoolClient): Promise<Map<string, string>> {

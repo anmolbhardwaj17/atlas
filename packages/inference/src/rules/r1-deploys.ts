@@ -7,7 +7,7 @@
  *     high (P3, BR-EDGE-4/5)
  * Evidence records the workflow, the raw target, and the match kind (for citations, P4).
  */
-import type { InferenceInput, InferredEdge, NodeLite, Rule } from "../types";
+import type { InferenceInput, InferredEdge, NodeLite, Rule, RuleOutput } from "../types";
 
 type DeployTarget =
   | { kind: "ecs"; cluster: string | null; service: string }
@@ -22,7 +22,7 @@ interface DeploySignalData {
 export const repoDeploysToRuntimeRule: Rule = {
   key: "repo_deploys_to_runtime",
   version: 1,
-  evaluate(input: InferenceInput): InferredEdge[] {
+  evaluate(input: InferenceInput): RuleOutput {
     const edges: InferredEdge[] = [];
     for (const signal of input.signalsByKind.get("github.workflow.deploy") ?? []) {
       const data = signal.data as DeploySignalData;
@@ -40,7 +40,7 @@ export const repoDeploysToRuntimeRule: Rule = {
         }
       }
     }
-    return edges;
+    return { nodes: [], edges };
   },
 };
 

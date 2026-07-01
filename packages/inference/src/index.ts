@@ -6,14 +6,23 @@
  */
 export { runInference } from "./engine";
 export type { InferenceDeps, InferenceLogger } from "./engine";
-export { ALL_RULES, repoDeploysToRuntimeRule } from "./rules";
+export {
+  ALL_RULES,
+  repoDeploysToRuntimeRule,
+  serviceDerivationRule,
+  ownershipPropagationRule,
+  prChangesServiceRule,
+} from "./rules";
 export type {
   Rule,
+  RuleOutput,
   InferenceInput,
   InferredEdge,
+  DerivedNode,
   InferenceStats,
   NodeLite,
   SignalLite,
+  EdgeLite,
   ObservedEdgeLite,
   ConfidenceTier,
 } from "./types";

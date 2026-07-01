@@ -1,13 +1,24 @@
 /**
- * The registered rule set the engine runs (docs/05 §6.4). Grows unit by unit through
- * G1; each rule is pure and independently testable. Order is irrelevant (rules are
- * independent), except rules that consume other rules' edges read the DB, so a later
- * inference pass sees earlier passes' results — R4/R6 (which build on R1's DEPLOYS_TO)
- * are handled by re-running after R1 persists, or by reading observed/edge state.
+ * The registered rule set the engine runs (docs/05 §6.4), in DEPENDENCY ORDER: rules
+ * that consume another rule's edges must run after it (the engine folds each rule's
+ * output back into the input). R1 (DEPLOYS_TO) → R4 (service + IMPLEMENTS/RUNS) →
+ * R5-propagation (service OWNED_BY, reads IMPLEMENTS) + R6 (CHANGED_BY, reads IMPLEMENTS).
+ * Each rule is pure and independently testable.
  */
 import type { Rule } from "../types";
 import { repoDeploysToRuntimeRule } from "./r1-deploys";
+import { serviceDerivationRule } from "./r4-service";
+import { ownershipPropagationRule } from "./r5-ownership";
+import { prChangesServiceRule } from "./r6-changed";
 
-export const ALL_RULES: readonly Rule[] = [repoDeploysToRuntimeRule];
+export const ALL_RULES: readonly Rule[] = [
+  repoDeploysToRuntimeRule,
+  serviceDerivationRule,
+  ownershipPropagationRule,
+  prChangesServiceRule,
+];
 
 export { repoDeploysToRuntimeRule } from "./r1-deploys";
+export { serviceDerivationRule } from "./r4-service";
+export { ownershipPropagationRule } from "./r5-ownership";
+export { prChangesServiceRule } from "./r6-changed";
