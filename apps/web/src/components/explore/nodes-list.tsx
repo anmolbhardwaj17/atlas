@@ -1,18 +1,19 @@
 import Link from "next/link";
+import { SearchX } from "lucide-react";
 import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/patterns/empty-state";
 import type { NodeDto } from "@/lib/graph-types";
 
 /** The nodes table (docs/09 §5.3) — kind · name · region, with certainty + freshness legible per row. */
 export function NodesList({ nodes }: { nodes: NodeDto[] }) {
   if (nodes.length === 0) {
     return (
-      <div className="rounded-lg border border-border py-12 text-center">
-        <p className="text-sm text-foreground">No resources match these filters</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Try clearing filters, or connect a source and let it sync.
-        </p>
-      </div>
+      <EmptyState
+        icon={SearchX}
+        title="No resources match these filters"
+        description="Try clearing filters, or connect a source and let it sync."
+      />
     );
   }
   return (

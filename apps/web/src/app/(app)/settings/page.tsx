@@ -1,8 +1,10 @@
+import { Plug } from "lucide-react";
 import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
 import { OrgPanel } from "@/app/org-panel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/certainty";
+import { EmptyState } from "@/components/patterns/empty-state";
 
 export const dynamic = "force-dynamic";
 
@@ -60,9 +62,12 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent>
           {conns.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No sources connected yet. Connecting AWS or GitHub starts building your graph.
-            </p>
+            <EmptyState
+              bare
+              icon={Plug}
+              title="No sources connected"
+              description="Connecting AWS or GitHub starts building your graph. From the dashboard you can also load sample data to explore Atlas without credentials."
+            />
           ) : (
             <ul className="divide-y divide-border rounded-md border">
               {conns.map((c) => (

@@ -3,6 +3,7 @@ import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
 import { NodeFilters } from "@/components/explore/node-filters";
 import { NodesList } from "@/components/explore/nodes-list";
+import { ErrorState } from "@/components/patterns/empty-state";
 import type { NodeDto } from "@/lib/graph-types";
 
 export const dynamic = "force-dynamic";
@@ -63,9 +64,10 @@ export default async function ExplorePage({
       <NodeFilters values={{ q, kind, status, confidence }} />
 
       {res.status !== 0 && res.body === null ? (
-        <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          Couldn’t load nodes (status {res.status}).
-        </div>
+        <ErrorState
+          title="Couldn’t load resources"
+          description={`The graph read failed (status ${res.status}). Try again in a moment.`}
+        />
       ) : (
         <NodesList nodes={nodes} />
       )}

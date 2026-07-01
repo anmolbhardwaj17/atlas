@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfidenceBadge } from "@/components/certainty";
+import { ErrorState } from "@/components/patterns/empty-state";
 import type { TraversalResult } from "@/lib/graph-types";
 
 /**
@@ -25,8 +26,12 @@ export function ImpactPanel({
         <CardHeader>
           <CardTitle>{title}</CardTitle>
         </CardHeader>
-        <CardBody>
-          <p className="text-sm text-muted-foreground">Couldn’t compute this traversal.</p>
+        <CardBody className="p-0">
+          <ErrorState
+            bare
+            title="Couldn’t compute this traversal"
+            description="The graph query failed or timed out. Try again in a moment."
+          />
         </CardBody>
       </Card>
     );

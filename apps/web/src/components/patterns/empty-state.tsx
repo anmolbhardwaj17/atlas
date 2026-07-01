@@ -1,12 +1,14 @@
 import * as React from "react";
+import { AlertTriangle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
 
 /**
- * Empty state (design-system pattern, docs/09 §7). One consistent shape for every "no data
- * yet" surface — icon, title, one-line description, and an optional action row — so empty is
- * always a designed, actionable state, never a blank screen (US/EC-2). Reused by the
- * dashboard, Explore, Ask, and honest-absence surfaces (P1.3 keeps these consistent).
+ * Empty / error / honest-absence state (design-system pattern, docs/09 §7). One consistent
+ * shape for every "no data" or "couldn't load" surface — icon, title, one-line description,
+ * optional action row — so these are always designed, actionable states, never a blank
+ * screen (US/EC-2). `tone="danger"` is the failure variant. Reused by the dashboard,
+ * Explore, impact panels, settings, and honest-absence surfaces (P1.3 consistency).
  */
 export function EmptyState({
   icon: Icon,
@@ -14,6 +16,7 @@ export function EmptyState({
   description,
   actions,
   className,
+  tone = "default",
   bare = false,
 }: {
   icon?: React.ComponentType<{ className?: string }>;
@@ -21,17 +24,24 @@ export function EmptyState({
   description?: React.ReactNode;
   actions?: React.ReactNode;
   className?: string;
+  tone?: "default" | "danger";
   /** Render without the surrounding Card (when already inside one). */
   bare?: boolean;
 }) {
+  const danger = tone === "danger";
   const body = (
     <div className={cn("flex flex-col items-center px-6 py-12 text-center", className)}>
       {Icon ? (
-        <div className="mb-3 grid size-10 place-items-center rounded-lg bg-muted text-muted-foreground">
+        <div
+          className={cn(
+            "mb-3 grid size-10 place-items-center rounded-lg",
+            danger ? "bg-danger/10 text-danger" : "bg-muted text-muted-foreground",
+          )}
+        >
           <Icon className="size-5" />
         </div>
       ) : null}
-      <p className="text-sm font-medium">{title}</p>
+      <p className={cn("text-sm font-medium", danger && "text-danger")}>{title}</p>
       {description ? (
         <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">{description}</p>
       ) : null}
@@ -41,8 +51,37 @@ export function EmptyState({
 
   if (bare) return body;
   return (
-    <Card>
+    <Card className={cn(danger && "border-danger/30")}>
       <CardContent className="p-0">{body}</CardContent>
     </Card>
+  );
+}
+
+/**
+ * Error state — `EmptyState` in the danger tone with a default alert icon. The one way to
+ * render "couldn't load / compute this" across the app.
+ */
+export function ErrorState({
+  title = "Something went wrong",
+  description,
+  actions,
+  bare = false,
+  icon = AlertTriangle,
+}: {
+  title?: string;
+  description?: React.ReactNode;
+  actions?: React.ReactNode;
+  bare?: boolean;
+  icon?: React.ComponentType<{ className?: string }>;
+}) {
+  return (
+    <EmptyState
+      tone="danger"
+      icon={icon}
+      title={title}
+      description={description}
+      actions={actions}
+      bare={bare}
+    />
   );
 }

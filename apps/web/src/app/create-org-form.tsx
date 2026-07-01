@@ -60,7 +60,7 @@ export function CreateOrgForm() {
           {busy ? "Creating…" : "Create"}
         </Button>
       </div>
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? <p className="text-sm text-danger">{error}</p> : null}
     </form>
   );
 }

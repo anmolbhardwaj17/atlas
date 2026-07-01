@@ -39,7 +39,7 @@ export default function LoginPage() {
           <Button onClick={signInWithGoogle} disabled={busy} variant="outline" className="w-full">
             {busy ? "Redirecting…" : "Sign in with Google"}
           </Button>
-          {error ? <p className="text-center text-sm text-destructive">{error}</p> : null}
+          {error ? <p className="text-center text-sm text-danger">{error}</p> : null}
         </CardContent>
       </Card>
     </main>
