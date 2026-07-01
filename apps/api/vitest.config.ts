@@ -10,4 +10,11 @@ export default defineConfig({
       },
     },
   },
+  // Env-gated service integration tests hit a remote Postgres; allow generous timeouts
+  // and run files sequentially (shared DB).
+  test: {
+    testTimeout: 30000,
+    hookTimeout: 30000,
+    fileParallelism: false,
+  },
 });

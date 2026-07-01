@@ -11,6 +11,7 @@ export type ApiErrorCode =
   | "org_access_denied"
   | "not_found"
   | "validation_failed"
+  | "invalid_cursor"
   | "already_exists"
   | "invalid_state_transition"
   | "connection_verification_failed"
