@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, Zap } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
 import type { NodeDetail, EdgeDto } from "@/lib/graph-types";
@@ -16,6 +16,12 @@ export function NodeDetailView({ node, edges }: { node: NodeDetail; edges: EdgeD
           <h1 className="text-xl font-semibold">{node.name ?? "unnamed"}</h1>
           <ConfidenceBadge tier={node.confidence} />
           <FreshnessTag status={node.status} />
+          <Link
+            href={`/explore/${node.id}/impact`}
+            className="ml-auto flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted hover:text-fg"
+          >
+            <Zap size={13} /> Impact analysis
+          </Link>
         </div>
         <p className="mt-1 break-all font-mono text-xs text-muted">{node.urn}</p>
         <p className="mt-1 text-sm text-muted">

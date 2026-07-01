@@ -43,6 +43,36 @@ export interface EdgeDto {
   to: EdgeEndpoint;
 }
 
+export interface NodeSummary {
+  id: string;
+  urn: string;
+  kind: string;
+  name: string | null;
+}
+
+export interface EdgeVia {
+  edgeId: string;
+  type: string;
+  confidence: string;
+  evidence: Record<string, unknown>;
+  rule: string | null;
+  provenanceId: string;
+}
+
+export interface TraversalResult {
+  root: NodeSummary;
+  impacted: Array<{
+    node: NodeSummary;
+    distance: number;
+    via: EdgeVia[];
+    pathConfidence: string;
+  }>;
+  warnings: string[];
+  depthUsed: number;
+  nodeBudget: number;
+  truncated: boolean;
+}
+
 export interface EdgeDetail {
   id: string;
   type: string;
