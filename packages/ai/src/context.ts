@@ -20,6 +20,8 @@ export interface BuiltContext {
   cites: Cite[];
   /** Distinct node ids surfaced (for the `retrieval` SSE "nodes considered" + audit). */
   nodesConsidered: number;
+  /** Staleness/truncation notes → answer caveats (docs/10 §5). */
+  freshnessNotes: string[];
 }
 
 export function buildContext(orgId: string, result: RetrievalResult): BuiltContext {
@@ -101,7 +103,12 @@ export function buildContext(orgId: string, result: RetrievalResult): BuiltConte
   if (notes.length) sections.push("FRESHNESS:", ...notes.map((n) => `  ${n}`));
   sections.push("[END CONTEXT]");
 
-  return { context: sections.join("\n"), cites, nodesConsidered: nodeMarker.size };
+  return {
+    context: sections.join("\n"),
+    cites,
+    nodesConsidered: nodeMarker.size,
+    freshnessNotes: notes,
+  };
 }
 
 /** Compact single-line JSON-ish rendering (token-frugal; untrusted data stays delimited). */
