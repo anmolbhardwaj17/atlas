@@ -11,6 +11,7 @@ export interface Shell {
   token: string;
   orgId: string;
   orgName: string;
+  role: string;
   email: string;
 }
 
@@ -43,6 +44,7 @@ export const requireShell = cache(async (): Promise<Shell> => {
     token: session.token,
     orgId: active.orgId,
     orgName: active.orgName,
+    role: active.role,
     email: me.email ?? session.email,
   };
 });

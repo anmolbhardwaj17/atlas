@@ -12,6 +12,8 @@ export { InMemorySecretBroker } from "./secret-broker";
 export type { SecretBroker } from "./secret-broker";
 export { MockConnector } from "./mock-connector";
 export type { MockResource, MockScope, MockControl } from "./mock-connector";
+export { seedDemoData, DEMO_SCOPES, DEMO_CONNECTION_NAME } from "./demo-estate";
+export type { DemoSeedDeps, DemoSeedResult } from "./demo-estate";
 export { InMemoryQueue } from "./queue";
 export type { Job, JobHandler, JobQueue } from "./queue";
 export { BullMQQueue } from "./bullmq-queue";

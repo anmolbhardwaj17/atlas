@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Boxes, GitBranch, Sparkles, Plug } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FreshnessTag } from "@/components/certainty";
+import { Onboarding } from "@/components/onboarding";
 import { apiGet, type ApiOk } from "@/lib/api";
 
 interface Overview {
@@ -21,7 +22,15 @@ interface NodeDto {
 
 /** Dashboard (docs/09 §5.2) — the authenticated home: headline metrics, graph
  *  composition, certainty mix, and a recent-resources peek. */
-export async function Dashboard({ orgId, token }: { orgId: string; token: string }) {
+export async function Dashboard({
+  orgId,
+  token,
+  role,
+}: {
+  orgId: string;
+  token: string;
+  role: string;
+}) {
   const [ovRes, nodesRes] = await Promise.all([
     apiGet<ApiOk<Overview>>("/overview", { token, orgId }),
     apiGet<ApiOk<NodeDto[]>>("/nodes?limit=6", { token, orgId }),
@@ -29,27 +38,9 @@ export async function Dashboard({ orgId, token }: { orgId: string; token: string
   const ov = ovRes.body?.data;
   const recent = nodesRes.body?.data ?? [];
 
+  // Empty graph → the onboarding first-run experience (choose a source / load sample data).
   if (!ov || ov.nodeCount === 0) {
-    return (
-      <div className="space-y-6">
-        <Header />
-        <Card>
-          <CardContent className="py-14 text-center">
-            <p className="text-sm font-medium">Your graph is empty</p>
-            <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-              Connect AWS or GitHub to start building your knowledge graph. Head to Settings to add
-              a source.
-            </p>
-            <Link
-              href="/settings"
-              className="mt-4 inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              Go to Settings
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <Onboarding orgId={orgId} canSeed={role === "Owner" || role === "Admin"} />;
   }
 
   const inferred = ov.edgesByConfidence.inferredHigh + ov.edgesByConfidence.inferredLow;

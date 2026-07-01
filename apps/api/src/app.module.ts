@@ -7,6 +7,7 @@ import { ConnectionsModule } from "./connections/connections.module";
 import { GraphModule } from "./graph/graph.module";
 import { SearchModule } from "./search/search.module";
 import { AiModule } from "./ai/ai.module";
+import { DemoModule } from "./demo/demo.module";
 import { HealthController } from "./health/health.controller";
 import { ResponseInterceptor } from "./common/response.interceptor";
 import { HttpExceptionFilter } from "./common/http-exception.filter";
@@ -21,6 +22,7 @@ import { HttpExceptionFilter } from "./common/http-exception.filter";
     GraphModule,
     SearchModule,
     AiModule,
+    DemoModule,
   ],
   controllers: [HealthController],
   providers: [

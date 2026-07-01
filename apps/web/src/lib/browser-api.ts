@@ -35,6 +35,40 @@ export async function searchNodes(
   return body.data ?? [];
 }
 
+export interface DemoSeedResult {
+  status: string;
+  nodeCount: number;
+  observedEdges: number;
+  inferredEdges: number;
+  signals: number;
+}
+
+/**
+ * Load the sample "Shopyard" estate into the current org (onboarding "Load sample data",
+ * P1.2). Admin-only + empty-org-gated server-side. Throws with a human message on failure.
+ */
+export async function seedDemo(orgId: string): Promise<DemoSeedResult> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/demo/seed`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "X-Atlas-Org": orgId,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({}),
+  });
+  const body = (await res.json().catch(() => null)) as {
+    data?: DemoSeedResult;
+    error?: { message?: string };
+  } | null;
+  if (!res.ok || !body?.data) {
+    throw new Error(body?.error?.message ?? `Couldn't load sample data (${res.status}).`);
+  }
+  return body.data;
+}
+
 /** The SSE event union the /ai messages endpoint streams (mirrors AnswerEvent). */
 export type AskEvent =
   | { type: "retrieval"; nodesConsidered: number; intent: string }
