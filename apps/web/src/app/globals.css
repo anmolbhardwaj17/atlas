@@ -47,6 +47,11 @@
     --inferred-low: 0 0% 52%;
     --stale: 0 0% 64%;
 
+    /* Semantic status colors (the one place we use hue in the mono UI). */
+    --success: 142 72% 29%;
+    --warning: 35 92% 33%;
+    --danger: 0 72% 45%;
+
     /* Sidebar. */
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 0 0% 25%;
@@ -91,6 +96,10 @@
     --inferred-high: 0 0% 72%;
     --inferred-low: 0 0% 55%;
     --stale: 0 0% 42%;
+
+    --success: 142 60% 55%;
+    --warning: 40 90% 60%;
+    --danger: 0 72% 62%;
 
     --sidebar-background: 0 0% 6%;
     --sidebar-foreground: 0 0% 85%;

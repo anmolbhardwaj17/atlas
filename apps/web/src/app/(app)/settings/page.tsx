@@ -2,6 +2,7 @@ import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
 import { OrgPanel } from "@/app/org-panel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusBadge } from "@/components/certainty";
 
 export const dynamic = "force-dynamic";
 
@@ -69,7 +70,7 @@ export default async function SettingsPage() {
                   <span>
                     <span className="text-muted-foreground">{c.provider}</span> · {c.displayName}
                   </span>
-                  <span className="text-muted-foreground">{c.status}</span>
+                  <StatusBadge status={c.status} />
                 </li>
               ))}
             </ul>

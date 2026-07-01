@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
+import { Badge } from "@/components/ui/badge";
 import type { NodeDto } from "@/lib/graph-types";
 
 /** The nodes table (docs/09 §5.3) — kind · name · region, with certainty + freshness legible per row. */
@@ -35,7 +36,11 @@ export function NodesList({ nodes }: { nodes: NodeDto[] }) {
                 </Link>
                 <div className="max-w-md truncate text-xs text-muted-foreground">{n.urn}</div>
               </td>
-              <td className="px-4 py-2.5 text-muted-foreground">{n.kind}</td>
+              <td className="px-4 py-2.5">
+                <Badge variant="secondary" className="font-mono text-[11px] font-normal">
+                  {n.kind}
+                </Badge>
+              </td>
               <td className="px-4 py-2.5 text-muted-foreground">{n.region ?? "—"}</td>
               <td className="px-4 py-2.5">
                 <ConfidenceBadge tier={n.confidence} />

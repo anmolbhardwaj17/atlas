@@ -65,6 +65,10 @@ export default {
         "inferred-high": "hsl(var(--inferred-high))",
         "inferred-low": "hsl(var(--inferred-low))",
         stale: "hsl(var(--stale))",
+        // Semantic status.
+        success: "hsl(var(--success))",
+        warning: "hsl(var(--warning))",
+        danger: "hsl(var(--danger))",
       },
       borderRadius: {
         lg: "var(--radius)",
