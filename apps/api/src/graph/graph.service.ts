@@ -15,6 +15,7 @@ import {
   type NodeDto,
   type NodeListQuery,
   type NodeRowish,
+  type TimelineQuery,
   type TraversalQuery,
 } from "./dto";
 
@@ -53,6 +54,57 @@ export interface EdgeVia {
   rule: string | null;
   provenanceId: string;
 }
+export interface EdgeDetail {
+  id: string;
+  type: string;
+  origin: string;
+  confidence: string;
+  status: string;
+  from: NodeSummary;
+  to: NodeSummary;
+  rule: string | null;
+  evidence: Record<string, unknown>;
+  provenance: {
+    source: string | null;
+    observedAt: string | null;
+    rawSnapshotId: string | null;
+    rawSnapshotRef: string | null;
+  };
+  firstSeen: string;
+  lastSeen: string;
+}
+interface EdgeDetailRow {
+  id: string;
+  type: string;
+  origin: string;
+  confidence: string;
+  status: string;
+  first_seen: Date;
+  last_seen: Date;
+  from_id: string;
+  from_urn: string;
+  from_kind: string;
+  from_name: string | null;
+  to_id: string;
+  to_urn: string;
+  to_kind: string;
+  to_name: string | null;
+  source: string | null;
+  observed_at: Date | null;
+  evidence: Record<string, unknown> | null;
+  raw_snapshot_id: string | null;
+  storage_ref: string | null;
+  rule_key: string | null;
+  rule_version: number | null;
+}
+
+export interface TimelineItem {
+  changeKind: "node" | "edge";
+  changeType: "created" | "updated";
+  at: string;
+  entity: Record<string, unknown>;
+}
+
 export interface TraversalResult {
   root: NodeSummary;
   impacted: Array<{
@@ -227,6 +279,134 @@ export class GraphService {
   /** Outbound dependency closure — "what this depends on" (US-9). */
   async dependencies(orgId: string, id: string, q: TraversalQuery): Promise<TraversalResult> {
     return this.traverse(orgId, id, "outbound", q);
+  }
+
+  /** Edge detail: evidence, rule, provenance + raw-snapshot link (docs/08 §9). */
+  async getEdge(orgId: string, id: string): Promise<EdgeDetail> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      if (!UUID_RE.test(id)) throw ApiException.notFound();
+      const { rows } = await c.query<EdgeDetailRow>(
+        `SELECT e.id, e.type, e.origin, e.confidence, e.status,
+                e.first_seen, e.last_seen,
+                nf.id AS from_id, nf.urn AS from_urn, nf.kind AS from_kind, nf.name AS from_name,
+                nt.id AS to_id, nt.urn AS to_urn, nt.kind AS to_kind, nt.name AS to_name,
+                p.source, p.observed_at, p.evidence, p.raw_snapshot_id,
+                rs.storage_ref, ir.key AS rule_key, ir.version AS rule_version
+           FROM edges e
+           JOIN nodes nf ON nf.id = e.from_node_id
+           JOIN nodes nt ON nt.id = e.to_node_id
+           LEFT JOIN provenance p ON p.id = e.provenance_id
+           LEFT JOIN raw_snapshots rs ON rs.id = p.raw_snapshot_id
+           LEFT JOIN inference_rules ir ON ir.id = e.inference_rule_id
+          WHERE e.id = $1`,
+        [id],
+      );
+      const r = rows[0];
+      if (!r) throw ApiException.notFound();
+      return {
+        id: r.id,
+        type: r.type,
+        origin: r.origin,
+        confidence: r.confidence,
+        status: r.status,
+        from: { id: r.from_id, urn: r.from_urn, kind: r.from_kind, name: r.from_name },
+        to: { id: r.to_id, urn: r.to_urn, kind: r.to_kind, name: r.to_name },
+        rule: r.rule_key ? `${r.rule_key}@${r.rule_version}` : null,
+        evidence: r.evidence ?? {},
+        provenance: {
+          source: r.source,
+          observedAt: r.observed_at?.toISOString() ?? null,
+          rawSnapshotId: r.raw_snapshot_id,
+          rawSnapshotRef: r.storage_ref,
+        },
+        firstSeen: r.first_seen.toISOString(),
+        lastSeen: r.last_seen.toISOString(),
+      };
+    });
+  }
+
+  /**
+   * "What changed since" (docs/08 §10.3, US-5): new/updated nodes + new edges since a
+   * timestamp, merged and ordered newest-first. `kinds` filters node changes.
+   */
+  async timeline(orgId: string, q: TimelineQuery): Promise<{ data: TimelineItem[] }> {
+    const since = q.since.toISOString();
+    const kinds = q.kinds
+      ? q.kinds
+          .split(",")
+          .map((k) => k.trim())
+          .filter(Boolean)
+      : null;
+    return withOrgScope(this.db, orgId, async (c) => {
+      const nodeParams: unknown[] = [since];
+      let kindFilter = "";
+      if (kinds && kinds.length > 0) {
+        kindFilter = ` AND kind = ANY($${nodeParams.push(kinds)}::text[])`;
+      }
+      const nodeRows = (
+        await c.query<{
+          id: string;
+          urn: string;
+          kind: string;
+          name: string | null;
+          first_seen: Date;
+          last_seen: Date;
+        }>(
+          `SELECT id, urn, kind, name, first_seen, last_seen FROM nodes
+            WHERE status <> 'deleted' AND (first_seen >= $1 OR last_seen >= $1)${kindFilter}
+            ORDER BY GREATEST(first_seen, last_seen) DESC LIMIT ${q.limit}`,
+          nodeParams,
+        )
+      ).rows;
+
+      const edgeRows = (
+        await c.query<{
+          id: string;
+          type: string;
+          confidence: string;
+          first_seen: Date;
+          from_urn: string;
+          from_name: string | null;
+          to_urn: string;
+          to_name: string | null;
+        }>(
+          `SELECT e.id, e.type, e.confidence, e.first_seen,
+                  nf.urn AS from_urn, nf.name AS from_name, nt.urn AS to_urn, nt.name AS to_name
+             FROM edges e
+             JOIN nodes nf ON nf.id = e.from_node_id
+             JOIN nodes nt ON nt.id = e.to_node_id
+            WHERE e.status = 'active' AND e.first_seen >= $1
+            ORDER BY e.first_seen DESC LIMIT ${q.limit}`,
+          [since],
+        )
+      ).rows;
+
+      const items: TimelineItem[] = [
+        ...nodeRows.map((n): TimelineItem => {
+          const created = n.first_seen >= q.since;
+          return {
+            changeKind: "node",
+            changeType: created ? "created" : "updated",
+            at: (created ? n.first_seen : n.last_seen).toISOString(),
+            entity: { id: n.id, urn: n.urn, kind: n.kind, name: n.name },
+          };
+        }),
+        ...edgeRows.map((e): TimelineItem => ({
+          changeKind: "edge",
+          changeType: "created",
+          at: e.first_seen.toISOString(),
+          entity: {
+            id: e.id,
+            type: e.type,
+            confidence: e.confidence,
+            from: { urn: e.from_urn, name: e.from_name },
+            to: { urn: e.to_urn, name: e.to_name },
+          },
+        })),
+      ];
+      items.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+      return { data: items.slice(0, q.limit) };
+    });
   }
 
   /**

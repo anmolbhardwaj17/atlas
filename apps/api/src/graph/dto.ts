@@ -90,6 +90,16 @@ export const TraversalQuerySchema = z
   .strict();
 export type TraversalQuery = z.infer<typeof TraversalQuerySchema>;
 
+/** Timeline "what changed since" (docs/08 §10.3, US-5). `kinds` filters node changes. */
+export const TimelineQuerySchema = z
+  .object({
+    since: z.coerce.date(),
+    kinds: z.string().min(1).optional(),
+    limit: z.coerce.number().int().min(1).max(200).default(50),
+  })
+  .strict();
+export type TimelineQuery = z.infer<typeof TimelineQuerySchema>;
+
 /** Impact-bearing edge types traversed for blast-radius/dependencies (docs/05 §7.2). */
 export const IMPACT_EDGE_TYPES = [
   "CONNECTS_TO",

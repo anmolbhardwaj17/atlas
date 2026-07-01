@@ -11,6 +11,7 @@ import {
   EdgesQuerySchema,
   NeighborsQuerySchema,
   NodeListQuerySchema,
+  TimelineQuerySchema,
   TraversalQuerySchema,
 } from "./dto";
 
@@ -73,6 +74,18 @@ export class GraphController {
     @Query() query: unknown,
   ): Promise<unknown> {
     return this.graph.dependencies(org(req).id, id, parseBody(TraversalQuerySchema, query));
+  }
+
+  @Get("edges/:id")
+  @Roles("Member")
+  async getEdge(@Req() req: AuthedRequest, @Param("id") id: string): Promise<unknown> {
+    return this.graph.getEdge(org(req).id, id);
+  }
+
+  @Get("timeline")
+  @Roles("Member")
+  async timeline(@Req() req: AuthedRequest, @Query() query: unknown): Promise<unknown> {
+    return this.graph.timeline(org(req).id, parseBody(TimelineQuerySchema, query));
   }
 }
 

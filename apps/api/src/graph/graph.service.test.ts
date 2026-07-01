@@ -225,4 +225,42 @@ suite("G2.1 GraphService", () => {
     expect(clamped.depthUsed).toBe(6);
     expect(clamped.warnings.some((w) => /depth clamped/.test(w))).toBe(true);
   });
+
+  it("getEdge returns endpoints + evidence/provenance; 404 on missing", async () => {
+    const eid = one(
+      (await admin.query<{ id: string }>("SELECT id FROM edges WHERE org_id=$1", [orgId])).rows,
+    ).id;
+    const edge = await graph.getEdge(orgId, eid);
+    expect(edge).toMatchObject({
+      type: "CONNECTS_TO",
+      from: { urn: LAMBDA },
+      to: { urn: RDS },
+      provenance: { source: "edge" },
+    });
+    await expect(graph.getEdge(orgId, randomUUID())).rejects.toBeInstanceOf(ApiException);
+    await expect(graph.getEdge(otherOrgId, eid)).rejects.toBeInstanceOf(ApiException); // R8
+  });
+
+  it("timeline returns node + edge changes since a timestamp, kind-filterable", async () => {
+    const since = new Date(Date.now() - 3600_000);
+    const tl = await graph.timeline(orgId, { since, limit: 50 });
+    const kinds = tl.data.map((i) => i.changeKind);
+    expect(kinds).toContain("node");
+    expect(kinds).toContain("edge");
+
+    const filtered = await graph.timeline(orgId, {
+      since,
+      kinds: "aws.lambda.function",
+      limit: 50,
+    });
+    const nodeItems = filtered.data.filter((i) => i.changeKind === "node");
+    expect(nodeItems.length).toBeGreaterThan(0);
+    expect(
+      nodeItems.every((i) => (i.entity as { kind?: string }).kind === "aws.lambda.function"),
+    ).toBe(true);
+
+    // A future `since` yields nothing.
+    const none = await graph.timeline(orgId, { since: new Date(Date.now() + 3600_000), limit: 50 });
+    expect(none.data).toHaveLength(0);
+  });
 });
