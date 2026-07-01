@@ -26,3 +26,5 @@ export type {
   ViaEdge,
   TimelineChange,
 } from "./retrieval-port";
+export { classifyIntent, extractTerms, resolveEntity, plan } from "./planner";
+export type { Intent, RetrievalPlan, ResolvedEntity } from "./planner";
