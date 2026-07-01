@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
-import { AppShell } from "@/components/app-shell";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfidenceBadge } from "@/components/certainty";
 import type { EdgeDetail } from "@/lib/graph-types";
@@ -23,7 +22,7 @@ export default async function EdgePage({ params }: { params: Promise<{ id: strin
   const edge = res.body?.data ?? null;
 
   return (
-    <AppShell orgName={shell.orgName} email={shell.email} orgId={shell.orgId}>
+    <>
       {edge ? (
         <div className="space-y-6">
           <div>
@@ -91,7 +90,7 @@ export default async function EdgePage({ params }: { params: Promise<{ id: strin
           </p>
         </div>
       )}
-    </AppShell>
+    </>
   );
 }
 

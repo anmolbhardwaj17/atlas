@@ -11,20 +11,24 @@ interface Style {
   className: string;
 }
 const TIER: Record<string, Style> = {
-  observed: { label: "observed", className: "border-observed/30 bg-observed/10 text-observed" },
+  // Monochrome hierarchy: solid = fact, dark outline = strong, gray = weak, dashed = none.
+  observed: { label: "observed", className: "border-transparent bg-foreground text-background" },
   "inferred-high": {
     label: "inferred · high",
-    className: "border-inferred-high/30 bg-inferred-high/10 text-inferred-high",
+    className: "border-foreground/50 text-foreground",
   },
   "inferred-low": {
     label: "inferred · low",
-    className: "border-inferred-low/30 bg-inferred-low/10 text-inferred-low",
+    className: "border-muted-foreground/40 text-muted-foreground",
   },
-  insufficient: { label: "no data", className: "border-stale/30 bg-stale/10 text-stale" },
+  insufficient: {
+    label: "no data",
+    className: "border-dashed border-muted-foreground/40 text-muted-foreground",
+  },
 };
 const TIER_FALLBACK: Style = {
   label: "no data",
-  className: "border-stale/30 bg-stale/10 text-stale",
+  className: "border-dashed border-muted-foreground/40 text-muted-foreground",
 };
 
 export function ConfidenceBadge({ tier, evidence }: { tier: string; evidence?: string }) {
@@ -41,16 +45,16 @@ export function ConfidenceBadge({ tier, evidence }: { tier: string; evidence?: s
 }
 
 const FRESH: Record<string, Style> = {
-  active: { label: "fresh", className: "border-observed/30 bg-observed/10 text-observed" },
-  stale: { label: "stale", className: "border-stale/40 bg-stale/10 text-stale" },
+  active: { label: "fresh", className: "border-foreground/40 text-foreground" },
+  stale: { label: "stale", className: "border-muted-foreground/40 text-muted-foreground" },
   deleted: {
     label: "removed",
-    className: "border-destructive/30 bg-destructive/10 text-destructive",
+    className: "border-transparent bg-muted text-foreground line-through decoration-1",
   },
 };
 const FRESH_FALLBACK: Style = {
   label: "unknown",
-  className: "border-stale/40 bg-stale/10 text-stale",
+  className: "border-dashed border-muted-foreground/40 text-muted-foreground",
 };
 
 export function FreshnessTag({ status }: { status: string }) {

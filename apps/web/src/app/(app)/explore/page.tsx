@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
-import { AppShell } from "@/components/app-shell";
 import { NodeFilters } from "@/components/explore/node-filters";
 import { NodesList } from "@/components/explore/nodes-list";
 import type { NodeDto } from "@/lib/graph-types";
@@ -52,37 +51,35 @@ export default async function ExplorePage({
   if (page?.nextCursor) nextParams.set("cursor", page.nextCursor);
 
   return (
-    <AppShell orgName={shell.orgName} email={shell.email} orgId={shell.orgId}>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-xl font-semibold">Explore</h1>
-          <p className="text-sm text-muted-foreground">
-            Every node in your graph — filter by kind, status, or confidence. Click through for
-            provenance and connections.
-          </p>
-        </div>
-
-        <NodeFilters values={{ q, kind, status, confidence }} />
-
-        {res.status !== 0 && res.body === null ? (
-          <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            Couldn’t load nodes (status {res.status}).
-          </div>
-        ) : (
-          <NodesList nodes={nodes} />
-        )}
-
-        {page?.hasMore && page.nextCursor && (
-          <div className="flex justify-end">
-            <Link
-              href={`/explore?${nextParams.toString()}`}
-              className="rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground"
-            >
-              Next page →
-            </Link>
-          </div>
-        )}
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-semibold">Explore</h1>
+        <p className="text-sm text-muted-foreground">
+          Every node in your graph — filter by kind, status, or confidence. Click through for
+          provenance and connections.
+        </p>
       </div>
-    </AppShell>
+
+      <NodeFilters values={{ q, kind, status, confidence }} />
+
+      {res.status !== 0 && res.body === null ? (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          Couldn’t load nodes (status {res.status}).
+        </div>
+      ) : (
+        <NodesList nodes={nodes} />
+      )}
+
+      {page?.hasMore && page.nextCursor && (
+        <div className="flex justify-end">
+          <Link
+            href={`/explore?${nextParams.toString()}`}
+            className="rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground"
+          >
+            Next page →
+          </Link>
+        </div>
+      )}
+    </div>
   );
 }

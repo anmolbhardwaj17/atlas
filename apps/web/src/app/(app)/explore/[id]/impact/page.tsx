@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
-import { AppShell } from "@/components/app-shell";
 import { ImpactPanel } from "@/components/explore/impact-panel";
 import type { NodeDetail, TraversalResult } from "@/lib/graph-types";
 
@@ -24,7 +23,7 @@ export default async function ImpactPage({ params }: { params: Promise<{ id: str
   const node = nodeRes.body?.data ?? null;
 
   return (
-    <AppShell orgName={shell.orgName} email={shell.email} orgId={shell.orgId}>
+    <>
       <div className="mb-5">
         <Link
           href={`/explore/${id}`}
@@ -65,6 +64,6 @@ export default async function ImpactPage({ params }: { params: Promise<{ id: str
           </p>
         </div>
       )}
-    </AppShell>
+    </>
   );
 }

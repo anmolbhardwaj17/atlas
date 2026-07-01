@@ -28,7 +28,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const NAV = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard, match: (p: string) => p === "/" },
+  {
+    href: "/dashboard",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    match: (p: string) => p === "/dashboard",
+  },
   {
     href: "/explore",
     label: "Explore",
@@ -61,7 +66,7 @@ export function AppSidebar({ orgName, email }: { orgName: string; email: string 
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href="/">
+              <Link href="/dashboard">
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
                   A
                 </div>

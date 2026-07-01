@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
-import { AppShell } from "@/components/app-shell";
 import { NodeDetailView } from "@/components/explore/node-detail";
 import type { NodeDetail, EdgeDto } from "@/lib/graph-types";
 
@@ -19,7 +18,7 @@ export default async function NodePage({ params }: { params: Promise<{ id: strin
   const edges = edgesRes.body?.data ?? [];
 
   return (
-    <AppShell orgName={shell.orgName} email={shell.email} orgId={shell.orgId}>
+    <>
       <div className="mb-5">
         <Link href="/explore" className="text-sm text-muted-foreground hover:text-foreground">
           ← Explore
@@ -35,6 +34,6 @@ export default async function NodePage({ params }: { params: Promise<{ id: strin
           </p>
         </div>
       )}
-    </AppShell>
+    </>
   );
 }

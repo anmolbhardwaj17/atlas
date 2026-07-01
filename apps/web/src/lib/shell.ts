@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { getSession, apiGet, type ApiOk } from "@/lib/api";
 
@@ -26,7 +27,11 @@ interface MeResponse {
   defaultOrgId: string | null;
 }
 
-export async function requireShell(): Promise<Shell> {
+/**
+ * Wrapped in React `cache()` so the layout and its page share a single `/me` fetch
+ * within one server render (they both call this), instead of fetching twice per nav.
+ */
+export const requireShell = cache(async (): Promise<Shell> => {
   const session = await getSession();
   if (!session) redirect("/login");
 
@@ -40,4 +45,4 @@ export async function requireShell(): Promise<Shell> {
     orgName: active.orgName,
     email: me.email ?? session.email,
   };
-}
+});
