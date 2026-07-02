@@ -69,11 +69,18 @@ export interface DashboardSummary {
   inventory: {
     resources: number;
     relationships: number;
+    // Infrastructure
     services: number;
     datastores: number;
     environments: number;
     clouds: number;
     accounts: number;
+    // Code (present when a code host is connected)
+    repositories: number;
+    projects: number;
+    pipelines: number;
+    contributors: number;
+    pullRequests: number;
   };
   trust: {
     sources: number;
@@ -240,7 +247,18 @@ export class GraphService {
   async summary(orgId: string): Promise<DashboardSummary> {
     const impact = [...IMPACT_EDGE_TYPES];
     const base = await withOrgScope(this.db, orgId, async (c) => {
-      const [cats, meta, edgeCount, conns, cross, blast, stale] = await Promise.all([
+      const [
+        cats,
+        meta,
+        edgeCount,
+        conns,
+        cross,
+        blast,
+        stale,
+        codeCounts,
+        noPipeline,
+        emptyProjects,
+      ] = await Promise.all([
         c.query<{ category: string; n: number }>(
           `SELECT nk.category, count(*)::int AS n
              FROM nodes nd JOIN node_kinds nk ON nk.kind = nd.kind
@@ -293,8 +311,44 @@ export class GraphService {
           [impact],
         ),
         c.query<{ n: number }>("SELECT count(*)::int AS n FROM nodes WHERE status = 'stale'"),
+        // Code inventory (repos / projects / pipelines / people / PRs) — makes the dashboard
+        // meaningful for a code-heavy org, not just cloud infra.
+        c.query<{
+          repositories: number;
+          projects: number;
+          pipelines: number;
+          contributors: number;
+          pull_requests: number;
+        }>(
+          `SELECT
+             count(*) FILTER (WHERE kind LIKE '%.repository')::int AS repositories,
+             count(*) FILTER (WHERE kind LIKE '%.project')::int AS projects,
+             count(*) FILTER (WHERE kind LIKE '%.pipeline' OR kind LIKE '%.workflow')::int AS pipelines,
+             count(*) FILTER (WHERE kind LIKE '%.user' OR kind LIKE '%.team')::int AS contributors,
+             count(*) FILTER (WHERE kind LIKE '%.pullrequest' OR kind LIKE '%.pull_request')::int AS pull_requests
+           FROM nodes WHERE status <> 'deleted'`,
+        ),
+        // Repos with no CI/CD pipeline (no CONTAINS→pipeline) — a hygiene finding.
+        c.query<{ n: number }>(
+          `SELECT count(*)::int AS n FROM nodes r
+            WHERE r.kind LIKE '%.repository' AND r.status <> 'deleted'
+              AND NOT EXISTS (
+                SELECT 1 FROM edges e JOIN nodes p ON p.id = e.to_node_id
+                 WHERE e.from_node_id = r.id AND e.type = 'CONTAINS'
+                   AND (p.kind LIKE '%.pipeline' OR p.kind LIKE '%.workflow'))`,
+        ),
+        // Projects that contain no repositories.
+        c.query<{ n: number }>(
+          `SELECT count(*)::int AS n FROM nodes pr
+            WHERE pr.kind LIKE '%.project' AND pr.status <> 'deleted'
+              AND NOT EXISTS (
+                SELECT 1 FROM edges e JOIN nodes r ON r.id = e.to_node_id
+                 WHERE e.from_node_id = pr.id AND e.type = 'CONTAINS'
+                   AND r.kind LIKE '%.repository')`,
+        ),
       ]);
 
+      const code = codeCounts.rows[0];
       const catN = (names: string[]): number =>
         cats.rows.filter((r) => names.includes(r.category)).reduce((s, r) => s + r.n, 0);
 
@@ -327,11 +381,18 @@ export class GraphService {
         environments: envs.size,
         clouds: clouds.size,
         accounts: accounts.size,
+        repositories: code?.repositories ?? 0,
+        projects: code?.projects ?? 0,
+        pipelines: code?.pipelines ?? 0,
+        contributors: code?.contributors ?? 0,
+        pullRequests: code?.pull_requests ?? 0,
         conns: conns.rows,
         crossCloud,
         crossAccount,
         blast: blast.rows[0] ?? null,
         stale: stale.rows[0]?.n ?? 0,
+        noPipeline: noPipeline.rows[0]?.n ?? 0,
+        emptyProjects: emptyProjects.rows[0]?.n ?? 0,
       };
     });
 
@@ -408,6 +469,28 @@ export class GraphService {
         count: base.stale,
       });
     }
+    if (base.noPipeline > 0) {
+      findings.push({
+        id: "repos-no-pipeline",
+        severity: "low",
+        category: "Code hygiene",
+        title: `${base.noPipeline} repositor${base.noPipeline > 1 ? "ies have" : "y has"} no CI/CD pipeline`,
+        detail: "No deployment pipeline was found — these repos may ship manually or not at all.",
+        href: "/explore?kind=bitbucket.repository",
+        count: base.noPipeline,
+      });
+    }
+    if (base.emptyProjects > 0) {
+      findings.push({
+        id: "empty-projects",
+        severity: "low",
+        category: "Code hygiene",
+        title: `${base.emptyProjects} project${base.emptyProjects > 1 ? "s contain" : " contains"} no repositories`,
+        detail: "An empty project — likely archived, or a placeholder that can be cleaned up.",
+        href: "/explore?kind=bitbucket.project",
+        count: base.emptyProjects,
+      });
+    }
     const rank = { high: 0, medium: 1, low: 2 };
     findings.sort((a, b) => rank[a.severity] - rank[b.severity]);
 
@@ -429,6 +512,11 @@ export class GraphService {
         environments: base.environments,
         clouds: base.clouds,
         accounts: base.accounts,
+        repositories: base.repositories,
+        projects: base.projects,
+        pipelines: base.pipelines,
+        contributors: base.contributors,
+        pullRequests: base.pullRequests,
       },
       trust: {
         sources: base.conns.length,

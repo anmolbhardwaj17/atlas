@@ -8,6 +8,9 @@ import {
   CheckCircle2,
   ChevronRight,
   GitBranch,
+  FolderGit2,
+  Play,
+  Users,
   Plus,
   RefreshCw,
   Map as MapIcon,
@@ -52,6 +55,11 @@ interface Summary {
     environments: number;
     clouds: number;
     accounts: number;
+    repositories: number;
+    projects: number;
+    pipelines: number;
+    contributors: number;
+    pullRequests: number;
   };
   trust: { sources: number; healthySources: number; lastSyncAt: string | null };
   crossBoundary: { crossCloud: number; crossAccount: number };
@@ -89,20 +97,48 @@ export async function Dashboard({
 
       <AskLauncher />
 
-      {/* At a glance — human inventory. */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat icon={<Boxes className="size-4" />} label="Services" value={inv.services} />
-        <Stat icon={<Database className="size-4" />} label="Datastores" value={inv.datastores} />
-        <Stat icon={<Layers className="size-4" />} label="Environments" value={inv.environments} />
-        <Stat
-          icon={<Cloud className="size-4" />}
-          label="Clouds"
-          value={inv.clouds}
-          sub={
-            inv.accounts > 0 ? `${inv.accounts} account${inv.accounts > 1 ? "s" : ""}` : undefined
-          }
-        />
-      </div>
+      {/* At a glance — human inventory. Infrastructure and Code rows each show only when
+          that side of the estate is connected, so a code-only or infra-only org isn't all zeros. */}
+      {inv.services + inv.datastores + inv.clouds > 0 && (
+        <StatGroup label="Infrastructure">
+          <Stat icon={<Boxes className="size-4" />} label="Services" value={inv.services} />
+          <Stat icon={<Database className="size-4" />} label="Datastores" value={inv.datastores} />
+          <Stat
+            icon={<Layers className="size-4" />}
+            label="Environments"
+            value={inv.environments}
+          />
+          <Stat
+            icon={<Cloud className="size-4" />}
+            label="Clouds"
+            value={inv.clouds}
+            sub={
+              inv.accounts > 0 ? `${inv.accounts} account${inv.accounts > 1 ? "s" : ""}` : undefined
+            }
+          />
+        </StatGroup>
+      )}
+      {inv.repositories > 0 && (
+        <StatGroup label="Code">
+          <Stat
+            icon={<GitBranch className="size-4" />}
+            label="Repositories"
+            value={inv.repositories}
+          />
+          <Stat icon={<FolderGit2 className="size-4" />} label="Projects" value={inv.projects} />
+          <Stat
+            icon={<Play className="size-4" />}
+            label="Pipelines"
+            value={inv.pipelines}
+            sub={
+              inv.pullRequests > 0
+                ? `${inv.pullRequests} open PR${inv.pullRequests > 1 ? "s" : ""}`
+                : undefined
+            }
+          />
+          <Stat icon={<Users className="size-4" />} label="Contributors" value={inv.contributors} />
+        </StatGroup>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
@@ -272,6 +308,17 @@ function MapPreview({
         </Link>
       </CardContent>
     </Card>
+  );
+}
+
+function StatGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{children}</div>
+    </div>
   );
 }
 
