@@ -2,11 +2,18 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Boxes, Cloud, Github, Sparkles, Loader2 } from "lucide-react";
+import { Boxes, Sparkles, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AwsSetup, GithubSetup } from "@/components/integrations/provider-setup";
+import { CloudIcon } from "@/components/cloud-icon";
+import {
+  AwsSetup,
+  GithubSetup,
+  AzureSetup,
+  GcpSetup,
+  BitbucketSetup,
+} from "@/components/integrations/provider-setup";
 import { seedDemo } from "@/lib/browser-api";
 
 /**
@@ -14,9 +21,9 @@ import { seedDemo } from "@/lib/browser-api";
  * the org's front door. Two paths:
  *   1. **Load sample data** — one click seeds the "Shopyard" estate via the real pipeline
  *      so the user is exploring a cited graph in seconds (TTFI < 30 min, NFR-22). No creds.
- *   2. **Connect a real source** — AWS (read-only IAM role) or GitHub (App install) setup
- *      instructions with copy-ready policy/config (docs/13 §4–5). Live verification needs
- *      customer creds (deferral ledger), so sample data is the recommended quick start.
+ *   2. **Connect a real source** — AWS / GitHub / Bitbucket / Azure / GCP read-only setup
+ *      instructions with copy-ready policy/config (docs/13 §4–5), shared with the Integrations
+ *      hub. Live verification needs customer creds, so sample data is the recommended quick start.
  *
  * Composed from the design-system primitives (Steps, CodeBlock, Card, Button, Tabs) so the
  * pattern is repeatable across surfaces. Mono B&W theme; the only hue is semantic status.
@@ -124,12 +131,21 @@ function ConnectSource() {
     <Card>
       <CardContent className="p-6">
         <Tabs defaultValue="aws">
-          <TabsList className="grid w-full max-w-xs grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5">
             <TabsTrigger value="aws">
-              <Cloud className="mr-1.5 size-4" /> AWS
+              <CloudIcon name="aws" className="mr-1.5 size-4" /> AWS
             </TabsTrigger>
             <TabsTrigger value="github">
-              <Github className="mr-1.5 size-4" /> GitHub
+              <CloudIcon name="github-icon" className="mr-1.5 size-4" /> GitHub
+            </TabsTrigger>
+            <TabsTrigger value="bitbucket">
+              <CloudIcon name="bitbucket" className="mr-1.5 size-4" /> Bitbucket
+            </TabsTrigger>
+            <TabsTrigger value="azure">
+              <CloudIcon name="microsoft-azure" className="mr-1.5 size-4" /> Azure
+            </TabsTrigger>
+            <TabsTrigger value="gcp">
+              <CloudIcon name="google-cloud" className="mr-1.5 size-4" /> GCP
             </TabsTrigger>
           </TabsList>
 
@@ -138,6 +154,15 @@ function ConnectSource() {
           </TabsContent>
           <TabsContent value="github" className="pt-4">
             <GithubSetup />
+          </TabsContent>
+          <TabsContent value="bitbucket" className="pt-4">
+            <BitbucketSetup />
+          </TabsContent>
+          <TabsContent value="azure" className="pt-4">
+            <AzureSetup />
+          </TabsContent>
+          <TabsContent value="gcp" className="pt-4">
+            <GcpSetup />
           </TabsContent>
         </Tabs>
         <p className="mt-4 text-xs text-muted-foreground">
