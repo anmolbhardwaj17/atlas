@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json && (tsc -p tsconfig.build.json --watch --preserveWatchOutput --incremental & node --watch dist/main.js)",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
