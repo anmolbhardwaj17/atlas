@@ -9,6 +9,7 @@ import type { AuthedRequest } from "../auth/auth.types";
 import { GraphService } from "./graph.service";
 import {
   EdgesQuerySchema,
+  GraphQuerySchema,
   NeighborsQuerySchema,
   NodeListQuerySchema,
   TimelineQuerySchema,
@@ -28,6 +29,12 @@ export class GraphController {
   @Roles("Member")
   async overview(@Req() req: AuthedRequest): Promise<unknown> {
     return this.graph.overview(org(req).id);
+  }
+
+  @Get("graph")
+  @Roles("Member")
+  async graphMap(@Req() req: AuthedRequest, @Query() query: unknown): Promise<unknown> {
+    return this.graph.graph(org(req).id, parseBody(GraphQuerySchema, query));
   }
 
   @Get("nodes")

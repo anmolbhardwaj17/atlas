@@ -263,4 +263,22 @@ suite("G2.1 GraphService", () => {
     const none = await graph.timeline(orgId, { since: new Date(Date.now() + 3600_000), limit: 50 });
     expect(none.data).toHaveLength(0);
   });
+
+  it("graph() returns the node set + interior edges, each node with an environment", async () => {
+    const g = await graph.graph(orgId, { limit: 400 });
+    expect(g.nodes.length).toBe(2); // checkout lambda + prod-orders rds
+    expect(g.edges.length).toBe(1); // CONNECTS_TO(lambda→rds)
+    expect(g.edges[0]).toMatchObject({ type: "CONNECTS_TO", from: lambdaId, to: rdsId });
+    // prod-orders → env "prod" by naming; every node carries an environment + accountRef key.
+    const rds = g.nodes.find((n) => n.id === rdsId);
+    expect(rds?.environment).toBe("prod");
+    expect(g.nodes.every((n) => "environment" in n && "accountRef" in n)).toBe(true);
+    // Cross-tenant: the other org sees an empty graph.
+    expect((await graph.graph(otherOrgId, { limit: 400 })).nodes).toHaveLength(0);
+  });
+
+  it("graph() filters by environment (derived, applied in-process)", async () => {
+    expect((await graph.graph(orgId, { limit: 400, environment: "prod" })).nodes.length).toBe(1);
+    expect((await graph.graph(orgId, { limit: 400, environment: "dev" })).nodes.length).toBe(0);
+  });
 });

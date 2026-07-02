@@ -100,6 +100,24 @@ export const TimelineQuerySchema = z
   .strict();
 export type TimelineQuery = z.infer<typeof TimelineQuerySchema>;
 
+/** Whole-graph fetch for the visual map (nodes+edges, bounded, grouped by env/account/region). */
+export const GraphQuerySchema = z
+  .object({
+    environment: z.enum(["prod", "staging", "dev", "test", "unknown"]).optional(),
+    account: z.string().min(1).optional(),
+    region: z.string().min(1).optional(),
+    kind: z.string().min(1).optional(),
+    limit: z.coerce.number().int().min(1).max(1000).default(400),
+  })
+  .strict();
+export type GraphQuery = z.infer<typeof GraphQuerySchema>;
+
+/** A node in the map view: the read DTO plus its (derived) environment + account grouping. */
+export interface GraphNodeDto extends NodeDto {
+  environment: string;
+  accountRef: string | null;
+}
+
 /** Impact-bearing edge types traversed for blast-radius/dependencies (docs/05 §7.2). */
 export const IMPACT_EDGE_TYPES = [
   "CONNECTS_TO",

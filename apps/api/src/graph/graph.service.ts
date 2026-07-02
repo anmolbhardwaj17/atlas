@@ -11,6 +11,8 @@ import {
   rankToConfidence,
   toNodeDto,
   type EdgesQuery,
+  type GraphNodeDto,
+  type GraphQuery,
   type NeighborsQuery,
   type NodeDto,
   type NodeListQuery,
@@ -18,6 +20,7 @@ import {
   type TimelineQuery,
   type TraversalQuery,
 } from "./dto";
+import { inferEnvironment } from "./environment";
 
 const MAX_DEPTH = 6;
 const MAX_NODE_BUDGET = 500;
@@ -47,6 +50,22 @@ export interface EdgeDto {
   status: string;
   from: { id: string; urn: string; kind: string; name: string | null };
   to: { id: string; urn: string; kind: string; name: string | null };
+}
+
+/** A directed connection between two map nodes (light — just what the canvas draws). */
+export interface GraphEdgeLite {
+  id: string;
+  from: string;
+  to: string;
+  type: string;
+  origin: string;
+  confidence: string;
+}
+export interface GraphResult {
+  nodes: GraphNodeDto[];
+  edges: GraphEdgeLite[];
+  /** True when the node budget clipped the result (the map shows a banner). */
+  truncated: boolean;
 }
 
 export interface NodeSummary {
@@ -176,6 +195,80 @@ export class GraphService {
         })),
         lastSyncAt: lastSync.rows[0]?.ts?.toISOString() ?? null,
       };
+    });
+  }
+
+  /**
+   * Whole-graph fetch for the visual map (docs/09 §5.4): bounded nodes + the edges among
+   * them, each node carrying its (derived) environment + account for grouping. SQL filters
+   * kind/region/account; environment is inferred in-process (not a column) so it's filtered
+   * after. Node-budgeted — `truncated` tells the UI to show a "showing N of many" banner.
+   */
+  async graph(orgId: string, q: GraphQuery): Promise<GraphResult> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      const where = ["status <> 'deleted'"];
+      const params: unknown[] = [];
+      const p = (v: unknown): string => `$${params.push(v)}`;
+      if (q.kind) where.push(`kind = ${p(q.kind)}`);
+      if (q.region) where.push(`region = ${p(q.region)}`);
+      if (q.account) where.push(`account_ref = ${p(q.account)}`);
+
+      // Over-fetch a little so env filtering + the budget still yield a full map.
+      const hardCap = Math.min(q.limit * 2, 1000);
+      const nodeRows = (
+        await c.query<NodeRowish & { account_ref: string | null }>(
+          `SELECT ${NODE_COLS}, account_ref FROM nodes
+           WHERE ${where.join(" AND ")}
+           ORDER BY last_seen DESC, id DESC
+           LIMIT ${hardCap + 1}`,
+          params,
+        )
+      ).rows;
+
+      let mapped: GraphNodeDto[] = nodeRows.map((r) => ({
+        ...toNodeDto(r),
+        environment: inferEnvironment({
+          name: r.name,
+          urn: r.urn,
+          tags: r.tags,
+          attributes: r.attributes,
+        }),
+        accountRef: r.account_ref,
+      }));
+      if (q.environment) mapped = mapped.filter((n) => n.environment === q.environment);
+
+      const truncated = mapped.length > q.limit;
+      const nodes = mapped.slice(0, q.limit);
+      const ids = nodes.map((n) => n.id);
+
+      // Edges fully inside the visible node set (so the canvas never dangles an endpoint).
+      const edges =
+        ids.length === 0
+          ? []
+          : (
+              await c.query<{
+                id: string;
+                from_node_id: string;
+                to_node_id: string;
+                type: string;
+                origin: string;
+                confidence: string;
+              }>(
+                `SELECT id, from_node_id, to_node_id, type, origin, confidence FROM edges
+                 WHERE status = 'active'
+                   AND from_node_id = ANY($1::uuid[]) AND to_node_id = ANY($1::uuid[])`,
+                [ids],
+              )
+            ).rows.map((e) => ({
+              id: e.id,
+              from: e.from_node_id,
+              to: e.to_node_id,
+              type: e.type,
+              origin: e.origin,
+              confidence: e.confidence,
+            }));
+
+      return { nodes, edges, truncated };
     });
   }
 
