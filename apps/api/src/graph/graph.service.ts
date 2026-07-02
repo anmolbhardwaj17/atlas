@@ -682,13 +682,14 @@ export class GraphService {
       if (q.kind) {
         where.push(`kind = ${p(q.kind)}`);
       } else {
-        // Explore browses the durable estate — the *things* you have: repos, services, datastores,
-        // pipelines, cloud resources. Not ephemeral activity (PRs) and not people (users/teams);
-        // those live on the dashboard feed / a repo's connections. An explicit ?kind can still
-        // target them if ever needed.
+        // Explore browses the top-level estate — the *things* you have: repos, services,
+        // datastores, cloud resources. Not ephemeral activity (PRs), not people (users/teams),
+        // and not per-repo sub-resources like CI pipelines/workflows (too granular — they show on
+        // a repo's detail). Those live elsewhere; an explicit ?kind can still target them.
         where.push(
           `kind NOT LIKE '%.pullrequest' AND kind NOT LIKE '%.pull_request'
-             AND kind NOT LIKE '%.user' AND kind NOT LIKE '%.team'`,
+             AND kind NOT LIKE '%.user' AND kind NOT LIKE '%.team'
+             AND kind NOT LIKE '%.pipeline' AND kind NOT LIKE '%.workflow'`,
         );
       }
       if (q.region) where.push(`region = ${p(q.region)}`);

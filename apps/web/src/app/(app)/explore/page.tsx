@@ -45,7 +45,7 @@ export default async function ExplorePage({
   const page = res.body?.page;
   // Explore shows the estate (repos, services, resources), not activity (PRs) or people
   // (users/teams) — keep those out of the kind filter too, matching listNodes' default-hide.
-  const HIDDEN = [".pullrequest", ".pull_request", ".user", ".team"];
+  const HIDDEN = [".pullrequest", ".pull_request", ".user", ".team", ".pipeline", ".workflow"];
   const kinds = (overview.body?.data?.byKind ?? [])
     .map((k) => k.kind)
     .filter((k) => !HIDDEN.some((h) => k.endsWith(h)));

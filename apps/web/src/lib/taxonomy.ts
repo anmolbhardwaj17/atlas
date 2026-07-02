@@ -151,20 +151,20 @@ export const SEVERITY_META: Record<Severity, SeverityMeta> = {
   high: {
     label: "High",
     icon: AlertTriangle,
-    className: "border-transparent bg-danger/12 text-danger",
-    accent: "bg-danger",
+    className: "border-transparent bg-red-500/15 text-red-600 dark:text-red-400",
+    accent: "bg-red-500",
   },
   medium: {
     label: "Medium",
     icon: AlertCircle,
-    className: "border-transparent bg-warning/15 text-warning",
-    accent: "bg-warning",
+    className: "border-transparent bg-amber-500/20 text-amber-600 dark:text-amber-400",
+    accent: "bg-amber-500",
   },
   low: {
     label: "Low",
     icon: Info,
-    className: "border-transparent bg-slate-500/15 text-slate-600 dark:text-slate-300",
-    accent: "bg-slate-400",
+    className: "border-transparent bg-sky-500/15 text-sky-600 dark:text-sky-400",
+    accent: "bg-sky-500",
   },
 };
 
