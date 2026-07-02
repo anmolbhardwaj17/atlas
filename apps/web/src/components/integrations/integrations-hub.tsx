@@ -23,7 +23,12 @@ import {
   BitbucketSetup,
 } from "@/components/integrations/provider-setup";
 import { PROVIDERS, type ProviderMeta } from "@/components/integrations/providers";
-import { createConnection, deleteConnection, type ConnectionSummary } from "@/lib/browser-api";
+import {
+  createConnection,
+  verifyConnection,
+  deleteConnection,
+  type ConnectionSummary,
+} from "@/lib/browser-api";
 import { cn } from "@/lib/cn";
 
 /** The right setup steps for each connectable provider. */
@@ -47,7 +52,7 @@ const CREDENTIAL_NOUN: Record<string, string> = {
   github: "App",
   azure: "service principal",
   gcp: "service account",
-  bitbucket: "App password",
+  bitbucket: "API token",
 };
 
 /**
@@ -252,13 +257,22 @@ function ConnectSheet({
 }) {
   const router = useRouter();
   const [name, setName] = React.useState("");
+  const [workspace, setWorkspace] = React.useState("");
+  const [email, setEmail] = React.useState("");
+  const [token, setToken] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+
+  // Bitbucket is the first live credential flow (email + scoped API token → verify).
+  const needsCreds = provider?.id === "bitbucket";
 
   // Reset the form whenever a different provider's sheet opens.
   React.useEffect(() => {
     if (provider) {
       setName(`${provider.name.split(" ")[0]} — production`);
+      setWorkspace("");
+      setEmail("");
+      setToken("");
       setError(null);
       setBusy(false);
     }
@@ -269,7 +283,26 @@ function ConnectSheet({
     setBusy(true);
     setError(null);
     try {
-      await createConnection(orgId, provider.id, name.trim());
+      if (needsCreds) {
+        if (!email.trim() || !token.trim()) {
+          setError("Enter your Atlassian email and API token.");
+          setBusy(false);
+          return;
+        }
+        const config = workspace.trim() ? { workspace: workspace.trim() } : undefined;
+        const conn = await createConnection(orgId, provider.id, name.trim(), config);
+        const verified = await verifyConnection(orgId, conn.id, {
+          email: email.trim(),
+          apiToken: token.trim(),
+        });
+        if (verified.status === "error") {
+          setError("Bitbucket rejected the credentials — check the email, token, and its scopes.");
+          setBusy(false);
+          return;
+        }
+      } else {
+        await createConnection(orgId, provider.id, name.trim());
+      }
       onClose();
       router.refresh();
     } catch (e) {
@@ -293,20 +326,71 @@ function ConnectSheet({
             <div className="mt-6 space-y-6">
               <ProviderSetup providerId={provider.id} />
 
-              <div className="space-y-2 border-t border-border pt-4">
-                <label htmlFor="conn-name" className="text-sm font-medium">
-                  Connection name
-                </label>
-                <Input
-                  id="conn-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Production account"
-                />
-                <p className="text-xs text-muted-foreground">
-                  This adds the connection. Live verification (credentials) is the next step once
-                  your {CREDENTIAL_NOUN[provider.id] ?? "credentials"} are set up.
-                </p>
+              <div className="space-y-3 border-t border-border pt-4">
+                <div className="space-y-2">
+                  <label htmlFor="conn-name" className="text-sm font-medium">
+                    Connection name
+                  </label>
+                  <Input
+                    id="conn-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Production account"
+                  />
+                </div>
+
+                {needsCreds ? (
+                  <>
+                    <div className="space-y-2">
+                      <label htmlFor="bb-workspace" className="text-sm font-medium">
+                        Workspace <span className="text-muted-foreground">(optional)</span>
+                      </label>
+                      <Input
+                        id="bb-workspace"
+                        value={workspace}
+                        onChange={(e) => setWorkspace(e.target.value)}
+                        placeholder="e.g. siemba — leave blank to auto-detect"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="bb-email" className="text-sm font-medium">
+                        Atlassian email
+                      </label>
+                      <Input
+                        id="bb-email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="you@company.com"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="bb-token" className="text-sm font-medium">
+                        API token
+                      </label>
+                      <Input
+                        id="bb-token"
+                        type="password"
+                        value={token}
+                        onChange={(e) => setToken(e.target.value)}
+                        placeholder="Scoped API token (read scopes)"
+                        autoComplete="off"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Sent once to verify + stored encrypted in the secrets broker — never saved
+                        in the database or shown again.
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    This adds the connection. Live verification (credentials) is the next step once
+                    your {CREDENTIAL_NOUN[provider.id] ?? "credentials"} are set up.
+                  </p>
+                )}
+
                 {error ? (
                   <p role="alert" className="text-sm text-danger">
                     {error}
@@ -314,7 +398,7 @@ function ConnectSheet({
                 ) : null}
                 <Button onClick={() => void add()} disabled={busy || name.trim().length === 0}>
                   {busy ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-                  Add connection
+                  {needsCreds ? "Connect & verify" : "Add connection"}
                 </Button>
               </div>
             </div>

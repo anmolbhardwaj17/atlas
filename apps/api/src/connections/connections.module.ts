@@ -7,6 +7,7 @@ import { AuthModule } from "../auth/auth.module";
 import { ConnectionService } from "./connection.service";
 import { ConnectionController } from "./connection.controller";
 import { ConnectorRegistry } from "./connector-registry";
+import { SyncWorkerBootstrap } from "./sync-worker.bootstrap";
 import { SECRET_BROKER, JOB_QUEUE } from "./tokens";
 
 /**
@@ -43,6 +44,12 @@ const connectorRegistryProvider: Provider = {
 @Module({
   imports: [AuthModule],
   controllers: [ConnectionController],
-  providers: [ConnectionService, secretBrokerProvider, jobQueueProvider, connectorRegistryProvider],
+  providers: [
+    ConnectionService,
+    secretBrokerProvider,
+    jobQueueProvider,
+    connectorRegistryProvider,
+    SyncWorkerBootstrap,
+  ],
 })
 export class ConnectionsModule {}

@@ -81,6 +81,7 @@ export async function createConnection(
   orgId: string,
   provider: string,
   displayName: string,
+  config?: Record<string, unknown>,
 ): Promise<ConnectionSummary> {
   const token = await getClientToken();
   if (!token) throw new Error("You're not signed in.");
@@ -91,7 +92,7 @@ export async function createConnection(
       "X-Atlas-Org": orgId,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ provider, displayName }),
+    body: JSON.stringify({ provider, displayName, ...(config ? { config } : {}) }),
   });
   const body = (await res.json().catch(() => null)) as {
     data?: ConnectionSummary;
@@ -99,6 +100,35 @@ export async function createConnection(
   } | null;
   if (!res.ok || !body?.data) {
     throw new Error(body?.error?.message ?? `Couldn't add the connection (${res.status}).`);
+  }
+  return body.data;
+}
+
+/** Attach credentials + run the connector's live verification probe (FR-1.3). The raw
+ *  credentials go to the Secrets Broker (never persisted on the row); only the resulting
+ *  status/health returns. */
+export async function verifyConnection(
+  orgId: string,
+  id: string,
+  credentials: Record<string, string>,
+): Promise<ConnectionSummary> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/connections/${id}/verify`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "X-Atlas-Org": orgId,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ credentials }),
+  });
+  const body = (await res.json().catch(() => null)) as {
+    data?: ConnectionSummary;
+    error?: { message?: string };
+  } | null;
+  if (!res.ok || !body?.data) {
+    throw new Error(body?.error?.message ?? `Verification failed (${res.status}).`);
   }
   return body.data;
 }
