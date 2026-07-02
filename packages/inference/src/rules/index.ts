@@ -13,12 +13,14 @@ import { prChangesServiceRule } from "./r6-changed";
 import { sgCorrelationConnectsRule } from "./r2-sg";
 import { configRefConnectsRule } from "./r3-config";
 import { iamAccessConnectsRule } from "./r8-iam";
+import { crossBoundaryConnectsRule } from "./r9-cross-boundary";
 
 export const ALL_RULES: readonly Rule[] = [
-  // Connection rules (R2/R3/R8) are independent of R1/R4 and can run first or last.
+  // Connection rules (R2/R3/R8/R9) are independent of R1/R4 and can run first or last.
   sgCorrelationConnectsRule,
   configRefConnectsRule,
   iamAccessConnectsRule,
+  crossBoundaryConnectsRule,
   // Deploy → service chain (dependency-ordered).
   repoDeploysToRuntimeRule,
   serviceDerivationRule,
@@ -33,3 +35,4 @@ export { prChangesServiceRule } from "./r6-changed";
 export { sgCorrelationConnectsRule } from "./r2-sg";
 export { configRefConnectsRule } from "./r3-config";
 export { iamAccessConnectsRule } from "./r8-iam";
+export { crossBoundaryConnectsRule } from "./r9-cross-boundary";
