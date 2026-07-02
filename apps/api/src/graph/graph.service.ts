@@ -888,11 +888,20 @@ export class GraphService {
         name: string | null;
         author_name: string | null;
         repo_name: string | null;
-        first_seen: Date;
+        act_at: Date;
       }>(
-        `SELECT id, kind, name, author_name, repo_name, first_seen FROM (
+        // `act_at` is the real-world activity time — a PR's raised/merged time (updatedOn ▸
+        // createdOn), a resource's own last-updated time, else when Atlas first saw it. Ordering
+        // (and the displayed "N ago") by this, not first_seen, is what makes the feed chronological:
+        // first_seen is the *ingest* time, identical across a bulk sync, so it can't order activity.
+        `SELECT id, kind, name, author_name, repo_name, act_at FROM (
            SELECT DISTINCT ON (n.id)
-                  n.id, n.kind, n.name, n.first_seen,
+                  n.id, n.kind, n.name,
+                  COALESCE(
+                    NULLIF(n.attributes->>'updatedOn', '')::timestamptz,
+                    NULLIF(n.attributes->>'createdOn', '')::timestamptz,
+                    n.first_seen
+                  ) AS act_at,
                   u.name AS author_name, r.name AS repo_name
              FROM nodes n
              LEFT JOIN edges eo ON eo.from_node_id = n.id AND eo.type = 'OWNED_BY'
@@ -904,13 +913,18 @@ export class GraphService {
              LEFT JOIN nodes r  ON r.id = ec.from_node_id AND r.kind LIKE '%.repository'
             WHERE n.status <> 'deleted'
               AND n.connection_id IS NOT NULL
-              AND n.first_seen >= $1
+              -- structural/inventory kinds aren't "activity" (a repo's updatedOn is just its last
+              -- push, and would clutter the feed as a bogus "new repository"); PRs + real infra
+              -- resource changes are. Users/teams/projects are structure too.
               AND n.kind NOT LIKE '%.user'
               AND n.kind NOT LIKE '%.team'
               AND n.kind NOT LIKE '%.project'
+              AND n.kind NOT LIKE '%.repository'
+              AND n.kind NOT LIKE '%.pipeline'
             ORDER BY n.id
          ) t
-         ORDER BY first_seen DESC
+         WHERE act_at >= $1
+         ORDER BY act_at DESC
          LIMIT $2`,
         [since.toISOString(), limit],
       );
@@ -936,7 +950,7 @@ export class GraphService {
           category,
           title: n.name ?? n.kind,
           subtitle,
-          at: n.first_seen.toISOString(),
+          at: n.act_at.toISOString(),
         };
       });
     });
