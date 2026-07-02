@@ -107,6 +107,8 @@ export interface DashboardSummary {
 export interface ActivityItem {
   /** Node id for deep-linking to /explore/:id (always present for a real node). */
   id: string | null;
+  /** Node kind (e.g. `bitbucket.pullrequest`) so the UI can show the right provider/service logo. */
+  kind: string;
   category: "pull_request" | "repository" | "pipeline" | "resource";
   /** The thing itself, e.g. "#42 ROAR-4427" or a resource name. */
   title: string;
@@ -930,6 +932,7 @@ export class GraphService {
             : null;
         return {
           id: n.id,
+          kind: n.kind,
           category,
           title: n.name ?? n.kind,
           subtitle,

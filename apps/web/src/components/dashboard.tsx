@@ -19,7 +19,9 @@ import { Onboarding } from "@/components/onboarding";
 import { AskLauncher } from "@/components/dashboard/ask-launcher";
 import { RefreshLatest } from "@/components/dashboard/refresh-latest";
 import { SeverityBadge } from "@/components/tags";
-import { severityMeta } from "@/lib/taxonomy";
+import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
+import { KIND_LOGO } from "@/lib/kind-visual";
+import { severityMeta, PROVIDER_META } from "@/lib/taxonomy";
 import { apiGet, type ApiOk } from "@/lib/api";
 
 interface Finding {
@@ -33,6 +35,7 @@ interface Finding {
 }
 interface ActivityItem {
   id: string | null;
+  kind: string;
   category: "pull_request" | "repository" | "pipeline" | "resource";
   title: string;
   subtitle: string | null;
@@ -258,13 +261,28 @@ const ACTIVITY_META = {
   resource: { Icon: Boxes, label: "New resource" },
 } as const;
 
+/** The provider/service brand logo for an activity item — a service logo (e.g. an AWS service)
+ *  if one is known, else the provider brand (Bitbucket, GitHub, AWS…); null when there's no
+ *  brand icon and we fall back to the category glyph. Mirrors the Explore row logic. */
+function activityLogo(kind: string): string | null {
+  const svc = KIND_LOGO[kind];
+  if (svc && hasCloudIcon(svc)) return svc;
+  const brand = PROVIDER_META[kind.split(".")[0] ?? ""]?.logo;
+  return brand && hasCloudIcon(brand) ? brand : null;
+}
+
 function ActivityRow({ a }: { a: ActivityItem }) {
   const { Icon, label } = ACTIVITY_META[a.category];
+  const logo = activityLogo(a.kind);
   const href = a.id ? `/explore/${a.id}` : null;
 
   const inner = (
     <div className="flex items-start gap-2.5 text-sm">
-      <Icon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+      {logo ? (
+        <CloudIcon name={logo} className="mt-0.5 size-4 shrink-0" />
+      ) : (
+        <Icon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+      )}
       <div className="min-w-0 flex-1">
         <div>
           <span className="text-muted-foreground">{label}: </span>
