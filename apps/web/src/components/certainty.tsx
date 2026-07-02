@@ -39,11 +39,14 @@ export function ConfidenceBadge({ tier, evidence }: { tier: string; evidence?: s
   );
 }
 
-/** Semantic status color, applied on top of the official `outline` badge (shape unchanged). */
-const SUCCESS = "border-success/30 bg-success/10 text-success";
-const WARNING = "border-warning/30 bg-warning/10 text-warning";
-const DANGER = "border-danger/30 bg-danger/10 text-danger";
-const NEUTRAL = "border-muted-foreground/30 bg-muted text-muted-foreground";
+/**
+ * Semantic status color as a soft badge — tinted bg + colored text + TRANSPARENT border,
+ * mirroring shadcn's `destructive` badge style (never a colored border).
+ */
+const SUCCESS = "border-transparent bg-success/10 text-success";
+const WARNING = "border-transparent bg-warning/10 text-warning";
+const DANGER = "border-transparent bg-danger/10 text-danger";
+const NEUTRAL = "border-transparent bg-muted text-muted-foreground";
 
 const FRESH: Record<string, { label: string; className: string }> = {
   active: { label: "fresh", className: SUCCESS },
