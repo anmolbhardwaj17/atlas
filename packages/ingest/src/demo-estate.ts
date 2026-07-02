@@ -192,8 +192,58 @@ const githubScope: MockScope = {
   ],
 };
 
-/** The full Shopyard estate (AWS + GitHub scopes) fed through the mock connector. */
-export const DEMO_SCOPES: readonly MockScope[] = [awsScope, githubScope];
+// ── Staging estate (a second environment, in a second region) ─────────────────
+// A compact staging slice in us-west-2 so the map visibly separates environments
+// (prod vs staging) AND regions (us-east-1 vs us-west-2). Its ECS cluster is named
+// "staging" so the prod deploy signals (cluster "prod") never ambiguously match it.
+const RG2 = "us-west-2";
+const awsW = (short: string, name: string): string => `aws:${RG2}:${ACC}:${short}/${name}`;
+const S_VPC = awsW("vpc", "staging-vpc");
+const S_SG = awsW("sg", "staging-sg-data");
+const S_CLUSTER = awsW("ecs-cluster", "staging");
+const S_SVC_ORDERS = awsW("ecs-service", "staging-orders");
+const S_RDS = awsW("rds", "staging-orders-db");
+
+const stagingScope: MockScope = {
+  key: "aws:us-west-2",
+  resources: [
+    node(S_VPC, "aws.vpc", "staging-vpc"),
+    node(S_SG, "aws.securitygroup", "staging-sg-data"),
+    node(S_CLUSTER, "aws.ecs.cluster", "staging", [{ type: "CONTAINS", toUrn: S_SVC_ORDERS }]),
+    svc("staging-orders", S_SVC_ORDERS, [{ type: "STORES_IN", toUrn: S_RDS }], {
+      cluster: "staging",
+      region: RG2,
+    }),
+    node(S_RDS, "aws.rds.instance", "staging-orders-db", [], { engine: "postgres" }),
+  ],
+};
+
+/**
+ * Stamp an environment + account + region onto every resource in a scope (in `attributes`,
+ * which the runner promotes to the `region`/`account_ref` columns and `inferEnvironment`
+ * reads). Existing per-resource `region` (e.g. on services) is preserved.
+ */
+function stampEnv(scope: MockScope, environment: string, region: string): MockScope {
+  return {
+    ...scope,
+    resources: scope.resources.map((r) => ({
+      ...r,
+      attributes: {
+        ...r.attributes,
+        environment,
+        accountRef: ACC,
+        region: typeof r.attributes?.region === "string" ? r.attributes.region : region,
+      },
+    })),
+  };
+}
+
+/** The full Shopyard estate: prod (us-east-1) + staging (us-west-2) AWS + GitHub (code). */
+export const DEMO_SCOPES: readonly MockScope[] = [
+  stampEnv(awsScope, "prod", RG),
+  stampEnv(stagingScope, "staging", RG2),
+  githubScope,
+];
 
 /** Display name of the single connection all demo data is attributed to (idempotency key). */
 export const DEMO_CONNECTION_NAME = "Demo data (seeded)";
