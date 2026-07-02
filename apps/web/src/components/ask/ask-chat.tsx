@@ -87,8 +87,9 @@ export function AskChat({ orgId }: { orgId: string }) {
   }
 
   return (
-    <div className="flex min-h-[70dvh] flex-col">
-      <div className="flex-1 space-y-5">
+    // Fill the content area (viewport − header − page padding) so the input pins to the bottom.
+    <div className="flex h-[calc(100dvh-7rem)] min-h-[420px] flex-col">
+      <div className="flex-1 space-y-5 overflow-y-auto pr-1">
         {messages.length === 0 ? (
           <EmptyState onPick={(q) => void ask(q)} />
         ) : (
@@ -107,7 +108,7 @@ export function AskChat({ orgId }: { orgId: string }) {
           e.preventDefault();
           void ask(input);
         }}
-        className="sticky bottom-0 mt-6 flex items-center gap-2 border-t border-border bg-background/80 py-4 backdrop-blur"
+        className="mt-4 flex shrink-0 items-center gap-2 border-t border-border bg-background pt-4"
       >
         <input
           value={input}
