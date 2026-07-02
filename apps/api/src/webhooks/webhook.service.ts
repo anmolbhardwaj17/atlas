@@ -24,8 +24,8 @@ export interface WebhookResult {
 /**
  * GitHub webhook ingress (docs/07 §5, docs/13 §5, GHR-8). Verifies the HMAC signature
  * BEFORE trusting anything, maps the event to a re-crawl decision, resolves the
- * connection's org (via the SECURITY DEFINER resolver — the request carries no session/GUC),
- * then enqueues an org-scoped incremental sync. Webhooks are never the only source — a
+ * connection's org (via the SECURITY DEFINER resolver - the request carries no session/GUC),
+ * then enqueues an org-scoped incremental sync. Webhooks are never the only source - a
  * periodic reconcile heals missed/forged deliveries (DD-2), so this only ever *accelerates*
  * freshness; a dropped event never corrupts the graph.
  */
@@ -78,7 +78,7 @@ export class WebhookService {
   }
 
   /** Create a queued incremental sync_run (org-scoped) + enqueue it. BR-SYNC-1 (one in-flight
-   *  run per connection) makes a conflicting insert a no-op — the existing run covers it. */
+   *  run per connection) makes a conflicting insert a no-op - the existing run covers it. */
   private async enqueueIncremental(
     orgId: string,
     connectionId: string,

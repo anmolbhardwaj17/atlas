@@ -8,7 +8,7 @@ interface RawRequest {
 }
 
 /**
- * GitHub webhook ingress (docs/07 §5). Unauthenticated by design — there is no Atlas
+ * GitHub webhook ingress (docs/07 §5). Unauthenticated by design - there is no Atlas
  * session; the HMAC signature (`x-hub-signature-256`) IS the authentication (verified in
  * the service before anything is trusted). Per-connection URL (`/webhooks/github/:id`) so
  * the handler knows which source to re-sync without a cross-org installation lookup. Always

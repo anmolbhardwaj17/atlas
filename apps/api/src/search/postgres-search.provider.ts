@@ -6,7 +6,7 @@ import type { SearchProvider, SearchQuery, SearchResponse, SearchResult } from "
 /**
  * Postgres-backed search (docs/11 SE-1: a projection of `nodes`, no separate index).
  * Keyword/identifier matching via `pg_trgm` similarity + substring over name/urn/attributes
- * — strong for the exact tokens engineers type (ARNs, `prod-orders`). Org-scoped (RLS,
+ * - strong for the exact tokens engineers type (ARNs, `prod-orders`). Org-scoped (RLS,
  * SE-4). Semantic (vector) ranking arrives with the OpenSearch driver; `semantic` is null.
  */
 @Injectable()

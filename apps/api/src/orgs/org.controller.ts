@@ -31,7 +31,7 @@ import {
 } from "./dto";
 
 /**
- * Organizations, members, invitations (docs/08 §7, docs/12 §5–6). Guard stack:
+ * Organizations, members, invitations (docs/08 §7, docs/12 §5-6). Guard stack:
  * AuthGuard (identity) → TenantScopeGuard (active org + live role) → RolesGuard
  * (@Roles minimum). `POST /orgs` has no org yet, so it uses AuthGuard only.
  */
@@ -47,7 +47,7 @@ export class OrgController {
   @UseGuards(AuthGuard)
   async create(@Req() req: AuthedRequest, @Body() body: unknown): Promise<OrgDto> {
     const dto = await this.orgs.create(claims(req), parseBody(CreateOrgSchema, body));
-    // No req.org yet (create precedes membership) — record against the new org directly.
+    // No req.org yet (create precedes membership) - record against the new org directly.
     await this.audit.record(dto.id, {
       action: "org.create",
       actorUserId: claims(req).userId,

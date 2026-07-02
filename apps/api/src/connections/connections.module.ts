@@ -15,9 +15,9 @@ import { SECRET_BROKER, JOB_QUEUE } from "./tokens";
  *
  * The Secrets Broker is the in-memory dev impl (F2.6); AWS Secrets Manager is the
  * production impl (docs/13 §7). The ConnectorRegistry holds the REAL AwsConnector (I1)
- * and GithubConnector (I2) — verify runs a live AssumeRole / installation-token probe.
+ * and GithubConnector (I2) - verify runs a live AssumeRole / installation-token probe.
  * The JobQueue is the in-memory dev impl (F2.5); a BullMQ/Redis queue + a worker process
- * run jobs in deploy (docs/02 §5) — the API only enqueues.
+ * run jobs in deploy (docs/02 §5) - the API only enqueues.
  */
 const secretBrokerProvider: Provider = {
   provide: SECRET_BROKER,

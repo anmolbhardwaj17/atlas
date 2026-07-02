@@ -1,5 +1,5 @@
 /**
- * Org slug helpers (docs/04 — slug CHECK is `^[a-z0-9-]{3,40}$`). `deriveSlug`
+ * Org slug helpers (docs/04 - slug CHECK is `^[a-z0-9-]{3,40}$`). `deriveSlug`
  * turns a display name into a valid slug; `isValidSlug` mirrors the DB constraint
  * so we fail with a clean validation error instead of a raw constraint violation.
  */

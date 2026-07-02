@@ -16,7 +16,7 @@ interface HttpReply {
 interface HttpRequest {
   method: string;
   url: string;
-  /** Fastify correlation id (from `x-request-id` or generated) — see main.ts. */
+  /** Fastify correlation id (from `x-request-id` or generated) - see main.ts. */
   id?: string;
 }
 
@@ -52,7 +52,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         message = p.message;
         details = p.details;
       } else {
-        // Built-in HttpException (e.g. UnauthorizedException) — map status → code.
+        // Built-in HttpException (e.g. UnauthorizedException) - map status → code.
         code = codeForStatus(status);
         message = extractMessage(payload) ?? exception.message;
       }

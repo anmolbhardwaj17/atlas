@@ -6,7 +6,7 @@ import { WebhookService } from "./webhook.service";
 
 /**
  * GitHub webhook ingress (docs/07 §5). ENV + PG_POOL come from the @Global CoreModule.
- * The JobQueue is the in-memory dev impl (F2.5) — the API only enqueues; a worker process
+ * The JobQueue is the in-memory dev impl (F2.5) - the API only enqueues; a worker process
  * drains it in deploy (docs/02 §5). No AuthModule: the endpoint is HMAC-authenticated.
  */
 const jobQueueProvider: Provider = {

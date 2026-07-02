@@ -27,7 +27,7 @@ const ACTION_LABEL: Record<string, string> = {
 };
 
 /**
- * Activity log (docs/13 §8 — "trust is visible"). Admin-only view of the org's recent
+ * Activity log (docs/13 §8 - "trust is visible"). Admin-only view of the org's recent
  * security-relevant actions. Server-rendered; reads the append-only `/audit` feed.
  */
 export async function AuditLog({ orgId, token }: { orgId: string; token: string }) {
@@ -45,7 +45,7 @@ export async function AuditLog({ orgId, token }: { orgId: string; token: string 
             bare
             icon={ScrollText}
             title="No activity yet"
-            description="Security-relevant actions — organization, member, and connection changes — will appear here."
+            description="Security-relevant actions - organization, member, and connection changes - will appear here."
           />
         ) : (
           <ul className="divide-y divide-border">

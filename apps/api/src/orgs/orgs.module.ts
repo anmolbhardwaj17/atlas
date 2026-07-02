@@ -6,7 +6,7 @@ import { OrgController } from "./org.controller";
 import { InvitationController } from "./invitation.controller";
 
 /**
- * Organizations / RBAC / memberships / invitations (docs/12 §5–6, F1.6). Imports
+ * Organizations / RBAC / memberships / invitations (docs/12 §5-6, F1.6). Imports
  * AuthModule for the guards + UserMirrorService used by the services.
  */
 @Module({

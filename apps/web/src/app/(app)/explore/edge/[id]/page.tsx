@@ -8,7 +8,7 @@ import type { EdgeDetail } from "@/lib/graph-types";
 export const dynamic = "force-dynamic";
 
 /**
- * Edge provenance — the "why?" behind a connection (docs/09 §5.3, P4). Shows the origin
+ * Edge provenance - the "why?" behind a connection (docs/09 §5.3, P4). Shows the origin
  * (observed vs inferred), the rule that derived it, the evidence, and the raw source.
  */
 export default async function EdgePage({ params }: { params: Promise<{ id: string }> }) {
@@ -49,14 +49,14 @@ export default async function EdgePage({ params }: { params: Promise<{ id: strin
               <CardBody>
                 <dl className="space-y-1.5 text-sm">
                   <Row label="Origin" value={edge.origin} />
-                  <Row label="Derived by rule" value={edge.rule ?? "— (directly observed)"} mono />
-                  <Row label="Source" value={edge.provenance.source ?? "—"} />
+                  <Row label="Derived by rule" value={edge.rule ?? "- (directly observed)"} mono />
+                  <Row label="Source" value={edge.provenance.source ?? "-"} />
                   <Row
                     label="Observed"
                     value={
                       edge.provenance.observedAt
                         ? new Date(edge.provenance.observedAt).toLocaleString()
-                        : "—"
+                        : "-"
                     }
                   />
                   {edge.provenance.rawSnapshotRef && (

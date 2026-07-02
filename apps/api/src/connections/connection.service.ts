@@ -21,7 +21,7 @@ const SELECT_COLS = `id, org_id, provider, display_name, status, config, secret_
  * Credentials go to the Secrets Broker (only the opaque secret_ref is stored, BR-CONN-1).
  * `verify` resolves the provider's connector from the registry; on success it enqueues
  * an onboarding full sync (docs/06 §11, FR-1.5). One in-flight run per connection
- * (BR-SYNC-1) — a duplicate enqueue is a no-op.
+ * (BR-SYNC-1) - a duplicate enqueue is a no-op.
  */
 @Injectable()
 export class ConnectionService {
@@ -127,7 +127,7 @@ export class ConnectionService {
 
   /**
    * Manually trigger a full re-sync ("fetch latest info", FR-1.5). Guards that the source is
-   * usable and — critically — that its credentials are still resolvable: the dev Secrets Broker
+   * usable and - critically - that its credentials are still resolvable: the dev Secrets Broker
    * is in-memory, so a `secret_ref` can dangle after an API restart (or if it was seeded by a
    * separate process). Rather than enqueue a sync that would fail auth mid-run, we surface that
    * as a clear "reconnect" error up front. One in-flight run per connection (BR-SYNC-1): if a
@@ -162,7 +162,7 @@ export class ConnectionService {
 
     const { runId, alreadyRunning } = await this.enqueueSyncRun(orgId, id, "manual");
     if (!alreadyRunning && !runId) {
-      throw new ApiException(500, "internal_error", "Couldn't start a sync — please retry.");
+      throw new ApiException(500, "internal_error", "Couldn't start a sync - please retry.");
     }
     return { status: alreadyRunning ? "already_running" : "queued", runId: runId ?? null };
   }
@@ -170,7 +170,7 @@ export class ConnectionService {
   /**
    * Create a queued sync_run and enqueue the job (docs/06 §11). BR-SYNC-1 caps one in-flight
    * run per connection via uq_sync_inflight; a conflicting insert (a run already queued/running)
-   * is reported as `alreadyRunning` — the existing run covers it. Never throws: infra errors are
+   * is reported as `alreadyRunning` - the existing run covers it. Never throws: infra errors are
    * logged and surface as a missing `runId` so callers can decide whether to raise them.
    */
   private async enqueueSyncRun(
@@ -221,7 +221,7 @@ export class ConnectionService {
   }
 
   /**
-   * Purge a source's graph data on disconnect (docs/03, docs/04) — the connection row is
+   * Purge a source's graph data on disconnect (docs/03, docs/04) - the connection row is
    * kept (soft-deleted) for history/audit, but its graph footprint is removed so a removed
    * source leaves no lingering nodes/edges. Runs in the caller's org-scoped transaction, so
    * RLS confines every delete to this org. Deleting the connection's nodes cascades their
@@ -244,7 +244,7 @@ export class ConnectionService {
         )
       ).rows[0]?.n ?? "0",
     );
-    // Detach provenance from the snapshots we're about to delete — the FK is RESTRICT, so a
+    // Detach provenance from the snapshots we're about to delete - the FK is RESTRICT, so a
     // referencing provenance row would block the delete (the row itself is swept below).
     await c.query(
       `UPDATE provenance SET raw_snapshot_id = NULL

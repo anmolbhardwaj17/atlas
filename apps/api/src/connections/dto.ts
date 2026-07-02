@@ -18,7 +18,7 @@ export const VerifyConnectionSchema = z
   .strict();
 export type VerifyConnectionBody = z.infer<typeof VerifyConnectionSchema>;
 
-/** Response DTO — secrets are NEVER present (docs/08 §4 DD-2; secret_ref is internal). */
+/** Response DTO - secrets are NEVER present (docs/08 §4 DD-2; secret_ref is internal). */
 export interface ConnectionDto {
   id: string;
   provider: ConnectionProvider;

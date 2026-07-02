@@ -30,7 +30,7 @@ export interface MapData {
   truncated: boolean;
 }
 
-/** Provider derived from the URN prefix (robust — `aws:…`, `azure:…`, `gcp:…`, `github:…`). */
+/** Provider derived from the URN prefix (robust - `aws:…`, `azure:…`, `gcp:…`, `github:…`). */
 export function providerOf(node: MapNode): string {
   return node.urn.split(":")[0] || node.provider || "unknown";
 }
@@ -38,7 +38,7 @@ export function providerOf(node: MapNode): string {
 const CLOUD_PROVIDERS = new Set(["aws", "azure", "gcp"]);
 
 /**
- * Whether an edge crosses a cloud or account boundary — the multi-cloud money shot. Only
+ * Whether an edge crosses a cloud or account boundary - the multi-cloud money shot. Only
  * cloud→cloud edges count (a repo→service edge isn't "cross-cloud"): different provider →
  * crossCloud; same cloud, different account/subscription/project → crossAccount.
  */
@@ -113,7 +113,7 @@ function byFixedOrder(fixed: readonly string[]): (keys: string[]) => string[] {
 export interface ChipVisual {
   /** Selected-state Tailwind classes (environments). */
   activeClass?: string | undefined;
-  /** Brand hex (clouds) — drives border/text/fill inline when selected. */
+  /** Brand hex (clouds) - drives border/text/fill inline when selected. */
   brand?: string | undefined;
   /** Always-visible category dot (environments). */
   dot?: string | undefined;

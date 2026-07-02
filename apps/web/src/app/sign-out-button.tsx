@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-/** Ends the Supabase session (docs/12 §3 — revocation handled by Supabase) and
+/** Ends the Supabase session (docs/12 §3 - revocation handled by Supabase) and
  *  refreshes the server-rendered page. */
 export function SignOutButton() {
   const router = useRouter();

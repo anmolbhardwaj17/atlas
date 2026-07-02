@@ -26,7 +26,7 @@ export function CodeBlock({
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // clipboard blocked — no-op; the code stays selectable
+      // clipboard blocked - no-op; the code stays selectable
     }
   }
 

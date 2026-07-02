@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 /**
- * Node-list filters (docs/09 §5.3). A plain GET form — fully server-rendered, works
+ * Node-list filters (docs/09 §5.3). A plain GET form - fully server-rendered, works
  * without JS, and keeps the URL the source of truth (shareable, back-button friendly).
  */
 export interface NodeFilterValues {

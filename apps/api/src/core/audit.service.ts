@@ -40,9 +40,9 @@ interface AuditRow {
 /**
  * Append-only audit log (docs/13 §8). Records who did what to which target, org-scoped and
  * correlated by request id. Writes go through `withOrgScope` (RLS-enforced) into the
- * append-only `audit_events` table (atlas_app has INSERT+SELECT only — no UPDATE/DELETE).
+ * append-only `audit_events` table (atlas_app has INSERT+SELECT only - no UPDATE/DELETE).
  *
- * **Best-effort:** auditing must never break the operation it records — a failed insert is
+ * **Best-effort:** auditing must never break the operation it records - a failed insert is
  * logged loudly and swallowed (the mutation already succeeded). Global (provided by the
  * @Global CoreModule) so any feature module can inject it.
  */
@@ -93,7 +93,7 @@ export class AuditService {
   }
 
   /**
-   * Recent audit events for an org, newest first (docs/13 §8 — "trust is visible"). Admin
+   * Recent audit events for an org, newest first (docs/13 §8 - "trust is visible"). Admin
    * read only (enforced at the controller). Org-scoped via RLS; the actor email is joined
    * from `users` (a global identity table `atlas_app` may read). `limit` is clamped 1..200.
    */

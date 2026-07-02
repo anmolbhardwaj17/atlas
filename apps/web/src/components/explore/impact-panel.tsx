@@ -6,7 +6,7 @@ import { ErrorState } from "@/components/patterns/empty-state";
 import type { TraversalResult } from "@/lib/graph-types";
 
 /**
- * Blast-radius / dependencies panel (docs/09 §5.4). List-first (a11y — the graph canvas
+ * Blast-radius / dependencies panel (docs/09 §5.4). List-first (a11y - the graph canvas
  * is an optional enhancement, not the source of truth): nodes grouped by hop distance,
  * each with its **pathConfidence** (weakest edge on the path, P3) and an expandable
  * why-chain (the edges that connect it back to the root, P4).
@@ -60,7 +60,7 @@ export function ImpactPanel({
             <div>
               {result.truncated && (
                 <p>
-                  Truncated at the node budget ({result.nodeBudget}) — some paths are not shown.
+                  Truncated at the node budget ({result.nodeBudget}) - some paths are not shown.
                 </p>
               )}
               {result.warnings.map((w) => (
@@ -72,7 +72,7 @@ export function ImpactPanel({
 
         {result.impacted.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Nothing found within depth {result.depthUsed} — this is a truthful empty result, not a
+            Nothing found within depth {result.depthUsed} - this is a truthful empty result, not a
             failure.
           </p>
         ) : (

@@ -67,7 +67,7 @@ interface Summary {
   };
 }
 
-/** Consumer dashboard (docs/09 §5.2) — answers a user's real questions: what do I have, is it
+/** Consumer dashboard (docs/09 §5.2) - answers a user's real questions: what do I have, is it
  *  trustworthy, what needs attention, what changed. Graph-derived + cited, not graph internals. */
 export async function Dashboard({
   orgId,
@@ -102,7 +102,7 @@ export async function Dashboard({
 
       <AskLauncher />
 
-      {/* At a glance — human inventory. Infrastructure and Code rows each show only when
+      {/* At a glance - human inventory. Infrastructure and Code rows each show only when
           that side of the estate is connected, so a code-only or infra-only org isn't all zeros. */}
       {inv.services + inv.datastores + inv.clouds > 0 && (
         <StatGroup label="Infrastructure">
@@ -195,7 +195,7 @@ function NeedsAttention({ findings }: { findings: Finding[] }) {
             <div>
               <div className="font-medium">Nothing needs attention</div>
               <div className="text-muted-foreground">
-                Your graph looks healthy — no risks, drift, or unhealthy sources right now.
+                Your graph looks healthy - no risks, drift, or unhealthy sources right now.
               </div>
             </div>
           </div>
@@ -261,7 +261,7 @@ const ACTIVITY_META = {
   resource: { Icon: Boxes, label: "New resource" },
 } as const;
 
-/** The provider/service brand logo for an activity item — a service logo (e.g. an AWS service)
+/** The provider/service brand logo for an activity item - a service logo (e.g. an AWS service)
  *  if one is known, else the provider brand (Bitbucket, GitHub, AWS…); null when there's no
  *  brand icon and we fall back to the category glyph. Mirrors the Explore row logic. */
 function activityLogo(kind: string): string | null {
@@ -362,7 +362,7 @@ function Insights({ insights }: { insights: Summary["insights"] }) {
           subtitle="PRs raised · 30d"
           items={topContributors}
           href="/explore?kind=bitbucket.user"
-          emptyLabel="No PRs in the last 30 days — reconnect Bitbucket to sync recent activity."
+          emptyLabel="No PRs in the last 30 days - reconnect Bitbucket to sync recent activity."
         />
         <Leaderboard
           title="Most active repos"

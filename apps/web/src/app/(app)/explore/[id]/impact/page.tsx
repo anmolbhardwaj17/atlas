@@ -38,7 +38,7 @@ export default async function ImpactPage({ params }: { params: Promise<{ id: str
           <div>
             <h1 className="text-xl font-semibold">Impact · {node.name ?? node.urn}</h1>
             <p className="text-sm text-muted-foreground">
-              What changes if this resource does — and what it depends on. Every path shows its
+              What changes if this resource does - and what it depends on. Every path shows its
               weakest-link confidence and the evidence behind each hop.
             </p>
           </div>

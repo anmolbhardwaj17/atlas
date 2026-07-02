@@ -14,7 +14,7 @@ import { ConnectorRegistry } from "./connector-registry";
 /**
  * Dev in-process sync worker (F2.5). In deploy a separate worker process consumes a
  * BullMQ/Redis queue (docs/02 §5); locally the API enqueues onto the in-memory queue and
- * nothing would run it — so here we register the same staged-sync handler in-process so
+ * nothing would run it - so here we register the same staged-sync handler in-process so
  * connect → verify → sync → graph works end to end on a laptop. It shares the API's
  * ConnectorRegistry (real connectors) + Secrets Broker (the credentials verify just stored),
  * so no secret ever leaves the process. Raw snapshots use the in-memory store (dev).

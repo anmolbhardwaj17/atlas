@@ -26,7 +26,7 @@ interface Invitation {
 }
 
 /** Org members + invitations (docs/08 §7). Members/invitations are server-fetched (reliable
- *  session) and passed in as initial state — no client auth race on first paint. The client
+ *  session) and passed in as initial state - no client auth race on first paint. The client
  *  Supabase session (Bearer) is used only to refresh after an invite; Admin+ invite endpoints
  *  surface 403s inline for viewers. */
 export function OrgPanel({

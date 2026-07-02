@@ -2,7 +2,7 @@ import type { z } from "zod";
 import { ApiException } from "./errors";
 
 /**
- * Parse a request body/query against a zod schema (docs/08 §4 — validate at the edge,
+ * Parse a request body/query against a zod schema (docs/08 §4 - validate at the edge,
  * reject extra fields). On failure throws `400 validation_failed` with per-field
  * issues (docs/08 §11). Use `.strict()` schemas to block mass-assignment (P8).
  *

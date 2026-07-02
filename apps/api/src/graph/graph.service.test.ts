@@ -169,7 +169,7 @@ suite("G2.1 GraphService", () => {
     expect(sub.edges).toHaveLength(1);
   });
 
-  it("is tenant-isolated — another org sees nothing (R8)", async () => {
+  it("is tenant-isolated - another org sees nothing (R8)", async () => {
     expect((await graph.listNodes(otherOrgId, { limit: 50 })).data).toHaveLength(0);
     await expect(graph.getNode(otherOrgId, lambdaId)).rejects.toBeInstanceOf(ApiException);
   });

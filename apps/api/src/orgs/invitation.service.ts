@@ -28,7 +28,7 @@ interface InviteRow {
 /**
  * Invitations (docs/12 §6.2, docs/08 §7). The raw token is single-use and only its
  * SHA-256 hash is stored; the token is NEVER returned by the API (BR-INV-1, docs/13)
- * — it is delivered out of band (email). Accept is capability-based: the bearer of
+ * - it is delivered out of band (email). Accept is capability-based: the bearer of
  * the token, signed in as the invited email, atomically gains an active membership.
  */
 @Injectable()
@@ -115,7 +115,7 @@ export class InvitationService {
     }
     if (invite.email.toLowerCase() !== claims.email.toLowerCase()) {
       throw ApiException.orgAccessDenied(
-        "This invitation was sent to a different email — sign in with that address.",
+        "This invitation was sent to a different email - sign in with that address.",
       );
     }
 

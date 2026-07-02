@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 
 /**
- * Shared node-kind visuals — the icon + category colour for a kind, used by both the infra
+ * Shared node-kind visuals - the icon + category colour for a kind, used by both the infra
  * map (ResourceNode) and the Explore list so a repo/project/pipeline/PR/person read the same
  * everywhere. Category colour encodes *type* (docs/09 §3.2); code kinds are split so they're
  * distinguishable (container / repo / pipeline / change / people / package).
@@ -154,7 +154,7 @@ const CATEGORY_STYLE: Record<string, string> = {
 };
 const CATEGORY_FALLBACK = "bg-muted text-muted-foreground";
 
-/** Kinds with a real provider service/brand logo (aws services, github mark) — the map uses
+/** Kinds with a real provider service/brand logo (aws services, github mark) - the map uses
  *  these; bitbucket is intentionally NOT here so map nodes keep their per-type colours. */
 export const KIND_LOGO: Record<string, string> = {
   "aws.ec2.instance": "aws-ec2",
@@ -187,7 +187,7 @@ export function kindStyle(kind: string): string {
   return CATEGORY_STYLE[CATEGORY[kind] ?? ""] ?? CATEGORY_FALLBACK;
 }
 
-/** Short, human kind label — strips the provider prefix (aws./bitbucket./…). */
+/** Short, human kind label - strips the provider prefix (aws./bitbucket./…). */
 export function kindShort(kind: string): string {
   return kind.replace(/^aws\.|^github\.|^external\.|^atlas\.|^azure\.|^gcp\.|^bitbucket\./, "");
 }

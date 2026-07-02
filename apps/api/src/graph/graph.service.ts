@@ -52,7 +52,7 @@ export interface EdgeDto {
   to: { id: string; urn: string; kind: string; name: string | null };
 }
 
-/** A graph-derived thing worth a consumer's attention — cited, precision-first (P3/P4). */
+/** A graph-derived thing worth a consumer's attention - cited, precision-first (P3/P4). */
 export interface Finding {
   id: string;
   severity: "high" | "medium" | "low";
@@ -90,7 +90,7 @@ export interface DashboardSummary {
   crossBoundary: { crossCloud: number; crossAccount: number };
   findings: Finding[];
   activity: ActivityItem[];
-  /** Positive, informational code stats (leaderboards) — present when a code host is connected. */
+  /** Positive, informational code stats (leaderboards) - present when a code host is connected. */
   insights: {
     topContributors: Array<{ name: string; count: number }>;
     mostActiveRepos: Array<{ name: string; count: number }>;
@@ -101,7 +101,7 @@ export interface DashboardSummary {
 /**
  * A human-readable dashboard activity item (docs/09 §5.2). Unlike the raw graph change-feed
  * (`timeline()`), this is node-centric and collapses a PR into ONE "opened in <repo> by <author>"
- * line — it never surfaces internal containment/ownership edges (which read as meaningless
+ * line - it never surfaces internal containment/ownership edges (which read as meaningless
  * "X → Y" rows to a user).
  */
 export interface ActivityItem {
@@ -112,12 +112,12 @@ export interface ActivityItem {
   category: "pull_request" | "repository" | "pipeline" | "resource";
   /** The thing itself, e.g. "#42 ROAR-4427" or a resource name. */
   title: string;
-  /** Context line, e.g. "gpt-idor-service · Sahil Saleem" (PRs) — null when there's none. */
+  /** Context line, e.g. "gpt-idor-service · Sahil Saleem" (PRs) - null when there's none. */
   subtitle: string | null;
   at: string;
 }
 
-/** A directed connection between two map nodes (light — just what the canvas draws). */
+/** A directed connection between two map nodes (light - just what the canvas draws). */
 export interface GraphEdgeLite {
   id: string;
   from: string;
@@ -214,7 +214,7 @@ export interface TraversalResult {
 
 /**
  * Graph read API (docs/08 §9). All reads are org-scoped via withOrgScope (RLS enforces;
- * cross-tenant ⇒ empty/404, never leakage — R8). Node list uses keyset pagination over
+ * cross-tenant ⇒ empty/404, never leakage - R8). Node list uses keyset pagination over
  * (last_seen desc, id desc), stable under concurrent crawl writes (DD-3).
  */
 @Injectable()
@@ -264,8 +264,8 @@ export class GraphService {
   }
 
   /**
-   * Consumer dashboard summary (docs/09 §5.2). Answers a regular user's real questions —
-   * *what do I have, is it trustworthy, what needs attention, what changed* — from the graph
+   * Consumer dashboard summary (docs/09 §5.2). Answers a regular user's real questions -
+   * *what do I have, is it trustworthy, what needs attention, what changed* - from the graph
    * itself, not from graph internals. Findings are precision-first + cited (P3/P4): each is a
    * fact the graph proves, with a click-through to its evidence.
    */
@@ -332,7 +332,7 @@ export class GraphService {
                    OR (nf.account_ref IS NOT NULL AND nt.account_ref IS NOT NULL
                        AND nf.account_ref <> nt.account_ref))`,
         ),
-        // Highest in-degree over impact edges — the biggest single point of failure.
+        // Highest in-degree over impact edges - the biggest single point of failure.
         c.query<{ id: string; name: string | null; kind: string; deg: number }>(
           `SELECT e.to_node_id AS id, nd.name, nd.kind, count(*)::int AS deg
              FROM edges e JOIN nodes nd ON nd.id = e.to_node_id
@@ -342,7 +342,7 @@ export class GraphService {
           [impact],
         ),
         c.query<{ n: number }>("SELECT count(*)::int AS n FROM nodes WHERE status = 'stale'"),
-        // Code inventory (repos / projects / pipelines / people / PRs) — makes the dashboard
+        // Code inventory (repos / projects / pipelines / people / PRs) - makes the dashboard
         // meaningful for a code-heavy org, not just cloud infra.
         c.query<{
           repositories: number;
@@ -362,7 +362,7 @@ export class GraphService {
              )::int AS pull_requests
            FROM nodes WHERE status <> 'deleted'`,
         ),
-        // Repos with no CI/CD pipeline (no CONTAINS→pipeline) — a hygiene finding.
+        // Repos with no CI/CD pipeline (no CONTAINS→pipeline) - a hygiene finding.
         c.query<{ n: number }>(
           `SELECT count(*)::int AS n FROM nodes r
             WHERE r.kind LIKE '%.repository' AND r.status <> 'deleted'
@@ -416,7 +416,7 @@ export class GraphService {
           inferEnvironment({ name: m.name, urn: m.urn, tags: m.tags, attributes: m.attributes }),
         );
         // Cloud is derived from the URN prefix (the canonical identity, robust vs the
-        // provider column) — consistent with the map's `providerOf`.
+        // provider column) - consistent with the map's `providerOf`.
         const cloud = m.urn.split(":")[0] ?? "";
         if (["aws", "azure", "gcp"].includes(cloud)) clouds.add(cloud);
         if (m.account_ref) accounts.add(m.account_ref);
@@ -468,7 +468,7 @@ export class GraphService {
           severity: "high",
           category: "Source health",
           title: `${conn.display_name} failed to sync`,
-          detail: "This source errored — its slice of your graph may be out of date.",
+          detail: "This source errored - its slice of your graph may be out of date.",
           href: "/settings",
         });
       } else if (conn.status === "degraded") {
@@ -477,7 +477,7 @@ export class GraphService {
           severity: "medium",
           category: "Source health",
           title: `${conn.display_name} is degraded`,
-          detail: "The last sync was partial — some resources may be missing.",
+          detail: "The last sync was partial - some resources may be missing.",
           href: "/settings",
         });
       } else if (
@@ -490,7 +490,7 @@ export class GraphService {
           severity: "low",
           category: "Source health",
           title: `${conn.display_name} hasn't synced in a while`,
-          detail: "Its data is older than 7 days — the graph here may have drifted.",
+          detail: "Its data is older than 7 days - the graph here may have drifted.",
           href: "/settings",
         });
       }
@@ -503,7 +503,7 @@ export class GraphService {
         category: "Cross-boundary",
         title: `${crossTotal} connection${crossTotal > 1 ? "s" : ""} span a cloud or account boundary`,
         detail:
-          "A resource depends on a datastore in another cloud or account — a wider blast radius (and likely egress cost).",
+          "A resource depends on a datastore in another cloud or account - a wider blast radius (and likely egress cost).",
         href: "/map",
         count: crossTotal,
       });
@@ -514,7 +514,7 @@ export class GraphService {
         severity: base.blast.deg >= 6 ? "medium" : "low",
         category: "Blast radius",
         title: `${base.blast.name ?? base.blast.kind} is a single point of failure`,
-        detail: `${base.blast.deg} resources depend on it directly — if it fails, they're affected.`,
+        detail: `${base.blast.deg} resources depend on it directly - if it fails, they're affected.`,
         href: `/explore/${base.blast.id}/impact`,
         count: base.blast.deg,
       });
@@ -525,7 +525,7 @@ export class GraphService {
         severity: "low",
         category: "Freshness",
         title: `${base.stale} resource${base.stale > 1 ? "s" : ""} went stale`,
-        detail: "Not seen in the latest sync — they may have been removed.",
+        detail: "Not seen in the latest sync - they may have been removed.",
         href: "/explore?status=stale",
         count: base.stale,
       });
@@ -536,7 +536,7 @@ export class GraphService {
         severity: "low",
         category: "Code hygiene",
         title: `${base.noPipeline} repositor${base.noPipeline > 1 ? "ies have" : "y has"} no CI/CD pipeline`,
-        detail: "No deployment pipeline was found — these repos may ship manually or not at all.",
+        detail: "No deployment pipeline was found - these repos may ship manually or not at all.",
         href: "/explore?kind=bitbucket.repository",
         count: base.noPipeline,
       });
@@ -547,7 +547,7 @@ export class GraphService {
         severity: "low",
         category: "Code hygiene",
         title: `${base.emptyProjects} project${base.emptyProjects > 1 ? "s contain" : " contains"} no repositories`,
-        detail: "An empty project — likely archived, or a placeholder that can be cleaned up.",
+        detail: "An empty project - likely archived, or a placeholder that can be cleaned up.",
         href: "/explore?kind=bitbucket.project",
         count: base.emptyProjects,
       });
@@ -555,7 +555,7 @@ export class GraphService {
     const rank = { high: 0, medium: 1, low: 2 };
     findings.sort((a, b) => rank[a.severity] - rank[b.severity]);
 
-    // ── Recent activity (human, PR-centric — not raw graph edges) ──────────────
+    // ── Recent activity (human, PR-centric - not raw graph edges) ──────────────
     const since = new Date(now - 30 * 24 * 60 * 60 * 1000);
     const activity = await this.recentActivity(orgId, since, 6);
 
@@ -602,7 +602,7 @@ export class GraphService {
    * Whole-graph fetch for the visual map (docs/09 §5.4): bounded nodes + the edges among
    * them, each node carrying its (derived) environment + account for grouping. SQL filters
    * kind/region/account; environment is inferred in-process (not a column) so it's filtered
-   * after. Node-budgeted — `truncated` tells the UI to show a "showing N of many" banner.
+   * after. Node-budgeted - `truncated` tells the UI to show a "showing N of many" banner.
    */
   async graph(orgId: string, q: GraphQuery): Promise<GraphResult> {
     return withOrgScope(this.db, orgId, async (c) => {
@@ -682,9 +682,9 @@ export class GraphService {
       if (q.kind) {
         where.push(`kind = ${p(q.kind)}`);
       } else {
-        // Explore browses the top-level estate — the *things* you have: repos, services,
+        // Explore browses the top-level estate - the *things* you have: repos, services,
         // datastores, cloud resources. Not ephemeral activity (PRs), not people (users/teams),
-        // and not per-repo sub-resources like CI pipelines/workflows (too granular — they show on
+        // and not per-repo sub-resources like CI pipelines/workflows (too granular - they show on
         // a repo's detail). Those live elsewhere; an explicit ?kind can still target them.
         where.push(
           `kind NOT LIKE '%.pullrequest' AND kind NOT LIKE '%.pull_request'
@@ -828,11 +828,11 @@ export class GraphService {
     });
   }
 
-  /** Inbound impact closure — "what breaks if this is deleted" (US-4, docs/08 §9). */
+  /** Inbound impact closure - "what breaks if this is deleted" (US-4, docs/08 §9). */
   async blastRadius(orgId: string, id: string, q: TraversalQuery): Promise<TraversalResult> {
     return this.traverse(orgId, id, "inbound", q);
   }
-  /** Outbound dependency closure — "what this depends on" (US-9). */
+  /** Outbound dependency closure - "what this depends on" (US-9). */
   async dependencies(orgId: string, id: string, q: TraversalQuery): Promise<TraversalResult> {
     return this.traverse(orgId, id, "outbound", q);
   }
@@ -902,7 +902,7 @@ export class GraphService {
         repo_name: string | null;
         act_at: Date;
       }>(
-        // `act_at` is the real-world activity time — a PR's raised/merged time (updatedOn ▸
+        // `act_at` is the real-world activity time - a PR's raised/merged time (updatedOn ▸
         // createdOn), a resource's own last-updated time, else when Atlas first saw it. Ordering
         // (and the displayed "N ago") by this, not first_seen, is what makes the feed chronological:
         // first_seen is the *ingest* time, identical across a bulk sync, so it can't order activity.

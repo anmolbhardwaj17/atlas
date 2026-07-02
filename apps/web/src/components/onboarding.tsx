@@ -19,10 +19,10 @@ import { seedDemo } from "@/lib/browser-api";
 /**
  * Onboarding / first-run empty state (P1.2, docs/09 §8). The graph is empty, so this is
  * the org's front door. Two paths:
- *   1. **Load sample data** — one click seeds the "Shopyard" estate via the real pipeline
+ *   1. **Load sample data** - one click seeds the "Shopyard" estate via the real pipeline
  *      so the user is exploring a cited graph in seconds (TTFI < 30 min, NFR-22). No creds.
- *   2. **Connect a real source** — AWS / GitHub / Bitbucket / Azure / GCP read-only setup
- *      instructions with copy-ready policy/config (docs/13 §4–5), shared with the Integrations
+ *   2. **Connect a real source** - AWS / GitHub / Bitbucket / Azure / GCP read-only setup
+ *      instructions with copy-ready policy/config (docs/13 §4-5), shared with the Integrations
  *      hub. Live verification needs customer creds, so sample data is the recommended quick start.
  *
  * Composed from the design-system primitives (Steps, CodeBlock, Card, Button, Tabs) so the
@@ -67,7 +67,7 @@ function SampleDataCard({ orgId, canSeed }: { orgId: string; canSeed: boolean })
     setError(null);
     try {
       await seedDemo(orgId);
-      // The dashboard is a server component — refresh re-renders it with the seeded graph.
+      // The dashboard is a server component - refresh re-renders it with the seeded graph.
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
@@ -86,7 +86,7 @@ function SampleDataCard({ orgId, canSeed }: { orgId: string; canSeed: boolean })
             <p className="font-medium">Load sample data</p>
             <p className="mt-0.5 max-w-md text-sm text-muted-foreground">
               Seed a realistic e-commerce estate (services, databases, repos, deploys) built through
-              the real ingest &amp; inference pipeline. Explore it immediately — no credentials
+              the real ingest &amp; inference pipeline. Explore it immediately - no credentials
               needed.
             </p>
             {error ? (

@@ -3,7 +3,7 @@ import { cn } from "@/lib/cn";
 
 /**
  * The certainty visual language (docs/09 §3.2, FE-1) + semantic status, built strictly on the
- * official shadcn `Badge` variants — observed = the solid `default` badge, inferred-high = the
+ * official shadcn `Badge` variants - observed = the solid `default` badge, inferred-high = the
  * `secondary` badge, inferred-low / no-data = the `outline` badge. No custom radius or borders;
  * the only additions are the sanctioned semantic status colors (docs/09 §3.3).
  */
@@ -32,7 +32,7 @@ export function ConfidenceBadge({ tier, evidence }: { tier: string; evidence?: s
     <Badge
       variant={t.variant}
       className={t.className}
-      title={evidence ? `${t.label} — ${evidence}` : t.label}
+      title={evidence ? `${t.label} - ${evidence}` : t.label}
     >
       {t.label}
     </Badge>
@@ -40,7 +40,7 @@ export function ConfidenceBadge({ tier, evidence }: { tier: string; evidence?: s
 }
 
 /**
- * Semantic status color as a soft badge — tinted bg + colored text + TRANSPARENT border,
+ * Semantic status color as a soft badge - tinted bg + colored text + TRANSPARENT border,
  * mirroring shadcn's `destructive` badge style (never a colored border).
  */
 const SUCCESS = "border-transparent bg-success/10 text-success";
@@ -64,7 +64,7 @@ export function FreshnessTag({ status }: { status: string }) {
 }
 
 /**
- * Semantic status badge (docs/09 §3.3) — the one place hue is used in the mono UI:
+ * Semantic status badge (docs/09 §3.3) - the one place hue is used in the mono UI:
  * connected/healthy → green, pending/in-progress → amber, error → red, inactive → gray.
  */
 const STATUS: Record<string, { label: string; className: string }> = {

@@ -123,7 +123,7 @@ suite("G2.4 PostgresSearchProvider", () => {
     expect(res.data.some((r) => r.node.name === "prod-orders")).toBe(true);
   });
 
-  it("is tenant-isolated — only this org's nodes (R8/SE-4)", async () => {
+  it("is tenant-isolated - only this org's nodes (R8/SE-4)", async () => {
     const res = await search.search(otherOrgId, { q: "checkout", type: "keyword", limit: 10 });
     expect(res.data).toHaveLength(0); // 'checkout' node belongs to orgId only
   });

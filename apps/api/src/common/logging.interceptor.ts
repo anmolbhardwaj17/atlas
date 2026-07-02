@@ -18,12 +18,12 @@ interface LoggedReply {
 
 /**
  * Structured access logging (observability baseline, docs/02 §9.4). Emits one JSON line per
- * completed request — `{ requestId, method, url, status, durationMs }` — so logs are
+ * completed request - `{ requestId, method, url, status, durationMs }` - so logs are
  * machine-parseable and correlatable by the `x-request-id` the client also sees (main.ts).
  * Errors are logged with their status too; the error envelope carries the same requestId.
  *
  * Only HTTP contexts are logged (skips anything non-HTTP). No secrets/headers/bodies are
- * logged (SEC-6) — just the request line + outcome.
+ * logged (SEC-6) - just the request line + outcome.
  */
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {

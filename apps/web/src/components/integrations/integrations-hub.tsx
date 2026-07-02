@@ -57,7 +57,7 @@ const CREDENTIAL_NOUN: Record<string, string> = {
 };
 
 /**
- * Integrations hub (docs/18) — the one place to connect the company's accounts. A tile per
+ * Integrations hub (docs/18) - the one place to connect the company's accounts. A tile per
  * provider (AWS / GitHub / Azure / GCP / Bitbucket connectable; GitLab / Datadog "coming
  * soon"), each showing its connected accounts with status, a guided Connect flow, and
  * disconnect (which purges that source's graph).
@@ -215,7 +215,7 @@ function ConnectionRow({
         text:
           r.status === "already_running"
             ? "Already syncing…"
-            : "Sync started — new data lands in a few minutes.",
+            : "Sync started - new data lands in a few minutes.",
       });
       setTimeout(() => router.refresh(), 1500);
     } catch (e) {
@@ -237,7 +237,7 @@ function ConnectionRow({
               onClick={() => void sync()}
               disabled={syncing}
               aria-label="Sync now"
-              title="Sync now — fetch the latest data"
+              title="Sync now - fetch the latest data"
               className="text-muted-foreground hover:text-foreground disabled:opacity-50"
             >
               <RefreshCw className={cn("size-3.5", syncing && "animate-spin")} />
@@ -315,7 +315,7 @@ function ConnectSheet({
   // Reset the form whenever a different provider's sheet opens.
   React.useEffect(() => {
     if (provider) {
-      setName(`${provider.name.split(" ")[0]} — production`);
+      setName(`${provider.name.split(" ")[0]} - production`);
       setWorkspace("");
       setEmail("");
       setToken("");
@@ -342,7 +342,7 @@ function ConnectSheet({
           apiToken: token.trim(),
         });
         if (verified.status === "error") {
-          setError("Bitbucket rejected the credentials — check the email, token, and its scopes.");
+          setError("Bitbucket rejected the credentials - check the email, token, and its scopes.");
           setBusy(false);
           return;
         }
@@ -400,7 +400,7 @@ function ConnectSheet({
                         id="bb-workspace"
                         value={workspace}
                         onChange={(e) => setWorkspace(e.target.value)}
-                        placeholder="e.g. siemba — leave blank to auto-detect"
+                        placeholder="e.g. siemba - leave blank to auto-detect"
                         autoComplete="off"
                       />
                     </div>
@@ -430,7 +430,7 @@ function ConnectSheet({
                         autoComplete="off"
                       />
                       <p className="text-xs text-muted-foreground">
-                        Sent once to verify + stored encrypted in the secrets broker — never saved
+                        Sent once to verify + stored encrypted in the secrets broker - never saved
                         in the database or shown again.
                       </p>
                     </div>

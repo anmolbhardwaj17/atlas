@@ -11,14 +11,14 @@ import {
 } from "lucide-react";
 
 /**
- * Categorical taxonomy — the single source of truth for how enum-typed things are labelled,
+ * Categorical taxonomy - the single source of truth for how enum-typed things are labelled,
  * ordered, coloured, and iconed across the app (roles, environments, providers). Reused so the
  * same category always reads the same way (a "production" chip on the map and a "production"
  * finding on the dashboard share one style). Colour here always encodes a *category*, never
- * decoration — the mono theme still governs chrome; hue is reserved for meaning.
+ * decoration - the mono theme still governs chrome; hue is reserved for meaning.
  *
  * Semantic *status* (connected / stale / error) and graph *certainty* (observed / inferred)
- * live in `certainty.tsx` — a different axis (trust/health), intentionally kept separate.
+ * live in `certainty.tsx` - a different axis (trust/health), intentionally kept separate.
  */
 
 // ── Roles (org RBAC, mirrors @atlas/db `Role`) ──────────────────────────────────
@@ -30,12 +30,12 @@ export interface RoleMeta {
   /** Privilege rank, 0 = highest. Sort members by this so Owners lead. */
   rank: number;
   icon: LucideIcon;
-  /** Tinted badge style — category hue, transparent border (never a hard ring). */
+  /** Tinted badge style - category hue, transparent border (never a hard ring). */
   className: string;
 }
 
-// All three constructed identically — transparent border + a clearly-visible tinted fill +
-// coloured text — so the row of badges reads as one consistent set (no bare-text outliers).
+// All three constructed identically - transparent border + a clearly-visible tinted fill +
+// coloured text - so the row of badges reads as one consistent set (no bare-text outliers).
 export const ROLE_META: Record<Role, RoleMeta> = {
   Owner: {
     label: "Owner",
@@ -61,7 +61,7 @@ export function roleMeta(role: string): RoleMeta {
   return ROLE_META[role as Role] ?? ROLE_META.Member;
 }
 
-/** Sort comparator by privilege (Owners first), then by name — for member lists. */
+/** Sort comparator by privilege (Owners first), then by name - for member lists. */
 export function byRole<T extends { role: string; name?: string | null; email?: string }>(
   a: T,
   b: T,
@@ -81,7 +81,7 @@ export interface CategoryStyle {
   dot: string;
 }
 
-// `chip` = the selected (filled) state — tinted bg + coloured text + TRANSPARENT border
+// `chip` = the selected (filled) state - tinted bg + coloured text + TRANSPARENT border
 // (never a coloured border; matches the shadcn filled badge). `dot` keeps the category legible.
 export const ENV_STYLE: Record<string, CategoryStyle> = {
   prod: {
@@ -136,7 +136,7 @@ export function providerMeta(id: string): ProviderMeta | undefined {
   return PROVIDER_META[id];
 }
 
-// ── Finding severity (dashboard "needs attention") — semantic, filled, no coloured border ──
+// ── Finding severity (dashboard "needs attention") - semantic, filled, no coloured border ──
 export type Severity = "high" | "medium" | "low";
 
 export interface SeverityMeta {

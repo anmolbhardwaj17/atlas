@@ -137,7 +137,7 @@ export function rankToConfidence(rank: number): string {
   return rank >= 3 ? "observed" : rank === 2 ? "inferred-high" : "inferred-low";
 }
 
-/** Opaque keyset cursor over (last_seen desc, id desc) — stable under concurrent writes. */
+/** Opaque keyset cursor over (last_seen desc, id desc) - stable under concurrent writes. */
 export interface NodeCursor {
   lastSeen: string;
   id: string;

@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseAnonKey, supabaseUrl } from "@/lib/env";
 
-/** Refreshes the Supabase session cookie on every request (docs/12 §3 — Supabase
+/** Refreshes the Supabase session cookie on every request (docs/12 §3 - Supabase
  *  manages the access/refresh lifecycle; this keeps server reads from seeing an
  *  expired token). Standard @supabase/ssr middleware pattern. */
 export async function updateSession(request: NextRequest): Promise<NextResponse> {

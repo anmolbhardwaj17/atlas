@@ -7,7 +7,7 @@ import type { OrgDto } from "./dto";
 import type { Role } from "@atlas/db";
 
 /**
- * Accept an invitation (docs/08 §7, docs/12 §6.2). Auth required — the invitee must
+ * Accept an invitation (docs/08 §7, docs/12 §6.2). Auth required - the invitee must
  * be signed in (with the invited email). Realized as a trailing `/accept` segment:
  * the documented `{token}:accept` colon-action can't be expressed for a *dynamic*
  * path param under Fastify routing, so dynamic-id actions use `/{action}` in code.

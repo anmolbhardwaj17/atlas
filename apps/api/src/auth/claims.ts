@@ -3,7 +3,7 @@ import type { AuthClaims } from "./auth.types";
 
 /**
  * Pure mapping from a verified Supabase JWT payload to Atlas's trusted identity
- * (docs/12 §2.2). No I/O — unit-tested. "Parse, don't validate" (docs/16 CS-2):
+ * (docs/12 §2.2). No I/O - unit-tested. "Parse, don't validate" (docs/16 CS-2):
  * narrows untyped claim values once into a typed `AuthClaims`.
  */
 function asString(value: unknown): string | null {

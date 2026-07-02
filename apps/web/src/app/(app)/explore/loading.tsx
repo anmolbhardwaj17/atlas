@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * Explore loading fallback (docs/09 §7). Route-specific so the skeleton matches the page
- * it precedes (header + filter bar + table rows), instead of the generic app skeleton —
+ * it precedes (header + filter bar + table rows), instead of the generic app skeleton -
  * navigation reads as "this page, loading" rather than a mismatched flash.
  */
 export default function ExploreLoading() {

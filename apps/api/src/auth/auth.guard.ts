@@ -11,7 +11,7 @@ import type { AuthedRequest } from "./auth.types";
 /**
  * Authenticates a request from its `Authorization: Bearer <supabase-jwt>` header
  * (docs/12 §4 step 1). On success, attaches trusted `AuthClaims` to the request.
- * Authorization (org/role) is resolved downstream — the token carries no tenancy.
+ * Authorization (org/role) is resolved downstream - the token carries no tenancy.
  */
 @Injectable()
 export class AuthGuard implements CanActivate {

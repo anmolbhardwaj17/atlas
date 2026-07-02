@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Sparkles, ArrowRight } from "lucide-react";
 
 /**
- * The "Ask Atlas" hero (docs/09 §5.2) — the AI is the interface (P1), so the home invites a
+ * The "Ask Atlas" hero (docs/09 §5.2) - the AI is the interface (P1), so the home invites a
  * question first. Submitting (or clicking an example) routes to /ask with the question
  * prefilled, where the grounded, cited answer streams.
  */
@@ -26,7 +26,7 @@ export function AskLauncher() {
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 sm:p-7">
-      {/* Subtle monochrome accent glow — the home's headline interaction (P1). */}
+      {/* Subtle monochrome accent glow - the home's headline interaction (P1). */}
       <div
         className="pointer-events-none absolute -right-16 -top-20 size-52 rounded-full bg-primary/5 blur-3xl"
         aria-hidden
@@ -39,7 +39,7 @@ export function AskLauncher() {
           <h2 className="text-base font-semibold">Ask Atlas</h2>
         </div>
         <p className="mb-4 max-w-xl text-sm text-muted-foreground">
-          Ask anything about your infrastructure and code — every answer is grounded in your live
+          Ask anything about your infrastructure and code - every answer is grounded in your live
           graph and cited back to it.
         </p>
 

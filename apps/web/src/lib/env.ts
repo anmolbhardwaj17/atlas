@@ -1,5 +1,5 @@
 /**
- * Public web config (docs/12 §2.1). Only `NEXT_PUBLIC_*` vars — these are inlined
+ * Public web config (docs/12 §2.1). Only `NEXT_PUBLIC_*` vars - these are inlined
  * into the browser bundle and are safe to expose (the anon key is public by
  * design; never put the service-role key here). Lazy getters so a missing var
  * fails at use, not at module import during build.

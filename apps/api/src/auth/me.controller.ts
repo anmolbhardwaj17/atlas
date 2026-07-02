@@ -25,7 +25,7 @@ interface MeResponse {
  * The post-login landing call (docs/12 §2.1, docs/08 §6). Verifies the session,
  * mirrors the identity, and returns the user + memberships (docs/08 §6 shape; the
  * global interceptor wraps it as `{ data }`). A brand-new user has zero memberships
- * (onboarding = create/accept an org, F1.6) — still 200.
+ * (onboarding = create/accept an org, F1.6) - still 200.
  */
 @Controller("me")
 @UseGuards(AuthGuard)

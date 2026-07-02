@@ -1,5 +1,5 @@
 /**
- * Environment inference (docs/05 — a derived, best-effort grouping). Cloud resources rarely
+ * Environment inference (docs/05 - a derived, best-effort grouping). Cloud resources rarely
  * declare their environment in one place, so we look, in priority order:
  *   1. an explicit tag/attribute (`environment`/`env`/`stage`/`tier`),
  *   2. failing that, a name/URN convention (`prod-`, `staging-`, `dev-`, …).

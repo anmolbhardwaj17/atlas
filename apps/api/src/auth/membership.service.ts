@@ -12,8 +12,8 @@ export interface OrgMembership {
 
 /**
  * Resolves which orgs the authenticated user belongs to (docs/12 §4 step 2). Uses
- * the `app_user_memberships` SECURITY DEFINER function (migration 0003) — the only
- * sanctioned cross-org read, keyed strictly to one user — so the atlas_app pool
+ * the `app_user_memberships` SECURITY DEFINER function (migration 0003) - the only
+ * sanctioned cross-org read, keyed strictly to one user - so the atlas_app pool
  * stays non-bypass. Returns active memberships only; empty for a brand-new user.
  */
 @Injectable()

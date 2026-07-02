@@ -38,7 +38,7 @@ export class ApiException extends HttpException {
   }
 
   static notFound(message = "Not found."): ApiException {
-    // Cross-tenant ids resolve here too — existence is never leaked (R8/US-12, docs/08 §11).
+    // Cross-tenant ids resolve here too - existence is never leaked (R8/US-12, docs/08 §11).
     return new ApiException(HttpStatus.NOT_FOUND, "not_found", message);
   }
   static insufficientRole(message: string): ApiException {

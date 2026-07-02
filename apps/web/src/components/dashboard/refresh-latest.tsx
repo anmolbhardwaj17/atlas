@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { listConnections, triggerSync } from "@/lib/browser-api";
 
 /**
- * "Fetch latest" — manually re-sync every connected source, then refresh the dashboard.
+ * "Fetch latest" - manually re-sync every connected source, then refresh the dashboard.
  * Rendered for Admin/Owner only (sync is an Admin action server-side). Syncs run in the
  * background (minutes, docs/06), so we don't block: we report that new data lands
  * progressively and refresh the view to reflect status/freshness. A source whose dev
@@ -36,7 +36,7 @@ export function RefreshLatest({ orgId }: { orgId: string }) {
       if (started > 0) {
         setMsg({
           tone: "ok",
-          text: `Refreshing ${started} source${started > 1 ? "s" : ""} — new data appears in a few minutes.`,
+          text: `Refreshing ${started} source${started > 1 ? "s" : ""} - new data appears in a few minutes.`,
         });
         // Reflect status/freshness now; the sync itself continues in the background.
         setTimeout(() => router.refresh(), 1500);

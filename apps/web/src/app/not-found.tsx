@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 /**
- * App-router 404 (docs/09 §7 — a designed state, never a raw error). Standalone (outside
+ * App-router 404 (docs/09 §7 - a designed state, never a raw error). Standalone (outside
  * the app shell), so a centered hero matching the login/landing aesthetic. Also makes
  * Next generate the 404 via the app router instead of the pages-router fallback.
  */

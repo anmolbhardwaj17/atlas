@@ -11,7 +11,7 @@ import { LLM_PROVIDER } from "./tokens";
 
 /**
  * AI (docs/10). Wires the NestJS-free `@atlas/ai` engine: a RetrievalPort adapter over the
- * G2 read layer + an LLM provider (Claude when ANTHROPIC_API_KEY is set, else a dev mock —
+ * G2 read layer + an LLM provider (Claude when ANTHROPIC_API_KEY is set, else a dev mock -
  * so retrieval/grounding/citation still work in dev/CI without a key). GraphService +
  * search provider are provided locally (both are stateless over the global PG pool).
  */

@@ -3,7 +3,7 @@ import { CodeBlock } from "@/components/ui/code-block";
 import { Steps, Step } from "@/components/patterns/steps";
 
 /**
- * Provider connect instructions (docs/13 §4–5), shared by the onboarding wizard and the
+ * Provider connect instructions (docs/13 §4-5), shared by the onboarding wizard and the
  * Integrations hub so the guidance stays in one place. Read-only scopes only, by design.
  */
 
@@ -45,7 +45,7 @@ export function AwsSetup() {
         <Step title="Create a read-only IAM role">
           In the AWS console, create an IAM role that Atlas assumes. It grants only{" "}
           <InlineCode>Describe*</InlineCode> / <InlineCode>List*</InlineCode> /{" "}
-          <InlineCode>Get*</InlineCode> — no mutating actions exist in the policy, so Atlas is
+          <InlineCode>Get*</InlineCode> - no mutating actions exist in the policy, so Atlas is
           read-only by construction.
         </Step>
         <Step title="Trust Atlas with your External ID">
@@ -54,7 +54,7 @@ export function AwsSetup() {
           External ID when you add the connection.
         </Step>
         <Step title="Paste the Role ARN and verify">
-          Back in Atlas, paste the role ARN. Atlas runs a live permission probe — a missing
+          Back in Atlas, paste the role ARN. Atlas runs a live permission probe - a missing
           permission is reported as a fixable gap, never a silent failure.
         </Step>
       </Steps>
@@ -73,7 +73,7 @@ export function GithubSetup() {
         </Step>
         <Step title="Atlas indexes structure, not code">
           From each repo Atlas reads CODEOWNERS (ownership), dependency manifests (packages), and
-          workflows (deploy targets) — enough to connect code to the infrastructure it ships to,
+          workflows (deploy targets) - enough to connect code to the infrastructure it ships to,
           without storing your source.
         </Step>
         <Step title="Confirm the installation">
@@ -90,7 +90,7 @@ az ad sp create-for-rbac \\
   --name "atlas-reader" \\
   --role "Reader" \\
   --scopes "/subscriptions/<SUBSCRIPTION_ID>"
-# Reader is a built-in role — describe/list only, no mutating actions.`;
+# Reader is a built-in role - describe/list only, no mutating actions.`;
 
 export function AzureSetup() {
   return (
@@ -98,7 +98,7 @@ export function AzureSetup() {
       <Steps>
         <Step title="Create a read-only service principal">
           In Microsoft Entra ID, register an app / service principal for Atlas and assign it the
-          built-in <InlineCode>Reader</InlineCode> role at the subscription scope — read-only by
+          built-in <InlineCode>Reader</InlineCode> role at the subscription scope - read-only by
           construction.
         </Step>
         <Step title="Grant Atlas the tenant, client &amp; subscription IDs">
@@ -128,7 +128,7 @@ export function GcpSetup() {
       <Steps>
         <Step title="Create a read-only service account">
           In the GCP project, create a service account for Atlas and grant it{" "}
-          <InlineCode>roles/viewer</InlineCode> — a project-wide read-only role.
+          <InlineCode>roles/viewer</InlineCode> - a project-wide read-only role.
         </Step>
         <Step title="Connect it (key or workload identity)">
           Atlas authenticates as the service account (a key, or keyless workload-identity
@@ -161,11 +161,11 @@ export function BitbucketSetup() {
         </Step>
         <Step title="Give Atlas your email + the token">
           Atlas authenticates with your Atlassian <strong>account email</strong> as the username and
-          the <strong>API token</strong> as the password (read-only — it never gets write access).
+          the <strong>API token</strong> as the password (read-only - it never gets write access).
         </Step>
         <Step title="Atlas indexes structure, not code">
           From each repo Atlas reads ownership, dependency manifests, and Pipelines (deploy targets)
-          — enough to connect code to the infrastructure it ships to, without storing your source.
+          - enough to connect code to the infrastructure it ships to, without storing your source.
         </Step>
       </Steps>
       <CodeBlock label="Required read scopes" code={BITBUCKET_SCOPES} />

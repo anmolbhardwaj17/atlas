@@ -7,7 +7,7 @@ import { CloudIcon } from "@/components/cloud-icon";
 import { kindIcon, kindStyle, kindShort, KIND_LOGO } from "@/lib/kind-visual";
 import type { MapNode } from "@/lib/map-types";
 
-/** Certainty accent (docs/09 §3.2) — solid = observed fact, ring = inferred, mono only. */
+/** Certainty accent (docs/09 §3.2) - solid = observed fact, ring = inferred, mono only. */
 const CERTAINTY: Record<string, string> = {
   observed: "bg-foreground",
   "inferred-high": "bg-foreground/50",

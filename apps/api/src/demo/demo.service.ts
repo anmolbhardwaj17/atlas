@@ -7,7 +7,7 @@ import { ApiException } from "../common/errors";
 
 /**
  * Demo data (P1.2, docs/09 §8). Backs the onboarding "Load sample data" button so a new
- * org reaches a populated, explorable, AI-answerable graph in seconds — TTFI < 30 min
+ * org reaches a populated, explorable, AI-answerable graph in seconds - TTFI < 30 min
  * without any cloud credentials (NFR-22). Seeds the "Shopyard" estate via the REAL
  * pipeline (`@atlas/ingest` `seedDemoData` → MockConnector → runStagedSync → runInference),
  * so it exercises the same code paths a live sync would and stays constraint-correct.
@@ -23,7 +23,7 @@ export class DemoService {
   constructor(@Inject(PG_POOL) private readonly db: Db) {}
 
   async seed(orgId: string): Promise<DemoSeedResult> {
-    // Guard: refuse if a real (non-demo) source is connected — sample data is for empty orgs.
+    // Guard: refuse if a real (non-demo) source is connected - sample data is for empty orgs.
     // Demo connections are the legacy single name or the per-provider "… (demo)" connections.
     const realSources = await withOrgScope(this.db, orgId, async (c) => {
       const { rows } = await c.query<{ n: number }>(

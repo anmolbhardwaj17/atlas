@@ -40,7 +40,7 @@ const nodeTypes = { resource: ResourceNode, envLane: EnvLaneNode };
  * framed into environment lanes (prod / staging / … / code). Read-first: pan, zoom, filter
  * by environment, click a resource to inspect it and jump to its detail / blast-radius.
  * Certainty is legible per node (solid = observed, faded/ring = inferred) and per edge
- * (solid = observed, dashed = inferred) — P3/P4, mono theme.
+ * (solid = observed, dashed = inferred) - P3/P4, mono theme.
  */
 const GROUP_MODES: { mode: GroupMode; label: string }[] = [
   { mode: "environment", label: "Environment" },
@@ -48,14 +48,14 @@ const GROUP_MODES: { mode: GroupMode; label: string }[] = [
   { mode: "account", label: "Account" },
 ];
 
-/** One-line explainer of what the lanes mean in the current grouping — updates on selection. */
+/** One-line explainer of what the lanes mean in the current grouping - updates on selection. */
 const GROUP_HELP: Record<GroupMode, string> = {
   environment:
-    "Lanes are environments — where each resource runs (Production, Staging, or shared code).",
+    "Lanes are environments - where each resource runs (Production, Staging, or shared code).",
   cloud:
-    "Lanes are cloud providers — who runs each resource (AWS, Azure, GCP) plus your code hosts.",
+    "Lanes are cloud providers - who runs each resource (AWS, Azure, GCP) plus your code hosts.",
   account:
-    "Lanes are accounts — the billing & isolation boundary each resource lives in (an AWS account, Azure subscription, or GCP project).",
+    "Lanes are accounts - the billing & isolation boundary each resource lives in (an AWS account, Azure subscription, or GCP project).",
 };
 
 export function InfraMap({ data }: { data: MapData }) {
@@ -74,7 +74,7 @@ export function InfraMap({ data }: { data: MapData }) {
 
   // Containment hierarchy for drill-down collapse: a node "contains" the nodes it points to
   // via structural edges (project→repo→pipeline/PR; PR→author). `connectedIds` = nodes with
-  // any edge — so isolated workspace members (no PRs) are dropped from the map entirely.
+  // any edge - so isolated workspace members (no PRs) are dropped from the map entirely.
   const { childrenOf, connectedIds } = useMemo(() => {
     const children = new Map<string, string[]>();
     const connected = new Set<string>();
@@ -91,7 +91,7 @@ export function InfraMap({ data }: { data: MapData }) {
   }, [data.edges]);
 
   // Default = collapsed to top-level containers. Until the user toggles, the effective set is
-  // "all containers folded" — computed during render so the FIRST paint is already collapsed
+  // "all containers folded" - computed during render so the FIRST paint is already collapsed
   // (no 130-node → 27-node flash that made fitView zoom to nothing).
   const userToggled = useRef(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -116,7 +116,7 @@ export function InfraMap({ data }: { data: MapData }) {
     [childrenOf],
   );
 
-  // How many connections cross a cloud / account boundary — the enterprise headline.
+  // How many connections cross a cloud / account boundary - the enterprise headline.
   const cross = useMemo(() => {
     const byId = new Map(data.nodes.map((n) => [n.id, n]));
     let crossCloud = 0;
@@ -147,7 +147,7 @@ export function InfraMap({ data }: { data: MapData }) {
         <div>
           <h1 className="text-xl font-semibold">Infrastructure map</h1>
           <p className="text-sm text-muted-foreground">
-            Your estate as one graph — across accounts and clouds. Group it, then click a resource
+            Your estate as one graph - across accounts and clouds. Group it, then click a resource
             to inspect it.
           </p>
         </div>
@@ -172,7 +172,7 @@ export function InfraMap({ data }: { data: MapData }) {
         </div>
       </div>
 
-      {/* Contextual explainer — what the lanes mean in the current grouping. */}
+      {/* Contextual explainer - what the lanes mean in the current grouping. */}
       <p className="flex items-center gap-1.5 rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
         <Info className="size-3.5 shrink-0" />
         {GROUP_HELP[groupMode]}
@@ -208,7 +208,7 @@ export function InfraMap({ data }: { data: MapData }) {
 
       {data.truncated && (
         <p className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-          Showing the most recent {data.nodes.length} resources — the graph is larger. Filter to
+          Showing the most recent {data.nodes.length} resources - the graph is larger. Filter to
           focus.
         </p>
       )}
@@ -236,7 +236,7 @@ export function InfraMap({ data }: { data: MapData }) {
 
 /**
  * The canvas itself. Nodes/edges are driven through `useNodesState`/`useEdgesState` so React
- * Flow receives dimension measurements (required in v12 — a static `nodes` prop leaves nodes
+ * Flow receives dimension measurements (required in v12 - a static `nodes` prop leaves nodes
  * `visibility:hidden` and never fits). We re-layout + re-fit whenever the data or the env
  * filter changes.
  */
@@ -309,7 +309,7 @@ function Flow({
   useEffect(() => {
     setNodes(layout.nodes);
     setEdges(layout.edges);
-    // Fit AFTER the store has the new nodes and painted them (double rAF) — fitting in the same
+    // Fit AFTER the store has the new nodes and painted them (double rAF) - fitting in the same
     // tick reads the stale store and zooms to the wrong box (the blank first paint).
     let raf2 = 0;
     const raf1 = requestAnimationFrame(() => {
@@ -407,7 +407,7 @@ function GroupChip({
     );
   }
 
-  // Account (neutral): a neutral *tint* when active — same weight as the coloured lanes, so all
+  // Account (neutral): a neutral *tint* when active - same weight as the coloured lanes, so all
   // chip types read as "selected" consistently (not a heavy solid fill that stood out).
   return (
     <button
@@ -482,7 +482,7 @@ function DetailPanel({
         if (nb) out.push({ verb: relVerb(e.type, nb.kind, false), name: shortName(nb) });
       }
     }
-    // Put ownership/authorship first — it's usually what you're looking for.
+    // Put ownership/authorship first - it's usually what you're looking for.
     out.sort((a, b) => (a.verb.includes("by") ? -1 : 0) - (b.verb.includes("by") ? -1 : 0));
     return out;
   }, [data, node]);

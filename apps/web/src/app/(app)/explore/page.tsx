@@ -44,7 +44,7 @@ export default async function ExplorePage({
   const nodes = res.body?.data ?? [];
   const page = res.body?.page;
   // Explore shows the estate (repos, services, resources), not activity (PRs) or people
-  // (users/teams) — keep those out of the kind filter too, matching listNodes' default-hide.
+  // (users/teams) - keep those out of the kind filter too, matching listNodes' default-hide.
   const HIDDEN = [".pullrequest", ".pull_request", ".user", ".team", ".pipeline", ".workflow"];
   const kinds = (overview.body?.data?.byKind ?? [])
     .map((k) => k.kind)
@@ -63,7 +63,7 @@ export default async function ExplorePage({
       <div>
         <h1 className="text-xl font-semibold">Explore</h1>
         <p className="text-sm text-muted-foreground">
-          Your infrastructure and code — repositories, services, datastores, and cloud resources.
+          Your infrastructure and code - repositories, services, datastores, and cloud resources.
           Filter by kind, status, or confidence; click through for provenance and connections.
         </p>
       </div>

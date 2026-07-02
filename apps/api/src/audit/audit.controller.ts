@@ -8,9 +8,9 @@ import { AuditService, type AuditEventView } from "../core/audit.service";
 import type { AuthedRequest } from "../auth/auth.types";
 
 /**
- * Audit log read API (docs/13 §8 — "trust is visible"). `GET /audit` returns the org's
+ * Audit log read API (docs/13 §8 - "trust is visible"). `GET /audit` returns the org's
  * recent security-relevant events, newest first. Org selected via `X-Atlas-Org`
- * (TenantScopeGuard); **Admin+** only (the log names actors + actions — sensitive).
+ * (TenantScopeGuard); **Admin+** only (the log names actors + actions - sensitive).
  */
 @Controller("audit")
 @UseGuards(AuthGuard, TenantScopeGuard, RolesGuard)

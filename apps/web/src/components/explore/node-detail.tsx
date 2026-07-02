@@ -47,24 +47,24 @@ export function NodeDetailView({ node, edges }: { node: NodeDetail; edges: EdgeD
           <CardBody>
             {node.provenance ? (
               <dl className="space-y-1.5 text-sm">
-                <Row label="Source" value={node.provenance.source ?? "—"} />
+                <Row label="Source" value={node.provenance.source ?? "-"} />
                 <Row
                   label="Observed"
                   value={
                     node.provenance.observedAt
                       ? new Date(node.provenance.observedAt).toLocaleString()
-                      : "—"
+                      : "-"
                   }
                 />
                 <Row label="Confidence" value={node.provenance.confidence ?? node.confidence} />
-                <Row label="Sync run" value={node.provenance.syncRunId ?? "—"} mono />
+                <Row label="Sync run" value={node.provenance.syncRunId ?? "-"} mono />
                 {node.provenance.rawSnapshotRef && (
                   <Row label="Raw snapshot" value={node.provenance.rawSnapshotRef} mono />
                 )}
               </dl>
             ) : (
               <p className="text-sm text-muted-foreground">
-                No provenance recorded — this node was derived, not directly observed.
+                No provenance recorded - this node was derived, not directly observed.
               </p>
             )}
           </CardBody>

@@ -14,7 +14,7 @@ export function CloudIcon({ name, className }: { name: string; className?: strin
       className={className}
       role="img"
       aria-hidden="true"
-      // Trusted, build-time icon data (CC0 logos) — not user input.
+      // Trusted, build-time icon data (CC0 logos) - not user input.
       dangerouslySetInnerHTML={{ __html: ic.body }}
     />
   );

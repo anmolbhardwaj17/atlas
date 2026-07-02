@@ -10,7 +10,7 @@ import { cn } from "@/lib/cn";
 import type { NodeDto } from "@/lib/graph-types";
 
 /** The real logo for a row: a specific service logo (aws-ec2…) if we have one, else the
- *  provider's brand logo (bitbucket / github / azure / gcp / aws) — the Kind column already
+ *  provider's brand logo (bitbucket / github / azure / gcp / aws) - the Kind column already
  *  names the exact type, so the brand mark reads cleanly here. */
 function rowLogo(kind: string): string | null {
   const svc = KIND_LOGO[kind];
@@ -19,7 +19,7 @@ function rowLogo(kind: string): string | null {
   return brand && hasCloudIcon(brand) ? brand : null;
 }
 
-/** The nodes table (docs/09 §5.3) — kind · name · region, with certainty + freshness legible per row. */
+/** The nodes table (docs/09 §5.3) - kind · name · region, with certainty + freshness legible per row. */
 export function NodesList({ nodes }: { nodes: NodeDto[] }) {
   if (nodes.length === 0) {
     return (
@@ -75,7 +75,7 @@ export function NodesList({ nodes }: { nodes: NodeDto[] }) {
                     {n.kind}
                   </Badge>
                 </td>
-                <td className="px-4 py-2.5 text-muted-foreground">{n.region ?? "—"}</td>
+                <td className="px-4 py-2.5 text-muted-foreground">{n.region ?? "-"}</td>
                 <td className="px-4 py-2.5">
                   <ConfidenceBadge tier={n.confidence} />
                 </td>

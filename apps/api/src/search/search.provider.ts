@@ -3,7 +3,7 @@ import { z } from "zod";
 /**
  * Search abstraction (docs/11 DD-1 impl note). One hybrid engine serves both the human
  * (⌘K) and the AI (entity resolution, docs/10 §4.2). The Postgres impl ships first;
- * the OpenSearch (BM25 + kNN) driver is a swap-in at deploy — same contract.
+ * the OpenSearch (BM25 + kNN) driver is a swap-in at deploy - same contract.
  */
 export const SEARCH_PROVIDER = Symbol("ATLAS_SEARCH_PROVIDER");
 

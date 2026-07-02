@@ -35,7 +35,7 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, {
     rawBody: true,
   });
-  // The web app calls the API from the browser (Bearer token) — allow its origin (docs/08 §3).
+  // The web app calls the API from the browser (Bearer token) - allow its origin (docs/08 §3).
   app.enableCors({
     origin: env.WEB_ORIGIN,
     methods: ["GET", "POST", "PATCH", "DELETE"],

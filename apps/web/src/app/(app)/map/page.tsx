@@ -23,7 +23,7 @@ export default async function MapPage() {
         <div>
           <h1 className="text-xl font-semibold">Infrastructure map</h1>
           <p className="text-sm text-muted-foreground">
-            Your estate as a graph — resources, how they connect, grouped by environment.
+            Your estate as a graph - resources, how they connect, grouped by environment.
           </p>
         </div>
         <EmptyState

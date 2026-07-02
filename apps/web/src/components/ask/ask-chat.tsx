@@ -31,7 +31,7 @@ const EXAMPLES = [
 /**
  * Ask AI (docs/09 §5.5, docs/10). Retrieval-first, streamed. Every answer is cited and
  * confidence-tiered; a zero-grounding answer renders as an explicit "I don't know"
- * (US-11) — one of the four designed states (empty · streaming · answered · honest-absence).
+ * (US-11) - one of the four designed states (empty · streaming · answered · honest-absence).
  */
 export function AskChat({
   orgId,
@@ -93,7 +93,7 @@ export function AskChat({
     }
   }
 
-  // Prefilled question (e.g. arriving from the dashboard "Ask Atlas" hero) — ask once.
+  // Prefilled question (e.g. arriving from the dashboard "Ask Atlas" hero) - ask once.
   useEffect(() => {
     if (!autoAsked.current && initialQuestion && initialQuestion.trim()) {
       autoAsked.current = true;
@@ -257,7 +257,7 @@ function EmptyState({ onPick }: { onPick: (q: string) => void }) {
       </div>
       <p className="max-w-lg text-sm text-muted-foreground">
         Ask about your infrastructure, dependencies, and deploys. Every answer is grounded in your
-        graph — cited, confidence-tiered, and honest when it doesn’t know.
+        graph - cited, confidence-tiered, and honest when it doesn’t know.
       </p>
       <div className="mt-5 flex flex-col gap-2">
         {EXAMPLES.map((q) => (

@@ -127,7 +127,7 @@ export class OrgService {
       }
       // BR-MEM-2 / BR-ORG-1: never demote the last Owner.
       if (target.role === "Owner" && newRole !== "Owner" && (await ownerCount(c)) <= 1) {
-        throw ApiException.invalidState("Cannot demote the last Owner — promote another first.");
+        throw ApiException.invalidState("Cannot demote the last Owner - promote another first.");
       }
       const { rows } = await c.query<{
         user_id: string;

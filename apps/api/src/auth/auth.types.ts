@@ -1,6 +1,6 @@
 /**
  * Identity Atlas trusts after verifying a Supabase access JWT (docs/12 §2.2, §3).
- * Derived from the token claims — never from request input. `userId` is the
+ * Derived from the token claims - never from request input. `userId` is the
  * Supabase auth uid and equals `public.users.id` (the mirror, docs/12 §2.2).
  */
 export interface AuthClaims {
@@ -27,7 +27,7 @@ export interface OrgContext {
 export interface AuthedRequest {
   headers: Record<string, string | string[] | undefined>;
   params?: Record<string, string | undefined>;
-  /** Fastify correlation id (from `x-request-id` or generated) — for audit provenance. */
+  /** Fastify correlation id (from `x-request-id` or generated) - for audit provenance. */
   id?: string;
   auth?: AuthClaims;
   org?: OrgContext;

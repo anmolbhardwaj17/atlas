@@ -12,8 +12,8 @@ import type { AuthedRequest } from "./auth.types";
  * Resolves the active org + the caller's role LIVE per request (docs/12 §4) and
  * attaches it as `req.org`. Source of the org id: the `orgId` route param (for
  * `/orgs/{orgId}/...`) or the `X-Atlas-Org` header. Membership is verified via the
- * SECURITY DEFINER resolver — no active membership means:
- *   - path id  → 404 not_found  (never leak another tenant's existence — R8/US-12)
+ * SECURITY DEFINER resolver - no active membership means:
+ *   - path id  → 404 not_found  (never leak another tenant's existence - R8/US-12)
  *   - header   → 403 org_access_denied
  * Must run AFTER AuthGuard (needs `req.auth`).
  */
@@ -32,7 +32,7 @@ export class TenantScopeGuard implements CanActivate {
     const orgId = fromPath ?? fromHeader;
     if (!orgId) {
       throw ApiException.orgAccessDenied(
-        "No organization selected — use an /orgs/{orgId} route or set the X-Atlas-Org header.",
+        "No organization selected - use an /orgs/{orgId} route or set the X-Atlas-Org header.",
       );
     }
 

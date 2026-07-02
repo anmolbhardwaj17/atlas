@@ -6,7 +6,7 @@ import { Search } from "lucide-react";
 import { searchNodes, type SearchHit } from "@/lib/browser-api";
 
 /**
- * ⌘K command palette (docs/09 §5.5). One search seam for the human — the same hybrid
+ * ⌘K command palette (docs/09 §5.5). One search seam for the human - the same hybrid
  * engine the AI uses for entity resolution. Keyboard-first (⌘K / Ctrl-K to open,
  * ↑↓ to move, ↵ to open, Esc to close); results link into Explore.
  */

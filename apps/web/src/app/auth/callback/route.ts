@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 
 /** OAuth redirect target (docs/12 §2.1). Supabase sends the user here with a
  *  `code`; we exchange it for a session (sets httpOnly cookies) and land on the
- *  app. The PKCE/state/nonce handling lives inside Supabase — not here. */
+ *  app. The PKCE/state/nonce handling lives inside Supabase - not here. */
 export async function GET(request: Request): Promise<NextResponse> {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");

@@ -194,7 +194,7 @@ suite("F2.8 ConnectionService.disconnect purge", () => {
     expect(await countIn("raw_snapshots", orgId)).toBe(0);
   });
 
-  it("is org-scoped — another org's graph is untouched", async () => {
+  it("is org-scoped - another org's graph is untouched", async () => {
     await svc.disconnect(orgId, connId);
     expect(await countIn("nodes", otherOrgId)).toBe(1);
   });

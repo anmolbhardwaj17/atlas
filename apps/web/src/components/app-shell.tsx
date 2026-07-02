@@ -6,7 +6,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { Separator } from "@/components/ui/separator";
 
 /**
- * AppShell (docs/09 §5.1) — the authenticated wrapper: a collapsible shadcn sidebar
+ * AppShell (docs/09 §5.1) - the authenticated wrapper: a collapsible shadcn sidebar
  * (nav + org + user) beside a bounded content area with a sticky header (sidebar toggle
  * + ⌘K search). Server component; the interactive pieces are client islands.
  */

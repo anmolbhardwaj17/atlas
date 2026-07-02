@@ -20,7 +20,7 @@ export function RoleBadge({ role, className }: { role: string; className?: strin
   );
 }
 
-/** Finding severity as a filled tag (High / Medium / Low) — dashboard "needs attention". */
+/** Finding severity as a filled tag (High / Medium / Low) - dashboard "needs attention". */
 export function SeverityBadge({ severity, className }: { severity: string; className?: string }) {
   const m = severityMeta(severity);
   const Icon = m.icon;

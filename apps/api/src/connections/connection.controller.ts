@@ -16,10 +16,10 @@ import {
 } from "./dto";
 
 /**
- * Connections (docs/08 §8). "Data" endpoints — org is selected via the `X-Atlas-Org`
+ * Connections (docs/08 §8). "Data" endpoints - org is selected via the `X-Atlas-Org`
  * header (TenantScopeGuard), not the path. RBAC: read = Member+, mutate = Admin+.
  * `:verify` is realized as `/verify` (Fastify can't route a colon-action on a path
- * with no dynamic suffix conflict — same convention as invitations).
+ * with no dynamic suffix conflict - same convention as invitations).
  */
 @Controller("connections")
 @UseGuards(AuthGuard, TenantScopeGuard, RolesGuard)

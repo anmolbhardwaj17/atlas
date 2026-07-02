@@ -3,13 +3,13 @@
 @tailwind utilities;
 
 /*
- * Atlas design system (docs/09 §3). shadcn/ui token model — light theme by default,
+ * Atlas design system (docs/09 §3). shadcn/ui token model - light theme by default,
  * with the **certainty visual language** layered on top as first-class semantic colors
  * (observed / inferred-high / inferred-low / stale) so trust is always legible.
  */
 @layer base {
   :root {
-    /* Monochrome (black & white). Neutral grayscale — no hue anywhere. */
+    /* Monochrome (black & white). Neutral grayscale - no hue anywhere. */
     --background: 0 0% 100%;
     --foreground: 0 0% 9%;
 
@@ -40,7 +40,7 @@
 
     --radius: 0.6rem;
 
-    /* Certainty tiers — grayscale gradient (darker = more trusted) so the certainty
+    /* Certainty tiers - grayscale gradient (darker = more trusted) so the certainty
        language survives in black & white (weight, not hue). */
     --observed: 0 0% 9%;
     --inferred-high: 0 0% 38%;
