@@ -14,6 +14,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { StatusBadge } from "@/components/certainty";
+import { CloudIcon } from "@/components/cloud-icon";
 import { AwsSetup, GithubSetup } from "@/components/integrations/provider-setup";
 import { PROVIDERS, type ProviderMeta } from "@/components/integrations/providers";
 import { createConnection, deleteConnection, type ConnectionSummary } from "@/lib/browser-api";
@@ -88,13 +89,12 @@ function ProviderTile({
   onConnect: () => void;
 }) {
   const comingSoon = provider.status === "coming-soon";
-  const Icon = provider.icon;
   return (
     <Card className={cn(comingSoon && "opacity-70")}>
       <CardContent className="flex h-full flex-col gap-3 p-5">
         <div className="flex items-start gap-3">
-          <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-muted text-foreground">
-            <Icon className="size-5" />
+          <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-border bg-background">
+            <CloudIcon name={provider.logo} className="size-6" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">

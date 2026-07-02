@@ -24,7 +24,27 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { CloudIcon } from "@/components/cloud-icon";
 import type { MapNode } from "@/lib/map-types";
+
+/** Kinds that have a real provider logo (else we fall back to the colored lucide glyph). */
+const LOGO: Record<string, string> = {
+  "aws.ec2.instance": "aws-ec2",
+  "aws.lambda.function": "aws-lambda",
+  "aws.ecs.cluster": "aws-ecs",
+  "aws.ecs.service": "aws-ecs",
+  "aws.ecs.taskdef": "aws-ecs",
+  "aws.rds.instance": "aws-rds",
+  "aws.dynamodb.table": "aws-dynamodb",
+  "aws.elasticache.cluster": "aws-elasticache",
+  "aws.s3.bucket": "aws-s3",
+  "aws.vpc": "aws-vpc",
+  "aws.elb": "aws-elb",
+  "aws.route53.record": "aws-route53",
+  "aws.apigateway": "aws-api-gateway",
+  "aws.iam.role": "aws-iam",
+  "github.repository": "github",
+};
 
 const ICON: Record<string, LucideIcon> = {
   "aws.vpc": Network,
@@ -107,6 +127,7 @@ const CATEGORY_FALLBACK = "bg-muted text-muted-foreground";
 export function ResourceNode({ data, selected }: NodeProps) {
   const node = (data as { node: MapNode }).node;
   const Icon = ICON[node.kind] ?? Box;
+  const logo = LOGO[node.kind];
   const kindShort = node.kind.replace(/^aws\.|^github\.|^external\.|^atlas\./, "");
   const stale = node.status === "stale";
   const iconStyle = CATEGORY_STYLE[CATEGORY[node.kind] ?? ""] ?? CATEGORY_FALLBACK;
@@ -129,8 +150,13 @@ export function ResourceNode({ data, selected }: NodeProps) {
         position={Position.Left}
         className="!h-1.5 !w-1.5 !border-0 !bg-muted-foreground/40"
       />
-      <div className={cn("grid size-7 shrink-0 place-items-center rounded-md", iconStyle)}>
-        <Icon className="size-4" />
+      <div
+        className={cn(
+          "grid size-7 shrink-0 place-items-center rounded-md",
+          logo ? "bg-muted/60" : iconStyle,
+        )}
+      >
+        {logo ? <CloudIcon name={logo} className="size-[18px]" /> : <Icon className="size-4" />}
       </div>
       <div className="min-w-0 flex-1">
         <div className="truncate text-xs font-medium leading-tight">{node.name ?? kindShort}</div>

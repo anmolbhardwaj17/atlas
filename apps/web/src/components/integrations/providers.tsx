@@ -1,14 +1,3 @@
-import {
-  Cloud,
-  Github,
-  Server,
-  Boxes,
-  GitBranch,
-  Gitlab,
-  Activity,
-  type LucideIcon,
-} from "lucide-react";
-
 export type ProviderStatus = "available" | "coming-soon";
 
 export interface ProviderMeta {
@@ -18,13 +7,15 @@ export interface ProviderMeta {
   category: "Cloud" | "Code" | "Observability";
   status: ProviderStatus;
   blurb: string;
-  icon: LucideIcon;
+  /** Real brand logo key in CLOUD_ICONS (cloud-icons-data). */
+  logo: string;
 }
 
 /**
- * The integration catalog (docs/18 roadmap). AWS + GitHub are live (real connectors);
- * the rest are surfaced as "coming soon" so the roadmap is visible and the page reads as a
- * real hub. Adding a provider later = flip status + register a connector (docs/06 §3).
+ * The integration catalog (docs/18 roadmap). AWS + GitHub are live (real connectors); the
+ * rest are surfaced as "coming soon" so the roadmap is visible and the page reads as a real
+ * hub. Adding a provider later = flip status + register a connector (docs/06 §3). Tiles use
+ * the real provider brand logos.
  */
 export const PROVIDERS: ProviderMeta[] = [
   {
@@ -33,7 +24,7 @@ export const PROVIDERS: ProviderMeta[] = [
     category: "Cloud",
     status: "available",
     blurb: "EC2, ECS, Lambda, RDS, DynamoDB, VPC, IAM and more — via a read-only role.",
-    icon: Cloud,
+    logo: "aws",
   },
   {
     id: "github",
@@ -41,7 +32,7 @@ export const PROVIDERS: ProviderMeta[] = [
     category: "Code",
     status: "available",
     blurb: "Repositories, workflows, dependencies and ownership — via a read-only App.",
-    icon: Github,
+    logo: "github",
   },
   {
     id: "azure",
@@ -49,7 +40,7 @@ export const PROVIDERS: ProviderMeta[] = [
     category: "Cloud",
     status: "coming-soon",
     blurb: "VMs, AKS, App Service, and Azure SQL.",
-    icon: Server,
+    logo: "microsoft-azure",
   },
   {
     id: "gcp",
@@ -57,7 +48,7 @@ export const PROVIDERS: ProviderMeta[] = [
     category: "Cloud",
     status: "coming-soon",
     blurb: "Compute Engine, GKE, Cloud SQL, and Pub/Sub.",
-    icon: Boxes,
+    logo: "google-cloud",
   },
   {
     id: "bitbucket",
@@ -65,7 +56,7 @@ export const PROVIDERS: ProviderMeta[] = [
     category: "Code",
     status: "coming-soon",
     blurb: "Repositories and Pipelines (the connector abstraction is already proven).",
-    icon: GitBranch,
+    logo: "bitbucket",
   },
   {
     id: "gitlab",
@@ -73,7 +64,7 @@ export const PROVIDERS: ProviderMeta[] = [
     category: "Code",
     status: "coming-soon",
     blurb: "Projects, members, and CI/CD pipelines.",
-    icon: Gitlab,
+    logo: "gitlab",
   },
   {
     id: "datadog",
@@ -81,6 +72,6 @@ export const PROVIDERS: ProviderMeta[] = [
     category: "Observability",
     status: "coming-soon",
     blurb: "Monitors, dashboards, and the service map — richer runtime signal.",
-    icon: Activity,
+    logo: "datadog",
   },
 ];
