@@ -106,4 +106,23 @@ suite("P2 AuditService", () => {
     // A non-existent org violates the FK; record() must not throw (auditing can't break ops).
     await expect(audit.record(randomUUID(), { action: "org.create" })).resolves.toBeUndefined();
   });
+
+  it("list() returns events newest-first with the actor email joined, clamped by limit", async () => {
+    // A real user so the actor-email join resolves.
+    const userId = randomUUID();
+    await admin.query("INSERT INTO users (id, email) VALUES ($1,$2)", [userId, "amy@acme.test"]);
+
+    await audit.record(orgId, { action: "org.create", actorUserId: userId });
+    await audit.record(orgId, { action: "connection.verify", actorUserId: userId, targetId: "c1" });
+
+    const events = await audit.list(orgId);
+    expect(events.length).toBe(2);
+    // Newest first: connection.verify was recorded last.
+    expect(events[0]?.action).toBe("connection.verify");
+    expect(events[0]?.actor.email).toBe("amy@acme.test");
+    expect(events[1]?.action).toBe("org.create");
+
+    // Limit clamps the result set.
+    expect(await audit.list(orgId, 1)).toHaveLength(1);
+  });
 });

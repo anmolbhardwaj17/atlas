@@ -20,9 +20,14 @@ async function bootstrap(): Promise<void> {
     requestIdHeader: "x-request-id",
     genReqId: () => randomUUID(),
   });
-  // Echo the correlation id back so the client (and the browser Network tab) can quote it.
+  // Echo the correlation id back so the client (and the browser Network tab) can quote it,
+  // and set baseline security headers (docs/13). This is a JSON API (no HTML), so no CSP is
+  // needed; HSTS is applied at the TLS-terminating edge in deploy (docs/17).
   adapter.getInstance().addHook("onRequest", (req, reply, done) => {
     void reply.header("x-request-id", String(req.id));
+    void reply.header("x-content-type-options", "nosniff");
+    void reply.header("x-frame-options", "DENY");
+    void reply.header("referrer-policy", "no-referrer");
     done();
   });
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter);

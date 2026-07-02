@@ -8,6 +8,7 @@ import { GraphModule } from "./graph/graph.module";
 import { SearchModule } from "./search/search.module";
 import { AiModule } from "./ai/ai.module";
 import { DemoModule } from "./demo/demo.module";
+import { AuditModule } from "./audit/audit.module";
 import { HealthController } from "./health/health.controller";
 import { ResponseInterceptor } from "./common/response.interceptor";
 import { LoggingInterceptor } from "./common/logging.interceptor";
@@ -24,6 +25,7 @@ import { HttpExceptionFilter } from "./common/http-exception.filter";
     SearchModule,
     AiModule,
     DemoModule,
+    AuditModule,
   ],
   controllers: [HealthController],
   providers: [

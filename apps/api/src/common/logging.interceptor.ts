@@ -38,7 +38,7 @@ export class LoggingInterceptor implements NestInterceptor {
 
     const emit = (status: number, level: "info" | "error"): void => {
       const line = { level, msg: "request", ...base, status, durationMs: Date.now() - start };
-      // eslint-disable-next-line no-console -- structured access log to stdout by design
+      // Structured access log to stdout by design (collected by the platform in deploy).
       console.log(JSON.stringify(line));
     };
 
