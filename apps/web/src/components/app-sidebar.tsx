@@ -3,7 +3,15 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Boxes, Sparkles, Settings, ChevronsUpDown, LogOut } from "lucide-react";
+import {
+  LayoutDashboard,
+  Boxes,
+  Waypoints,
+  Sparkles,
+  Settings,
+  ChevronsUpDown,
+  LogOut,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   Sidebar,
@@ -33,6 +41,12 @@ const NAV = [
     label: "Dashboard",
     icon: LayoutDashboard,
     match: (p: string) => p === "/dashboard",
+  },
+  {
+    href: "/map",
+    label: "Map",
+    icon: Waypoints,
+    match: (p: string) => p.startsWith("/map"),
   },
   {
     href: "/explore",

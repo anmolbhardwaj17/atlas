@@ -5,6 +5,7 @@ import { OrgPanel } from "@/app/org-panel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/certainty";
 import { EmptyState } from "@/components/patterns/empty-state";
+import { AuditLog } from "@/components/settings/audit-log";
 
 export const dynamic = "force-dynamic";
 
@@ -84,6 +85,11 @@ export default async function SettingsPage() {
       </Card>
 
       <OrgPanel orgId={shell.orgId} />
+
+      {/* Activity log is Admin+ (names actors + actions); the API also enforces this. */}
+      {shell.role === "Owner" || shell.role === "Admin" ? (
+        <AuditLog orgId={shell.orgId} token={shell.token} />
+      ) : null}
     </div>
   );
 }
