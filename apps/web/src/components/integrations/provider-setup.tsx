@@ -143,25 +143,29 @@ export function GcpSetup() {
   );
 }
 
-const BITBUCKET_SCOPES = `account: read
-repository: read
-pullrequest: read
-pipeline: read`;
+const BITBUCKET_SCOPES = `read:account
+read:workspace:bitbucket
+read:repository:bitbucket
+read:pullrequest:bitbucket
+read:pipeline:bitbucket`;
 
 export function BitbucketSetup() {
   return (
     <div className="space-y-5">
       <Steps>
-        <Step title="Create a read-only App password">
-          In your Bitbucket workspace settings, create an App password for Atlas with only the{" "}
-          <InlineCode>read</InlineCode> scopes below (or install the Atlas OAuth app).
+        <Step title="Create a read-only API token with scopes">
+          In your Atlassian account → <strong>Security → API tokens</strong>, choose{" "}
+          <InlineCode>Create API token with scopes</InlineCode> (App passwords are deprecated),
+          select <strong>Bitbucket</strong>, and grant only the <InlineCode>read</InlineCode> scopes
+          below.
+        </Step>
+        <Step title="Give Atlas your email + the token">
+          Atlas authenticates with your Atlassian <strong>account email</strong> as the username and
+          the <strong>API token</strong> as the password (read-only — it never gets write access).
         </Step>
         <Step title="Atlas indexes structure, not code">
           From each repo Atlas reads ownership, dependency manifests, and Pipelines (deploy targets)
           — enough to connect code to the infrastructure it ships to, without storing your source.
-        </Step>
-        <Step title="Confirm the workspace">
-          Back in Atlas, confirm the workspace. The graph fills in as the first sync runs.
         </Step>
       </Steps>
       <CodeBlock label="Required read scopes" code={BITBUCKET_SCOPES} />
