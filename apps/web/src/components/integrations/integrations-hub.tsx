@@ -317,7 +317,12 @@ function ConnectSheet({
         {provider && (
           <>
             <SheetHeader>
-              <SheetTitle>Connect {provider.name}</SheetTitle>
+              <SheetTitle className="flex items-center gap-2.5">
+                <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-border bg-background">
+                  <CloudIcon name={provider.logo} className="size-5" />
+                </span>
+                Connect {provider.name}
+              </SheetTitle>
               <SheetDescription>
                 Follow the steps, then add the connection. Atlas requests read-only access only.
               </SheetDescription>
