@@ -12,7 +12,7 @@ import {
   RefreshCw,
   Map as MapIcon,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Onboarding } from "@/components/onboarding";
 import { AskLauncher } from "@/components/dashboard/ask-launcher";
 import { SeverityBadge } from "@/components/tags";
@@ -143,30 +143,26 @@ function TrustPulse({ trust, inv }: { trust: Summary["trust"]; inv: Summary["inv
 
 function NeedsAttention({ findings }: { findings: Finding[] }) {
   return (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle>Needs attention</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {findings.length === 0 ? (
-          <div className="flex items-center gap-3 rounded-md border border-border bg-muted/30 px-4 py-6 text-sm">
-            <CheckCircle2 className="size-5 text-success" />
-            <div>
-              <div className="font-medium">Nothing needs attention</div>
-              <div className="text-muted-foreground">
-                Your graph looks healthy — no risks, drift, or unhealthy sources right now.
-              </div>
+    <section>
+      <h2 className="mb-3 text-base font-semibold">Needs attention</h2>
+      {findings.length === 0 ? (
+        <div className="flex items-center gap-3 rounded-md border border-border bg-muted/30 px-4 py-6 text-sm">
+          <CheckCircle2 className="size-5 text-success" />
+          <div>
+            <div className="font-medium">Nothing needs attention</div>
+            <div className="text-muted-foreground">
+              Your graph looks healthy — no risks, drift, or unhealthy sources right now.
             </div>
           </div>
-        ) : (
-          <ul className="space-y-2">
-            {findings.map((f) => (
-              <FindingRow key={f.id} f={f} />
-            ))}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {findings.map((f) => (
+            <FindingRow key={f.id} f={f} />
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -196,22 +192,18 @@ function FindingRow({ f }: { f: Finding }) {
 
 function RecentActivity({ activity }: { activity: TimelineItem[] }) {
   return (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle>Recent activity</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {activity.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No recent changes.</p>
-        ) : (
-          <ul className="space-y-3">
-            {activity.map((a, i) => (
-              <ActivityRow key={i} a={a} />
-            ))}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
+    <section>
+      <h2 className="mb-3 text-base font-semibold">Recent activity</h2>
+      {activity.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No recent changes.</p>
+      ) : (
+        <ul className="space-y-3">
+          {activity.map((a, i) => (
+            <ActivityRow key={i} a={a} />
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
