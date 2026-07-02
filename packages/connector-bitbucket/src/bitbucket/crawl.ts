@@ -116,13 +116,21 @@ export async function* discoverRepo(
     // PRs not permitted — skip
   }
 
-  // Recently MERGED pull requests (shipped work → contribution history). Bounded to the most
-  // recent page per repo (single request, no pagination) so the graph doesn't fill with years
-  // of history — the current-state graph keeps a recent, useful slice.
+  // Recently MERGED pull requests (shipped work → contribution). Windowed to the last 90 days
+  // and bounded to one page per repo (single request, no pagination) so the current-state graph
+  // keeps a recent, useful slice rather than years of history.
   try {
+    const since = new Date(Date.now() - 90 * 86400 * 1000).toISOString();
     const res = await client.request<{ values?: Json[] }>(
       `/repositories/${workspace}/${repoSlug}/pullrequests`,
-      { params: { state: "MERGED", sort: "-updated_on", pagelen: 25 } },
+      {
+        params: {
+          state: "MERGED",
+          sort: "-updated_on",
+          pagelen: 25,
+          q: `updated_on >= "${since}"`,
+        },
+      },
     );
     for (const pr of res.data.values ?? []) {
       yield prRef(pr, repoSlug, scopeKey, ctx);

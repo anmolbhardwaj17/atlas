@@ -359,7 +359,7 @@ export class GraphService {
                  WHERE e.from_node_id = pr.id AND e.type = 'CONTAINS'
                    AND r.kind LIKE '%.repository')`,
         ),
-        // Top contributors by PRs raised (open + recently merged, once the connector crawls them).
+        // Top contributors by total PRs raised (open + merged).
         c.query<{ name: string | null; n: number }>(
           `SELECT u.name, count(*)::int AS n
              FROM edges e
@@ -368,13 +368,12 @@ export class GraphService {
             WHERE e.type = 'OWNED_BY' AND e.status = 'active'
             GROUP BY u.name ORDER BY n DESC, u.name LIMIT 5`,
         ),
-        // Most active repositories by open PRs (where in-flight work sits).
+        // Most active repositories by total PR activity (open + merged) — how much PR churn.
         c.query<{ name: string | null; n: number }>(
           `SELECT r.name, count(*)::int AS n
              FROM edges e
              JOIN nodes r ON r.id = e.from_node_id AND r.kind LIKE '%.repository'
              JOIN nodes pr ON pr.id = e.to_node_id AND pr.kind LIKE '%.pullrequest'
-             AND (pr.attributes->>'state' IS NULL OR pr.attributes->>'state' = 'OPEN')
             WHERE e.type = 'CONTAINS' AND e.status = 'active'
             GROUP BY r.name ORDER BY n DESC, r.name LIMIT 5`,
         ),

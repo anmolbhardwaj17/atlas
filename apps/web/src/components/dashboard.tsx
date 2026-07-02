@@ -329,17 +329,20 @@ function Insights({ insights }: { insights: Summary["insights"] }) {
 
   return (
     <div>
-      <h2 className="mb-3 text-base font-semibold">Insights</h2>
+      <h2 className="text-base font-semibold">Insights</h2>
+      <p className="mb-3 text-xs text-muted-foreground">
+        From pull requests — all open ones, plus those merged in the last 90 days.
+      </p>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Leaderboard
           title="Top contributors"
-          subtitle="by PRs raised"
+          subtitle="PRs raised"
           items={topContributors}
           href="/explore?kind=bitbucket.user"
         />
         <Leaderboard
           title="Most active repos"
-          subtitle="by open PRs"
+          subtitle="PR activity"
           items={mostActiveRepos}
           href="/explore?kind=bitbucket.repository"
         />
