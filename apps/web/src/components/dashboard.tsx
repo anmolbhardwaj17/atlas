@@ -8,11 +8,10 @@ import {
   CheckCircle2,
   ChevronRight,
   GitBranch,
+  GitPullRequest,
   FolderGit2,
   Play,
   Users,
-  Plus,
-  RefreshCw,
   Map as MapIcon,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,20 +31,12 @@ interface Finding {
   href: string | null;
   count?: number;
 }
-interface TimelineEntity {
-  id?: string;
-  urn?: string;
-  kind?: string;
-  name?: string | null;
-  type?: string;
-  from?: { urn: string; name: string | null };
-  to?: { urn: string; name: string | null };
-}
-interface TimelineItem {
-  changeKind: "node" | "edge";
-  changeType: "created" | "updated";
+interface ActivityItem {
+  id: string | null;
+  category: "pull_request" | "repository" | "pipeline" | "resource";
+  title: string;
+  subtitle: string | null;
   at: string;
-  entity: TimelineEntity;
 }
 interface Summary {
   inventory: {
@@ -65,7 +56,7 @@ interface Summary {
   trust: { sources: number; healthySources: number; lastSyncAt: string | null };
   crossBoundary: { crossCloud: number; crossAccount: number };
   findings: Finding[];
-  activity: TimelineItem[];
+  activity: ActivityItem[];
   insights: {
     topContributors: Array<{ name: string; count: number }>;
     mostActiveRepos: Array<{ name: string; count: number }>;
@@ -192,26 +183,28 @@ function TrustPulse({ trust, inv }: { trust: Summary["trust"]; inv: Summary["inv
 
 function NeedsAttention({ findings }: { findings: Finding[] }) {
   return (
-    <section>
-      <h2 className="mb-3 text-base font-semibold">Needs attention</h2>
-      {findings.length === 0 ? (
-        <div className="flex items-center gap-3 rounded-md border border-border bg-muted/30 px-4 py-6 text-sm">
-          <CheckCircle2 className="size-5 text-success" />
-          <div>
-            <div className="font-medium">Nothing needs attention</div>
-            <div className="text-muted-foreground">
-              Your graph looks healthy — no risks, drift, or unhealthy sources right now.
+    <Card>
+      <CardContent className="p-5">
+        <h2 className="mb-3 text-base font-semibold">Needs attention</h2>
+        {findings.length === 0 ? (
+          <div className="flex items-center gap-3 rounded-md border border-border bg-muted/30 px-4 py-6 text-sm">
+            <CheckCircle2 className="size-5 text-success" />
+            <div>
+              <div className="font-medium">Nothing needs attention</div>
+              <div className="text-muted-foreground">
+                Your graph looks healthy — no risks, drift, or unhealthy sources right now.
+              </div>
             </div>
           </div>
-        </div>
-      ) : (
-        <ul className="space-y-2">
-          {findings.map((f) => (
-            <FindingRow key={f.id} f={f} />
-          ))}
-        </ul>
-      )}
-    </section>
+        ) : (
+          <ul className="space-y-2">
+            {findings.map((f) => (
+              <FindingRow key={f.id} f={f} />
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -239,7 +232,7 @@ function FindingRow({ f }: { f: Finding }) {
   return <li>{f.href ? <Link href={f.href}>{body}</Link> : body}</li>;
 }
 
-function RecentActivity({ activity }: { activity: TimelineItem[] }) {
+function RecentActivity({ activity }: { activity: ActivityItem[] }) {
   return (
     <Card>
       <CardContent className="p-5">
@@ -258,21 +251,26 @@ function RecentActivity({ activity }: { activity: TimelineItem[] }) {
   );
 }
 
-function ActivityRow({ a }: { a: TimelineItem }) {
-  const isEdge = a.changeKind === "edge";
-  const Icon = isEdge ? GitBranch : a.changeType === "created" ? Plus : RefreshCw;
-  const label = isEdge ? "New connection" : a.changeType === "created" ? "New resource" : "Updated";
-  const name = isEdge
-    ? `${short(a.entity.from?.name ?? a.entity.from?.urn)} → ${short(a.entity.to?.name ?? a.entity.to?.urn)}`
-    : (a.entity.name ?? shortKind(a.entity.kind));
-  const href = !isEdge && a.entity.id ? `/explore/${a.entity.id}` : null;
+const ACTIVITY_META = {
+  pull_request: { Icon: GitPullRequest, label: "Pull request" },
+  repository: { Icon: FolderGit2, label: "New repository" },
+  pipeline: { Icon: Play, label: "New pipeline" },
+  resource: { Icon: Boxes, label: "New resource" },
+} as const;
+
+function ActivityRow({ a }: { a: ActivityItem }) {
+  const { Icon, label } = ACTIVITY_META[a.category];
+  const href = a.id ? `/explore/${a.id}` : null;
 
   const inner = (
     <div className="flex items-start gap-2.5 text-sm">
       <Icon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1">
-        <span className="text-muted-foreground">{label}: </span>
-        <span className="font-medium">{name}</span>
+        <div>
+          <span className="text-muted-foreground">{label}: </span>
+          <span className="font-medium">{a.title}</span>
+        </div>
+        {a.subtitle ? <div className="text-xs text-muted-foreground">{a.subtitle}</div> : null}
       </div>
       <span className="shrink-0 text-xs text-muted-foreground">{timeAgo(a.at)}</span>
     </div>
@@ -461,16 +459,6 @@ function Stat({
   );
 }
 
-function short(s: string | null | undefined): string {
-  if (!s) return "?";
-  const tail = s.includes(":") ? (s.split(":").pop() ?? s) : s;
-  return tail.length > 22 ? `${tail.slice(0, 21)}…` : tail;
-}
-function shortKind(kind: string | undefined): string {
-  return kind
-    ? kind.replace(/^aws\.|^github\.|^external\.|^atlas\.|^azure\.|^gcp\.|^bitbucket\./, "")
-    : "resource";
-}
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);

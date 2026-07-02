@@ -89,13 +89,30 @@ export interface DashboardSummary {
   };
   crossBoundary: { crossCloud: number; crossAccount: number };
   findings: Finding[];
-  activity: TimelineItem[];
+  activity: ActivityItem[];
   /** Positive, informational code stats (leaderboards) — present when a code host is connected. */
   insights: {
     topContributors: Array<{ name: string; count: number }>;
     mostActiveRepos: Array<{ name: string; count: number }>;
     pipelineCoverage: { withPipeline: number; total: number };
   };
+}
+
+/**
+ * A human-readable dashboard activity item (docs/09 §5.2). Unlike the raw graph change-feed
+ * (`timeline()`), this is node-centric and collapses a PR into ONE "opened in <repo> by <author>"
+ * line — it never surfaces internal containment/ownership edges (which read as meaningless
+ * "X → Y" rows to a user).
+ */
+export interface ActivityItem {
+  /** Node id for deep-linking to /explore/:id (always present for a real node). */
+  id: string | null;
+  category: "pull_request" | "repository" | "pipeline" | "resource";
+  /** The thing itself, e.g. "#42 ROAR-4427" or a resource name. */
+  title: string;
+  /** Context line, e.g. "gpt-idor-service · Sahil Saleem" (PRs) — null when there's none. */
+  subtitle: string | null;
+  at: string;
 }
 
 /** A directed connection between two map nodes (light — just what the canvas draws). */
@@ -536,9 +553,9 @@ export class GraphService {
     const rank = { high: 0, medium: 1, low: 2 };
     findings.sort((a, b) => rank[a.severity] - rank[b.severity]);
 
-    // ── Recent activity (change feed, all-members readable) ────────────────────
+    // ── Recent activity (human, PR-centric — not raw graph edges) ──────────────
     const since = new Date(now - 30 * 24 * 60 * 60 * 1000);
-    const activity = (await this.timeline(orgId, { since, limit: 6 })).data;
+    const activity = await this.recentActivity(orgId, since, 6);
 
     const lastSyncAt = base.conns
       .map((c) => c.last_synced_at)
@@ -854,6 +871,74 @@ export class GraphService {
    * "What changed since" (docs/08 §10.3, US-5): new/updated nodes + new edges since a
    * timestamp, merged and ordered newest-first. `kinds` filters node changes.
    */
+  /**
+   * Human "recent activity" for the dashboard (docs/09 §5.2). Node-centric: a PR / repo /
+   * pipeline / resource *appearing* is the activity. A PR is enriched with its containing repo
+   * (CONTAINS) and author (OWNED_BY) so it reads "opened in <repo> by <author>", instead of the
+   * three cryptic graph events (PR node + two edges) a raw change-feed would emit. Users, teams
+   * and projects are excluded (structure, not activity), as are derived nodes (connection_id NULL).
+   */
+  private async recentActivity(orgId: string, since: Date, limit: number): Promise<ActivityItem[]> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      const { rows } = await c.query<{
+        id: string;
+        kind: string;
+        name: string | null;
+        author_name: string | null;
+        repo_name: string | null;
+        first_seen: Date;
+      }>(
+        `SELECT id, kind, name, author_name, repo_name, first_seen FROM (
+           SELECT DISTINCT ON (n.id)
+                  n.id, n.kind, n.name, n.first_seen,
+                  u.name AS author_name, r.name AS repo_name
+             FROM nodes n
+             LEFT JOIN edges eo ON eo.from_node_id = n.id AND eo.type = 'OWNED_BY'
+                                AND eo.status = 'active'
+             LEFT JOIN nodes u  ON u.id = eo.to_node_id
+                                AND (u.kind LIKE '%.user' OR u.kind LIKE '%.team')
+             LEFT JOIN edges ec ON ec.to_node_id = n.id AND ec.type = 'CONTAINS'
+                                AND ec.status = 'active'
+             LEFT JOIN nodes r  ON r.id = ec.from_node_id AND r.kind LIKE '%.repository'
+            WHERE n.status <> 'deleted'
+              AND n.connection_id IS NOT NULL
+              AND n.first_seen >= $1
+              AND n.kind NOT LIKE '%.user'
+              AND n.kind NOT LIKE '%.team'
+              AND n.kind NOT LIKE '%.project'
+            ORDER BY n.id
+         ) t
+         ORDER BY first_seen DESC
+         LIMIT $2`,
+        [since.toISOString(), limit],
+      );
+      return rows.map((n): ActivityItem => {
+        const isPr = n.kind.endsWith(".pullrequest");
+        const isRepo = n.kind.endsWith(".repository");
+        const isPipeline = n.kind.endsWith(".pipeline");
+        const category: ActivityItem["category"] = isPr
+          ? "pull_request"
+          : isRepo
+            ? "repository"
+            : isPipeline
+              ? "pipeline"
+              : "resource";
+        const subtitle = isPr
+          ? [n.repo_name, n.author_name].filter(Boolean).join(" · ") || null
+          : isPipeline
+            ? n.repo_name
+            : null;
+        return {
+          id: n.id,
+          category,
+          title: n.name ?? n.kind,
+          subtitle,
+          at: n.first_seen.toISOString(),
+        };
+      });
+    });
+  }
+
   async timeline(orgId: string, q: TimelineQuery): Promise<{ data: TimelineItem[] }> {
     const since = q.since.toISOString();
     const kinds = q.kinds
