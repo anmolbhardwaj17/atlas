@@ -57,7 +57,7 @@ const FRESH: Record<string, { label: string; className: string }> = {
 export function FreshnessTag({ status }: { status: string }) {
   const f = FRESH[status] ?? { label: "unknown", className: NEUTRAL };
   return (
-    <Badge variant="outline" className={f.className}>
+    <Badge variant="outline" className={cn("capitalize", f.className)}>
       {f.label}
     </Badge>
   );
@@ -86,7 +86,7 @@ const STATUS: Record<string, { label: string; className: string }> = {
 export function StatusBadge({ status }: { status: string }) {
   const s = STATUS[status] ?? { label: status, className: NEUTRAL };
   return (
-    <Badge variant="outline" className={s.className}>
+    <Badge variant="outline" className={cn("capitalize", s.className)}>
       <span className="mr-1 inline-block size-1.5 rounded-full bg-current opacity-80" />
       {s.label}
     </Badge>
