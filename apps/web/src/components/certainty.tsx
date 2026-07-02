@@ -2,40 +2,35 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
 
 /**
- * The certainty visual language (docs/09 §3.2, FE-1). Observed vs inferred-high vs
- * inferred-low are visually distinct everywhere so trust is always legible (P3/P4/trust
- * is visible). These are the reusable primitives the graph/detail/AI surfaces all use.
+ * The certainty visual language (docs/09 §3.2, FE-1) + semantic status, built strictly on the
+ * official shadcn `Badge` variants — observed = the solid `default` badge, inferred-high = the
+ * `secondary` badge, inferred-low / no-data = the `outline` badge. No custom radius or borders;
+ * the only additions are the sanctioned semantic status colors (docs/09 §3.3).
  */
-interface Style {
+type Variant = "default" | "secondary" | "destructive" | "outline";
+
+interface TierStyle {
   label: string;
-  className: string;
+  variant: Variant;
+  className?: string;
 }
-const TIER: Record<string, Style> = {
-  // Monochrome hierarchy: solid = fact, dark outline = strong, gray = weak, dashed = none.
-  observed: { label: "observed", className: "border-transparent bg-foreground text-background" },
-  "inferred-high": {
-    label: "inferred · high",
-    className: "border-foreground/50 text-foreground",
-  },
-  "inferred-low": {
-    label: "inferred · low",
-    className: "border-muted-foreground/40 text-muted-foreground",
-  },
-  insufficient: {
-    label: "no data",
-    className: "border-dashed border-muted-foreground/40 text-muted-foreground",
-  },
-};
-const TIER_FALLBACK: Style = {
+const TIER_FALLBACK: TierStyle = {
   label: "no data",
-  className: "border-dashed border-muted-foreground/40 text-muted-foreground",
+  variant: "outline",
+  className: "text-muted-foreground",
+};
+const TIER: Record<string, TierStyle> = {
+  observed: { label: "observed", variant: "default" },
+  "inferred-high": { label: "inferred · high", variant: "secondary" },
+  "inferred-low": { label: "inferred · low", variant: "outline" },
+  insufficient: TIER_FALLBACK,
 };
 
 export function ConfidenceBadge({ tier, evidence }: { tier: string; evidence?: string }) {
   const t = TIER[tier] ?? TIER_FALLBACK;
   return (
     <Badge
-      variant="outline"
+      variant={t.variant}
       className={t.className}
       title={evidence ? `${t.label} — ${evidence}` : t.label}
     >
@@ -44,18 +39,20 @@ export function ConfidenceBadge({ tier, evidence }: { tier: string; evidence?: s
   );
 }
 
-const FRESH: Record<string, Style> = {
-  active: { label: "fresh", className: "border-success/30 bg-success/10 text-success" },
-  stale: { label: "stale", className: "border-warning/30 bg-warning/10 text-warning" },
-  deleted: { label: "removed", className: "border-danger/30 bg-danger/10 text-danger" },
-};
-const FRESH_FALLBACK: Style = {
-  label: "unknown",
-  className: "border-dashed border-muted-foreground/40 text-muted-foreground",
+/** Semantic status color, applied on top of the official `outline` badge (shape unchanged). */
+const SUCCESS = "border-success/30 bg-success/10 text-success";
+const WARNING = "border-warning/30 bg-warning/10 text-warning";
+const DANGER = "border-danger/30 bg-danger/10 text-danger";
+const NEUTRAL = "border-muted-foreground/30 bg-muted text-muted-foreground";
+
+const FRESH: Record<string, { label: string; className: string }> = {
+  active: { label: "fresh", className: SUCCESS },
+  stale: { label: "stale", className: WARNING },
+  deleted: { label: "removed", className: DANGER },
 };
 
 export function FreshnessTag({ status }: { status: string }) {
-  const f = FRESH[status] ?? FRESH_FALLBACK;
+  const f = FRESH[status] ?? { label: "unknown", className: NEUTRAL };
   return (
     <Badge variant="outline" className={f.className}>
       {f.label}
@@ -67,33 +64,24 @@ export function FreshnessTag({ status }: { status: string }) {
  * Semantic status badge (docs/09 §3.3) — the one place hue is used in the mono UI:
  * connected/healthy → green, pending/in-progress → amber, error → red, inactive → gray.
  */
-const STATUS: Record<string, Style> = {
-  connected: { label: "connected", className: "border-success/30 bg-success/10 text-success" },
-  succeeded: { label: "succeeded", className: "border-success/30 bg-success/10 text-success" },
-  active: { label: "active", className: "border-success/30 bg-success/10 text-success" },
-  pending: { label: "pending", className: "border-warning/30 bg-warning/10 text-warning" },
-  verifying: { label: "verifying", className: "border-warning/30 bg-warning/10 text-warning" },
-  queued: { label: "queued", className: "border-warning/30 bg-warning/10 text-warning" },
-  running: { label: "running", className: "border-warning/30 bg-warning/10 text-warning" },
-  degraded: { label: "degraded", className: "border-warning/40 bg-warning/10 text-warning" },
-  partial: { label: "partial", className: "border-warning/40 bg-warning/10 text-warning" },
-  error: { label: "error", className: "border-danger/30 bg-danger/10 text-danger" },
-  failed: { label: "failed", className: "border-danger/30 bg-danger/10 text-danger" },
-  disconnected: {
-    label: "disconnected",
-    className: "border-muted-foreground/30 bg-muted text-muted-foreground",
-  },
-  cancelled: {
-    label: "cancelled",
-    className: "border-muted-foreground/30 bg-muted text-muted-foreground",
-  },
+const STATUS: Record<string, { label: string; className: string }> = {
+  connected: { label: "connected", className: SUCCESS },
+  succeeded: { label: "succeeded", className: SUCCESS },
+  active: { label: "active", className: SUCCESS },
+  pending: { label: "pending", className: WARNING },
+  verifying: { label: "verifying", className: WARNING },
+  queued: { label: "queued", className: WARNING },
+  running: { label: "running", className: WARNING },
+  degraded: { label: "degraded", className: WARNING },
+  partial: { label: "partial", className: WARNING },
+  error: { label: "error", className: DANGER },
+  failed: { label: "failed", className: DANGER },
+  disconnected: { label: "disconnected", className: NEUTRAL },
+  cancelled: { label: "cancelled", className: NEUTRAL },
 };
 
 export function StatusBadge({ status }: { status: string }) {
-  const s = STATUS[status] ?? {
-    label: status,
-    className: "border-muted-foreground/30 bg-muted text-muted-foreground",
-  };
+  const s = STATUS[status] ?? { label: status, className: NEUTRAL };
   return (
     <Badge variant="outline" className={s.className}>
       <span className="mr-1 inline-block size-1.5 rounded-full bg-current opacity-80" />
