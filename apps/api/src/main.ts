@@ -30,7 +30,11 @@ async function bootstrap(): Promise<void> {
     void reply.header("referrer-policy", "no-referrer");
     done();
   });
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter);
+  // rawBody: keep the exact request bytes on `req.rawBody` so the GitHub webhook can verify
+  // its HMAC signature over what was actually sent (a re-serialized JSON body wouldn't match).
+  const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, {
+    rawBody: true,
+  });
   // The web app calls the API from the browser (Bearer token) — allow its origin (docs/08 §3).
   app.enableCors({
     origin: env.WEB_ORIGIN,

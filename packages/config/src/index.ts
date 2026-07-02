@@ -38,6 +38,11 @@ export const EnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: optionalString,
   SUPABASE_JWT_SECRET: optionalString,
 
+  // GitHub App webhook secret (docs/07 §5, docs/13 §5). App-level (one per App), used to
+  // HMAC-verify inbound webhooks. Optional: if unset, the webhook endpoint rejects all
+  // deliveries (fail-closed) — periodic reconcile still heals the graph (DD-2).
+  GITHUB_WEBHOOK_SECRET: optionalString,
+
   // Browser origin allowed to call the API (CORS). The web app calls the API
   // client-side (Bearer token), so this must list the web origin. Default = local web.
   WEB_ORIGIN: z.string().url().default("http://localhost:4291"),

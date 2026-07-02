@@ -9,6 +9,7 @@ import { SearchModule } from "./search/search.module";
 import { AiModule } from "./ai/ai.module";
 import { DemoModule } from "./demo/demo.module";
 import { AuditModule } from "./audit/audit.module";
+import { WebhookModule } from "./webhooks/webhook.module";
 import { HealthController } from "./health/health.controller";
 import { ResponseInterceptor } from "./common/response.interceptor";
 import { LoggingInterceptor } from "./common/logging.interceptor";
@@ -26,6 +27,7 @@ import { HttpExceptionFilter } from "./common/http-exception.filter";
     AiModule,
     DemoModule,
     AuditModule,
+    WebhookModule,
   ],
   controllers: [HealthController],
   providers: [
