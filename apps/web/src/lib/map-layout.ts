@@ -77,6 +77,9 @@ export function buildLayout(mapNodes: MapNode[], mapEdges: MapEdge[]): LayoutRes
       data: { label: ENV_LABEL[env] ?? env, count: laneNodes.length },
       draggable: false,
       selectable: false,
+      // Explicit dimensions so React Flow renders immediately (no measure-then-reveal).
+      width: laneW,
+      height: laneH,
       style: { width: laneW, height: laneH, zIndex: 0 },
     });
 
@@ -91,6 +94,8 @@ export function buildLayout(mapNodes: MapNode[], mapEdges: MapEdge[]): LayoutRes
         },
         data: { node: n },
         draggable: false,
+        width: NODE_W,
+        height: NODE_H,
         style: { zIndex: 1 },
       });
     }

@@ -1,9 +1,19 @@
 "use client";
 
 import "@xyflow/react/dist/style.css";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ReactFlow, Background, Controls, MiniMap, type NodeMouseHandler } from "@xyflow/react";
+import {
+  ReactFlow,
+  ReactFlowProvider,
+  Background,
+  Controls,
+  MiniMap,
+  useNodesState,
+  useEdgesState,
+  useReactFlow,
+  type NodeMouseHandler,
+} from "@xyflow/react";
 import { X } from "lucide-react";
 import { buildLayout } from "@/lib/map-layout";
 import { ENV_ORDER, ENV_LABEL, type MapData, type MapNode } from "@/lib/map-types";
@@ -28,21 +38,7 @@ export function InfraMap({ data }: { data: MapData }) {
 
   const [active, setActive] = useState<Set<string>>(() => new Set(present));
   const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  const { nodes, edges } = useMemo(() => {
-    const visibleNodes = data.nodes.filter((n) =>
-      active.has(isEnv(n.environment) ? n.environment : "unknown"),
-    );
-    const ids = new Set(visibleNodes.map((n) => n.id));
-    const visibleEdges = data.edges.filter((e) => ids.has(e.from) && ids.has(e.to));
-    return buildLayout(visibleNodes, visibleEdges);
-  }, [data, active]);
-
   const selected = selectedId ? (data.nodes.find((n) => n.id === selectedId) ?? null) : null;
-
-  const onNodeClick: NodeMouseHandler = (_evt, node) => {
-    setSelectedId(node.type === "resource" ? node.id : null);
-  };
 
   function toggleEnv(env: string) {
     setActive((prev) => {
@@ -93,31 +89,76 @@ export function InfraMap({ data }: { data: MapData }) {
       )}
 
       <div className="relative h-[calc(100dvh-14rem)] min-h-[480px] overflow-hidden rounded-xl border border-border bg-background">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          onNodeClick={onNodeClick}
-          onPaneClick={() => setSelectedId(null)}
-          nodesDraggable={false}
-          nodesConnectable={false}
-          fitView
-          minZoom={0.15}
-          proOptions={{ hideAttribution: false }}
-        >
-          <Background gap={20} className="!bg-background" color="hsl(var(--border))" />
-          <Controls showInteractive={false} className="!shadow-sm" />
-          <MiniMap
-            pannable
-            zoomable
-            className="!bg-muted"
-            nodeColor="hsl(var(--muted-foreground))"
-          />
-        </ReactFlow>
-
+        <ReactFlowProvider>
+          <Flow data={data} active={active} onSelect={setSelectedId} />
+        </ReactFlowProvider>
         {selected && <DetailPanel node={selected} onClose={() => setSelectedId(null)} />}
       </div>
     </div>
+  );
+}
+
+/**
+ * The canvas itself. Nodes/edges are driven through `useNodesState`/`useEdgesState` so React
+ * Flow receives dimension measurements (required in v12 — a static `nodes` prop leaves nodes
+ * `visibility:hidden` and never fits). We re-layout + re-fit whenever the data or the env
+ * filter changes.
+ */
+function Flow({
+  data,
+  active,
+  onSelect,
+}: {
+  data: MapData;
+  active: Set<string>;
+  onSelect: (id: string | null) => void;
+}) {
+  const layout = useMemo(() => {
+    const visibleNodes = data.nodes.filter((n) =>
+      active.has(isEnv(n.environment) ? n.environment : "unknown"),
+    );
+    const ids = new Set(visibleNodes.map((n) => n.id));
+    const visibleEdges = data.edges.filter((e) => ids.has(e.from) && ids.has(e.to));
+    return buildLayout(visibleNodes, visibleEdges);
+  }, [data, active]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(layout.nodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(layout.edges);
+  const { fitView } = useReactFlow();
+
+  useEffect(() => {
+    setNodes(layout.nodes);
+    setEdges(layout.edges);
+    // Fit after the new nodes are in the store + painted (filter changes re-fit too).
+    const t = setTimeout(() => void fitView({ padding: 0.15, duration: 300 }), 160);
+    return () => clearTimeout(t);
+  }, [layout, setNodes, setEdges, fitView]);
+
+  const onNodeClick: NodeMouseHandler = (_evt, node) => {
+    onSelect(node.type === "resource" ? node.id : null);
+  };
+
+  return (
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      onNodesChange={onNodesChange}
+      onEdgesChange={onEdgesChange}
+      nodeTypes={nodeTypes}
+      onNodeClick={onNodeClick}
+      onPaneClick={() => onSelect(null)}
+      onInit={(inst) => void inst.fitView({ padding: 0.15 })}
+      nodesDraggable={false}
+      nodesConnectable={false}
+      elementsSelectable
+      fitView
+      minZoom={0.1}
+      proOptions={{ hideAttribution: false }}
+    >
+      <Background gap={20} color="hsl(var(--border))" />
+      <Controls showInteractive={false} />
+      <MiniMap pannable zoomable nodeColor="hsl(var(--muted-foreground))" />
+    </ReactFlow>
   );
 }
 
