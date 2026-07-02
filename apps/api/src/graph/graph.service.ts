@@ -52,6 +52,39 @@ export interface EdgeDto {
   to: { id: string; urn: string; kind: string; name: string | null };
 }
 
+/** A graph-derived thing worth a consumer's attention — cited, precision-first (P3/P4). */
+export interface Finding {
+  id: string;
+  severity: "high" | "medium" | "low";
+  category: string;
+  title: string;
+  detail: string;
+  /** Click-through to the evidence (a node, edge, filtered list, or settings). */
+  href: string | null;
+  count?: number;
+}
+
+/** Consumer-facing dashboard summary (docs/09 §5.2): inventory, trust, findings, activity. */
+export interface DashboardSummary {
+  inventory: {
+    resources: number;
+    relationships: number;
+    services: number;
+    datastores: number;
+    environments: number;
+    clouds: number;
+    accounts: number;
+  };
+  trust: {
+    sources: number;
+    healthySources: number;
+    lastSyncAt: string | null;
+  };
+  crossBoundary: { crossCloud: number; crossAccount: number };
+  findings: Finding[];
+  activity: TimelineItem[];
+}
+
 /** A directed connection between two map nodes (light — just what the canvas draws). */
 export interface GraphEdgeLite {
   id: string;
@@ -196,6 +229,216 @@ export class GraphService {
         lastSyncAt: lastSync.rows[0]?.ts?.toISOString() ?? null,
       };
     });
+  }
+
+  /**
+   * Consumer dashboard summary (docs/09 §5.2). Answers a regular user's real questions —
+   * *what do I have, is it trustworthy, what needs attention, what changed* — from the graph
+   * itself, not from graph internals. Findings are precision-first + cited (P3/P4): each is a
+   * fact the graph proves, with a click-through to its evidence.
+   */
+  async summary(orgId: string): Promise<DashboardSummary> {
+    const impact = [...IMPACT_EDGE_TYPES];
+    const base = await withOrgScope(this.db, orgId, async (c) => {
+      const [cats, meta, edgeCount, conns, cross, blast, stale] = await Promise.all([
+        c.query<{ category: string; n: number }>(
+          `SELECT nk.category, count(*)::int AS n
+             FROM nodes nd JOIN node_kinds nk ON nk.kind = nd.kind
+            WHERE nd.status <> 'deleted' GROUP BY nk.category`,
+        ),
+        // Minimal columns for env inference + distinct clouds/accounts (bounded).
+        c.query<{
+          name: string | null;
+          urn: string;
+          provider: string;
+          account_ref: string | null;
+          tags: Record<string, unknown>;
+          attributes: Record<string, unknown>;
+        }>(
+          `SELECT name, urn, provider, account_ref, tags, attributes
+             FROM nodes WHERE status <> 'deleted' LIMIT 5000`,
+        ),
+        c.query<{ n: number }>("SELECT count(*)::int AS n FROM edges WHERE status = 'active'"),
+        c.query<{
+          id: string;
+          provider: string;
+          display_name: string;
+          status: string;
+          last_synced_at: Date | null;
+        }>(
+          `SELECT id, provider, display_name, status, last_synced_at
+             FROM connections WHERE deleted_at IS NULL ORDER BY created_at`,
+        ),
+        // Cross-boundary edges (cloud→cloud spanning a provider or account boundary).
+        c.query<{ pf: string; af: string | null; pt: string; at2: string | null }>(
+          `SELECT split_part(nf.urn, ':', 1) AS pf, nf.account_ref AS af,
+                  split_part(nt.urn, ':', 1) AS pt, nt.account_ref AS at2
+             FROM edges e
+             JOIN nodes nf ON nf.id = e.from_node_id
+             JOIN nodes nt ON nt.id = e.to_node_id
+            WHERE e.status = 'active'
+              AND split_part(nf.urn, ':', 1) IN ('aws','azure','gcp')
+              AND split_part(nt.urn, ':', 1) IN ('aws','azure','gcp')
+              AND (split_part(nf.urn, ':', 1) <> split_part(nt.urn, ':', 1)
+                   OR (nf.account_ref IS NOT NULL AND nt.account_ref IS NOT NULL
+                       AND nf.account_ref <> nt.account_ref))`,
+        ),
+        // Highest in-degree over impact edges — the biggest single point of failure.
+        c.query<{ id: string; name: string | null; kind: string; deg: number }>(
+          `SELECT e.to_node_id AS id, nd.name, nd.kind, count(*)::int AS deg
+             FROM edges e JOIN nodes nd ON nd.id = e.to_node_id
+            WHERE e.status = 'active' AND e.type = ANY($1)
+            GROUP BY e.to_node_id, nd.name, nd.kind
+            ORDER BY deg DESC LIMIT 1`,
+          [impact],
+        ),
+        c.query<{ n: number }>("SELECT count(*)::int AS n FROM nodes WHERE status = 'stale'"),
+      ]);
+
+      const catN = (names: string[]): number =>
+        cats.rows.filter((r) => names.includes(r.category)).reduce((s, r) => s + r.n, 0);
+
+      const envs = new Set<string>();
+      const clouds = new Set<string>();
+      const accounts = new Set<string>();
+      for (const m of meta.rows) {
+        envs.add(
+          inferEnvironment({ name: m.name, urn: m.urn, tags: m.tags, attributes: m.attributes }),
+        );
+        // Cloud is derived from the URN prefix (the canonical identity, robust vs the
+        // provider column) — consistent with the map's `providerOf`.
+        const cloud = m.urn.split(":")[0] ?? "";
+        if (["aws", "azure", "gcp"].includes(cloud)) clouds.add(cloud);
+        if (m.account_ref) accounts.add(m.account_ref);
+      }
+
+      let crossCloud = 0;
+      let crossAccount = 0;
+      for (const r of cross.rows) {
+        if (r.pf !== r.pt) crossCloud += 1;
+        else if (r.af && r.at2 && r.af !== r.at2) crossAccount += 1;
+      }
+
+      return {
+        resources: meta.rows.length,
+        relationships: edgeCount.rows[0]?.n ?? 0,
+        services: catN(["compute"]),
+        datastores: catN(["data", "storage"]),
+        environments: envs.size,
+        clouds: clouds.size,
+        accounts: accounts.size,
+        conns: conns.rows,
+        crossCloud,
+        crossAccount,
+        blast: blast.rows[0] ?? null,
+        stale: stale.rows[0]?.n ?? 0,
+      };
+    });
+
+    // ── Findings (severity-ranked, cited) ──────────────────────────────────────
+    const findings: Finding[] = [];
+    const STALE_MS = 7 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    for (const conn of base.conns) {
+      if (conn.status === "error") {
+        findings.push({
+          id: `source-error-${conn.id}`,
+          severity: "high",
+          category: "Source health",
+          title: `${conn.display_name} failed to sync`,
+          detail: "This source errored — its slice of your graph may be out of date.",
+          href: "/settings",
+        });
+      } else if (conn.status === "degraded") {
+        findings.push({
+          id: `source-degraded-${conn.id}`,
+          severity: "medium",
+          category: "Source health",
+          title: `${conn.display_name} is degraded`,
+          detail: "The last sync was partial — some resources may be missing.",
+          href: "/settings",
+        });
+      } else if (
+        conn.status === "connected" &&
+        conn.last_synced_at &&
+        now - conn.last_synced_at.getTime() > STALE_MS
+      ) {
+        findings.push({
+          id: `source-stale-${conn.id}`,
+          severity: "low",
+          category: "Source health",
+          title: `${conn.display_name} hasn't synced in a while`,
+          detail: "Its data is older than 7 days — the graph here may have drifted.",
+          href: "/settings",
+        });
+      }
+    }
+    const crossTotal = base.crossCloud + base.crossAccount;
+    if (crossTotal > 0) {
+      findings.push({
+        id: "cross-boundary",
+        severity: "medium",
+        category: "Cross-boundary",
+        title: `${crossTotal} connection${crossTotal > 1 ? "s" : ""} span a cloud or account boundary`,
+        detail:
+          "A resource depends on a datastore in another cloud or account — a wider blast radius (and likely egress cost).",
+        href: "/map",
+        count: crossTotal,
+      });
+    }
+    if (base.blast && base.blast.deg >= 3) {
+      findings.push({
+        id: `blast-${base.blast.id}`,
+        severity: base.blast.deg >= 6 ? "medium" : "low",
+        category: "Blast radius",
+        title: `${base.blast.name ?? base.blast.kind} is a single point of failure`,
+        detail: `${base.blast.deg} resources depend on it directly — if it fails, they're affected.`,
+        href: `/explore/${base.blast.id}/impact`,
+        count: base.blast.deg,
+      });
+    }
+    if (base.stale > 0) {
+      findings.push({
+        id: "stale-resources",
+        severity: "low",
+        category: "Freshness",
+        title: `${base.stale} resource${base.stale > 1 ? "s" : ""} went stale`,
+        detail: "Not seen in the latest sync — they may have been removed.",
+        href: "/explore?status=stale",
+        count: base.stale,
+      });
+    }
+    const rank = { high: 0, medium: 1, low: 2 };
+    findings.sort((a, b) => rank[a.severity] - rank[b.severity]);
+
+    // ── Recent activity (change feed, all-members readable) ────────────────────
+    const since = new Date(now - 30 * 24 * 60 * 60 * 1000);
+    const activity = (await this.timeline(orgId, { since, limit: 6 })).data;
+
+    const lastSyncAt = base.conns
+      .map((c) => c.last_synced_at)
+      .filter((d): d is Date => d != null)
+      .sort((a, b) => b.getTime() - a.getTime())[0];
+
+    return {
+      inventory: {
+        resources: base.resources,
+        relationships: base.relationships,
+        services: base.services,
+        datastores: base.datastores,
+        environments: base.environments,
+        clouds: base.clouds,
+        accounts: base.accounts,
+      },
+      trust: {
+        sources: base.conns.length,
+        healthySources: base.conns.filter((c) => c.status === "connected").length,
+        lastSyncAt: lastSyncAt?.toISOString() ?? null,
+      },
+      crossBoundary: { crossCloud: base.crossCloud, crossAccount: base.crossAccount },
+      findings,
+      activity,
+    };
   }
 
   /**

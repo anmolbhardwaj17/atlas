@@ -158,7 +158,7 @@ function ProviderTile({
               Coming soon
             </Button>
           ) : canManage ? (
-            <Button variant="outline" size="sm" className="w-full" onClick={onConnect}>
+            <Button size="sm" className="w-full" onClick={onConnect}>
               <Plus className="size-4" />
               {connections.length > 0 ? "Add another" : `Connect ${provider.name.split(" ")[0]}`}
             </Button>

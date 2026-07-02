@@ -1,27 +1,66 @@
 import Link from "next/link";
-import { Boxes, GitBranch, Sparkles, Plug } from "lucide-react";
+import {
+  Boxes,
+  Database,
+  Layers,
+  Cloud,
+  ArrowRight,
+  CheckCircle2,
+  ChevronRight,
+  GitBranch,
+  Plus,
+  RefreshCw,
+  Map as MapIcon,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FreshnessTag } from "@/components/certainty";
 import { Onboarding } from "@/components/onboarding";
+import { AskLauncher } from "@/components/dashboard/ask-launcher";
+import { SeverityBadge } from "@/components/tags";
+import { severityMeta } from "@/lib/taxonomy";
 import { apiGet, type ApiOk } from "@/lib/api";
 
-interface Overview {
-  nodeCount: number;
-  edgeCount: number;
-  byKind: Array<{ kind: string; n: number }>;
-  edgesByConfidence: { observed: number; inferredHigh: number; inferredLow: number };
-  connections: Array<{ id: string; provider: string; displayName: string; status: string }>;
-  lastSyncAt: string | null;
-}
-interface NodeDto {
+interface Finding {
   id: string;
-  kind: string;
-  name: string | null;
-  status: string;
+  severity: string;
+  category: string;
+  title: string;
+  detail: string;
+  href: string | null;
+  count?: number;
+}
+interface TimelineEntity {
+  id?: string;
+  urn?: string;
+  kind?: string;
+  name?: string | null;
+  type?: string;
+  from?: { urn: string; name: string | null };
+  to?: { urn: string; name: string | null };
+}
+interface TimelineItem {
+  changeKind: "node" | "edge";
+  changeType: "created" | "updated";
+  at: string;
+  entity: TimelineEntity;
+}
+interface Summary {
+  inventory: {
+    resources: number;
+    relationships: number;
+    services: number;
+    datastores: number;
+    environments: number;
+    clouds: number;
+    accounts: number;
+  };
+  trust: { sources: number; healthySources: number; lastSyncAt: string | null };
+  crossBoundary: { crossCloud: number; crossAccount: number };
+  findings: Finding[];
+  activity: TimelineItem[];
 }
 
-/** Dashboard (docs/09 §5.2) — the authenticated home: headline metrics, graph
- *  composition, certainty mix, and a recent-resources peek. */
+/** Consumer dashboard (docs/09 §5.2) — answers a user's real questions: what do I have, is it
+ *  trustworthy, what needs attention, what changed. Graph-derived + cited, not graph internals. */
 export async function Dashboard({
   orgId,
   token,
@@ -31,124 +70,216 @@ export async function Dashboard({
   token: string;
   role: string;
 }) {
-  const [ovRes, nodesRes] = await Promise.all([
-    apiGet<ApiOk<Overview>>("/overview", { token, orgId }),
-    apiGet<ApiOk<NodeDto[]>>("/nodes?limit=6", { token, orgId }),
-  ]);
-  const ov = ovRes.body?.data;
-  const recent = nodesRes.body?.data ?? [];
+  const res = await apiGet<ApiOk<Summary>>("/summary", { token, orgId });
+  const s = res.body?.data;
 
-  // Empty graph → the onboarding first-run experience (choose a source / load sample data).
-  if (!ov || ov.nodeCount === 0) {
+  // Empty graph → the onboarding first-run experience.
+  if (!s || s.inventory.resources === 0) {
     return <Onboarding orgId={orgId} canSeed={role === "Owner" || role === "Admin"} />;
   }
 
-  const inferred = ov.edgesByConfidence.inferredHigh + ov.edgesByConfidence.inferredLow;
-  const inferredPct = ov.edgeCount > 0 ? Math.round((inferred / ov.edgeCount) * 100) : 0;
-  const topKinds = ov.byKind.slice(0, 8);
-  const maxKind = topKinds[0]?.n ?? 1;
+  const { inventory: inv, trust } = s;
 
   return (
     <div className="space-y-6">
-      <Header lastSyncAt={ov.lastSyncAt} />
+      <div>
+        <h1 className="text-xl font-semibold">Overview</h1>
+        <TrustPulse trust={trust} inv={inv} />
+      </div>
 
+      <AskLauncher />
+
+      {/* At a glance — human inventory. */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat icon={<Boxes className="size-4" />} label="Resources" value={ov.nodeCount} />
-        <Stat icon={<GitBranch className="size-4" />} label="Relationships" value={ov.edgeCount} />
+        <Stat icon={<Boxes className="size-4" />} label="Services" value={inv.services} />
+        <Stat icon={<Database className="size-4" />} label="Datastores" value={inv.datastores} />
+        <Stat icon={<Layers className="size-4" />} label="Environments" value={inv.environments} />
         <Stat
-          icon={<Sparkles className="size-4" />}
-          label="Inferred edges"
-          value={`${inferred}`}
-          sub={`${inferredPct}% of graph`}
+          icon={<Cloud className="size-4" />}
+          label="Clouds"
+          value={inv.clouds}
+          sub={
+            inv.accounts > 0 ? `${inv.accounts} account${inv.accounts > 1 ? "s" : ""}` : undefined
+          }
         />
-        <Stat icon={<Plug className="size-4" />} label="Sources" value={ov.connections.length} />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Certainty mix</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <ConfBar
-              label="Observed"
-              n={ov.edgesByConfidence.observed}
-              total={ov.edgeCount}
-              shade="bg-foreground"
-            />
-            <ConfBar
-              label="Inferred · high"
-              n={ov.edgesByConfidence.inferredHigh}
-              total={ov.edgeCount}
-              shade="bg-foreground/60"
-            />
-            <ConfBar
-              label="Inferred · low"
-              n={ov.edgesByConfidence.inferredLow}
-              total={ov.edgeCount}
-              shade="bg-foreground/30"
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle>Composition</CardTitle>
-            <Link href="/explore" className="text-xs text-muted-foreground hover:text-foreground">
-              Explore all
-            </Link>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {topKinds.map((k) => (
-              <div key={k.kind} className="flex items-center gap-3 text-sm">
-                <span className="w-40 shrink-0 truncate text-muted-foreground">{k.kind}</span>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-foreground/70"
-                    style={{ width: `${Math.max(6, Math.round((k.n / maxKind) * 100))}%` }}
-                  />
-                </div>
-                <span className="w-6 shrink-0 text-right tabular-nums">{k.n}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <NeedsAttention findings={s.findings} />
+        </div>
+        <RecentActivity activity={s.activity} />
       </div>
 
-      <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0">
-          <CardTitle>Recent resources</CardTitle>
-          <Link href="/explore" className="text-xs text-muted-foreground hover:text-foreground">
-            View all
-          </Link>
-        </CardHeader>
-        <CardContent>
-          <ul className="divide-y divide-border">
-            {recent.map((n) => (
-              <li key={n.id} className="flex items-center justify-between py-2 text-sm">
-                <Link href={`/explore/${n.id}`} className="truncate hover:text-primary">
-                  <span className="text-muted-foreground">{n.kind}</span> ·{" "}
-                  {n.name ?? n.id.slice(0, 8)}
-                </Link>
-                <FreshnessTag status={n.status} />
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
+      <MapPreview inv={inv} cross={s.crossBoundary} />
     </div>
   );
 }
 
-function Header({ lastSyncAt }: { lastSyncAt?: string | null }) {
+function TrustPulse({ trust, inv }: { trust: Summary["trust"]; inv: Summary["inventory"] }) {
+  const allHealthy = trust.sources > 0 && trust.healthySources === trust.sources;
   return (
-    <div>
-      <h1 className="text-xl font-semibold">Overview</h1>
-      <p className="text-sm text-muted-foreground">
-        Your infrastructure and code as one continuously-updated, cited knowledge graph.
-        {lastSyncAt ? ` Last synced ${new Date(lastSyncAt).toLocaleString()}.` : ""}
-      </p>
+    <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+      <span>
+        {inv.resources} resources · {inv.relationships} relationships
+      </span>
+      <span aria-hidden>·</span>
+      <span className="inline-flex items-center gap-1.5">
+        <span
+          className={`size-1.5 rounded-full ${allHealthy ? "bg-success" : "bg-warning"}`}
+          aria-hidden
+        />
+        {trust.healthySources}/{trust.sources} sources healthy
+      </span>
+      {trust.lastSyncAt ? (
+        <>
+          <span aria-hidden>·</span>
+          <span>synced {timeAgo(trust.lastSyncAt)}</span>
+        </>
+      ) : null}
+    </p>
+  );
+}
+
+function NeedsAttention({ findings }: { findings: Finding[] }) {
+  return (
+    <Card className="h-full">
+      <CardHeader>
+        <CardTitle>Needs attention</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {findings.length === 0 ? (
+          <div className="flex items-center gap-3 rounded-md border border-border bg-muted/30 px-4 py-6 text-sm">
+            <CheckCircle2 className="size-5 text-success" />
+            <div>
+              <div className="font-medium">Nothing needs attention</div>
+              <div className="text-muted-foreground">
+                Your graph looks healthy — no risks, drift, or unhealthy sources right now.
+              </div>
+            </div>
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {findings.map((f) => (
+              <FindingRow key={f.id} f={f} />
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function FindingRow({ f }: { f: Finding }) {
+  const accent = severityMeta(f.severity).accent;
+  const body = (
+    <div className="flex items-start gap-3 rounded-md border border-border p-3 transition-colors hover:bg-muted/40">
+      <span
+        className={`mt-0.5 h-full w-0.5 shrink-0 self-stretch rounded-full ${accent}`}
+        aria-hidden
+      />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <SeverityBadge severity={f.severity} />
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">
+            {f.category}
+          </span>
+        </div>
+        <div className="mt-1.5 text-sm font-medium">{f.title}</div>
+        <div className="text-sm text-muted-foreground">{f.detail}</div>
+      </div>
+      {f.href ? <ChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" /> : null}
     </div>
+  );
+  return <li>{f.href ? <Link href={f.href}>{body}</Link> : body}</li>;
+}
+
+function RecentActivity({ activity }: { activity: TimelineItem[] }) {
+  return (
+    <Card className="h-full">
+      <CardHeader>
+        <CardTitle>Recent activity</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {activity.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No recent changes.</p>
+        ) : (
+          <ul className="space-y-3">
+            {activity.map((a, i) => (
+              <ActivityRow key={i} a={a} />
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ActivityRow({ a }: { a: TimelineItem }) {
+  const isEdge = a.changeKind === "edge";
+  const Icon = isEdge ? GitBranch : a.changeType === "created" ? Plus : RefreshCw;
+  const label = isEdge ? "New connection" : a.changeType === "created" ? "New resource" : "Updated";
+  const name = isEdge
+    ? `${short(a.entity.from?.name ?? a.entity.from?.urn)} → ${short(a.entity.to?.name ?? a.entity.to?.urn)}`
+    : (a.entity.name ?? shortKind(a.entity.kind));
+  const href = !isEdge && a.entity.id ? `/explore/${a.entity.id}` : null;
+
+  const inner = (
+    <div className="flex items-start gap-2.5 text-sm">
+      <Icon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+      <div className="min-w-0 flex-1">
+        <span className="text-muted-foreground">{label}: </span>
+        <span className="font-medium">{name}</span>
+      </div>
+      <span className="shrink-0 text-xs text-muted-foreground">{timeAgo(a.at)}</span>
+    </div>
+  );
+  return (
+    <li>
+      {href ? (
+        <Link href={href} className="block hover:opacity-80">
+          {inner}
+        </Link>
+      ) : (
+        inner
+      )}
+    </li>
+  );
+}
+
+function MapPreview({
+  inv,
+  cross,
+}: {
+  inv: Summary["inventory"];
+  cross: Summary["crossBoundary"];
+}) {
+  const crossTotal = cross.crossCloud + cross.crossAccount;
+  return (
+    <Card>
+      <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+        <div className="flex items-center gap-3">
+          <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-border bg-muted/40">
+            <MapIcon className="size-5" />
+          </div>
+          <div>
+            <div className="text-sm font-medium">Your infrastructure map</div>
+            <div className="text-sm text-muted-foreground">
+              {inv.resources} resources across {inv.clouds} cloud{inv.clouds === 1 ? "" : "s"}
+              {crossTotal > 0
+                ? ` · ${crossTotal} cross-boundary connection${crossTotal > 1 ? "s" : ""}`
+                : ""}
+            </div>
+          </div>
+        </div>
+        <Link
+          href="/map"
+          className="inline-flex items-center gap-1.5 rounded-md border border-border px-3.5 py-2 text-sm font-medium hover:border-foreground/40"
+        >
+          Open map <ArrowRight className="size-4" />
+        </Link>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -161,7 +292,7 @@ function Stat({
   icon: React.ReactNode;
   label: string;
   value: number | string;
-  sub?: string;
+  sub?: string | undefined;
 }) {
   return (
     <Card>
@@ -177,25 +308,23 @@ function Stat({
   );
 }
 
-function ConfBar({
-  label,
-  n,
-  total,
-  shade,
-}: {
-  label: string;
-  n: number;
-  total: number;
-  shade: string;
-}) {
-  const pct = total > 0 ? Math.round((n / total) * 100) : 0;
-  return (
-    <div className="flex items-center gap-3 text-sm">
-      <span className="w-28 shrink-0 text-muted-foreground">{label}</span>
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-        <div className={`h-full rounded-full ${shade}`} style={{ width: `${pct}%` }} />
-      </div>
-      <span className="w-10 shrink-0 text-right tabular-nums">{n}</span>
-    </div>
-  );
+function short(s: string | null | undefined): string {
+  if (!s) return "?";
+  const tail = s.includes(":") ? (s.split(":").pop() ?? s) : s;
+  return tail.length > 22 ? `${tail.slice(0, 21)}…` : tail;
+}
+function shortKind(kind: string | undefined): string {
+  return kind
+    ? kind.replace(/^aws\.|^github\.|^external\.|^atlas\.|^azure\.|^gcp\.|^bitbucket\./, "")
+    : "resource";
+}
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
 }

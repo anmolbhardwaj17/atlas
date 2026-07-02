@@ -132,8 +132,8 @@ export function InfraMap({ data }: { data: MapData }) {
         <span className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
           {cross.crossCloud + cross.crossAccount > 0 && (
             <span
-              className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-medium"
-              style={{ color: CROSS_COLOR, borderColor: CROSS_COLOR }}
+              className="flex items-center gap-1.5 rounded-full border border-transparent px-2.5 py-1 font-medium"
+              style={{ color: CROSS_COLOR, backgroundColor: `${CROSS_COLOR}1F` }}
               title="Connections that span a cloud or account boundary"
             >
               <span className="size-1.5 rounded-full" style={{ backgroundColor: CROSS_COLOR }} />
@@ -257,16 +257,8 @@ function GroupChip({
         type="button"
         onClick={onToggle}
         aria-pressed={active}
-        className={cn(base, !active && off)}
-        style={
-          active
-            ? {
-                borderColor: visual.brand,
-                color: visual.brand,
-                backgroundColor: `${visual.brand}14`,
-              }
-            : undefined
-        }
+        className={cn(base, active ? "border-transparent" : off)}
+        style={active ? { color: visual.brand, backgroundColor: `${visual.brand}1F` } : undefined}
       >
         {visual.logo && hasCloudIcon(visual.logo) ? (
           <CloudIcon name={visual.logo} className="size-3.5" />

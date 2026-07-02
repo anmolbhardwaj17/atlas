@@ -1,5 +1,14 @@
 import type { LucideIcon } from "lucide-react";
-import { Crown, ShieldCheck, User, Boxes, Package } from "lucide-react";
+import {
+  Crown,
+  ShieldCheck,
+  User,
+  Boxes,
+  Package,
+  AlertTriangle,
+  AlertCircle,
+  Info,
+} from "lucide-react";
 
 /**
  * Categorical taxonomy — the single source of truth for how enum-typed things are labelled,
@@ -25,24 +34,26 @@ export interface RoleMeta {
   className: string;
 }
 
+// All three constructed identically — transparent border + a clearly-visible tinted fill +
+// coloured text — so the row of badges reads as one consistent set (no bare-text outliers).
 export const ROLE_META: Record<Role, RoleMeta> = {
   Owner: {
     label: "Owner",
     rank: 0,
     icon: Crown,
-    className: "border-transparent bg-amber-500/12 text-amber-700 dark:text-amber-400",
+    className: "border-transparent bg-amber-500/20 text-amber-700 dark:text-amber-400",
   },
   Admin: {
     label: "Admin",
     rank: 1,
     icon: ShieldCheck,
-    className: "border-transparent bg-blue-500/12 text-blue-700 dark:text-blue-400",
+    className: "border-transparent bg-blue-500/15 text-blue-700 dark:text-blue-400",
   },
   Member: {
     label: "Member",
     rank: 2,
     icon: User,
-    className: "border-transparent bg-muted text-muted-foreground",
+    className: "border-transparent bg-slate-500/15 text-slate-600 dark:text-slate-300",
   },
 };
 
@@ -70,30 +81,32 @@ export interface CategoryStyle {
   dot: string;
 }
 
+// `chip` = the selected (filled) state — tinted bg + coloured text + TRANSPARENT border
+// (never a coloured border; matches the shadcn filled badge). `dot` keeps the category legible.
 export const ENV_STYLE: Record<string, CategoryStyle> = {
   prod: {
     text: "text-blue-700 dark:text-blue-400",
-    chip: "border-blue-500 bg-blue-500/12 text-blue-700 dark:text-blue-400",
+    chip: "border-transparent bg-blue-500/12 text-blue-700 dark:text-blue-400",
     dot: "bg-blue-500",
   },
   staging: {
     text: "text-amber-700 dark:text-amber-400",
-    chip: "border-amber-500 bg-amber-500/12 text-amber-700 dark:text-amber-400",
+    chip: "border-transparent bg-amber-500/12 text-amber-700 dark:text-amber-400",
     dot: "bg-amber-500",
   },
   dev: {
     text: "text-violet-700 dark:text-violet-400",
-    chip: "border-violet-500 bg-violet-500/12 text-violet-700 dark:text-violet-400",
+    chip: "border-transparent bg-violet-500/12 text-violet-700 dark:text-violet-400",
     dot: "bg-violet-500",
   },
   test: {
     text: "text-cyan-700 dark:text-cyan-400",
-    chip: "border-cyan-500 bg-cyan-500/12 text-cyan-700 dark:text-cyan-400",
+    chip: "border-transparent bg-cyan-500/12 text-cyan-700 dark:text-cyan-400",
     dot: "bg-cyan-500",
   },
   unknown: {
     text: "text-slate-600 dark:text-slate-300",
-    chip: "border-slate-400 bg-slate-400/12 text-slate-700 dark:text-slate-300",
+    chip: "border-transparent bg-slate-400/15 text-slate-700 dark:text-slate-300",
     dot: "bg-slate-400",
   },
 };
@@ -121,4 +134,40 @@ export const PROVIDER_META: Record<string, ProviderMeta> = {
 
 export function providerMeta(id: string): ProviderMeta | undefined {
   return PROVIDER_META[id];
+}
+
+// ── Finding severity (dashboard "needs attention") — semantic, filled, no coloured border ──
+export type Severity = "high" | "medium" | "low";
+
+export interface SeverityMeta {
+  label: string;
+  icon: LucideIcon;
+  className: string;
+  /** Left-rail accent used on the finding row. */
+  accent: string;
+}
+
+export const SEVERITY_META: Record<Severity, SeverityMeta> = {
+  high: {
+    label: "High",
+    icon: AlertTriangle,
+    className: "border-transparent bg-danger/12 text-danger",
+    accent: "bg-danger",
+  },
+  medium: {
+    label: "Medium",
+    icon: AlertCircle,
+    className: "border-transparent bg-warning/15 text-warning",
+    accent: "bg-warning",
+  },
+  low: {
+    label: "Low",
+    icon: Info,
+    className: "border-transparent bg-slate-500/15 text-slate-600 dark:text-slate-300",
+    accent: "bg-slate-400",
+  },
+};
+
+export function severityMeta(s: string): SeverityMeta {
+  return SEVERITY_META[s as Severity] ?? SEVERITY_META.low;
 }

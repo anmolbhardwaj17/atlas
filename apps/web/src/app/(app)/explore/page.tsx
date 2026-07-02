@@ -36,12 +36,14 @@ export default async function ExplorePage({
   if (confidence) params.set("confidence", confidence);
   if (cursor) params.set("cursor", cursor);
 
-  const res = await apiGet<ApiOk<NodeDto[]>>(`/nodes?${params.toString()}`, {
-    token: shell.token,
-    orgId: shell.orgId,
-  });
+  const auth = { token: shell.token, orgId: shell.orgId };
+  const [res, overview] = await Promise.all([
+    apiGet<ApiOk<NodeDto[]>>(`/nodes?${params.toString()}`, auth),
+    apiGet<ApiOk<{ byKind: Array<{ kind: string; n: number }> }>>("/overview", auth),
+  ]);
   const nodes = res.body?.data ?? [];
   const page = res.body?.page;
+  const kinds = (overview.body?.data?.byKind ?? []).map((k) => k.kind);
 
   // Preserve filters (but not cursor) for the "next page" link.
   const nextParams = new URLSearchParams();
@@ -61,7 +63,7 @@ export default async function ExplorePage({
         </p>
       </div>
 
-      <NodeFilters values={{ q, kind, status, confidence }} />
+      <NodeFilters values={{ q, kind, status, confidence }} kinds={kinds} />
 
       {res.status !== 0 && res.body === null ? (
         <ErrorState

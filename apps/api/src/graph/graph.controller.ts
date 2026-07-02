@@ -31,6 +31,12 @@ export class GraphController {
     return this.graph.overview(org(req).id);
   }
 
+  @Get("summary")
+  @Roles("Member")
+  async summary(@Req() req: AuthedRequest): Promise<unknown> {
+    return this.graph.summary(org(req).id);
+  }
+
   @Get("graph")
   @Roles("Member")
   async graphMap(@Req() req: AuthedRequest, @Query() query: unknown): Promise<unknown> {

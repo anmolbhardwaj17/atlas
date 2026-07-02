@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Send, Sparkles } from "lucide-react";
 import { ConfidenceBadge } from "@/components/certainty";
@@ -33,11 +33,18 @@ const EXAMPLES = [
  * confidence-tiered; a zero-grounding answer renders as an explicit "I don't know"
  * (US-11) — one of the four designed states (empty · streaming · answered · honest-absence).
  */
-export function AskChat({ orgId }: { orgId: string }) {
+export function AskChat({
+  orgId,
+  initialQuestion,
+}: {
+  orgId: string;
+  initialQuestion?: string | undefined;
+}) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const convoRef = useRef<string | null>(null);
+  const autoAsked = useRef(false);
 
   async function ask(question: string) {
     const q = question.trim();
@@ -85,6 +92,14 @@ export function AskChat({ orgId }: { orgId: string }) {
       setBusy(false);
     }
   }
+
+  // Prefilled question (e.g. arriving from the dashboard "Ask Atlas" hero) — ask once.
+  useEffect(() => {
+    if (!autoAsked.current && initialQuestion && initialQuestion.trim()) {
+      autoAsked.current = true;
+      void ask(initialQuestion);
+    }
+  }, [initialQuestion, ask]);
 
   return (
     // Fill the content area (viewport − header − page padding) so the input pins to the bottom.

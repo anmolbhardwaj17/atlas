@@ -163,7 +163,7 @@ flowchart LR
 
 | Page | Route | Render | Primary FR/US | Key components |
 |---|---|---|---|---|
-| **Dashboard/Home** | `/` | RSC | overview, entry points | counts by kind, recent changes, connection health, suggested questions |
+| **Dashboard/Home** | `/dashboard` | RSC | overview, entry points | **Ask-Atlas hero** (P1 — AI is the interface), **at-a-glance** human inventory (services/datastores/environments/clouds) + trust pulse, **Needs attention** (graph-derived, cited findings — source health · cross-boundary · blast-radius · freshness, severity-ranked, P3/P4), **Recent activity** (change feed), map preview. Backed by `GET /summary`. *Consumer-first: answers "what do I have · is it trustworthy · what needs attention · what changed" — not graph internals (OQ-FE-5 resolved).* |
 | **Onboarding** | `/onboarding` | mixed | FR-1.x, US-1/2 | AWS connect wizard, GitHub install, sync progress |
 | **Explore (Graph)** | `/explore` | Client | FR-5.1, US-4/7/8 | GraphCanvas, GraphControls, NodePanel, BlastRadiusPanel |
 | **Node detail** | `/nodes/[id]` | RSC + client islands | FR-5.2, US-4/9 | NodeCard, RelationshipRow list, ProvenanceDrawer, mini-graph |

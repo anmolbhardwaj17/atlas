@@ -17,9 +17,9 @@ const STATUS = ["active", "stale", "deleted"];
 const CONFIDENCE = ["observed", "inferred-high", "inferred-low"];
 
 const select =
-  "h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+  "h-9 rounded-md border border-input bg-transparent px-3 text-sm capitalize shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
-export function NodeFilters({ values }: { values: NodeFilterValues }) {
+export function NodeFilters({ values, kinds }: { values: NodeFilterValues; kinds: string[] }) {
   const hasFilters = Boolean(values.q || values.kind || values.status || values.confidence);
   return (
     <form method="get" className="flex flex-wrap items-center gap-2">
@@ -31,14 +31,19 @@ export function NodeFilters({ values }: { values: NodeFilterValues }) {
         aria-label="Search nodes by name"
         className="min-w-48 flex-1"
       />
-      <Input
-        type="text"
+      <select
         name="kind"
         defaultValue={values.kind ?? ""}
-        placeholder="kind (e.g. ecs.service)"
         aria-label="Filter by kind"
-        className="w-44"
-      />
+        className={`${select} w-44 normal-case`}
+      >
+        <option value="">any kind</option>
+        {kinds.map((k) => (
+          <option key={k} value={k}>
+            {k}
+          </option>
+        ))}
+      </select>
       <select
         name="status"
         defaultValue={values.status ?? ""}
