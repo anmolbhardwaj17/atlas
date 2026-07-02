@@ -90,6 +90,12 @@ export interface DashboardSummary {
   crossBoundary: { crossCloud: number; crossAccount: number };
   findings: Finding[];
   activity: TimelineItem[];
+  /** Positive, informational code stats (leaderboards) — present when a code host is connected. */
+  insights: {
+    topContributors: Array<{ name: string; count: number }>;
+    busiestProjects: Array<{ name: string; count: number }>;
+    pipelineCoverage: { withPipeline: number; total: number };
+  };
 }
 
 /** A directed connection between two map nodes (light — just what the canvas draws). */
@@ -258,6 +264,8 @@ export class GraphService {
         codeCounts,
         noPipeline,
         emptyProjects,
+        contributors,
+        busiestProjects,
       ] = await Promise.all([
         c.query<{ category: string; n: number }>(
           `SELECT nk.category, count(*)::int AS n
@@ -346,6 +354,24 @@ export class GraphService {
                  WHERE e.from_node_id = pr.id AND e.type = 'CONTAINS'
                    AND r.kind LIKE '%.repository')`,
         ),
+        // Top contributors by (open) PRs raised.
+        c.query<{ name: string | null; n: number }>(
+          `SELECT u.name, count(*)::int AS n
+             FROM edges e
+             JOIN nodes pr ON pr.id = e.from_node_id AND pr.kind LIKE '%.pullrequest'
+             JOIN nodes u ON u.id = e.to_node_id AND (u.kind LIKE '%.user' OR u.kind LIKE '%.team')
+            WHERE e.type = 'OWNED_BY' AND e.status = 'active'
+            GROUP BY u.name ORDER BY n DESC, u.name LIMIT 5`,
+        ),
+        // Busiest projects by repository count.
+        c.query<{ name: string | null; n: number }>(
+          `SELECT p.name, count(*)::int AS n
+             FROM edges e
+             JOIN nodes p ON p.id = e.from_node_id AND p.kind LIKE '%.project'
+             JOIN nodes r ON r.id = e.to_node_id AND r.kind LIKE '%.repository'
+            WHERE e.type = 'CONTAINS' AND e.status = 'active'
+            GROUP BY p.name ORDER BY n DESC, p.name LIMIT 5`,
+        ),
       ]);
 
       const code = codeCounts.rows[0];
@@ -393,6 +419,11 @@ export class GraphService {
         stale: stale.rows[0]?.n ?? 0,
         noPipeline: noPipeline.rows[0]?.n ?? 0,
         emptyProjects: emptyProjects.rows[0]?.n ?? 0,
+        topContributors: contributors.rows.map((r) => ({ name: r.name ?? "unknown", count: r.n })),
+        busiestProjects: busiestProjects.rows.map((r) => ({
+          name: r.name ?? "unknown",
+          count: r.n,
+        })),
       };
     });
 
@@ -524,6 +555,14 @@ export class GraphService {
         lastSyncAt: lastSyncAt?.toISOString() ?? null,
       },
       crossBoundary: { crossCloud: base.crossCloud, crossAccount: base.crossAccount },
+      insights: {
+        topContributors: base.topContributors,
+        busiestProjects: base.busiestProjects,
+        pipelineCoverage: {
+          withPipeline: Math.max(0, base.repositories - base.noPipeline),
+          total: base.repositories,
+        },
+      },
       findings,
       activity,
     };

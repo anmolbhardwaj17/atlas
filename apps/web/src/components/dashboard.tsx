@@ -65,6 +65,11 @@ interface Summary {
   crossBoundary: { crossCloud: number; crossAccount: number };
   findings: Finding[];
   activity: TimelineItem[];
+  insights: {
+    topContributors: Array<{ name: string; count: number }>;
+    busiestProjects: Array<{ name: string; count: number }>;
+    pipelineCoverage: { withPipeline: number; total: number };
+  };
 }
 
 /** Consumer dashboard (docs/09 §5.2) — answers a user's real questions: what do I have, is it
@@ -139,6 +144,8 @@ export async function Dashboard({
           <Stat icon={<Users className="size-4" />} label="Contributors" value={inv.contributors} />
         </StatGroup>
       )}
+
+      <Insights insights={s.insights} />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
@@ -306,6 +313,98 @@ function MapPreview({
         >
           Open map <ArrowRight className="size-4" />
         </Link>
+      </CardContent>
+    </Card>
+  );
+}
+
+function Insights({ insights }: { insights: Summary["insights"] }) {
+  const { topContributors, busiestProjects, pipelineCoverage } = insights;
+  if (topContributors.length === 0 && busiestProjects.length === 0) return null;
+  const pct =
+    pipelineCoverage.total > 0
+      ? Math.round((pipelineCoverage.withPipeline / pipelineCoverage.total) * 100)
+      : 0;
+
+  return (
+    <div>
+      <h2 className="mb-3 text-base font-semibold">Insights</h2>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Leaderboard
+          title="Top contributors"
+          subtitle="by open PRs"
+          items={topContributors}
+          href="/explore?kind=bitbucket.user"
+        />
+        <Leaderboard
+          title="Busiest projects"
+          subtitle="by repositories"
+          items={busiestProjects}
+          href="/explore?kind=bitbucket.project"
+        />
+        <Card>
+          <CardContent className="p-5">
+            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Pipeline coverage
+            </div>
+            <div className="mt-2 text-2xl font-semibold tabular-nums">{pct}%</div>
+            <div className="text-xs text-muted-foreground">
+              {pipelineCoverage.withPipeline} of {pipelineCoverage.total} repos have a CI/CD
+              pipeline
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-foreground/70" style={{ width: `${pct}%` }} />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function Leaderboard({
+  title,
+  subtitle,
+  items,
+  href,
+}: {
+  title: string;
+  subtitle: string;
+  items: Array<{ name: string; count: number }>;
+  href: string;
+}) {
+  const max = items[0]?.count ?? 1;
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="mb-3 flex items-baseline justify-between">
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {title}
+          </div>
+          <Link href={href} className="text-xs text-muted-foreground hover:text-foreground">
+            {subtitle}
+          </Link>
+        </div>
+        {items.length === 0 ? (
+          <p className="text-sm text-muted-foreground">None yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {items.map((it) => (
+              <li key={it.name} className="flex items-center gap-3 text-sm">
+                <span className="w-28 shrink-0 truncate">{it.name}</span>
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-foreground/60"
+                    style={{ width: `${Math.max(8, Math.round((it.count / max) * 100))}%` }}
+                  />
+                </div>
+                <span className="w-6 shrink-0 text-right tabular-nums text-muted-foreground">
+                  {it.count}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </CardContent>
     </Card>
   );
