@@ -241,18 +241,20 @@ function FindingRow({ f }: { f: Finding }) {
 
 function RecentActivity({ activity }: { activity: TimelineItem[] }) {
   return (
-    <section>
-      <h2 className="mb-3 text-base font-semibold">Recent activity</h2>
-      {activity.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No recent changes.</p>
-      ) : (
-        <ul className="space-y-3">
-          {activity.map((a, i) => (
-            <ActivityRow key={i} a={a} />
-          ))}
-        </ul>
-      )}
-    </section>
+    <Card>
+      <CardContent className="p-5">
+        <h2 className="mb-3 text-base font-semibold">Recent activity</h2>
+        {activity.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No recent changes.</p>
+        ) : (
+          <ul className="space-y-3">
+            {activity.map((a, i) => (
+              <ActivityRow key={i} a={a} />
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
