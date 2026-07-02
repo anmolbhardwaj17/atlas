@@ -224,11 +224,16 @@ async function persistNode(
   raw: RawResource,
   snapshots: SnapshotStore,
 ): Promise<{ id: string; changed: boolean }> {
+  // A node's provider is its URN prefix — the canonical identity (`<provider>:…`, docs/05).
+  // For a well-behaved connector this equals connection.provider; it only differs for a node
+  // one connector references but another owns (e.g. a cross-cloud datastore), where the URN is
+  // authoritative. Deriving it here keeps `provider` consistent with the URN by construction.
+  const provider = node.urn.split(":")[0] || connection.provider;
   // Self-bootstrap the kind vocabulary so we don't need a separate seed step.
   await c.query(
     `INSERT INTO node_kinds (kind, provider, category, description)
      VALUES ($1, $2, 'unknown', $1) ON CONFLICT (kind) DO NOTHING`,
-    [node.kind, connection.provider],
+    [node.kind, provider],
   );
   const region = typeof node.attributes.region === "string" ? node.attributes.region : null;
   const accountRef =
@@ -240,9 +245,10 @@ async function persistNode(
         status, confidence, last_seen, last_sync_run_id)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'active','observed', now(), $10)
      ON CONFLICT (org_id, urn) DO UPDATE SET
-       name = EXCLUDED.name, attributes = EXCLUDED.attributes, region = EXCLUDED.region,
-       account_ref = EXCLUDED.account_ref, connection_id = EXCLUDED.connection_id,
-       status = 'active', last_seen = now(), last_sync_run_id = EXCLUDED.last_sync_run_id
+       name = EXCLUDED.name, provider = EXCLUDED.provider, attributes = EXCLUDED.attributes,
+       region = EXCLUDED.region, account_ref = EXCLUDED.account_ref,
+       connection_id = EXCLUDED.connection_id, status = 'active', last_seen = now(),
+       last_sync_run_id = EXCLUDED.last_sync_run_id
      RETURNING id`,
     [
       run.orgId,
@@ -250,7 +256,7 @@ async function persistNode(
       node.urn,
       node.kind,
       node.displayName,
-      connection.provider,
+      provider,
       region,
       accountRef,
       JSON.stringify(node.attributes),
