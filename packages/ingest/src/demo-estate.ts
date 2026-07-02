@@ -12,7 +12,7 @@
 import type { Connection, ConnectorLogger, Signal } from "@atlas/connector-sdk";
 import { withOrgScope, type Db } from "@atlas/db";
 import { runInference, ALL_RULES } from "@atlas/inference";
-import { runStagedSync, type SyncRunRecord, type SyncResult } from "./sync-runner";
+import { runStagedSync, type SyncResult } from "./sync-runner";
 import { InMemorySnapshotStore } from "./snapshot-store";
 import { nullSecretAccessor, silentLogger } from "./runtime";
 import { MockConnector, type MockScope, type MockResource } from "./mock-connector";
@@ -318,9 +318,40 @@ const gcpScope: MockScope = {
   ],
 };
 
+// ── Bitbucket estate (a second code host) ────────────────────────────────────
+const bb = (kind: string, name: string): string => `bitbucket:acme:${kind}/${name}`;
+const BB_PROJECT = bb("project", "platform");
+const BB_REPO_MOBILE = bb("repository", "mobile-app");
+const BB_REPO_DATA = bb("repository", "data-pipeline");
+const BB_PIPE_MOBILE = bb("pipeline", "mobile-deploy");
+const BB_PR = bb("pullrequest", "mobile-231");
+const BB_USER = bb("user", "diego");
+
+const bitbucketScope: MockScope = {
+  key: "bitbucket:acme",
+  resources: [
+    node(BB_PROJECT, "bitbucket.project", "platform", [
+      { type: "CONTAINS", toUrn: BB_REPO_MOBILE },
+      { type: "CONTAINS", toUrn: BB_REPO_DATA },
+    ]),
+    node(BB_REPO_MOBILE, "bitbucket.repository", "mobile-app", [
+      { type: "CONTAINS", toUrn: BB_PIPE_MOBILE },
+      { type: "OWNED_BY", toUrn: BB_USER },
+    ]),
+    node(BB_REPO_DATA, "bitbucket.repository", "data-pipeline", [
+      { type: "OWNED_BY", toUrn: BB_USER },
+    ]),
+    node(BB_PIPE_MOBILE, "bitbucket.pipeline", "mobile-deploy"),
+    node(BB_PR, "bitbucket.pullrequest", "mobile#231 — offline mode", [
+      { type: "OWNED_BY", toUrn: BB_USER },
+    ]),
+    node(BB_USER, "bitbucket.user", "diego"),
+  ],
+};
+
 /**
  * The full estate: AWS prod (us-east-1) + staging (us-west-2) + a shared data account,
- * plus Azure and GCP — one multi-cloud, multi-account graph. GitHub is the code layer.
+ * plus Azure, GCP, GitHub, and Bitbucket — one multi-cloud, multi-account, multi-source graph.
  */
 export const DEMO_SCOPES: readonly MockScope[] = [
   stampEnv(awsScope, "prod", ACC, RG),
@@ -329,10 +360,29 @@ export const DEMO_SCOPES: readonly MockScope[] = [
   stampEnv(azureScope, "prod", AZ_SUB, "eastus"),
   stampEnv(gcpScope, "prod", GCP_PROJ, "us-central1"),
   githubScope,
+  bitbucketScope,
 ];
 
-/** Display name of the single connection all demo data is attributed to (idempotency key). */
+/** Legacy single-connection name (kept for cleanup on re-seed). Demo connections now end "(demo)". */
 export const DEMO_CONNECTION_NAME = "Demo data (seeded)";
+
+/** One demo connection per provider, so the Integrations hub shows each source connected. */
+const PROVIDER_CONNECTIONS: { provider: string; name: string }[] = [
+  { provider: "aws", name: "Amazon Web Services (demo)" },
+  { provider: "azure", name: "Microsoft Azure (demo)" },
+  { provider: "gcp", name: "Google Cloud (demo)" },
+  { provider: "github", name: "GitHub (demo)" },
+  { provider: "bitbucket", name: "Bitbucket (demo)" },
+];
+
+/** Demo teammates seeded so the Settings members panel + activity log look real. */
+const DEMO_MEMBERS: { email: string; name: string; role: "Owner" | "Admin" | "Member" }[] = [
+  { email: "priya@acme.test", name: "Priya Sharma", role: "Admin" },
+  { email: "diego@acme.test", name: "Diego Alvarez", role: "Member" },
+  { email: "mei@acme.test", name: "Mei Chen", role: "Member" },
+  { email: "sam@acme.test", name: "Sam Okafor", role: "Owner" },
+  { email: "lena@acme.test", name: "Lena Fischer", role: "Member" },
+];
 
 export interface DemoSeedDeps {
   db: Db;
@@ -356,53 +406,49 @@ export async function seedDemoData(deps: DemoSeedDeps, orgId: string): Promise<D
   const { db } = deps;
   const logger = deps.logger ?? silentLogger;
 
-  // 1. Ensure the single demo connection (idempotent by display_name).
-  const connectionId = await withOrgScope(db, orgId, async (c) => {
-    const existing = await c.query<{ id: string }>(
-      "SELECT id FROM connections WHERE display_name = $1 AND deleted_at IS NULL LIMIT 1",
+  // Retire the legacy single "Demo data (seeded)" connection (its nodes re-attribute below).
+  await withOrgScope(db, orgId, (c) =>
+    c.query(
+      "UPDATE connections SET deleted_at = now(), status = 'disconnected' WHERE display_name = $1 AND deleted_at IS NULL",
       [DEMO_CONNECTION_NAME],
-    );
-    if (existing.rows[0]) return existing.rows[0].id;
-    const { rows } = await c.query<{ id: string }>(
-      `INSERT INTO connections (org_id, provider, display_name, status)
-       VALUES ($1, 'aws', $2, 'connected') RETURNING id`,
-      [orgId, DEMO_CONNECTION_NAME],
-    );
-    return firstId(rows);
-  });
-
-  // 2. A fresh sync run (the previous one, if any, was finalized → no in-flight conflict).
-  const runId = await withOrgScope(db, orgId, async (c) => {
-    const { rows } = await c.query<{ id: string }>(
-      `INSERT INTO sync_runs (org_id, connection_id, type, trigger, status)
-       VALUES ($1, $2, 'full', 'manual', 'queued') RETURNING id`,
-      [orgId, connectionId],
-    );
-    return firstId(rows);
-  });
-  const run: SyncRunRecord = { id: runId, orgId, connectionId, type: "full" };
-
-  // 3. Drive the real staged-sync pipeline with the mock connector.
-  const connection: Connection = {
-    id: connectionId,
-    orgId,
-    provider: "aws",
-    displayName: DEMO_CONNECTION_NAME,
-    config: {},
-    secretRef: null,
-  };
-  const connector = new MockConnector(DEMO_SCOPES.map((s) => ({ ...s })));
-  const result = await runStagedSync(
-    { db, snapshots: new InMemorySnapshotStore(), secrets: nullSecretAccessor, logger },
-    connector,
-    connection,
-    run,
+    ),
   );
 
-  // 4. Derive inferred edges (DEPLOYS_TO, atlas.service, CONNECTS_TO, …).
+  // 1. Seed each provider's scopes under its OWN demo connection, so the Integrations hub
+  //    shows AWS / Azure / GCP / GitHub / Bitbucket each connected with its own data.
+  let status: SyncResult["status"] = "succeeded";
+  let signals = 0;
+  for (const pc of PROVIDER_CONNECTIONS) {
+    const scopes = DEMO_SCOPES.filter((s) => (s.key.split(":")[0] ?? "") === pc.provider);
+    if (scopes.length === 0) continue;
+    const connectionId = await ensureConnection(db, orgId, pc.provider, pc.name);
+    const runId = await createRun(db, orgId, connectionId);
+    const connection: Connection = {
+      id: connectionId,
+      orgId,
+      provider: pc.provider,
+      displayName: pc.name,
+      config: {},
+      secretRef: null,
+    };
+    const result = await runStagedSync(
+      { db, snapshots: new InMemorySnapshotStore(), secrets: nullSecretAccessor, logger },
+      new MockConnector(scopes.map((s) => ({ ...s }))),
+      connection,
+      { id: runId, orgId, connectionId, type: "full" },
+    );
+    if (result.status !== "succeeded") status = result.status;
+    signals += result.stats.signals;
+  }
+
+  // 2. Inference across ALL providers → cross-cloud/service edges (one graph).
   await runInference({ db, logger }, orgId, ALL_RULES);
 
-  // 5. Report the resulting graph size (org-scoped counts).
+  // 3. Seed teammates + an activity log so those UIs look real.
+  await seedMembers(db, orgId);
+  await seedActivity(db, orgId);
+
+  // 4. Report the resulting graph size (org-scoped counts).
   return withOrgScope(db, orgId, async (c) => {
     const nodes = await c.query<{ n: number }>(
       "SELECT count(*)::int AS n FROM nodes WHERE status <> 'deleted'",
@@ -415,12 +461,174 @@ export async function seedDemoData(deps: DemoSeedDeps, orgId: string): Promise<D
       .filter((r) => r.origin !== "observed")
       .reduce((sum, r) => sum + r.n, 0);
     return {
-      status: result.status,
+      status,
       nodeCount: nodes.rows[0]?.n ?? 0,
       observedEdges,
       inferredEdges,
-      signals: result.stats.signals,
+      signals,
     };
+  });
+}
+
+/** Idempotent connection by display_name (per provider). */
+async function ensureConnection(
+  db: Db,
+  orgId: string,
+  provider: string,
+  name: string,
+): Promise<string> {
+  return withOrgScope(db, orgId, async (c) => {
+    const existing = await c.query<{ id: string }>(
+      "SELECT id FROM connections WHERE display_name = $1 AND deleted_at IS NULL LIMIT 1",
+      [name],
+    );
+    if (existing.rows[0]) return existing.rows[0].id;
+    const { rows } = await c.query<{ id: string }>(
+      `INSERT INTO connections (org_id, provider, display_name, status)
+       VALUES ($1, $2, $3, 'connected') RETURNING id`,
+      [orgId, provider, name],
+    );
+    return firstId(rows);
+  });
+}
+
+async function createRun(db: Db, orgId: string, connectionId: string): Promise<string> {
+  return withOrgScope(db, orgId, async (c) => {
+    const { rows } = await c.query<{ id: string }>(
+      `INSERT INTO sync_runs (org_id, connection_id, type, trigger, status)
+       VALUES ($1, $2, 'full', 'manual', 'queued') RETURNING id`,
+      [orgId, connectionId],
+    );
+    return firstId(rows);
+  });
+}
+
+/** Seed demo teammates (users + memberships). Idempotent by email / (org,user). */
+async function seedMembers(db: Db, orgId: string): Promise<void> {
+  await withOrgScope(db, orgId, async (c) => {
+    for (const m of DEMO_MEMBERS) {
+      const u = await c.query<{ id: string }>(
+        `INSERT INTO users (email, name) VALUES ($1, $2)
+         ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name RETURNING id`,
+        [m.email, m.name],
+      );
+      const userId = u.rows[0]?.id;
+      if (!userId) continue;
+      await c.query(
+        `INSERT INTO memberships (org_id, user_id, role, status) VALUES ($1, $2, $3, 'active')
+         ON CONFLICT (org_id, user_id) DO NOTHING`,
+        [orgId, userId, m.role],
+      );
+    }
+  });
+}
+
+/** Seed a realistic activity log (append-only). Guarded so re-seeding doesn't duplicate. */
+async function seedActivity(db: Db, orgId: string): Promise<void> {
+  await withOrgScope(db, orgId, async (c) => {
+    const seeded = await c.query(
+      "SELECT 1 FROM audit_events WHERE org_id = $1 AND request_id = 'demo' LIMIT 1",
+      [orgId],
+    );
+    if (seeded.rows[0]) return;
+
+    const members = (
+      await c.query<{ id: string; email: string }>(
+        "SELECT u.id, u.email FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.org_id = $1",
+        [orgId],
+      )
+    ).rows;
+    const idOf = (email: string): string | null =>
+      members.find((m) => m.email === email)?.id ?? null;
+
+    const events: {
+      actor: string | null;
+      action: string;
+      targetType: string;
+      targetId: string;
+      hours: number;
+      metadata?: Record<string, unknown>;
+    }[] = [
+      {
+        actor: idOf("sam@acme.test"),
+        action: "org.create",
+        targetType: "org",
+        targetId: orgId,
+        hours: 132,
+      },
+      {
+        actor: idOf("priya@acme.test"),
+        action: "invitation.create",
+        targetType: "invitation",
+        targetId: "inv-diego",
+        hours: 108,
+        metadata: { email: "diego@acme.test", role: "Member" },
+      },
+      {
+        actor: idOf("diego@acme.test"),
+        action: "demo.seed",
+        targetType: "org",
+        targetId: orgId,
+        hours: 96,
+        metadata: { nodeCount: 52 },
+      },
+      {
+        actor: idOf("mei@acme.test"),
+        action: "connection.verify",
+        targetType: "connection",
+        targetId: "conn-aws",
+        hours: 72,
+        metadata: { provider: "aws", status: "connected" },
+      },
+      {
+        actor: idOf("sam@acme.test"),
+        action: "connection.verify",
+        targetType: "connection",
+        targetId: "conn-azure",
+        hours: 50,
+        metadata: { provider: "azure", status: "connected" },
+      },
+      {
+        actor: idOf("priya@acme.test"),
+        action: "member.role_change",
+        targetType: "user",
+        targetId: idOf("mei@acme.test") ?? "u",
+        hours: 28,
+        metadata: { newRole: "Member" },
+      },
+      {
+        actor: idOf("lena@acme.test"),
+        action: "invitation.create",
+        targetType: "invitation",
+        targetId: "inv-new",
+        hours: 5,
+        metadata: { email: "newhire@acme.test", role: "Member" },
+      },
+      {
+        actor: idOf("mei@acme.test"),
+        action: "connection.disconnect",
+        targetType: "connection",
+        targetId: "conn-old",
+        hours: 1,
+        metadata: { provider: "github" },
+      },
+    ];
+
+    for (const e of events) {
+      await c.query(
+        `INSERT INTO audit_events (org_id, actor_user_id, action, target_type, target_id, metadata, request_id, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, 'demo', now() - ($7 || ' hours')::interval)`,
+        [
+          orgId,
+          e.actor,
+          e.action,
+          e.targetType,
+          e.targetId,
+          JSON.stringify(e.metadata ?? {}),
+          e.hours,
+        ],
+      );
+    }
   });
 }
 

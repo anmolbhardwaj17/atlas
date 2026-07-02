@@ -24,10 +24,11 @@ export class DemoService {
 
   async seed(orgId: string): Promise<DemoSeedResult> {
     // Guard: refuse if a real (non-demo) source is connected — sample data is for empty orgs.
+    // Demo connections are the legacy single name or the per-provider "… (demo)" connections.
     const realSources = await withOrgScope(this.db, orgId, async (c) => {
       const { rows } = await c.query<{ n: number }>(
         `SELECT count(*)::int AS n FROM connections
-         WHERE deleted_at IS NULL AND display_name <> $1`,
+         WHERE deleted_at IS NULL AND display_name <> $1 AND display_name NOT LIKE '%(demo)'`,
         [DEMO_CONNECTION_NAME],
       );
       return rows[0]?.n ?? 0;

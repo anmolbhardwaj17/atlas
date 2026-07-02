@@ -43,7 +43,7 @@ const LOGO: Record<string, string> = {
   "aws.route53.record": "aws-route53",
   "aws.apigateway": "aws-api-gateway",
   "aws.iam.role": "aws-iam",
-  "github.repository": "github",
+  "github.repository": "github-icon",
 };
 
 const ICON: Record<string, LucideIcon> = {
@@ -96,6 +96,12 @@ const ICON: Record<string, LucideIcon> = {
   "gcp.vpc": Network,
   "gcp.subnet": Network,
   "gcp.pubsub.topic": Webhook,
+  // Bitbucket
+  "bitbucket.project": Boxes,
+  "bitbucket.repository": GitBranch,
+  "bitbucket.pipeline": Play,
+  "bitbucket.pullrequest": GitPullRequest,
+  "bitbucket.user": User,
 };
 
 /** Certainty accent (docs/09 §3.2) — solid = observed fact, ring = inferred, mono only. */
@@ -160,6 +166,12 @@ const CATEGORY: Record<string, string> = {
   "gcp.vpc": "network",
   "gcp.subnet": "network",
   "gcp.pubsub.topic": "compute",
+  // Bitbucket
+  "bitbucket.project": "code",
+  "bitbucket.repository": "code",
+  "bitbucket.pipeline": "code",
+  "bitbucket.pullrequest": "code",
+  "bitbucket.user": "code",
 };
 
 const CATEGORY_STYLE: Record<string, string> = {

@@ -70,12 +70,13 @@ export const ENV_LABEL: Record<string, string> = {
 };
 
 // ── Clouds / providers ───────────────────────────────────────────────────────
-const PROVIDER_ORDER = ["aws", "azure", "gcp", "github", "atlas", "external"];
+const PROVIDER_ORDER = ["aws", "azure", "gcp", "github", "bitbucket", "atlas", "external"];
 const PROVIDER_LABEL: Record<string, string> = {
   aws: "Amazon Web Services",
   azure: "Microsoft Azure",
   gcp: "Google Cloud",
   github: "GitHub",
+  bitbucket: "Bitbucket",
   atlas: "Atlas services",
   external: "Packages",
 };

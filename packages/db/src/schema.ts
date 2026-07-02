@@ -66,7 +66,8 @@ export interface InvitationRow {
 
 // Ingest substrate (docs/04 §5.2, F2). `connections` = source links; `sync_runs` =
 // crawl executions (the unit of freshness/history).
-export type ConnectionProvider = "aws" | "github";
+export type ConnectionProvider =
+  "aws" | "github" | "azure" | "gcp" | "bitbucket" | "gitlab" | "datadog";
 export type ConnectionStatus =
   "pending" | "verifying" | "connected" | "degraded" | "error" | "disconnected";
 export type SyncRunType = "full" | "incremental" | "webhook";

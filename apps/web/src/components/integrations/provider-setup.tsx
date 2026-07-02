@@ -84,3 +84,87 @@ export function GithubSetup() {
     </div>
   );
 }
+
+const AZURE_ROLE = `# Create a read-only service principal scoped to the subscription:
+az ad sp create-for-rbac \\
+  --name "atlas-reader" \\
+  --role "Reader" \\
+  --scopes "/subscriptions/<SUBSCRIPTION_ID>"
+# Reader is a built-in role — describe/list only, no mutating actions.`;
+
+export function AzureSetup() {
+  return (
+    <div className="space-y-5">
+      <Steps>
+        <Step title="Create a read-only service principal">
+          In Microsoft Entra ID, register an app / service principal for Atlas and assign it the
+          built-in <InlineCode>Reader</InlineCode> role at the subscription scope — read-only by
+          construction.
+        </Step>
+        <Step title="Grant Atlas the tenant, client &amp; subscription IDs">
+          Atlas authenticates with the client ID + a secret (or a federated credential), scoped to
+          the subscriptions you choose. It never gets write access.
+        </Step>
+        <Step title="Verify">
+          Atlas runs a permission probe and reports any missing read scope as a fixable gap.
+        </Step>
+      </Steps>
+      <CodeBlock label="Least-privilege role (az CLI)" code={AZURE_ROLE} />
+    </div>
+  );
+}
+
+const GCP_ROLE = `# Create a read-only service account and grant Viewer on the project:
+gcloud iam service-accounts create atlas-reader \\
+  --display-name "Atlas (read-only)"
+gcloud projects add-iam-policy-binding <PROJECT_ID> \\
+  --member "serviceAccount:atlas-reader@<PROJECT_ID>.iam.gserviceaccount.com" \\
+  --role "roles/viewer"
+# roles/viewer is read-only across the project.`;
+
+export function GcpSetup() {
+  return (
+    <div className="space-y-5">
+      <Steps>
+        <Step title="Create a read-only service account">
+          In the GCP project, create a service account for Atlas and grant it{" "}
+          <InlineCode>roles/viewer</InlineCode> — a project-wide read-only role.
+        </Step>
+        <Step title="Connect it (key or workload identity)">
+          Atlas authenticates as the service account (a key, or keyless workload-identity
+          federation). No write roles are ever requested.
+        </Step>
+        <Step title="Verify">
+          Atlas probes the granted roles and reports any missing read permission as a fixable gap.
+        </Step>
+      </Steps>
+      <CodeBlock label="Least-privilege role (gcloud)" code={GCP_ROLE} />
+    </div>
+  );
+}
+
+const BITBUCKET_SCOPES = `account: read
+repository: read
+pullrequest: read
+pipeline: read`;
+
+export function BitbucketSetup() {
+  return (
+    <div className="space-y-5">
+      <Steps>
+        <Step title="Create a read-only App password">
+          In your Bitbucket workspace settings, create an App password for Atlas with only the{" "}
+          <InlineCode>read</InlineCode> scopes below (or install the Atlas OAuth app).
+        </Step>
+        <Step title="Atlas indexes structure, not code">
+          From each repo Atlas reads ownership, dependency manifests, and Pipelines (deploy targets)
+          — enough to connect code to the infrastructure it ships to, without storing your source.
+        </Step>
+        <Step title="Confirm the workspace">
+          Back in Atlas, confirm the workspace. The graph fills in as the first sync runs.
+        </Step>
+      </Steps>
+      <CodeBlock label="Required read scopes" code={BITBUCKET_SCOPES} />
+    </div>
+  );
+}

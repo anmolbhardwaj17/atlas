@@ -15,15 +15,46 @@ import {
 } from "@/components/ui/sheet";
 import { StatusBadge } from "@/components/certainty";
 import { CloudIcon } from "@/components/cloud-icon";
-import { AwsSetup, GithubSetup } from "@/components/integrations/provider-setup";
+import {
+  AwsSetup,
+  GithubSetup,
+  AzureSetup,
+  GcpSetup,
+  BitbucketSetup,
+} from "@/components/integrations/provider-setup";
 import { PROVIDERS, type ProviderMeta } from "@/components/integrations/providers";
 import { createConnection, deleteConnection, type ConnectionSummary } from "@/lib/browser-api";
 import { cn } from "@/lib/cn";
 
+/** The right setup steps for each connectable provider. */
+function ProviderSetup({ providerId }: { providerId: string }) {
+  switch (providerId) {
+    case "aws":
+      return <AwsSetup />;
+    case "azure":
+      return <AzureSetup />;
+    case "gcp":
+      return <GcpSetup />;
+    case "bitbucket":
+      return <BitbucketSetup />;
+    default:
+      return <GithubSetup />;
+  }
+}
+
+const CREDENTIAL_NOUN: Record<string, string> = {
+  aws: "role",
+  github: "App",
+  azure: "service principal",
+  gcp: "service account",
+  bitbucket: "App password",
+};
+
 /**
  * Integrations hub (docs/18) — the one place to connect the company's accounts. A tile per
- * provider (AWS + GitHub live; the rest "coming soon"), each showing its connected accounts
- * with status, a guided Connect flow, and disconnect (which purges that source's graph).
+ * provider (AWS / GitHub / Azure / GCP / Bitbucket connectable; GitLab / Datadog "coming
+ * soon"), each showing its connected accounts with status, a guided Connect flow, and
+ * disconnect (which purges that source's graph).
  */
 export function IntegrationsHub({
   orgId,
@@ -260,7 +291,7 @@ function ConnectSheet({
             </SheetHeader>
 
             <div className="mt-6 space-y-6">
-              {provider.id === "aws" ? <AwsSetup /> : <GithubSetup />}
+              <ProviderSetup providerId={provider.id} />
 
               <div className="space-y-2 border-t border-border pt-4">
                 <label htmlFor="conn-name" className="text-sm font-medium">
@@ -274,7 +305,7 @@ function ConnectSheet({
                 />
                 <p className="text-xs text-muted-foreground">
                   This adds the connection. Live verification (credentials) is the next step once
-                  your {provider.id === "aws" ? "role" : "App"} is set up.
+                  your {CREDENTIAL_NOUN[provider.id] ?? "credentials"} are set up.
                 </p>
                 {error ? (
                   <p role="alert" className="text-sm text-danger">
