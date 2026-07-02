@@ -15,16 +15,34 @@ interface ConnectionDto {
   displayName: string;
   status: string;
 }
+interface MemberDto {
+  userId: string;
+  email: string;
+  name: string | null;
+  role: string;
+  status: string;
+}
+interface InvitationDto {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  expiresAt: string;
+}
 
 export default async function SettingsPage() {
   const shell = await requireShell();
-  const conns =
-    (
-      await apiGet<ApiOk<ConnectionDto[]>>("/connections", {
-        token: shell.token,
-        orgId: shell.orgId,
-      })
-    ).body?.data ?? [];
+  const auth = { token: shell.token, orgId: shell.orgId };
+  // Server-fetch everything with the reliable server session (no client auth race).
+  const [conns, members, invites] = await Promise.all([
+    apiGet<ApiOk<ConnectionDto[]>>("/connections", auth).then((r) => r.body?.data ?? []),
+    apiGet<ApiOk<MemberDto[]>>(`/orgs/${shell.orgId}/members`, auth).then(
+      (r) => r.body?.data ?? [],
+    ),
+    apiGet<ApiOk<InvitationDto[]>>(`/orgs/${shell.orgId}/invitations`, auth).then(
+      (r) => r.body?.data ?? [],
+    ),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -84,7 +102,7 @@ export default async function SettingsPage() {
         </CardContent>
       </Card>
 
-      <OrgPanel orgId={shell.orgId} />
+      <OrgPanel orgId={shell.orgId} initialMembers={members} initialInvites={invites} />
 
       {/* Activity log is Admin+ (names actors + actions); the API also enforces this. */}
       {shell.role === "Owner" || shell.role === "Admin" ? (

@@ -20,7 +20,9 @@ import {
   ENV_LABEL,
   edgeCrossing,
   groupingFor,
+  chipVisual,
   CROSS_COLOR,
+  type ChipVisual,
   type GroupMode,
   type Grouping,
   type MapData,
@@ -28,6 +30,7 @@ import {
 } from "@/lib/map-types";
 import { ResourceNode, EnvLaneNode } from "@/components/map/resource-node";
 import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
+import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
 import { cn } from "@/lib/cn";
 
 const nodeTypes = { resource: ResourceNode, envLane: EnvLaneNode };
@@ -117,20 +120,14 @@ export function InfraMap({ data }: { data: MapData }) {
 
       <div className="flex flex-wrap items-center gap-2">
         {present.map((key) => (
-          <button
+          <GroupChip
             key={key}
-            type="button"
-            onClick={() => toggleKey(key)}
-            aria-pressed={active.has(key)}
-            className={cn(
-              "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-              active.has(key)
-                ? "border-foreground bg-foreground text-background"
-                : "border-border text-muted-foreground hover:border-foreground/40",
-            )}
-          >
-            {grouping.labelOf(key)}
-          </button>
+            mode={groupMode}
+            label={grouping.labelOf(key)}
+            visual={chipVisual(groupMode, key)}
+            active={active.has(key)}
+            onToggle={() => toggleKey(key)}
+          />
         ))}
         <span className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
           {cross.crossCloud + cross.crossAccount > 0 && (
@@ -227,6 +224,85 @@ function Flow({
       <Controls showInteractive={false} />
       <MiniMap pannable zoomable nodeColor="hsl(var(--muted-foreground))" />
     </ReactFlow>
+  );
+}
+
+/**
+ * A group-by filter chip. Environments carry a semantic hue + dot; clouds carry their brand
+ * hue + real logo; accounts stay neutral. Selected = category-coloured fill, off = muted
+ * outline (with the category cue still visible so the palette reads even when filtered out).
+ */
+function GroupChip({
+  mode,
+  label,
+  visual,
+  active,
+  onToggle,
+}: {
+  mode: GroupMode;
+  label: string;
+  visual: ChipVisual;
+  active: boolean;
+  onToggle: () => void;
+}) {
+  const base =
+    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors";
+  const off = "border-border text-muted-foreground hover:border-foreground/40";
+  const FallbackIcon = visual.fallbackIcon;
+
+  // Cloud lanes: brand hue + real logo, driven inline (brand colours aren't theme tokens).
+  if (mode === "cloud" && visual.brand) {
+    return (
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-pressed={active}
+        className={cn(base, !active && off)}
+        style={
+          active
+            ? {
+                borderColor: visual.brand,
+                color: visual.brand,
+                backgroundColor: `${visual.brand}14`,
+              }
+            : undefined
+        }
+      >
+        {visual.logo && hasCloudIcon(visual.logo) ? (
+          <CloudIcon name={visual.logo} className="size-3.5" />
+        ) : FallbackIcon ? (
+          <FallbackIcon className="size-3.5" />
+        ) : null}
+        {label}
+      </button>
+    );
+  }
+
+  // Environment lanes: semantic hue class + always-visible dot.
+  if (mode === "environment") {
+    return (
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-pressed={active}
+        className={cn(base, active ? visual.activeClass : off)}
+      >
+        {visual.dot && <span className={cn("size-1.5 rounded-full", visual.dot)} />}
+        {label}
+      </button>
+    );
+  }
+
+  // Account (neutral): the original mono treatment.
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={active}
+      className={cn(base, active ? "border-foreground bg-foreground text-background" : off)}
+    >
+      {label}
+    </button>
   );
 }
 

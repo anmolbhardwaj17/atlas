@@ -1,3 +1,6 @@
+import type { LucideIcon } from "lucide-react";
+import { ENV_STYLE, PROVIDER_META } from "./taxonomy";
+
 /** Shapes returned by GET /graph (mirrors the API's GraphNodeDto / GraphEdgeLite). */
 export interface MapNode {
   id: string;
@@ -100,6 +103,36 @@ function byFixedOrder(fixed: readonly string[]): (keys: string[]) => string[] {
         (ia === -1 ? fixed.length : ia) - (ib === -1 ? fixed.length : ib) || a.localeCompare(b)
       );
     });
+}
+
+/**
+ * Per-chip category visuals for the group-by filter bar. Colour encodes the category so the
+ * lane filter reads at a glance: environments get a semantic hue + dot, clouds get their brand
+ * hue + real brand logo, accounts stay neutral (an account id carries no provider identity).
+ */
+export interface ChipVisual {
+  /** Selected-state Tailwind classes (environments). */
+  activeClass?: string | undefined;
+  /** Brand hex (clouds) — drives border/text/fill inline when selected. */
+  brand?: string | undefined;
+  /** Always-visible category dot (environments). */
+  dot?: string | undefined;
+  /** Brand logo key in cloud-icons-data (clouds). */
+  logo?: string | undefined;
+  /** Fallback glyph when no brand logo exists (atlas / packages lanes). */
+  fallbackIcon?: LucideIcon | undefined;
+}
+
+export function chipVisual(mode: GroupMode, key: string): ChipVisual {
+  if (mode === "environment") {
+    const s = ENV_STYLE[key] ?? ENV_STYLE.unknown;
+    return { activeClass: s?.chip, dot: s?.dot };
+  }
+  if (mode === "cloud") {
+    const p = PROVIDER_META[key];
+    return p ? { brand: p.brand, logo: p.logo, fallbackIcon: p.fallbackIcon } : {};
+  }
+  return {}; // account: neutral (no stable provider identity)
 }
 
 export function groupingFor(mode: GroupMode): Grouping {

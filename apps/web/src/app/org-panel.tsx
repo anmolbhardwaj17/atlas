@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { apiUrl } from "@/lib/env";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { RoleBadge } from "@/components/tags";
+import { StatusBadge } from "@/components/certainty";
+import { byRole } from "@/lib/taxonomy";
 
 interface Member {
   userId: string;
@@ -23,11 +25,21 @@ interface Invitation {
   expiresAt: string;
 }
 
-/** Org members + invitations (docs/08 §7). Client component — reads with the app's
- *  Supabase session (Bearer); Admin+ invite endpoints surface 403s inline for viewers. */
-export function OrgPanel({ orgId }: { orgId: string }) {
-  const [members, setMembers] = useState<Member[]>([]);
-  const [invites, setInvites] = useState<Invitation[]>([]);
+/** Org members + invitations (docs/08 §7). Members/invitations are server-fetched (reliable
+ *  session) and passed in as initial state — no client auth race on first paint. The client
+ *  Supabase session (Bearer) is used only to refresh after an invite; Admin+ invite endpoints
+ *  surface 403s inline for viewers. */
+export function OrgPanel({
+  orgId,
+  initialMembers = [],
+  initialInvites = [],
+}: {
+  orgId: string;
+  initialMembers?: Member[];
+  initialInvites?: Invitation[];
+}) {
+  const [members, setMembers] = useState<Member[]>(initialMembers);
+  const [invites, setInvites] = useState<Invitation[]>(initialInvites);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"Member" | "Admin">("Member");
   const [note, setNote] = useState<string | null>(null);
@@ -50,12 +62,8 @@ export function OrgPanel({ orgId }: { orgId: string }) {
       fetch(`${apiUrl()}/orgs/${orgId}/invitations`, { headers: h }).then((r) => r.json()),
     ]);
     if (m.data) setMembers(m.data as Member[]);
-    setInvites(i.data ? (i.data as Invitation[]) : []);
+    if (i.data) setInvites(i.data as Invitation[]);
   }, [orgId, authHeaders]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   async function invite(e: React.FormEvent): Promise<void> {
     e.preventDefault();
@@ -89,13 +97,13 @@ export function OrgPanel({ orgId }: { orgId: string }) {
             {members.length === 0 ? (
               <li className="px-3 py-2 text-sm text-muted-foreground">No members loaded.</li>
             ) : (
-              members.map((m) => (
+              [...members].sort(byRole).map((m) => (
                 <li key={m.userId} className="flex items-center justify-between px-3 py-2 text-sm">
                   <span>
                     <span className="font-medium">{m.name ?? m.email}</span>{" "}
                     <span className="text-muted-foreground">{m.email}</span>
                   </span>
-                  <Badge variant="secondary">{m.role}</Badge>
+                  <RoleBadge role={m.role} />
                 </li>
               ))
             )}
@@ -113,7 +121,7 @@ export function OrgPanel({ orgId }: { orgId: string }) {
                   <span>
                     {i.email} <span className="text-muted-foreground">· {i.role}</span>
                   </span>
-                  <Badge variant="outline">{i.status}</Badge>
+                  <StatusBadge status={i.status} />
                 </li>
               ))}
             </ul>

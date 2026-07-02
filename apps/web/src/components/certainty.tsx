@@ -71,7 +71,10 @@ const STATUS: Record<string, { label: string; className: string }> = {
   connected: { label: "connected", className: SUCCESS },
   succeeded: { label: "succeeded", className: SUCCESS },
   active: { label: "active", className: SUCCESS },
+  accepted: { label: "accepted", className: SUCCESS },
   pending: { label: "pending", className: WARNING },
+  invited: { label: "invited", className: WARNING },
+  requested: { label: "requested", className: WARNING },
   verifying: { label: "verifying", className: WARNING },
   queued: { label: "queued", className: WARNING },
   running: { label: "running", className: WARNING },
@@ -79,8 +82,10 @@ const STATUS: Record<string, { label: string; className: string }> = {
   partial: { label: "partial", className: WARNING },
   error: { label: "error", className: DANGER },
   failed: { label: "failed", className: DANGER },
+  revoked: { label: "revoked", className: DANGER },
   disconnected: { label: "disconnected", className: NEUTRAL },
   cancelled: { label: "cancelled", className: NEUTRAL },
+  expired: { label: "expired", className: NEUTRAL },
 };
 
 export function StatusBadge({ status }: { status: string }) {
