@@ -3,9 +3,21 @@ import { SearchX } from "lucide-react";
 import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/patterns/empty-state";
-import { kindIcon, kindStyle } from "@/lib/kind-visual";
+import { kindIcon, kindStyle, KIND_LOGO } from "@/lib/kind-visual";
+import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
+import { PROVIDER_META } from "@/lib/taxonomy";
 import { cn } from "@/lib/cn";
 import type { NodeDto } from "@/lib/graph-types";
+
+/** The real logo for a row: a specific service logo (aws-ec2…) if we have one, else the
+ *  provider's brand logo (bitbucket / github / azure / gcp / aws) — the Kind column already
+ *  names the exact type, so the brand mark reads cleanly here. */
+function rowLogo(kind: string): string | null {
+  const svc = KIND_LOGO[kind];
+  if (svc && hasCloudIcon(svc)) return svc;
+  const brand = PROVIDER_META[kind.split(".")[0] ?? ""]?.logo;
+  return brand && hasCloudIcon(brand) ? brand : null;
+}
 
 /** The nodes table (docs/09 §5.3) — kind · name · region, with certainty + freshness legible per row. */
 export function NodesList({ nodes }: { nodes: NodeDto[] }) {
@@ -33,6 +45,7 @@ export function NodesList({ nodes }: { nodes: NodeDto[] }) {
         <tbody className="divide-y divide-border">
           {nodes.map((n) => {
             const Icon = kindIcon(n.kind);
+            const logo = rowLogo(n.kind);
             return (
               <tr key={n.id} className="hover:bg-card/60">
                 <td className="px-4 py-2.5">
@@ -40,10 +53,14 @@ export function NodesList({ nodes }: { nodes: NodeDto[] }) {
                     <span
                       className={cn(
                         "grid size-7 shrink-0 place-items-center rounded-md",
-                        kindStyle(n.kind),
+                        logo ? "bg-muted/60" : kindStyle(n.kind),
                       )}
                     >
-                      <Icon className="size-4" />
+                      {logo ? (
+                        <CloudIcon name={logo} className="size-[18px]" />
+                      ) : (
+                        <Icon className="size-4" />
+                      )}
                     </span>
                     <div className="min-w-0">
                       <Link href={`/explore/${n.id}`} className="font-medium hover:text-primary">

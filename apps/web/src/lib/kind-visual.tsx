@@ -154,6 +154,26 @@ const CATEGORY_STYLE: Record<string, string> = {
 };
 const CATEGORY_FALLBACK = "bg-muted text-muted-foreground";
 
+/** Kinds with a real provider service/brand logo (aws services, github mark) — the map uses
+ *  these; bitbucket is intentionally NOT here so map nodes keep their per-type colours. */
+export const KIND_LOGO: Record<string, string> = {
+  "aws.ec2.instance": "aws-ec2",
+  "aws.lambda.function": "aws-lambda",
+  "aws.ecs.cluster": "aws-ecs",
+  "aws.ecs.service": "aws-ecs",
+  "aws.ecs.taskdef": "aws-ecs",
+  "aws.rds.instance": "aws-rds",
+  "aws.dynamodb.table": "aws-dynamodb",
+  "aws.elasticache.cluster": "aws-elasticache",
+  "aws.s3.bucket": "aws-s3",
+  "aws.vpc": "aws-vpc",
+  "aws.elb": "aws-elb",
+  "aws.route53.record": "aws-route53",
+  "aws.apigateway": "aws-api-gateway",
+  "aws.iam.role": "aws-iam",
+  "github.repository": "github-icon",
+};
+
 export function kindCategory(kind: string): string {
   return CATEGORY[kind] ?? "";
 }

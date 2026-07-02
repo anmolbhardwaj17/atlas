@@ -4,27 +4,8 @@ import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { CloudIcon } from "@/components/cloud-icon";
-import { kindIcon, kindStyle, kindShort } from "@/lib/kind-visual";
+import { kindIcon, kindStyle, kindShort, KIND_LOGO } from "@/lib/kind-visual";
 import type { MapNode } from "@/lib/map-types";
-
-/** Kinds that have a real provider logo (else we fall back to the colored lucide glyph). */
-const LOGO: Record<string, string> = {
-  "aws.ec2.instance": "aws-ec2",
-  "aws.lambda.function": "aws-lambda",
-  "aws.ecs.cluster": "aws-ecs",
-  "aws.ecs.service": "aws-ecs",
-  "aws.ecs.taskdef": "aws-ecs",
-  "aws.rds.instance": "aws-rds",
-  "aws.dynamodb.table": "aws-dynamodb",
-  "aws.elasticache.cluster": "aws-elasticache",
-  "aws.s3.bucket": "aws-s3",
-  "aws.vpc": "aws-vpc",
-  "aws.elb": "aws-elb",
-  "aws.route53.record": "aws-route53",
-  "aws.apigateway": "aws-api-gateway",
-  "aws.iam.role": "aws-iam",
-  "github.repository": "github-icon",
-};
 
 /** Certainty accent (docs/09 §3.2) — solid = observed fact, ring = inferred, mono only. */
 const CERTAINTY: Record<string, string> = {
@@ -48,7 +29,7 @@ export function ResourceNode({ data, selected }: NodeProps) {
   const node = d.node;
   const collapse = d.collapse;
   const Icon = kindIcon(node.kind);
-  const logo = LOGO[node.kind];
+  const logo = KIND_LOGO[node.kind];
   const short = kindShort(node.kind);
   const stale = node.status === "stale";
 
