@@ -30,3 +30,6 @@ tmp/
 .DS_Store
 .idea/
 *.swp
+
+# One-off debug/diagnostic scripts (never committed)
+*.tmp.js

@@ -330,22 +330,22 @@ function Insights({ insights }: { insights: Summary["insights"] }) {
     <div>
       <h2 className="text-base font-semibold">Insights</h2>
       <p className="mb-3 text-xs text-muted-foreground">
-        Pull requests raised in the last 90 days (open or merged).
+        Pull requests raised in the last 30 days (open or merged).
       </p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Leaderboard
           title="Top contributors"
-          subtitle="PRs raised · 90d"
+          subtitle="PRs raised · 30d"
           items={topContributors}
           href="/explore?kind=bitbucket.user"
-          emptyLabel="No PRs in the last 90 days — reconnect Bitbucket to sync recent activity."
+          emptyLabel="No PRs in the last 30 days — reconnect Bitbucket to sync recent activity."
         />
         <Leaderboard
           title="Most active repos"
-          subtitle="PRs · 90d"
+          subtitle="PRs · 30d"
           items={mostActiveRepos}
           href="/explore?kind=bitbucket.repository"
-          emptyLabel="No PRs in the last 90 days yet."
+          emptyLabel="No PRs in the last 30 days yet."
         />
         <Card>
           <CardContent className="p-5">

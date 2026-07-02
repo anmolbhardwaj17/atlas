@@ -116,11 +116,11 @@ export async function* discoverRepo(
     // PRs not permitted — skip
   }
 
-  // MERGED pull requests raised in the last 90 days (shipped work → contribution + repo
+  // MERGED pull requests raised in the last 30 days (shipped work → contribution + repo
   // activity). Paginated within the window but capped per repo so a hyper-active repo can't
   // fill the graph — the current-state graph keeps a recent, useful slice, not full history.
   try {
-    const since = new Date(Date.now() - 90 * 86400 * 1000).toISOString();
+    const since = new Date(Date.now() - PR_WINDOW_DAYS * 86400 * 1000).toISOString();
     let count = 0;
     for await (const pr of client.paginate<Json>(
       `/repositories/${workspace}/${repoSlug}/pullrequests`,
@@ -135,8 +135,11 @@ export async function* discoverRepo(
   }
 }
 
-/** Per-repo cap on merged PRs crawled (keeps a busy repo from flooding the graph). */
-const MERGED_PR_CAP = 150;
+/** Per-repo cap on merged PRs crawled (keeps a busy repo from flooding the graph — and the
+ *  sync fast over a remote DB; the leaderboards need ranking, not every PR). */
+const MERGED_PR_CAP = 40;
+/** How far back to pull merged PRs (contribution/activity window). */
+const PR_WINDOW_DAYS = 30;
 
 function prRef(pr: Json, repoSlug: string, scopeKey: string, ctx: AtlasContext): Discovered {
   const id = typeof pr.id === "number" ? pr.id : s(pr.id);

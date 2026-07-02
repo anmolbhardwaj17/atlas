@@ -252,10 +252,10 @@ export class GraphService {
    */
   async summary(orgId: string): Promise<DashboardSummary> {
     const impact = [...IMPACT_EDGE_TYPES];
-    // PR insight window: PRs *raised* in the last 90 days (created_on). Captures recent
-    // contribution + repo activity (open or merged); a PR opened years ago doesn't count as
+    // PR insight window: PRs *raised* in the last 30 days (created_on). Captures recent
+    // contribution + repo activity (open or merged); a PR opened long ago doesn't count as
     // recent activity. ISO strings sort chronologically → a lexicographic >= is a correct filter.
-    const prSince = new Date(Date.now() - 90 * 86400 * 1000).toISOString();
+    const prSince = new Date(Date.now() - 30 * 86400 * 1000).toISOString();
     const base = await withOrgScope(this.db, orgId, async (c) => {
       const [
         cats,
