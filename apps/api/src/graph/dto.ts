@@ -53,6 +53,10 @@ export function toNodeDto(row: NodeRowish): NodeDto {
 export const NodeListQuerySchema = z
   .object({
     kind: z.string().min(1).optional(),
+    // Product-facing facets: `source` = the connection provider (aws/bitbucket/…);
+    // `category` = the semantic node_kinds group (code/compute/data/networking/…).
+    source: z.string().min(1).optional(),
+    category: z.string().min(1).optional(),
     region: z.string().min(1).optional(),
     status: z.enum(["active", "stale", "deleted"]).optional(),
     confidence: z.enum(["observed", "inferred-high", "inferred-low"]).optional(),

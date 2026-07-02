@@ -28,6 +28,12 @@ const MAX_NODE_BUDGET = 500;
 const NODE_COLS = `id, urn, kind, name, provider, region, status, confidence, attributes, tags,
   first_seen, last_seen`;
 
+/** Kinds that Explore treats as non-estate (activity + people + per-repo CI sub-resources).
+ *  Hidden from the browse list and from the Source/Type facet options. */
+const ESTATE_KIND_EXCLUSIONS = `kind NOT LIKE '%.pullrequest' AND kind NOT LIKE '%.pull_request'
+  AND kind NOT LIKE '%.user' AND kind NOT LIKE '%.team'
+  AND kind NOT LIKE '%.pipeline' AND kind NOT LIKE '%.workflow'`;
+
 export interface NodeListResult {
   data: NodeDto[];
   page: { nextCursor: string | null; hasMore: boolean; limit: number };
@@ -37,6 +43,9 @@ export interface OverviewResult {
   nodeCount: number;
   edgeCount: number;
   byKind: Array<{ kind: string; n: number }>;
+  /** Estate facet options for Explore: sources (providers) + semantic categories present. */
+  byProvider: Array<{ provider: string; n: number }>;
+  byCategory: Array<{ category: string; n: number }>;
   edgesByConfidence: { observed: number; inferredHigh: number; inferredLow: number };
   connections: Array<{ id: string; provider: string; displayName: string; status: string }>;
   lastSyncAt: string | null;
@@ -224,11 +233,23 @@ export class GraphService {
   /** Org overview for the dashboard (docs/09 §5.2): counts + tiers + freshness. */
   async overview(orgId: string): Promise<OverviewResult> {
     return withOrgScope(this.db, orgId, async (c) => {
-      const [nodes, kinds, edges, conns, lastSync] = await Promise.all([
+      const [nodes, kinds, byProvider, byCategory, edges, conns, lastSync] = await Promise.all([
         c.query<{ n: number }>("SELECT count(*)::int AS n FROM nodes WHERE status <> 'deleted'"),
         c.query<{ kind: string; n: number }>(
           `SELECT kind, count(*)::int AS n FROM nodes WHERE status <> 'deleted'
            GROUP BY kind ORDER BY n DESC, kind`,
+        ),
+        // Estate facet options (exclude activity/people/CI so filters only offer browsable slices).
+        c.query<{ provider: string; n: number }>(
+          `SELECT provider, count(*)::int AS n FROM nodes
+             WHERE status <> 'deleted' AND ${ESTATE_KIND_EXCLUSIONS}
+             GROUP BY provider ORDER BY n DESC`,
+        ),
+        c.query<{ category: string; n: number }>(
+          `SELECT nk.category, count(*)::int AS n
+             FROM nodes nd JOIN node_kinds nk ON nk.kind = nd.kind
+            WHERE nd.status <> 'deleted' AND ${ESTATE_KIND_EXCLUSIONS.replace(/kind/g, "nd.kind")}
+            GROUP BY nk.category ORDER BY n DESC`,
         ),
         c.query<{ confidence: string; n: number }>(
           `SELECT confidence, count(*)::int AS n FROM edges WHERE status = 'active'
@@ -247,6 +268,8 @@ export class GraphService {
         nodeCount: nodes.rows[0]?.n ?? 0,
         edgeCount: edges.rows.reduce((s, r) => s + r.n, 0),
         byKind: kinds.rows,
+        byProvider: byProvider.rows,
+        byCategory: byCategory.rows.filter((r) => r.category),
         edgesByConfidence: {
           observed: conf("observed"),
           inferredHigh: conf("inferred-high"),
@@ -683,15 +706,16 @@ export class GraphService {
         where.push(`kind = ${p(q.kind)}`);
       } else {
         // Explore browses the top-level estate - the *things* you have: repos, services,
-        // datastores, cloud resources. Not ephemeral activity (PRs), not people (users/teams),
-        // and not per-repo sub-resources like CI pipelines/workflows (too granular - they show on
-        // a repo's detail). Those live elsewhere; an explicit ?kind can still target them.
-        where.push(
-          `kind NOT LIKE '%.pullrequest' AND kind NOT LIKE '%.pull_request'
-             AND kind NOT LIKE '%.user' AND kind NOT LIKE '%.team'
-             AND kind NOT LIKE '%.pipeline' AND kind NOT LIKE '%.workflow'`,
-        );
+        // datastores, cloud resources. Not activity (PRs), people (users/teams), or per-repo CI
+        // sub-resources. An explicit ?kind can still target those.
+        where.push(ESTATE_KIND_EXCLUSIONS);
       }
+      // Product facets: filter by source (connection provider) and/or semantic category.
+      // These compose with the estate exclusions above, so `category=code` still shows only
+      // repos/projects (PRs/users/pipelines stay hidden).
+      if (q.source) where.push(`provider = ${p(q.source)}`);
+      if (q.category)
+        where.push(`kind IN (SELECT kind FROM node_kinds WHERE category = ${p(q.category)})`);
       if (q.region) where.push(`region = ${p(q.region)}`);
       if (q.confidence) where.push(`confidence = ${p(q.confidence)}`);
       if (q.q) where.push(`name ILIKE ${p(`%${q.q}%`)}`);
