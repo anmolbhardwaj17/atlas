@@ -3,6 +3,8 @@ import { SearchX } from "lucide-react";
 import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/patterns/empty-state";
+import { kindIcon, kindStyle } from "@/lib/kind-visual";
+import { cn } from "@/lib/cn";
 import type { NodeDto } from "@/lib/graph-types";
 
 /** The nodes table (docs/09 §5.3) — kind · name · region, with certainty + freshness legible per row. */
@@ -29,28 +31,43 @@ export function NodesList({ nodes }: { nodes: NodeDto[] }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
-          {nodes.map((n) => (
-            <tr key={n.id} className="hover:bg-card/60">
-              <td className="px-4 py-2.5">
-                <Link href={`/explore/${n.id}`} className="font-medium hover:text-primary">
-                  {n.name ?? <span className="text-muted-foreground">unnamed</span>}
-                </Link>
-                <div className="max-w-md truncate text-xs text-muted-foreground">{n.urn}</div>
-              </td>
-              <td className="px-4 py-2.5">
-                <Badge variant="secondary" className="font-mono text-[11px] font-normal">
-                  {n.kind}
-                </Badge>
-              </td>
-              <td className="px-4 py-2.5 text-muted-foreground">{n.region ?? "—"}</td>
-              <td className="px-4 py-2.5">
-                <ConfidenceBadge tier={n.confidence} />
-              </td>
-              <td className="px-4 py-2.5">
-                <FreshnessTag status={n.status} />
-              </td>
-            </tr>
-          ))}
+          {nodes.map((n) => {
+            const Icon = kindIcon(n.kind);
+            return (
+              <tr key={n.id} className="hover:bg-card/60">
+                <td className="px-4 py-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className={cn(
+                        "grid size-7 shrink-0 place-items-center rounded-md",
+                        kindStyle(n.kind),
+                      )}
+                    >
+                      <Icon className="size-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <Link href={`/explore/${n.id}`} className="font-medium hover:text-primary">
+                        {n.name ?? <span className="text-muted-foreground">unnamed</span>}
+                      </Link>
+                      <div className="max-w-md truncate text-xs text-muted-foreground">{n.urn}</div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-4 py-2.5">
+                  <Badge variant="secondary" className="font-mono text-[11px] font-normal">
+                    {n.kind}
+                  </Badge>
+                </td>
+                <td className="px-4 py-2.5 text-muted-foreground">{n.region ?? "—"}</td>
+                <td className="px-4 py-2.5">
+                  <ConfidenceBadge tier={n.confidence} />
+                </td>
+                <td className="px-4 py-2.5">
+                  <FreshnessTag status={n.status} />
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
