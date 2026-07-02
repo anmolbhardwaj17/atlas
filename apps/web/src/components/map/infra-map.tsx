@@ -18,7 +18,9 @@ import { X } from "lucide-react";
 import { buildLayout } from "@/lib/map-layout";
 import {
   ENV_LABEL,
+  edgeCrossing,
   groupingFor,
+  CROSS_COLOR,
   type GroupMode,
   type Grouping,
   type MapData,
@@ -56,6 +58,19 @@ export function InfraMap({ data }: { data: MapData }) {
   const [active, setActive] = useState<Set<string>>(() => new Set(present));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = selectedId ? (data.nodes.find((n) => n.id === selectedId) ?? null) : null;
+
+  // How many connections cross a cloud / account boundary — the enterprise headline.
+  const cross = useMemo(() => {
+    const byId = new Map(data.nodes.map((n) => [n.id, n]));
+    let crossCloud = 0;
+    let crossAccount = 0;
+    for (const e of data.edges) {
+      const x = edgeCrossing(byId.get(e.from), byId.get(e.to));
+      if (x.crossCloud) crossCloud += 1;
+      if (x.crossAccount) crossAccount += 1;
+    }
+    return { crossCloud, crossAccount };
+  }, [data]);
 
   // Reset the lane filter to "all present" whenever the grouping dimension changes.
   useEffect(() => setActive(new Set(present)), [present]);
@@ -118,6 +133,18 @@ export function InfraMap({ data }: { data: MapData }) {
           </button>
         ))}
         <span className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
+          {cross.crossCloud + cross.crossAccount > 0 && (
+            <span
+              className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-medium"
+              style={{ color: CROSS_COLOR, borderColor: CROSS_COLOR }}
+              title="Connections that span a cloud or account boundary"
+            >
+              <span className="size-1.5 rounded-full" style={{ backgroundColor: CROSS_COLOR }} />
+              {cross.crossCloud > 0 && `${cross.crossCloud} cross-cloud`}
+              {cross.crossCloud > 0 && cross.crossAccount > 0 && " · "}
+              {cross.crossAccount > 0 && `${cross.crossAccount} cross-account`}
+            </span>
+          )}
           <Legend />
         </span>
       </div>
@@ -211,6 +238,10 @@ function Legend() {
       </span>
       <span className="flex items-center gap-1">
         <span className="h-px w-4 border-t border-dashed border-muted-foreground" /> inferred
+      </span>
+      <span className="flex items-center gap-1">
+        <span className="h-0.5 w-4 rounded" style={{ backgroundColor: CROSS_COLOR }} />{" "}
+        cross-boundary
       </span>
     </>
   );

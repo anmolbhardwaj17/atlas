@@ -32,6 +32,33 @@ export function providerOf(node: MapNode): string {
   return node.urn.split(":")[0] || node.provider || "unknown";
 }
 
+const CLOUD_PROVIDERS = new Set(["aws", "azure", "gcp"]);
+
+/**
+ * Whether an edge crosses a cloud or account boundary — the multi-cloud money shot. Only
+ * cloud→cloud edges count (a repo→service edge isn't "cross-cloud"): different provider →
+ * crossCloud; same cloud, different account/subscription/project → crossAccount.
+ */
+export function edgeCrossing(
+  from: MapNode | undefined,
+  to: MapNode | undefined,
+): { crossCloud: boolean; crossAccount: boolean } {
+  if (!from || !to) return { crossCloud: false, crossAccount: false };
+  const pf = providerOf(from);
+  const pt = providerOf(to);
+  if (!CLOUD_PROVIDERS.has(pf) || !CLOUD_PROVIDERS.has(pt)) {
+    return { crossCloud: false, crossAccount: false };
+  }
+  if (pf !== pt) return { crossCloud: true, crossAccount: false };
+  return {
+    crossCloud: false,
+    crossAccount: !!from.accountRef && !!to.accountRef && from.accountRef !== to.accountRef,
+  };
+}
+
+/** Violet accent for cross-boundary edges (the one accent that earns its place on the map). */
+export const CROSS_COLOR = "#8b5cf6";
+
 // ── Environments ─────────────────────────────────────────────────────────────
 export const ENV_ORDER = ["prod", "staging", "dev", "test", "unknown"] as const;
 export const ENV_LABEL: Record<string, string> = {

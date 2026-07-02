@@ -1,6 +1,6 @@
 import dagre from "@dagrejs/dagre";
 import type { Edge, Node } from "@xyflow/react";
-import type { Grouping, MapEdge, MapNode } from "./map-types";
+import { edgeCrossing, CROSS_COLOR, type Grouping, type MapEdge, type MapNode } from "./map-types";
 
 /**
  * Pure layout for the infra map: group resources into lanes by the chosen dimension
@@ -112,19 +112,30 @@ export function buildLayout(
     .filter((e) => byId.has(e.from) && byId.has(e.to))
     .map((e) => {
       const inferred = e.origin !== "observed";
+      const cross = edgeCrossing(byId.get(e.from), byId.get(e.to));
+      const boundary = cross.crossCloud || cross.crossAccount;
+      const label = boundary
+        ? `${cross.crossCloud ? "cross-cloud" : "cross-account"} · ${e.type.toLowerCase().replace(/_/g, " ")}`
+        : e.type.toLowerCase().replace(/_/g, " ");
       return {
         id: e.id,
         source: e.from,
         target: e.to,
         type: "smoothstep",
-        animated: FLOW_TYPES.has(e.type),
-        label: e.type.toLowerCase().replace(/_/g, " "),
+        // Cross-boundary links are the point of a multi-cloud graph → always animate + accent.
+        animated: boundary || FLOW_TYPES.has(e.type),
+        label,
         labelShowBg: true,
+        zIndex: boundary ? 5 : 1,
         style: {
-          stroke: inferred ? "hsl(var(--muted-foreground))" : "hsl(var(--foreground))",
-          strokeWidth: 1.5,
-          strokeDasharray: inferred ? "5 4" : undefined,
-          opacity: inferred ? 0.7 : 0.9,
+          stroke: boundary
+            ? CROSS_COLOR
+            : inferred
+              ? "hsl(var(--muted-foreground))"
+              : "hsl(var(--foreground))",
+          strokeWidth: boundary ? 2.25 : 1.5,
+          strokeDasharray: inferred && !boundary ? "5 4" : undefined,
+          opacity: boundary ? 1 : inferred ? 0.7 : 0.9,
         },
       };
     });
