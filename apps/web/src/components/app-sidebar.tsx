@@ -82,10 +82,7 @@ export function AppSidebar({ orgName, email }: { orgName: string; email: string 
   const initials = (email || "?").slice(0, 2).toUpperCase();
 
   return (
-    // `dark` scopes the sidebar subtree to the dark token set — a dark rail against the light
-    // content area (the main app stays light). Every token inside (sidebar-* and global) resolves
-    // to its dark value, so contrast stays correct without per-element overrides.
-    <Sidebar collapsible="icon" className="dark border-sidebar-border bg-sidebar">
+    <Sidebar collapsible="icon">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
