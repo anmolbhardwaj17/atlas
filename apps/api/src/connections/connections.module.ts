@@ -2,6 +2,7 @@ import { Module, type Provider } from "@nestjs/common";
 import { InMemorySecretBroker, InMemoryQueue, type SecretBroker } from "@atlas/ingest";
 import { createAwsConnector } from "@atlas/connector-aws";
 import { createGithubConnector } from "@atlas/connector-github";
+import { createBitbucketConnector } from "@atlas/connector-bitbucket";
 import { AuthModule } from "../auth/auth.module";
 import { ConnectionService } from "./connection.service";
 import { ConnectionController } from "./connection.controller";
@@ -33,6 +34,7 @@ const connectorRegistryProvider: Provider = {
     const registry = new ConnectorRegistry();
     registry.register("aws", createAwsConnector({ secrets }));
     registry.register("github", createGithubConnector({ secrets }));
+    registry.register("bitbucket", createBitbucketConnector({ secrets }));
     return registry;
   },
   inject: [SECRET_BROKER],

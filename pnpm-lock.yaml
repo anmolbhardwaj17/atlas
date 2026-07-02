@@ -41,6 +41,9 @@ importers:
       '@atlas/connector-aws':
         specifier: workspace:*
         version: link:../../packages/connector-aws
+      '@atlas/connector-bitbucket':
+        specifier: workspace:*
+        version: link:../../packages/connector-bitbucket
       '@atlas/connector-github':
         specifier: workspace:*
         version: link:../../packages/connector-github
@@ -241,6 +244,19 @@ importers:
       aws-sdk-client-mock:
         specifier: ^4.1.0
         version: 4.1.0
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.0)
+
+  packages/connector-bitbucket:
+    dependencies:
+      '@atlas/connector-sdk':
+        specifier: workspace:*
+        version: link:../connector-sdk
+    devDependencies:
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
