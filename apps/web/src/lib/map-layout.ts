@@ -102,6 +102,10 @@ export function buildLayout(mapNodes: MapNode[], mapEdges: MapEdge[]): LayoutRes
     cursorY += laneH + LANE_GAP;
   }
 
+  // "Flow" edges carry traffic/data → animate them so the map feels alive; structural edges
+  // (CONTAINS/PROTECTS/OWNED_BY/…) stay static so the motion means something.
+  const FLOW_TYPES = new Set(["CONNECTS_TO", "ROUTES_TO", "DEPLOYS_TO", "STORES_IN", "DEPENDS_ON"]);
+
   const edges: Edge[] = mapEdges
     .filter((e) => byId.has(e.from) && byId.has(e.to))
     .map((e) => {
@@ -111,6 +115,7 @@ export function buildLayout(mapNodes: MapNode[], mapEdges: MapEdge[]): LayoutRes
         source: e.from,
         target: e.to,
         type: "smoothstep",
+        animated: FLOW_TYPES.has(e.type),
         label: e.type.toLowerCase().replace(/_/g, " "),
         labelShowBg: true,
         style: {
