@@ -86,22 +86,22 @@ export interface CategoryStyle {
 export const ENV_STYLE: Record<string, CategoryStyle> = {
   prod: {
     text: "text-blue-700 dark:text-blue-400",
-    chip: "border-transparent bg-blue-500/12 text-blue-700 dark:text-blue-400",
+    chip: "border-transparent bg-blue-500/18 text-blue-700 dark:text-blue-400",
     dot: "bg-blue-500",
   },
   staging: {
     text: "text-amber-700 dark:text-amber-400",
-    chip: "border-transparent bg-amber-500/12 text-amber-700 dark:text-amber-400",
+    chip: "border-transparent bg-amber-500/18 text-amber-700 dark:text-amber-400",
     dot: "bg-amber-500",
   },
   dev: {
     text: "text-violet-700 dark:text-violet-400",
-    chip: "border-transparent bg-violet-500/12 text-violet-700 dark:text-violet-400",
+    chip: "border-transparent bg-violet-500/18 text-violet-700 dark:text-violet-400",
     dot: "bg-violet-500",
   },
   test: {
     text: "text-cyan-700 dark:text-cyan-400",
-    chip: "border-transparent bg-cyan-500/12 text-cyan-700 dark:text-cyan-400",
+    chip: "border-transparent bg-cyan-500/18 text-cyan-700 dark:text-cyan-400",
     dot: "bg-cyan-500",
   },
   unknown: {

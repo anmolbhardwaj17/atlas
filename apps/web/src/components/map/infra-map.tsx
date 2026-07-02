@@ -407,14 +407,21 @@ function GroupChip({
     );
   }
 
-  // Account (neutral): the original mono treatment.
+  // Account (neutral): a neutral *tint* when active — same weight as the coloured lanes, so all
+  // chip types read as "selected" consistently (not a heavy solid fill that stood out).
   return (
     <button
       type="button"
       onClick={onToggle}
       aria-pressed={active}
-      className={cn(base, active ? "border-foreground bg-foreground text-background" : off)}
+      className={cn(base, active ? "border-transparent bg-foreground/10 text-foreground" : off)}
     >
+      <span
+        className={cn(
+          "size-1.5 rounded-full",
+          active ? "bg-foreground/60" : "bg-muted-foreground/50",
+        )}
+      />
       {label}
     </button>
   );

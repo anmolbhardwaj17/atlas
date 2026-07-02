@@ -16,8 +16,10 @@ export interface NodeFilterValues {
 const STATUS = ["active", "stale", "deleted"];
 const CONFIDENCE = ["observed", "inferred-high", "inferred-low"];
 
+const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+
 const select =
-  "h-9 rounded-md border border-input bg-transparent px-3 text-sm capitalize shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+  "h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
 export function NodeFilters({ values, kinds }: { values: NodeFilterValues; kinds: string[] }) {
   const hasFilters = Boolean(values.q || values.kind || values.status || values.confidence);
@@ -35,9 +37,9 @@ export function NodeFilters({ values, kinds }: { values: NodeFilterValues; kinds
         name="kind"
         defaultValue={values.kind ?? ""}
         aria-label="Filter by kind"
-        className={`${select} w-44 normal-case`}
+        className={`${select} w-44`}
       >
-        <option value="">any kind</option>
+        <option value="">Any kind</option>
         {kinds.map((k) => (
           <option key={k} value={k}>
             {k}
@@ -50,10 +52,10 @@ export function NodeFilters({ values, kinds }: { values: NodeFilterValues; kinds
         aria-label="Filter by status"
         className={select}
       >
-        <option value="">any status</option>
+        <option value="">Any status</option>
         {STATUS.map((s) => (
           <option key={s} value={s}>
-            {s}
+            {cap(s)}
           </option>
         ))}
       </select>
@@ -63,10 +65,10 @@ export function NodeFilters({ values, kinds }: { values: NodeFilterValues; kinds
         aria-label="Filter by confidence"
         className={select}
       >
-        <option value="">any confidence</option>
+        <option value="">Any confidence</option>
         {CONFIDENCE.map((c) => (
           <option key={c} value={c}>
-            {c}
+            {cap(c)}
           </option>
         ))}
       </select>
