@@ -29,7 +29,9 @@ export default async function ExplorePage({
   const confidence = first(sp.confidence);
   const cursor = first(sp.cursor);
 
-  const params = new URLSearchParams({ limit: "50" });
+  // 100 = the server max; the estate (repos + services + cloud resources) fits on one page, so
+  // AWS/cloud resources aren't buried on page 2 behind freshly-synced code nodes.
+  const params = new URLSearchParams({ limit: "100" });
   if (q) params.set("q", q);
   if (kind) params.set("kind", kind);
   if (status) params.set("status", status);
