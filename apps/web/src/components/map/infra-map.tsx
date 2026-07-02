@@ -14,7 +14,7 @@ import {
   useReactFlow,
   type NodeMouseHandler,
 } from "@xyflow/react";
-import { X } from "lucide-react";
+import { X, Info } from "lucide-react";
 import { buildLayout } from "@/lib/map-layout";
 import {
   ENV_LABEL,
@@ -47,6 +47,16 @@ const GROUP_MODES: { mode: GroupMode; label: string }[] = [
   { mode: "cloud", label: "Cloud" },
   { mode: "account", label: "Account" },
 ];
+
+/** One-line explainer of what the lanes mean in the current grouping — updates on selection. */
+const GROUP_HELP: Record<GroupMode, string> = {
+  environment:
+    "Lanes are environments — where each resource runs (Production, Staging, or shared code).",
+  cloud:
+    "Lanes are cloud providers — who runs each resource (AWS, Azure, GCP) plus your code hosts.",
+  account:
+    "Lanes are accounts — the billing & isolation boundary each resource lives in (an AWS account, Azure subscription, or GCP project).",
+};
 
 export function InfraMap({ data }: { data: MapData }) {
   const [groupMode, setGroupMode] = useState<GroupMode>("environment");
@@ -117,6 +127,12 @@ export function InfraMap({ data }: { data: MapData }) {
           ))}
         </div>
       </div>
+
+      {/* Contextual explainer — what the lanes mean in the current grouping. */}
+      <p className="flex items-center gap-1.5 rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+        <Info className="size-3.5 shrink-0" />
+        {GROUP_HELP[groupMode]}
+      </p>
 
       <div className="flex flex-wrap items-center gap-2">
         {present.map((key) => (
