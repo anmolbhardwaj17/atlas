@@ -59,6 +59,35 @@ const TEAM_PLATFORM = gh("team", "platform");
 const PKG_EXPRESS = "external:npm:package:express";
 const PKG_STRIPE = "external:npm:package:stripe";
 
+// ── Multi-cloud: a 2nd AWS account (shared data), Azure, and GCP ─────────────
+// The demo is a real multi-cloud, multi-account estate. Cross-boundary env references (a
+// compute config value pointing at one of these hosts) let R9 stitch it into ONE graph —
+// AWS→Azure, Azure→GCP, GCP→AWS(other account) — each flagged crossCloud/crossAccount.
+const ACC_DATA = "999988887777";
+const awsData = (short: string, name: string): string =>
+  `aws:us-east-1:${ACC_DATA}:${short}/${name}`;
+const RDS_ANALYTICS = awsData("rds", "analytics-db");
+const ANALYTICS_HOST = "analytics-db.ro.us-east-1.rds.amazonaws.com";
+
+const AZ_SUB = "sub-acme-prod";
+const az = (short: string, name: string): string => `azure:eastus:${AZ_SUB}:${short}/${name}`;
+const AZ_SQL = az("sql", "customer-db");
+const AZ_SQL_HOST = "customer-db.database.windows.net";
+const AZ_FN = az("function", "profile-sync");
+
+const GCP_PROJ = "acme-ml";
+const gcpUrn = (short: string, name: string): string =>
+  `gcp:us-central1:${GCP_PROJ}:${short}/${name}`;
+const GCP_SQL = gcpUrn("cloudsql", "ml-features");
+const GCP_SQL_CONN = "acme-ml:us-central1:ml-features";
+const GCP_RUN = gcpUrn("cloudrun", "recommender");
+
+const envSignal = (
+  subjectUrn: string,
+  kind: string,
+  variables: Record<string, string>,
+): Signal[] => [{ kind, subjectUrn, data: { variables } }];
+
 type E = { type: string; toUrn: string };
 const svc = (
   name: string,
@@ -104,12 +133,18 @@ const awsScope: MockScope = {
       { type: "CONNECTS_TO", toUrn: SVC_CHECKOUT },
       { type: "CONNECTS_TO", toUrn: SVC_PAYMENTS },
     ]),
-    svc("orders", SVC_ORDERS, [
-      { type: "STORES_IN", toUrn: RDS_ORDERS },
-      { type: "STORES_IN", toUrn: DDB_CARTS },
-      { type: "CONNECTS_TO", toUrn: LAMBDA_RECEIPT },
-      { type: "DEPENDS_ON", toUrn: ROLE_ORDERS },
-    ]),
+    {
+      // orders (AWS prod) reads the Azure customer DB → R9 infers a cross-cloud link.
+      ...svc("orders", SVC_ORDERS, [
+        { type: "STORES_IN", toUrn: RDS_ORDERS },
+        { type: "STORES_IN", toUrn: DDB_CARTS },
+        { type: "CONNECTS_TO", toUrn: LAMBDA_RECEIPT },
+        { type: "DEPENDS_ON", toUrn: ROLE_ORDERS },
+      ]),
+      signals: envSignal(SVC_ORDERS, "aws.ecs.env", {
+        CUSTOMER_DB: `Server=${AZ_SQL_HOST};Database=customers`,
+      }),
+    },
     svc("checkout", SVC_CHECKOUT, [
       { type: "CONNECTS_TO", toUrn: SVC_PAYMENTS },
       { type: "STORES_IN", toUrn: CACHE },
@@ -223,7 +258,12 @@ const stagingScope: MockScope = {
  * which the runner promotes to the `region`/`account_ref` columns and `inferEnvironment`
  * reads). Existing per-resource `region` (e.g. on services) is preserved.
  */
-function stampEnv(scope: MockScope, environment: string, region: string): MockScope {
+function stampEnv(
+  scope: MockScope,
+  environment: string,
+  account: string,
+  region: string,
+): MockScope {
   return {
     ...scope,
     resources: scope.resources.map((r) => ({
@@ -231,17 +271,63 @@ function stampEnv(scope: MockScope, environment: string, region: string): MockSc
       attributes: {
         ...r.attributes,
         environment,
-        accountRef: ACC,
+        accountRef:
+          typeof r.attributes?.accountRef === "string" ? r.attributes.accountRef : account,
         region: typeof r.attributes?.region === "string" ? r.attributes.region : region,
       },
     })),
   };
 }
 
-/** The full Shopyard estate: prod (us-east-1) + staging (us-west-2) AWS + GitHub (code). */
+// ── 2nd AWS account (shared "data" account), Azure, GCP ─────────────────────
+// Referenced cross-boundary by prod AWS / GCP / Azure compute above → R9 stitches them.
+const dataAccountScope: MockScope = {
+  key: "aws:data-account",
+  resources: [
+    node(RDS_ANALYTICS, "aws.rds.instance", "analytics-db", [], {
+      engine: "postgres",
+      endpointAddress: ANALYTICS_HOST,
+      multiAz: true,
+    }),
+  ],
+};
+
+const azureScope: MockScope = {
+  key: "azure:eastus",
+  resources: [
+    node(AZ_SQL, "azure.sql.database", "customer-db", [], {
+      fullyQualifiedDomainName: AZ_SQL_HOST,
+    }),
+    {
+      // profile-sync (Azure) reads GCP Cloud SQL → cross-cloud link (Azure → GCP).
+      ...node(AZ_FN, "azure.function", "profile-sync"),
+      signals: envSignal(AZ_FN, "azure.function.env", { FEATURES_DB: GCP_SQL_CONN }),
+    },
+  ],
+};
+
+const gcpScope: MockScope = {
+  key: "gcp:us-central1",
+  resources: [
+    node(GCP_SQL, "gcp.cloudsql.instance", "ml-features", [], { connectionName: GCP_SQL_CONN }),
+    {
+      // recommender (GCP) reads the AWS data-account analytics DB → cross-cloud + cross-account.
+      ...node(GCP_RUN, "gcp.cloudrun", "recommender"),
+      signals: envSignal(GCP_RUN, "gcp.cloudrun.env", { ANALYTICS_DB: ANALYTICS_HOST }),
+    },
+  ],
+};
+
+/**
+ * The full estate: AWS prod (us-east-1) + staging (us-west-2) + a shared data account,
+ * plus Azure and GCP — one multi-cloud, multi-account graph. GitHub is the code layer.
+ */
 export const DEMO_SCOPES: readonly MockScope[] = [
-  stampEnv(awsScope, "prod", RG),
-  stampEnv(stagingScope, "staging", RG2),
+  stampEnv(awsScope, "prod", ACC, RG),
+  stampEnv(stagingScope, "staging", ACC, RG2),
+  stampEnv(dataAccountScope, "prod", ACC_DATA, "us-east-1"),
+  stampEnv(azureScope, "prod", AZ_SUB, "eastus"),
+  stampEnv(gcpScope, "prod", GCP_PROJ, "us-central1"),
   githubScope,
 ];
 
