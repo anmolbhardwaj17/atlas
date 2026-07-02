@@ -133,6 +133,47 @@ export async function verifyConnection(
   return body.data;
 }
 
+/** List the org's connections (browser). Returns [] when signed out or on error. */
+export async function listConnections(orgId: string): Promise<ConnectionSummary[]> {
+  const token = await getClientToken();
+  if (!token) return [];
+  const res = await fetch(`${apiUrl()}/connections`, {
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) return [];
+  const body = (await res.json().catch(() => null)) as { data?: ConnectionSummary[] } | null;
+  return body?.data ?? [];
+}
+
+export interface SyncTriggerResult {
+  status: "queued" | "already_running";
+  runId: string | null;
+}
+
+/** Trigger a full re-sync of a connection ("fetch latest info"). Throws with a human message
+ *  (e.g. credentials-unavailable → reconnect) on failure so the caller can surface it. Admin-only. */
+export async function triggerSync(orgId: string, id: string): Promise<SyncTriggerResult> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/connections/${id}/sync`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "X-Atlas-Org": orgId,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({}),
+  });
+  const body = (await res.json().catch(() => null)) as {
+    data?: SyncTriggerResult;
+    error?: { message?: string };
+  } | null;
+  if (!res.ok || !body?.data) {
+    throw new Error(body?.error?.message ?? `Couldn't start a sync (${res.status}).`);
+  }
+  return body.data;
+}
+
 /** Disconnect a source (purges its graph data server-side). Admin-only. */
 export async function deleteConnection(orgId: string, id: string): Promise<void> {
   const token = await getClientToken();

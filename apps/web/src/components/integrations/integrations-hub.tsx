@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Loader2, Trash2, Check, X } from "lucide-react";
+import { Plus, Loader2, Trash2, Check, X, RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,7 @@ import {
   createConnection,
   verifyConnection,
   deleteConnection,
+  triggerSync,
   type ConnectionSummary,
 } from "@/lib/browser-api";
 import { cn } from "@/lib/cn";
@@ -188,6 +189,10 @@ function ConnectionRow({
   const router = useRouter();
   const [confirming, setConfirming] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
+  const [syncing, setSyncing] = React.useState(false);
+  const [note, setNote] = React.useState<{ tone: "ok" | "warn"; text: string } | null>(null);
+
+  const canSync = conn.status === "connected" || conn.status === "degraded";
 
   async function remove() {
     setBusy(true);
@@ -200,48 +205,89 @@ function ConnectionRow({
     }
   }
 
+  async function sync() {
+    setSyncing(true);
+    setNote(null);
+    try {
+      const r = await triggerSync(orgId, conn.id);
+      setNote({
+        tone: "ok",
+        text:
+          r.status === "already_running"
+            ? "Already syncing…"
+            : "Sync started — new data lands in a few minutes.",
+      });
+      setTimeout(() => router.refresh(), 1500);
+    } catch (e) {
+      setNote({ tone: "warn", text: e instanceof Error ? e.message : "Couldn't start a sync." });
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   return (
-    <li className="flex items-center justify-between gap-2 text-sm">
-      <span className="min-w-0 truncate">{conn.displayName}</span>
-      <span className="flex shrink-0 items-center gap-2">
-        <StatusBadge status={conn.status} />
-        {canManage &&
-          (confirming ? (
-            <span className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => void remove()}
-                disabled={busy}
-                aria-label="Confirm disconnect"
-                className="text-danger hover:opacity-80"
-              >
-                {busy ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <Check className="size-3.5" />
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirming(false)}
-                aria-label="Cancel"
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="size-3.5" />
-              </button>
-            </span>
-          ) : (
+    <li className="flex flex-col gap-1 text-sm">
+      <div className="flex items-center justify-between gap-2">
+        <span className="min-w-0 truncate">{conn.displayName}</span>
+        <span className="flex shrink-0 items-center gap-2">
+          <StatusBadge status={conn.status} />
+          {canManage && canSync && !confirming ? (
             <button
               type="button"
-              onClick={() => setConfirming(true)}
-              aria-label="Disconnect"
-              title="Disconnect (removes this source's data)"
-              className="text-muted-foreground hover:text-danger"
+              onClick={() => void sync()}
+              disabled={syncing}
+              aria-label="Sync now"
+              title="Sync now — fetch the latest data"
+              className="text-muted-foreground hover:text-foreground disabled:opacity-50"
             >
-              <Trash2 className="size-3.5" />
+              <RefreshCw className={cn("size-3.5", syncing && "animate-spin")} />
             </button>
-          ))}
-      </span>
+          ) : null}
+          {canManage &&
+            (confirming ? (
+              <span className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => void remove()}
+                  disabled={busy}
+                  aria-label="Confirm disconnect"
+                  className="text-danger hover:opacity-80"
+                >
+                  {busy ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Check className="size-3.5" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirming(false)}
+                  aria-label="Cancel"
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirming(true)}
+                aria-label="Disconnect"
+                title="Disconnect (removes this source's data)"
+                className="text-muted-foreground hover:text-danger"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            ))}
+        </span>
+      </div>
+      {note ? (
+        <span
+          className={cn("text-xs", note.tone === "ok" ? "text-muted-foreground" : "text-warning")}
+        >
+          {note.text}
+        </span>
+      ) : null}
     </li>
   );
 }

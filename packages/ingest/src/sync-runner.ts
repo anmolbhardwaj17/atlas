@@ -208,12 +208,19 @@ async function finalize(
   completedScopes: string[],
   failedScopes: string[],
 ): Promise<void> {
-  await withOrgScope(db, run.orgId, (c) =>
-    c.query(
+  await withOrgScope(db, run.orgId, async (c) => {
+    await c.query(
       "UPDATE sync_runs SET status = $2, stats = $3, scope_result = $4, finished_at = now() WHERE id = $1",
       [run.id, status, JSON.stringify(stats), JSON.stringify({ completedScopes, failedScopes })],
-    ),
-  );
+    );
+    // Stamp the connection's freshness so the UI can show "synced N ago". Only on a run that
+    // actually persisted data (a hard failure leaves the prior last_synced_at untouched).
+    if (status === "succeeded" || status === "partial") {
+      await c.query("UPDATE connections SET last_synced_at = now() WHERE id = $1", [
+        run.connectionId,
+      ]);
+    }
+  });
 }
 
 async function persistNode(

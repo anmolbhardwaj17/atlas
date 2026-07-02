@@ -8,7 +8,12 @@ import { parseBody } from "../common/validation";
 import { AuditService } from "../core/audit.service";
 import type { AuthedRequest } from "../auth/auth.types";
 import { ConnectionService } from "./connection.service";
-import { CreateConnectionSchema, VerifyConnectionSchema, type ConnectionDto } from "./dto";
+import {
+  CreateConnectionSchema,
+  VerifyConnectionSchema,
+  type ConnectionDto,
+  type SyncTriggerDto,
+} from "./dto";
 
 /**
  * Connections (docs/08 §8). "Data" endpoints — org is selected via the `X-Atlas-Org`
@@ -61,6 +66,19 @@ export class ConnectionController {
       metadata: { provider: dto.provider, status: dto.status },
     });
     return dto;
+  }
+
+  @Post(":id/sync")
+  @Roles("Admin")
+  async sync(@Req() req: AuthedRequest, @Param("id") id: string): Promise<SyncTriggerDto> {
+    const result = await this.connections.triggerSync(org(req).id, id);
+    await this.audit.fromRequest(req, {
+      action: "connection.sync",
+      targetType: "connection",
+      targetId: id,
+      metadata: { status: result.status, runId: result.runId },
+    });
+    return result;
   }
 
   @Delete(":id")

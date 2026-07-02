@@ -6,7 +6,12 @@ import { PG_POOL } from "../core/tokens";
 import { ApiException } from "../common/errors";
 import { ConnectorRegistry } from "./connector-registry";
 import { SECRET_BROKER, JOB_QUEUE } from "./tokens";
-import type { ConnectionDto, CreateConnectionBody, VerifyConnectionBody } from "./dto";
+import type {
+  ConnectionDto,
+  CreateConnectionBody,
+  SyncTriggerDto,
+  VerifyConnectionBody,
+} from "./dto";
 
 const SELECT_COLS = `id, org_id, provider, display_name, status, config, secret_ref, health,
   last_error, last_synced_at, created_at, updated_at, deleted_at`;
@@ -112,41 +117,90 @@ export class ConnectionService {
       return toDto(rows[0]);
     });
 
-    // On a usable connection, kick off the onboarding full sync (FR-1.5).
+    // On a usable connection, kick off the onboarding full sync (FR-1.5). Errors are
+    // logged internally so they never fail the verify itself.
     if (dto.status === "connected" || dto.status === "degraded") {
-      await this.enqueueInitialSync(orgId, id);
+      await this.enqueueSyncRun(orgId, id, "onboarding");
     }
     return dto;
   }
 
   /**
-   * Create a queued onboarding sync_run and enqueue the job (docs/06 §11). BR-SYNC-1
-   * caps one in-flight run per connection via uq_sync_inflight; a conflicting insert
-   * (a run already queued/running) is swallowed — the existing run covers it.
+   * Manually trigger a full re-sync ("fetch latest info", FR-1.5). Guards that the source is
+   * usable and — critically — that its credentials are still resolvable: the dev Secrets Broker
+   * is in-memory, so a `secret_ref` can dangle after an API restart (or if it was seeded by a
+   * separate process). Rather than enqueue a sync that would fail auth mid-run, we surface that
+   * as a clear "reconnect" error up front. One in-flight run per connection (BR-SYNC-1): if a
+   * run is already going we report that instead of duplicating it.
    */
-  private async enqueueInitialSync(orgId: string, connectionId: string): Promise<void> {
+  async triggerSync(orgId: string, id: string): Promise<SyncTriggerDto> {
+    const row = await withOrgScope(this.db, orgId, (c) => this.load(c, id));
+
+    if (row.status === "disconnected") {
+      throw new ApiException(
+        409,
+        "invalid_state_transition",
+        "This source is disconnected. Reconnect it before syncing.",
+      );
+    }
+    if (!this.registry.get(row.provider)) {
+      throw new ApiException(
+        422,
+        "connection_verification_failed",
+        `Provider "${row.provider}" can't sync yet.`,
+      );
+    }
+    // Credentials must still be present in the broker (dangling ref ⇒ reconnect needed).
+    const material = row.secret_ref ? await this.secrets.get(row.secret_ref) : {};
+    if (Object.keys(material).length === 0) {
+      throw new ApiException(
+        409,
+        "invalid_state_transition",
+        "This source's credentials aren't available in this environment. Reconnect it, then sync.",
+      );
+    }
+
+    const { runId, alreadyRunning } = await this.enqueueSyncRun(orgId, id, "manual");
+    if (!alreadyRunning && !runId) {
+      throw new ApiException(500, "internal_error", "Couldn't start a sync — please retry.");
+    }
+    return { status: alreadyRunning ? "already_running" : "queued", runId: runId ?? null };
+  }
+
+  /**
+   * Create a queued sync_run and enqueue the job (docs/06 §11). BR-SYNC-1 caps one in-flight
+   * run per connection via uq_sync_inflight; a conflicting insert (a run already queued/running)
+   * is reported as `alreadyRunning` — the existing run covers it. Never throws: infra errors are
+   * logged and surface as a missing `runId` so callers can decide whether to raise them.
+   */
+  private async enqueueSyncRun(
+    orgId: string,
+    connectionId: string,
+    trigger: "onboarding" | "manual",
+  ): Promise<{ runId?: string; alreadyRunning: boolean }> {
     let runId: string | undefined;
     try {
       runId = await withOrgScope(this.db, orgId, async (c) => {
         const { rows } = await c.query<{ id: string }>(
           `INSERT INTO sync_runs (org_id, connection_id, type, trigger, status)
-           VALUES ($1, $2, 'full', 'onboarding', 'queued') RETURNING id`,
-          [orgId, connectionId],
+           VALUES ($1, $2, 'full', $3, 'queued') RETURNING id`,
+          [orgId, connectionId, trigger],
         );
         return rows[0]?.id;
       });
     } catch (err) {
       const code = (err as { code?: string }).code;
-      if (code === "23505") return; // BR-SYNC-1: a run is already in flight.
-      this.logger.error(`failed to create onboarding sync_run: ${(err as Error).message}`);
-      return;
+      if (code === "23505") return { alreadyRunning: true }; // BR-SYNC-1: a run is already in flight.
+      this.logger.error(`failed to create ${trigger} sync_run: ${(err as Error).message}`);
+      return { alreadyRunning: false };
     }
-    if (!runId) return;
+    if (!runId) return { alreadyRunning: false };
     try {
       await enqueueSync(this.queue, { orgId, connectionId, runId, type: "full" });
     } catch (err) {
-      this.logger.error(`failed to enqueue onboarding sync: ${(err as Error).message}`);
+      this.logger.error(`failed to enqueue ${trigger} sync: ${(err as Error).message}`);
     }
+    return { runId, alreadyRunning: false };
   }
 
   async disconnect(orgId: string, id: string): Promise<ConnectionDto> {

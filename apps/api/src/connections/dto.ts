@@ -30,3 +30,10 @@ export interface ConnectionDto {
   lastSyncedAt: string | null;
   createdAt: string;
 }
+
+/** Response for a manual sync trigger (POST /connections/:id/sync). */
+export interface SyncTriggerDto {
+  /** `queued` = a fresh run was enqueued; `already_running` = a run was already in flight. */
+  status: "queued" | "already_running";
+  runId: string | null;
+}

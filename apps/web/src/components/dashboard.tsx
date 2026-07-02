@@ -18,6 +18,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Onboarding } from "@/components/onboarding";
 import { AskLauncher } from "@/components/dashboard/ask-launcher";
+import { RefreshLatest } from "@/components/dashboard/refresh-latest";
 import { SeverityBadge } from "@/components/tags";
 import { severityMeta } from "@/lib/taxonomy";
 import { apiGet, type ApiOk } from "@/lib/api";
@@ -93,11 +94,16 @@ export async function Dashboard({
 
   const { inventory: inv, trust } = s;
 
+  const canManage = role === "Owner" || role === "Admin";
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Overview</h1>
-        <TrustPulse trust={trust} inv={inv} />
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold">Overview</h1>
+          <TrustPulse trust={trust} inv={inv} />
+        </div>
+        {canManage ? <RefreshLatest orgId={orgId} /> : null}
       </div>
 
       <AskLauncher />
