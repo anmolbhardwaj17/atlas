@@ -67,6 +67,7 @@ interface Summary {
   activity: TimelineItem[];
   insights: {
     topContributors: Array<{ name: string; count: number }>;
+    mostActiveRepos: Array<{ name: string; count: number }>;
     busiestProjects: Array<{ name: string; count: number }>;
     pipelineCoverage: { withPipeline: number; total: number };
   };
@@ -319,7 +320,7 @@ function MapPreview({
 }
 
 function Insights({ insights }: { insights: Summary["insights"] }) {
-  const { topContributors, busiestProjects, pipelineCoverage } = insights;
+  const { topContributors, mostActiveRepos, busiestProjects, pipelineCoverage } = insights;
   if (topContributors.length === 0 && busiestProjects.length === 0) return null;
   const pct =
     pipelineCoverage.total > 0
@@ -329,12 +330,18 @@ function Insights({ insights }: { insights: Summary["insights"] }) {
   return (
     <div>
       <h2 className="mb-3 text-base font-semibold">Insights</h2>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Leaderboard
           title="Top contributors"
-          subtitle="by open PRs"
+          subtitle="by PRs raised"
           items={topContributors}
           href="/explore?kind=bitbucket.user"
+        />
+        <Leaderboard
+          title="Most active repos"
+          subtitle="by open PRs"
+          items={mostActiveRepos}
+          href="/explore?kind=bitbucket.repository"
         />
         <Leaderboard
           title="Busiest projects"

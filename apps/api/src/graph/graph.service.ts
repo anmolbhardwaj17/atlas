@@ -93,6 +93,7 @@ export interface DashboardSummary {
   /** Positive, informational code stats (leaderboards) — present when a code host is connected. */
   insights: {
     topContributors: Array<{ name: string; count: number }>;
+    mostActiveRepos: Array<{ name: string; count: number }>;
     busiestProjects: Array<{ name: string; count: number }>;
     pipelineCoverage: { withPipeline: number; total: number };
   };
@@ -265,6 +266,7 @@ export class GraphService {
         noPipeline,
         emptyProjects,
         contributors,
+        mostActiveRepos,
         busiestProjects,
       ] = await Promise.all([
         c.query<{ category: string; n: number }>(
@@ -333,7 +335,10 @@ export class GraphService {
              count(*) FILTER (WHERE kind LIKE '%.project')::int AS projects,
              count(*) FILTER (WHERE kind LIKE '%.pipeline' OR kind LIKE '%.workflow')::int AS pipelines,
              count(*) FILTER (WHERE kind LIKE '%.user' OR kind LIKE '%.team')::int AS contributors,
-             count(*) FILTER (WHERE kind LIKE '%.pullrequest' OR kind LIKE '%.pull_request')::int AS pull_requests
+             count(*) FILTER (
+               WHERE (kind LIKE '%.pullrequest' OR kind LIKE '%.pull_request')
+                 AND (attributes->>'state' IS NULL OR attributes->>'state' = 'OPEN')
+             )::int AS pull_requests
            FROM nodes WHERE status <> 'deleted'`,
         ),
         // Repos with no CI/CD pipeline (no CONTAINS→pipeline) — a hygiene finding.
@@ -354,7 +359,7 @@ export class GraphService {
                  WHERE e.from_node_id = pr.id AND e.type = 'CONTAINS'
                    AND r.kind LIKE '%.repository')`,
         ),
-        // Top contributors by (open) PRs raised.
+        // Top contributors by PRs raised (open + recently merged, once the connector crawls them).
         c.query<{ name: string | null; n: number }>(
           `SELECT u.name, count(*)::int AS n
              FROM edges e
@@ -362,6 +367,16 @@ export class GraphService {
              JOIN nodes u ON u.id = e.to_node_id AND (u.kind LIKE '%.user' OR u.kind LIKE '%.team')
             WHERE e.type = 'OWNED_BY' AND e.status = 'active'
             GROUP BY u.name ORDER BY n DESC, u.name LIMIT 5`,
+        ),
+        // Most active repositories by open PRs (where in-flight work sits).
+        c.query<{ name: string | null; n: number }>(
+          `SELECT r.name, count(*)::int AS n
+             FROM edges e
+             JOIN nodes r ON r.id = e.from_node_id AND r.kind LIKE '%.repository'
+             JOIN nodes pr ON pr.id = e.to_node_id AND pr.kind LIKE '%.pullrequest'
+             AND (pr.attributes->>'state' IS NULL OR pr.attributes->>'state' = 'OPEN')
+            WHERE e.type = 'CONTAINS' AND e.status = 'active'
+            GROUP BY r.name ORDER BY n DESC, r.name LIMIT 5`,
         ),
         // Busiest projects by repository count.
         c.query<{ name: string | null; n: number }>(
@@ -420,6 +435,10 @@ export class GraphService {
         noPipeline: noPipeline.rows[0]?.n ?? 0,
         emptyProjects: emptyProjects.rows[0]?.n ?? 0,
         topContributors: contributors.rows.map((r) => ({ name: r.name ?? "unknown", count: r.n })),
+        mostActiveRepos: mostActiveRepos.rows.map((r) => ({
+          name: r.name ?? "unknown",
+          count: r.n,
+        })),
         busiestProjects: busiestProjects.rows.map((r) => ({
           name: r.name ?? "unknown",
           count: r.n,
@@ -557,6 +576,7 @@ export class GraphService {
       crossBoundary: { crossCloud: base.crossCloud, crossAccount: base.crossAccount },
       insights: {
         topContributors: base.topContributors,
+        mostActiveRepos: base.mostActiveRepos,
         busiestProjects: base.busiestProjects,
         pipelineCoverage: {
           withPipeline: Math.max(0, base.repositories - base.noPipeline),

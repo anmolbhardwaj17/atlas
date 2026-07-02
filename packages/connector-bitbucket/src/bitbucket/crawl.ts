@@ -1,6 +1,6 @@
 import type { ResourceRef } from "@atlas/connector-sdk";
 import type { BitbucketClient } from "./client";
-import { withContext } from "../modules/context";
+import { withContext, type AtlasContext } from "../modules/context";
 import { userKeyOf } from "../modules/nodes";
 
 /**
@@ -104,20 +104,38 @@ export async function* discoverRepo(
     // environments not configured / not permitted — skip this repo's pipelines
   }
 
-  // Open pull requests. Absent/forbidden ⇒ skip.
+  // Open pull requests (in-flight work). Absent/forbidden ⇒ skip.
   try {
     for await (const pr of client.paginate<Json>(
       `/repositories/${workspace}/${repoSlug}/pullrequests`,
       { params: { state: "OPEN" } },
     )) {
-      const id = typeof pr.id === "number" ? pr.id : s(pr.id);
-      if (!id && id !== 0) continue;
-      yield {
-        ref: { scopeKey, externalId: `pr:${repoSlug}:${id}`, kind: "bitbucket.pullrequest" },
-        payload: withContext(pr, ctx),
-      };
+      yield prRef(pr, repoSlug, scopeKey, ctx);
     }
   } catch {
     // PRs not permitted — skip
   }
+
+  // Recently MERGED pull requests (shipped work → contribution history). Bounded to the most
+  // recent page per repo (single request, no pagination) so the graph doesn't fill with years
+  // of history — the current-state graph keeps a recent, useful slice.
+  try {
+    const res = await client.request<{ values?: Json[] }>(
+      `/repositories/${workspace}/${repoSlug}/pullrequests`,
+      { params: { state: "MERGED", sort: "-updated_on", pagelen: 25 } },
+    );
+    for (const pr of res.data.values ?? []) {
+      yield prRef(pr, repoSlug, scopeKey, ctx);
+    }
+  } catch {
+    // merged PRs not permitted — skip
+  }
+}
+
+function prRef(pr: Json, repoSlug: string, scopeKey: string, ctx: AtlasContext): Discovered {
+  const id = typeof pr.id === "number" ? pr.id : s(pr.id);
+  return {
+    ref: { scopeKey, externalId: `pr:${repoSlug}:${id}`, kind: "bitbucket.pullrequest" },
+    payload: withContext(pr, ctx),
+  };
 }
