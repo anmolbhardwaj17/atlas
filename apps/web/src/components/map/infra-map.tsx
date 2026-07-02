@@ -1,7 +1,7 @@
 "use client";
 
 import "@xyflow/react/dist/style.css";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ReactFlow,
@@ -90,18 +90,30 @@ export function InfraMap({ data }: { data: MapData }) {
     return { childrenOf: children, connectedIds: connected };
   }, [data.edges]);
 
-  // Default = collapsed to top-level containers: every node that contains others starts folded.
+  // Default = collapsed to top-level containers. Until the user toggles, the effective set is
+  // "all containers folded" — computed during render so the FIRST paint is already collapsed
+  // (no 130-node → 27-node flash that made fitView zoom to nothing).
+  const userToggled = useRef(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  useEffect(() => setCollapsed(new Set(childrenOf.keys())), [childrenOf]);
+  useEffect(() => {
+    userToggled.current = false;
+    setCollapsed(new Set());
+  }, [data.edges]);
+  const effectiveCollapsed = useMemo(
+    () => (userToggled.current ? collapsed : new Set(childrenOf.keys())),
+    [collapsed, childrenOf],
+  );
   const toggleCollapse = useCallback(
     (id: string) =>
       setCollapsed((prev) => {
-        const next = new Set(prev);
+        const base = userToggled.current ? prev : new Set(childrenOf.keys());
+        userToggled.current = true;
+        const next = new Set(base);
         if (next.has(id)) next.delete(id);
         else next.add(id);
         return next;
       }),
-    [],
+    [childrenOf],
   );
 
   // How many connections cross a cloud / account boundary — the enterprise headline.
@@ -210,11 +222,13 @@ export function InfraMap({ data }: { data: MapData }) {
             onSelect={setSelectedId}
             childrenOf={childrenOf}
             connectedIds={connectedIds}
-            collapsed={collapsed}
+            collapsed={effectiveCollapsed}
             onToggleCollapse={toggleCollapse}
           />
         </ReactFlowProvider>
-        {selected && <DetailPanel node={selected} onClose={() => setSelectedId(null)} />}
+        {selected && (
+          <DetailPanel node={selected} data={data} onClose={() => setSelectedId(null)} />
+        )}
       </div>
     </div>
   );
@@ -295,9 +309,16 @@ function Flow({
   useEffect(() => {
     setNodes(layout.nodes);
     setEdges(layout.edges);
-    // Fit after the new nodes are in the store + painted (filter changes re-fit too).
-    const t = setTimeout(() => void fitView({ padding: 0.15, duration: 300 }), 160);
-    return () => clearTimeout(t);
+    // Fit AFTER the store has the new nodes and painted them (double rAF) — fitting in the same
+    // tick reads the stale store and zooms to the wrong box (the blank first paint).
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => void fitView({ padding: 0.18, duration: 250 }));
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      if (raf2) cancelAnimationFrame(raf2);
+    };
   }, [layout, setNodes, setEdges, fitView]);
 
   const onNodeClick: NodeMouseHandler = (_evt, node) => {
@@ -416,8 +437,49 @@ function Legend() {
   );
 }
 
-function DetailPanel({ node, onClose }: { node: MapNode; onClose: () => void }) {
-  const kindShort = node.kind.replace(/^aws\.|^github\.|^external\.|^atlas\./, "");
+/** Humanize an edge type from the selected node's perspective (outgoing = it's the source). */
+function relVerb(type: string, fromKind: string, outgoing: boolean): string {
+  if (type === "OWNED_BY") {
+    if (outgoing) return fromKind === "bitbucket.pullrequest" ? "Raised by" : "Owned by";
+    return "Owns";
+  }
+  if (type === "CONTAINS") return outgoing ? "Contains" : "In";
+  const pretty = type.toLowerCase().replace(/_/g, " ");
+  return outgoing ? pretty.charAt(0).toUpperCase() + pretty.slice(1) : `${pretty} ←`;
+}
+
+function shortName(n: MapNode): string {
+  return n.name ?? n.kind.replace(/^aws\.|^github\.|^external\.|^atlas\.|^bitbucket\./, "");
+}
+
+function DetailPanel({
+  node,
+  data,
+  onClose,
+}: {
+  node: MapNode;
+  data: MapData;
+  onClose: () => void;
+}) {
+  const kindShort = node.kind.replace(/^aws\.|^github\.|^external\.|^atlas\.|^bitbucket\./, "");
+
+  const rels = useMemo(() => {
+    const byId = new Map(data.nodes.map((n) => [n.id, n]));
+    const out: { verb: string; name: string }[] = [];
+    for (const e of data.edges) {
+      if (e.from === node.id) {
+        const nb = byId.get(e.to);
+        if (nb) out.push({ verb: relVerb(e.type, node.kind, true), name: shortName(nb) });
+      } else if (e.to === node.id) {
+        const nb = byId.get(e.from);
+        if (nb) out.push({ verb: relVerb(e.type, nb.kind, false), name: shortName(nb) });
+      }
+    }
+    // Put ownership/authorship first — it's usually what you're looking for.
+    out.sort((a, b) => (a.verb.includes("by") ? -1 : 0) - (b.verb.includes("by") ? -1 : 0));
+    return out;
+  }, [data, node]);
+
   return (
     <div className="absolute right-3 top-3 z-10 w-72 rounded-lg border border-border bg-card p-4 shadow-lg">
       <div className="flex items-start justify-between gap-2">
@@ -444,6 +506,25 @@ function DetailPanel({ node, onClose }: { node: MapNode; onClose: () => void }) 
         <ConfidenceBadge tier={node.confidence} />
         <FreshnessTag status={node.status} />
       </div>
+
+      {rels.length > 0 && (
+        <div className="mt-3 border-t border-border pt-3">
+          <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Connections
+          </p>
+          <ul className="space-y-1 text-xs">
+            {rels.slice(0, 6).map((r, i) => (
+              <li key={i} className="flex justify-between gap-3">
+                <span className="shrink-0 text-muted-foreground">{r.verb}</span>
+                <span className="min-w-0 truncate font-medium">{r.name}</span>
+              </li>
+            ))}
+          </ul>
+          {rels.length > 6 && (
+            <p className="mt-1 text-[10px] text-muted-foreground">+{rels.length - 6} more</p>
+          )}
+        </div>
+      )}
 
       <div className="mt-4 flex gap-2">
         <Link
