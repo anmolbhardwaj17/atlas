@@ -28,6 +28,7 @@ export function pullRequestNode(payload: unknown): NodeUpsert {
       state: str(payload, "state"),
       sourceBranch: str(obj(obj(payload, "source"), "branch"), "name"),
       destinationBranch: str(obj(obj(payload, "destination"), "branch"), "name"),
+      createdOn: str(payload, "created_on"),
       updatedOn: str(payload, "updated_on"),
     },
   };

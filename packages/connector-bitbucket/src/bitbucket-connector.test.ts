@@ -21,8 +21,9 @@ class FakeClient implements BitbucketClient {
     if (this.throwOn[key]) throw new BitbucketHttpError(this.throwOn[key]!, key);
     return { status: 200, data: (this.reqs[key] ?? {}) as T, headers: new Headers() };
   }
-  async *paginate<T>(path: string): AsyncIterable<T> {
-    const key = path.split("?")[0]!;
+  async *paginate<T>(path: string, opts?: { params?: Record<string, unknown> }): AsyncIterable<T> {
+    const state = opts?.params?.state ? `?state=${String(opts.params.state)}` : "";
+    const key = path.split("?")[0]! + state;
     if (this.throwOn[key]) throw new BitbucketHttpError(this.throwOn[key]!, key);
     for (const v of this.pages[key] ?? []) yield v as T;
   }
@@ -83,7 +84,7 @@ describe("BitbucketConnector crawl", () => {
       "/repositories/acme/mobile-app/environments/": [
         { uuid: "{e1}", name: "Production", environment_type: { name: "Production" } },
       ],
-      "/repositories/acme/mobile-app/pullrequests": [
+      "/repositories/acme/mobile-app/pullrequests?state=OPEN": [
         { id: 231, title: "offline mode", author: { nickname: "diego" } },
       ],
     },

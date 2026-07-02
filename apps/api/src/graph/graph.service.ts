@@ -253,6 +253,10 @@ export class GraphService {
    */
   async summary(orgId: string): Promise<DashboardSummary> {
     const impact = [...IMPACT_EDGE_TYPES];
+    // PR insight window: PRs *raised* in the last 90 days (created_on). Captures recent
+    // contribution + repo activity (open or merged); a PR opened years ago doesn't count as
+    // recent activity. ISO strings sort chronologically → a lexicographic >= is a correct filter.
+    const prSince = new Date(Date.now() - 90 * 86400 * 1000).toISOString();
     const base = await withOrgScope(this.db, orgId, async (c) => {
       const [
         cats,
@@ -359,23 +363,27 @@ export class GraphService {
                  WHERE e.from_node_id = pr.id AND e.type = 'CONTAINS'
                    AND r.kind LIKE '%.repository')`,
         ),
-        // Top contributors by total PRs raised (open + merged).
+        // Top contributors by PRs raised (open + merged) in the last 90 days.
         c.query<{ name: string | null; n: number }>(
           `SELECT u.name, count(*)::int AS n
              FROM edges e
              JOIN nodes pr ON pr.id = e.from_node_id AND pr.kind LIKE '%.pullrequest'
+               AND pr.attributes->>'createdOn' >= $1
              JOIN nodes u ON u.id = e.to_node_id AND (u.kind LIKE '%.user' OR u.kind LIKE '%.team')
             WHERE e.type = 'OWNED_BY' AND e.status = 'active'
             GROUP BY u.name ORDER BY n DESC, u.name LIMIT 5`,
+          [prSince],
         ),
-        // Most active repositories by total PR activity (open + merged) — how much PR churn.
+        // Most active repositories by PRs raised (open + merged) in the last 90 days.
         c.query<{ name: string | null; n: number }>(
           `SELECT r.name, count(*)::int AS n
              FROM edges e
              JOIN nodes r ON r.id = e.from_node_id AND r.kind LIKE '%.repository'
              JOIN nodes pr ON pr.id = e.to_node_id AND pr.kind LIKE '%.pullrequest'
+               AND pr.attributes->>'createdOn' >= $1
             WHERE e.type = 'CONTAINS' AND e.status = 'active'
             GROUP BY r.name ORDER BY n DESC, r.name LIMIT 5`,
+          [prSince],
         ),
         // Busiest projects by repository count.
         c.query<{ name: string | null; n: number }>(

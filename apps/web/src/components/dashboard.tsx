@@ -331,20 +331,22 @@ function Insights({ insights }: { insights: Summary["insights"] }) {
     <div>
       <h2 className="text-base font-semibold">Insights</h2>
       <p className="mb-3 text-xs text-muted-foreground">
-        From pull requests — all open ones, plus those merged in the last 90 days.
+        Pull requests raised in the last 90 days (open or merged).
       </p>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Leaderboard
           title="Top contributors"
-          subtitle="PRs raised"
+          subtitle="PRs raised · 90d"
           items={topContributors}
           href="/explore?kind=bitbucket.user"
+          emptyLabel="No PRs in the last 90 days — reconnect Bitbucket to sync recent activity."
         />
         <Leaderboard
           title="Most active repos"
-          subtitle="PR activity"
+          subtitle="PRs · 90d"
           items={mostActiveRepos}
           href="/explore?kind=bitbucket.repository"
+          emptyLabel="No PRs in the last 90 days yet."
         />
         <Leaderboard
           title="Busiest projects"
@@ -377,11 +379,13 @@ function Leaderboard({
   subtitle,
   items,
   href,
+  emptyLabel = "None yet.",
 }: {
   title: string;
   subtitle: string;
   items: Array<{ name: string; count: number }>;
   href: string;
+  emptyLabel?: string;
 }) {
   const max = items[0]?.count ?? 1;
   return (
@@ -396,7 +400,7 @@ function Leaderboard({
           </Link>
         </div>
         {items.length === 0 ? (
-          <p className="text-sm text-muted-foreground">None yet.</p>
+          <p className="text-sm text-muted-foreground">{emptyLabel}</p>
         ) : (
           <ul className="space-y-2">
             {items.map((it) => (
