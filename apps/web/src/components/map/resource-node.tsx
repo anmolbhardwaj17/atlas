@@ -71,6 +71,31 @@ const ICON: Record<string, LucideIcon> = {
   "github.team": Users,
   "external.package": Package,
   "atlas.service": Sparkles,
+  // Azure
+  "azure.vm": Server,
+  "azure.function": Zap,
+  "azure.appservice": Globe,
+  "azure.aks.cluster": Boxes,
+  "azure.sql.database": Database,
+  "azure.postgres": Database,
+  "azure.cosmosdb": Database,
+  "azure.storage.account": HardDrive,
+  "azure.vnet": Network,
+  "azure.subnet": Network,
+  "azure.loadbalancer": Split,
+  "azure.keyvault": Key,
+  // GCP
+  "gcp.gce.instance": Server,
+  "gcp.cloudrun": Boxes,
+  "gcp.cloudfunction": Zap,
+  "gcp.gke.cluster": Boxes,
+  "gcp.cloudsql.instance": Database,
+  "gcp.spanner": Database,
+  "gcp.firestore": Database,
+  "gcp.gcs.bucket": HardDrive,
+  "gcp.vpc": Network,
+  "gcp.subnet": Network,
+  "gcp.pubsub.topic": Webhook,
 };
 
 /** Certainty accent (docs/09 §3.2) — solid = observed fact, ring = inferred, mono only. */
@@ -110,6 +135,31 @@ const CATEGORY: Record<string, string> = {
   "github.user": "code",
   "external.package": "code",
   "atlas.service": "service",
+  // Azure
+  "azure.vm": "compute",
+  "azure.function": "compute",
+  "azure.appservice": "compute",
+  "azure.aks.cluster": "compute",
+  "azure.sql.database": "data",
+  "azure.postgres": "data",
+  "azure.cosmosdb": "data",
+  "azure.storage.account": "storage",
+  "azure.vnet": "network",
+  "azure.subnet": "network",
+  "azure.loadbalancer": "network",
+  "azure.keyvault": "security",
+  // GCP
+  "gcp.gce.instance": "compute",
+  "gcp.cloudrun": "compute",
+  "gcp.cloudfunction": "compute",
+  "gcp.gke.cluster": "compute",
+  "gcp.cloudsql.instance": "data",
+  "gcp.spanner": "data",
+  "gcp.firestore": "data",
+  "gcp.gcs.bucket": "storage",
+  "gcp.vpc": "network",
+  "gcp.subnet": "network",
+  "gcp.pubsub.topic": "compute",
 };
 
 const CATEGORY_STYLE: Record<string, string> = {

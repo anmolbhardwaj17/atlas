@@ -1,13 +1,13 @@
 import dagre from "@dagrejs/dagre";
 import type { Edge, Node } from "@xyflow/react";
-import { ENV_ORDER, ENV_LABEL, type MapEdge, type MapNode } from "./map-types";
+import type { Grouping, MapEdge, MapNode } from "./map-types";
 
 /**
- * Pure layout for the infra map: group resources into environment lanes (Production /
- * Staging / … / Code & shared), auto-layout each lane's subgraph left-to-right with dagre,
- * then stack the lanes and frame each with a labeled group box. Positions are absolute (no
- * React Flow parent/child) so cross-environment edges (e.g. a repo → a prod service) draw
- * cleanly across the frames. Deterministic → the map is stable across renders.
+ * Pure layout for the infra map: group resources into lanes by the chosen dimension
+ * (environment / cloud / account), auto-layout each lane's subgraph left-to-right with
+ * dagre, then stack the lanes and frame each with a labeled group box. Positions are
+ * absolute (no React Flow parent/child) so cross-lane edges (a repo → a prod service, or an
+ * AWS app → an Azure DB) draw cleanly across frames. Deterministic → stable across renders.
  */
 const NODE_W = 190;
 const NODE_H = 56;
@@ -21,18 +21,20 @@ export interface LayoutResult {
   edges: Edge[];
 }
 
-export function buildLayout(mapNodes: MapNode[], mapEdges: MapEdge[]): LayoutResult {
+export function buildLayout(
+  mapNodes: MapNode[],
+  mapEdges: MapEdge[],
+  grouping: Grouping,
+): LayoutResult {
   const byId = new Map(mapNodes.map((n) => [n.id, n]));
-  // Group nodes by environment (anything outside the known set → "unknown").
+  // Bucket nodes by the chosen grouping key.
   const groups = new Map<string, MapNode[]>();
   for (const n of mapNodes) {
-    const env = ENV_ORDER.includes(n.environment as (typeof ENV_ORDER)[number])
-      ? n.environment
-      : "unknown";
-    let bucket = groups.get(env);
+    const key = grouping.keyOf(n);
+    let bucket = groups.get(key);
     if (!bucket) {
       bucket = [];
-      groups.set(env, bucket);
+      groups.set(key, bucket);
     }
     bucket.push(n);
   }
@@ -40,8 +42,8 @@ export function buildLayout(mapNodes: MapNode[], mapEdges: MapEdge[]): LayoutRes
   const outNodes: Node[] = [];
   let cursorY = 0;
 
-  for (const env of ENV_ORDER) {
-    const laneNodes = groups.get(env);
+  for (const key of grouping.order([...groups.keys()])) {
+    const laneNodes = groups.get(key);
     if (!laneNodes || laneNodes.length === 0) continue;
     const ids = new Set(laneNodes.map((n) => n.id));
 
@@ -71,10 +73,10 @@ export function buildLayout(mapNodes: MapNode[], mapEdges: MapEdge[]): LayoutRes
     const laneH = maxY - minY + HEADER_H + PAD * 2;
 
     outNodes.push({
-      id: `lane-${env}`,
+      id: `lane-${key}`,
       type: "envLane",
       position: { x: 0, y: cursorY },
-      data: { label: ENV_LABEL[env] ?? env, count: laneNodes.length },
+      data: { label: grouping.labelOf(key), count: laneNodes.length },
       draggable: false,
       selectable: false,
       // Explicit dimensions so React Flow renders immediately (no measure-then-reveal).

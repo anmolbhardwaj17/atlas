@@ -16,7 +16,14 @@ import {
 } from "@xyflow/react";
 import { X } from "lucide-react";
 import { buildLayout } from "@/lib/map-layout";
-import { ENV_ORDER, ENV_LABEL, type MapData, type MapNode } from "@/lib/map-types";
+import {
+  ENV_LABEL,
+  groupingFor,
+  type GroupMode,
+  type Grouping,
+  type MapData,
+  type MapNode,
+} from "@/lib/map-types";
 import { ResourceNode, EnvLaneNode } from "@/components/map/resource-node";
 import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
 import { cn } from "@/lib/cn";
@@ -30,50 +37,84 @@ const nodeTypes = { resource: ResourceNode, envLane: EnvLaneNode };
  * Certainty is legible per node (solid = observed, faded/ring = inferred) and per edge
  * (solid = observed, dashed = inferred) — P3/P4, mono theme.
  */
+const GROUP_MODES: { mode: GroupMode; label: string }[] = [
+  { mode: "environment", label: "Environment" },
+  { mode: "cloud", label: "Cloud" },
+  { mode: "account", label: "Account" },
+];
+
 export function InfraMap({ data }: { data: MapData }) {
-  const present = useMemo(() => {
-    const set = new Set(data.nodes.map((n) => (isEnv(n.environment) ? n.environment : "unknown")));
-    return ENV_ORDER.filter((e) => set.has(e));
-  }, [data.nodes]);
+  const [groupMode, setGroupMode] = useState<GroupMode>("environment");
+  const grouping = useMemo(() => groupingFor(groupMode), [groupMode]);
+
+  // The present lane keys for the current grouping, in lane order.
+  const present = useMemo(
+    () => grouping.order([...new Set(data.nodes.map((n) => grouping.keyOf(n)))]),
+    [data.nodes, grouping],
+  );
 
   const [active, setActive] = useState<Set<string>>(() => new Set(present));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = selectedId ? (data.nodes.find((n) => n.id === selectedId) ?? null) : null;
 
-  function toggleEnv(env: string) {
+  // Reset the lane filter to "all present" whenever the grouping dimension changes.
+  useEffect(() => setActive(new Set(present)), [present]);
+
+  function toggleKey(key: string) {
     setActive((prev) => {
       const next = new Set(prev);
-      if (next.has(env)) next.delete(env);
-      else next.add(env);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next.size === 0 ? new Set(present) : next; // never show nothing
     });
   }
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Infrastructure map</h1>
-        <p className="text-sm text-muted-foreground">
-          Your estate as a graph — resources, how they connect, grouped by environment. Click a
-          resource to inspect it.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold">Infrastructure map</h1>
+          <p className="text-sm text-muted-foreground">
+            Your estate as one graph — across accounts and clouds. Group it, then click a resource
+            to inspect it.
+          </p>
+        </div>
+        {/* Group-by segmented control. */}
+        <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/40 p-0.5 text-xs">
+          {GROUP_MODES.map((g) => (
+            <button
+              key={g.mode}
+              type="button"
+              onClick={() => setGroupMode(g.mode)}
+              aria-pressed={groupMode === g.mode}
+              className={cn(
+                "rounded-md px-2.5 py-1 font-medium transition-colors",
+                groupMode === g.mode
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {g.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {present.map((env) => (
+        {present.map((key) => (
           <button
-            key={env}
+            key={key}
             type="button"
-            onClick={() => toggleEnv(env)}
-            aria-pressed={active.has(env)}
+            onClick={() => toggleKey(key)}
+            aria-pressed={active.has(key)}
             className={cn(
               "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-              active.has(env)
+              active.has(key)
                 ? "border-foreground bg-foreground text-background"
                 : "border-border text-muted-foreground hover:border-foreground/40",
             )}
           >
-            {ENV_LABEL[env] ?? env}
+            {grouping.labelOf(key)}
           </button>
         ))}
         <span className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
@@ -83,14 +124,14 @@ export function InfraMap({ data }: { data: MapData }) {
 
       {data.truncated && (
         <p className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-          Showing the most recent {data.nodes.length} resources — the graph is larger. Filter by
-          environment to focus.
+          Showing the most recent {data.nodes.length} resources — the graph is larger. Filter to
+          focus.
         </p>
       )}
 
       <div className="relative h-[calc(100dvh-14rem)] min-h-[480px] overflow-hidden rounded-xl border border-border bg-background">
         <ReactFlowProvider>
-          <Flow data={data} active={active} onSelect={setSelectedId} />
+          <Flow data={data} active={active} grouping={grouping} onSelect={setSelectedId} />
         </ReactFlowProvider>
         {selected && <DetailPanel node={selected} onClose={() => setSelectedId(null)} />}
       </div>
@@ -107,20 +148,20 @@ export function InfraMap({ data }: { data: MapData }) {
 function Flow({
   data,
   active,
+  grouping,
   onSelect,
 }: {
   data: MapData;
   active: Set<string>;
+  grouping: Grouping;
   onSelect: (id: string | null) => void;
 }) {
   const layout = useMemo(() => {
-    const visibleNodes = data.nodes.filter((n) =>
-      active.has(isEnv(n.environment) ? n.environment : "unknown"),
-    );
+    const visibleNodes = data.nodes.filter((n) => active.has(grouping.keyOf(n)));
     const ids = new Set(visibleNodes.map((n) => n.id));
     const visibleEdges = data.edges.filter((e) => ids.has(e.from) && ids.has(e.to));
-    return buildLayout(visibleNodes, visibleEdges);
-  }, [data, active]);
+    return buildLayout(visibleNodes, visibleEdges, grouping);
+  }, [data, active, grouping]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layout.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layout.edges);
@@ -160,10 +201,6 @@ function Flow({
       <MiniMap pannable zoomable nodeColor="hsl(var(--muted-foreground))" />
     </ReactFlow>
   );
-}
-
-function isEnv(e: string): e is (typeof ENV_ORDER)[number] {
-  return (ENV_ORDER as readonly string[]).includes(e);
 }
 
 function Legend() {
