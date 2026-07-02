@@ -68,7 +68,6 @@ interface Summary {
   insights: {
     topContributors: Array<{ name: string; count: number }>;
     mostActiveRepos: Array<{ name: string; count: number }>;
-    busiestProjects: Array<{ name: string; count: number }>;
     pipelineCoverage: { withPipeline: number; total: number };
   };
 }
@@ -320,8 +319,8 @@ function MapPreview({
 }
 
 function Insights({ insights }: { insights: Summary["insights"] }) {
-  const { topContributors, mostActiveRepos, busiestProjects, pipelineCoverage } = insights;
-  if (topContributors.length === 0 && busiestProjects.length === 0) return null;
+  const { topContributors, mostActiveRepos, pipelineCoverage } = insights;
+  if (pipelineCoverage.total === 0) return null;
   const pct =
     pipelineCoverage.total > 0
       ? Math.round((pipelineCoverage.withPipeline / pipelineCoverage.total) * 100)
@@ -333,7 +332,7 @@ function Insights({ insights }: { insights: Summary["insights"] }) {
       <p className="mb-3 text-xs text-muted-foreground">
         Pull requests raised in the last 90 days (open or merged).
       </p>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Leaderboard
           title="Top contributors"
           subtitle="PRs raised · 90d"
@@ -347,12 +346,6 @@ function Insights({ insights }: { insights: Summary["insights"] }) {
           items={mostActiveRepos}
           href="/explore?kind=bitbucket.repository"
           emptyLabel="No PRs in the last 90 days yet."
-        />
-        <Leaderboard
-          title="Busiest projects"
-          subtitle="by repositories"
-          items={busiestProjects}
-          href="/explore?kind=bitbucket.project"
         />
         <Card>
           <CardContent className="p-5">

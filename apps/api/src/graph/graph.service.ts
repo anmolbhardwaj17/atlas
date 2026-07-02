@@ -94,7 +94,6 @@ export interface DashboardSummary {
   insights: {
     topContributors: Array<{ name: string; count: number }>;
     mostActiveRepos: Array<{ name: string; count: number }>;
-    busiestProjects: Array<{ name: string; count: number }>;
     pipelineCoverage: { withPipeline: number; total: number };
   };
 }
@@ -271,7 +270,6 @@ export class GraphService {
         emptyProjects,
         contributors,
         mostActiveRepos,
-        busiestProjects,
       ] = await Promise.all([
         c.query<{ category: string; n: number }>(
           `SELECT nk.category, count(*)::int AS n
@@ -385,15 +383,6 @@ export class GraphService {
             GROUP BY r.name ORDER BY n DESC, r.name LIMIT 5`,
           [prSince],
         ),
-        // Busiest projects by repository count.
-        c.query<{ name: string | null; n: number }>(
-          `SELECT p.name, count(*)::int AS n
-             FROM edges e
-             JOIN nodes p ON p.id = e.from_node_id AND p.kind LIKE '%.project'
-             JOIN nodes r ON r.id = e.to_node_id AND r.kind LIKE '%.repository'
-            WHERE e.type = 'CONTAINS' AND e.status = 'active'
-            GROUP BY p.name ORDER BY n DESC, p.name LIMIT 5`,
-        ),
       ]);
 
       const code = codeCounts.rows[0];
@@ -443,10 +432,6 @@ export class GraphService {
         emptyProjects: emptyProjects.rows[0]?.n ?? 0,
         topContributors: contributors.rows.map((r) => ({ name: r.name ?? "unknown", count: r.n })),
         mostActiveRepos: mostActiveRepos.rows.map((r) => ({
-          name: r.name ?? "unknown",
-          count: r.n,
-        })),
-        busiestProjects: busiestProjects.rows.map((r) => ({
           name: r.name ?? "unknown",
           count: r.n,
         })),
@@ -584,7 +569,6 @@ export class GraphService {
       insights: {
         topContributors: base.topContributors,
         mostActiveRepos: base.mostActiveRepos,
-        busiestProjects: base.busiestProjects,
         pipelineCoverage: {
           withPipeline: Math.max(0, base.repositories - base.noPipeline),
           total: base.repositories,
