@@ -152,14 +152,69 @@ export class ConnectionService {
   async disconnect(orgId: string, id: string): Promise<ConnectionDto> {
     return withOrgScope(this.db, orgId, async (c) => {
       await this.load(c, id); // 404 if absent / cross-tenant
+      const purged = await this.purgeGraphData(c, id);
       const { rows } = await c.query<ConnectionRow>(
         `UPDATE connections SET status = 'disconnected', deleted_at = now() WHERE id = $1
          RETURNING ${SELECT_COLS}`,
         [id],
       );
-      // purge mode (remove the source's nodes) is an async job — follow-up.
+      this.logger.log(
+        `Disconnected ${id}: purged ${purged.nodes} nodes (+${purged.derivedNodes} orphaned derived), ` +
+          `${purged.edges} edges, ${purged.signals} signals`,
+      );
       return toDto(rows[0]);
     });
+  }
+
+  /**
+   * Purge a source's graph data on disconnect (docs/03, docs/04) — the connection row is
+   * kept (soft-deleted) for history/audit, but its graph footprint is removed so a removed
+   * source leaves no lingering nodes/edges. Runs in the caller's org-scoped transaction, so
+   * RLS confines every delete to this org. Deleting the connection's nodes cascades their
+   * incident edges (composite-FK ON DELETE CASCADE, BR-EDGE-1), incl. inferred edges to
+   * derived nodes; we then sweep derived nodes (e.g. atlas.service) left with no edges and
+   * provenance no surviving edge references, so no dangling artifacts remain.
+   */
+  private async purgeGraphData(
+    c: import("pg").PoolClient,
+    connectionId: string,
+  ): Promise<{ nodes: number; edges: number; signals: number; derivedNodes: number }> {
+    // Count incident edges before the cascade removes them (for the log).
+    const edges = Number(
+      (
+        await c.query<{ n: string }>(
+          `SELECT count(*)::text AS n FROM edges e
+             WHERE e.from_node_id IN (SELECT id FROM nodes WHERE connection_id = $1)
+                OR e.to_node_id   IN (SELECT id FROM nodes WHERE connection_id = $1)`,
+          [connectionId],
+        )
+      ).rows[0]?.n ?? "0",
+    );
+    // Snapshots first (node_id would otherwise be SET NULL, orphaning them).
+    await c.query(
+      `DELETE FROM raw_snapshots WHERE node_id IN (SELECT id FROM nodes WHERE connection_id = $1)`,
+      [connectionId],
+    );
+    const signals =
+      (await c.query(`DELETE FROM signals WHERE connection_id = $1`, [connectionId])).rowCount ?? 0;
+    // Deleting the source's nodes cascades their edges (composite FK).
+    const nodes =
+      (await c.query(`DELETE FROM nodes WHERE connection_id = $1`, [connectionId])).rowCount ?? 0;
+    // Sweep derived nodes (connection_id IS NULL) now left with no incident edges.
+    const derivedNodes =
+      (
+        await c.query(
+          `DELETE FROM nodes n
+             WHERE n.connection_id IS NULL
+               AND NOT EXISTS (SELECT 1 FROM edges e
+                                 WHERE e.from_node_id = n.id OR e.to_node_id = n.id)`,
+        )
+      ).rowCount ?? 0;
+    // Sweep provenance no surviving edge references (provenance is referenced only by edges).
+    await c.query(
+      `DELETE FROM provenance p WHERE NOT EXISTS (SELECT 1 FROM edges e WHERE e.provenance_id = p.id)`,
+    );
+    return { nodes, edges, signals, derivedNodes };
   }
 
   private async load(c: import("pg").PoolClient, id: string): Promise<ConnectionRow> {

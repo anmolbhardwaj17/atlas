@@ -215,7 +215,7 @@
 | **GitHub gaps** — webhook API ingress route (verifier built, endpoint not wired); team→member resolution (US-10); IaC (TF/CFN) ref parsing; more manifest ecosystems (have npm/pypi/go); multi-branch structural parse | I2 | P1/P2 + additive | 07 §5/§7 |
 | **OpenSearch hybrid search** — search runs behind `SearchProvider` with a Postgres (pg_trgm keyword) impl; the OpenSearch BM25+kNN driver + embedding/index pipeline + semantic ranking are the deploy target | G2.4 | deploy / P2 | 11 §3–§8 |
 | ~~**audit_events table + audit log**~~ — ✅ **DONE (P2)**: migration 0014, append-only + org-scoped `AuditService` wired into org/member/invitation/connection/demo mutations | F1 | ~~P2~~ done | 13 §8, 04 |
-| **Connection purge-on-delete** — delete soft-deletes; source's nodes not purged | F2.8 | P1/P2 | 03, 04 |
+| ~~**Connection purge-on-delete**~~ — ✅ **DONE**: `disconnect` now purges the source's nodes/edges/signals/snapshots + orphaned derived nodes + unreferenced provenance (org-scoped tx; composite-FK cascade), keeping the soft-deleted row for history. 2 live-PG tests | F2.8 | done | 03, 04 |
 | ~~**Observability baseline**~~ — ✅ **DONE (P2)**: correlation id (`x-request-id`) + structured JSON access logs + error envelope reuses the requestId. Metrics/tracing exporters remain for deploy | F1.3 | ~~P2~~ done (exporters at deploy) | 02 §9.4 |
 | **Adversarial QA agent + API-contract/E2E/load/mutation CI stages** — CI is format/lint/typecheck/test + PG-RLS integration only today | F1.2 | P2 (+ when PRs start) | 14 §7–13 |
 | **WebGL graph canvas** — the Explore impact/neighbor view is **list-first** (a11y source of truth); the interactive force-directed canvas is an optional visual enhancement on top | G4.3 | P1/P2 | 09 §5.4 |
