@@ -21,6 +21,9 @@ import {
   Users,
   Sparkles,
   Webhook,
+  FolderGit2,
+  ChevronDown,
+  ChevronRight,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -97,7 +100,7 @@ const ICON: Record<string, LucideIcon> = {
   "gcp.subnet": Network,
   "gcp.pubsub.topic": Webhook,
   // Bitbucket
-  "bitbucket.project": Boxes,
+  "bitbucket.project": FolderGit2,
   "bitbucket.repository": GitBranch,
   "bitbucket.pipeline": Play,
   "bitbucket.pullrequest": GitPullRequest,
@@ -134,12 +137,12 @@ const CATEGORY: Record<string, string> = {
   "aws.apigateway": "network",
   "aws.securitygroup": "security",
   "aws.iam.role": "security",
-  "github.repository": "code",
-  "github.workflow": "code",
-  "github.pull_request": "code",
-  "github.team": "code",
-  "github.user": "code",
-  "external.package": "code",
+  "github.repository": "repo",
+  "github.workflow": "pipeline",
+  "github.pull_request": "change",
+  "github.team": "people",
+  "github.user": "people",
+  "external.package": "package",
   "atlas.service": "service",
   // Azure
   "azure.vm": "compute",
@@ -167,32 +170,51 @@ const CATEGORY: Record<string, string> = {
   "gcp.subnet": "network",
   "gcp.pubsub.topic": "compute",
   // Bitbucket
-  "bitbucket.project": "code",
-  "bitbucket.repository": "code",
-  "bitbucket.pipeline": "code",
-  "bitbucket.pullrequest": "code",
-  "bitbucket.user": "code",
+  "bitbucket.project": "container",
+  "bitbucket.repository": "repo",
+  "bitbucket.pipeline": "pipeline",
+  "bitbucket.pullrequest": "change",
+  "bitbucket.user": "people",
 };
 
+/** Icon-chip tint per category. Code kinds are split (container/repo/pipeline/change/people/
+ *  package) so a project, a repo, a pipeline, a PR and a person read as different colours. */
 const CATEGORY_STYLE: Record<string, string> = {
   compute: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
   data: "bg-sky-500/15 text-sky-600 dark:text-sky-400",
   storage: "bg-teal-500/15 text-teal-600 dark:text-teal-400",
   network: "bg-violet-500/15 text-violet-600 dark:text-violet-400",
   security: "bg-rose-500/15 text-rose-600 dark:text-rose-400",
-  code: "bg-slate-500/15 text-slate-600 dark:text-slate-300",
   service: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+  container: "bg-indigo-500/15 text-indigo-600 dark:text-indigo-400",
+  repo: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+  pipeline: "bg-orange-500/15 text-orange-600 dark:text-orange-400",
+  change: "bg-green-500/15 text-green-600 dark:text-green-400",
+  people: "bg-pink-500/15 text-pink-600 dark:text-pink-400",
+  package: "bg-slate-500/15 text-slate-600 dark:text-slate-300",
 };
 const CATEGORY_FALLBACK = "bg-muted text-muted-foreground";
 
-/** A resource in the infra map: kind icon + name + region, with a certainty dot. */
+/** Collapse state handed to a node that contains others (drill-down). */
+export interface CollapseInfo {
+  hasChildren: boolean;
+  collapsed: boolean;
+  hiddenCount: number;
+  onToggle: () => void;
+}
+
+/** A resource in the infra map: kind icon + name + region, a certainty dot, a coloured
+ *  left accent (type at a glance), and a collapse toggle when it contains other nodes. */
 export function ResourceNode({ data, selected }: NodeProps) {
-  const node = (data as { node: MapNode }).node;
+  const d = data as { node: MapNode; collapse?: CollapseInfo };
+  const node = d.node;
+  const collapse = d.collapse;
   const Icon = ICON[node.kind] ?? Box;
   const logo = LOGO[node.kind];
-  const kindShort = node.kind.replace(/^aws\.|^github\.|^external\.|^atlas\./, "");
+  const kindShort = node.kind.replace(/^aws\.|^github\.|^external\.|^atlas\.|^bitbucket\./, "");
   const stale = node.status === "stale";
-  const iconStyle = CATEGORY_STYLE[CATEGORY[node.kind] ?? ""] ?? CATEGORY_FALLBACK;
+  const category = CATEGORY[node.kind] ?? "";
+  const iconStyle = CATEGORY_STYLE[category] ?? CATEGORY_FALLBACK;
 
   return (
     <div
@@ -227,13 +249,36 @@ export function ResourceNode({ data, selected }: NodeProps) {
           {node.region ? ` · ${node.region}` : ""}
         </div>
       </div>
-      <span
-        className={cn(
-          "size-2 shrink-0 rounded-full",
-          CERTAINTY[node.confidence] ?? CERTAINTY["inferred-low"],
-        )}
-        title={node.confidence}
-      />
+
+      {collapse?.hasChildren ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            collapse.onToggle();
+          }}
+          className="nodrag flex shrink-0 items-center gap-0.5 rounded-md border border-border bg-muted/40 px-1 py-0.5 text-[10px] tabular-nums text-muted-foreground hover:border-foreground/40 hover:text-foreground"
+          title={collapse.collapsed ? "Expand" : "Collapse"}
+          aria-label={collapse.collapsed ? "Expand" : "Collapse"}
+        >
+          {collapse.collapsed ? (
+            <>
+              <ChevronRight className="size-3" />
+              {collapse.hiddenCount}
+            </>
+          ) : (
+            <ChevronDown className="size-3" />
+          )}
+        </button>
+      ) : (
+        <span
+          className={cn(
+            "size-2 shrink-0 rounded-full",
+            CERTAINTY[node.confidence] ?? CERTAINTY["inferred-low"],
+          )}
+          title={node.confidence}
+        />
+      )}
       <Handle
         type="source"
         position={Position.Right}

@@ -1,7 +1,7 @@
 "use client";
 
 import "@xyflow/react/dist/style.css";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ReactFlow,
@@ -71,6 +71,38 @@ export function InfraMap({ data }: { data: MapData }) {
   const [active, setActive] = useState<Set<string>>(() => new Set(present));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = selectedId ? (data.nodes.find((n) => n.id === selectedId) ?? null) : null;
+
+  // Containment hierarchy for drill-down collapse: a node "contains" the nodes it points to
+  // via structural edges (project→repo→pipeline/PR; PR→author). `connectedIds` = nodes with
+  // any edge — so isolated workspace members (no PRs) are dropped from the map entirely.
+  const { childrenOf, connectedIds } = useMemo(() => {
+    const children = new Map<string, string[]>();
+    const connected = new Set<string>();
+    for (const e of data.edges) {
+      connected.add(e.from);
+      connected.add(e.to);
+      if (e.type === "CONTAINS" || e.type === "OWNED_BY") {
+        const arr = children.get(e.from);
+        if (arr) arr.push(e.to);
+        else children.set(e.from, [e.to]);
+      }
+    }
+    return { childrenOf: children, connectedIds: connected };
+  }, [data.edges]);
+
+  // Default = collapsed to top-level containers: every node that contains others starts folded.
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  useEffect(() => setCollapsed(new Set(childrenOf.keys())), [childrenOf]);
+  const toggleCollapse = useCallback(
+    (id: string) =>
+      setCollapsed((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      }),
+    [],
+  );
 
   // How many connections cross a cloud / account boundary — the enterprise headline.
   const cross = useMemo(() => {
@@ -171,7 +203,16 @@ export function InfraMap({ data }: { data: MapData }) {
 
       <div className="relative h-[calc(100dvh-14rem)] min-h-[480px] overflow-hidden rounded-xl border border-border bg-background">
         <ReactFlowProvider>
-          <Flow data={data} active={active} grouping={grouping} onSelect={setSelectedId} />
+          <Flow
+            data={data}
+            active={active}
+            grouping={grouping}
+            onSelect={setSelectedId}
+            childrenOf={childrenOf}
+            connectedIds={connectedIds}
+            collapsed={collapsed}
+            onToggleCollapse={toggleCollapse}
+          />
         </ReactFlowProvider>
         {selected && <DetailPanel node={selected} onClose={() => setSelectedId(null)} />}
       </div>
@@ -190,18 +231,62 @@ function Flow({
   active,
   grouping,
   onSelect,
+  childrenOf,
+  connectedIds,
+  collapsed,
+  onToggleCollapse,
 }: {
   data: MapData;
   active: Set<string>;
   grouping: Grouping;
   onSelect: (id: string | null) => void;
+  childrenOf: Map<string, string[]>;
+  connectedIds: Set<string>;
+  collapsed: Set<string>;
+  onToggleCollapse: (id: string) => void;
 }) {
+  // Descendants of any collapsed node are hidden (BFS down the containment tree, cycle-safe).
+  const hiddenSet = useMemo(() => {
+    const hidden = new Set<string>();
+    for (const cid of collapsed) {
+      const stack = [...(childrenOf.get(cid) ?? [])];
+      while (stack.length > 0) {
+        const x = stack.pop();
+        if (!x || hidden.has(x)) continue;
+        hidden.add(x);
+        for (const c of childrenOf.get(x) ?? []) stack.push(c);
+      }
+    }
+    return hidden;
+  }, [collapsed, childrenOf]);
+
   const layout = useMemo(() => {
-    const visibleNodes = data.nodes.filter((n) => active.has(grouping.keyOf(n)));
+    const visibleNodes = data.nodes.filter(
+      (n) => active.has(grouping.keyOf(n)) && connectedIds.has(n.id) && !hiddenSet.has(n.id),
+    );
     const ids = new Set(visibleNodes.map((n) => n.id));
     const visibleEdges = data.edges.filter((e) => ids.has(e.from) && ids.has(e.to));
-    return buildLayout(visibleNodes, visibleEdges, grouping);
-  }, [data, active, grouping]);
+    const l = buildLayout(visibleNodes, visibleEdges, grouping);
+    // Attach collapse state to any node that contains others (drives the ⊕/⊖ toggle).
+    l.nodes = l.nodes.map((nd) => {
+      if (nd.type !== "resource") return nd;
+      const kids = childrenOf.get(nd.id);
+      if (!kids || kids.length === 0) return nd;
+      return {
+        ...nd,
+        data: {
+          ...nd.data,
+          collapse: {
+            hasChildren: true,
+            collapsed: collapsed.has(nd.id),
+            hiddenCount: kids.length,
+            onToggle: () => onToggleCollapse(nd.id),
+          },
+        },
+      };
+    });
+    return l;
+  }, [data, active, grouping, hiddenSet, collapsed, childrenOf, connectedIds, onToggleCollapse]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layout.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layout.edges);
