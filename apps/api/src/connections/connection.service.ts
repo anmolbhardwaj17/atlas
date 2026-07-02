@@ -190,6 +190,15 @@ export class ConnectionService {
         )
       ).rows[0]?.n ?? "0",
     );
+    // Detach provenance from the snapshots we're about to delete — the FK is RESTRICT, so a
+    // referencing provenance row would block the delete (the row itself is swept below).
+    await c.query(
+      `UPDATE provenance SET raw_snapshot_id = NULL
+         WHERE raw_snapshot_id IN (
+           SELECT id FROM raw_snapshots WHERE node_id IN (SELECT id FROM nodes WHERE connection_id = $1)
+         )`,
+      [connectionId],
+    );
     // Snapshots first (node_id would otherwise be SET NULL, orphaning them).
     await c.query(
       `DELETE FROM raw_snapshots WHERE node_id IN (SELECT id FROM nodes WHERE connection_id = $1)`,
