@@ -1,0 +1,295 @@
+"use client";
+
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import { Plus, Loader2, Trash2, Check, X } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import { StatusBadge } from "@/components/certainty";
+import { AwsSetup, GithubSetup } from "@/components/integrations/provider-setup";
+import { PROVIDERS, type ProviderMeta } from "@/components/integrations/providers";
+import { createConnection, deleteConnection, type ConnectionSummary } from "@/lib/browser-api";
+import { cn } from "@/lib/cn";
+
+/**
+ * Integrations hub (docs/18) — the one place to connect the company's accounts. A tile per
+ * provider (AWS + GitHub live; the rest "coming soon"), each showing its connected accounts
+ * with status, a guided Connect flow, and disconnect (which purges that source's graph).
+ */
+export function IntegrationsHub({
+  orgId,
+  connections,
+  canManage,
+}: {
+  orgId: string;
+  connections: ConnectionSummary[];
+  canManage: boolean;
+}) {
+  const [connectProvider, setConnectProvider] = React.useState<ProviderMeta | null>(null);
+
+  const byProvider = new Map<string, ConnectionSummary[]>();
+  for (const c of connections) {
+    const arr = byProvider.get(c.provider) ?? [];
+    arr.push(c);
+    byProvider.set(c.provider, arr);
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-semibold">Integrations</h1>
+        <p className="text-sm text-muted-foreground">
+          Connect your cloud, code, and observability accounts. Atlas builds one cited graph across
+          everything you connect.
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {PROVIDERS.map((p) => (
+          <ProviderTile
+            key={p.id}
+            provider={p}
+            connections={byProvider.get(p.id) ?? []}
+            canManage={canManage}
+            orgId={orgId}
+            onConnect={() => setConnectProvider(p)}
+          />
+        ))}
+      </div>
+
+      <ConnectSheet
+        provider={connectProvider}
+        orgId={orgId}
+        onClose={() => setConnectProvider(null)}
+      />
+    </div>
+  );
+}
+
+function ProviderTile({
+  provider,
+  connections,
+  canManage,
+  orgId,
+  onConnect,
+}: {
+  provider: ProviderMeta;
+  connections: ConnectionSummary[];
+  canManage: boolean;
+  orgId: string;
+  onConnect: () => void;
+}) {
+  const comingSoon = provider.status === "coming-soon";
+  const Icon = provider.icon;
+  return (
+    <Card className={cn(comingSoon && "opacity-70")}>
+      <CardContent className="flex h-full flex-col gap-3 p-5">
+        <div className="flex items-start gap-3">
+          <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-muted text-foreground">
+            <Icon className="size-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="truncate font-medium">{provider.name}</span>
+              {comingSoon && (
+                <span className="rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Soon
+                </span>
+              )}
+            </div>
+            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              {provider.category}
+            </span>
+          </div>
+        </div>
+
+        <p className="text-sm text-muted-foreground">{provider.blurb}</p>
+
+        <div className="mt-auto space-y-2">
+          {connections.length > 0 && (
+            <ul className="space-y-1.5 border-t border-border pt-3">
+              {connections.map((c) => (
+                <ConnectionRow key={c.id} conn={c} orgId={orgId} canManage={canManage} />
+              ))}
+            </ul>
+          )}
+
+          {comingSoon ? (
+            <Button variant="outline" size="sm" className="w-full" disabled>
+              Coming soon
+            </Button>
+          ) : canManage ? (
+            <Button variant="outline" size="sm" className="w-full" onClick={onConnect}>
+              <Plus className="size-4" />
+              {connections.length > 0 ? "Add another" : `Connect ${provider.name.split(" ")[0]}`}
+            </Button>
+          ) : connections.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Ask an admin to connect this source.</p>
+          ) : null}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ConnectionRow({
+  conn,
+  orgId,
+  canManage,
+}: {
+  conn: ConnectionSummary;
+  orgId: string;
+  canManage: boolean;
+}) {
+  const router = useRouter();
+  const [confirming, setConfirming] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+
+  async function remove() {
+    setBusy(true);
+    try {
+      await deleteConnection(orgId, conn.id);
+      router.refresh();
+    } catch {
+      setBusy(false);
+      setConfirming(false);
+    }
+  }
+
+  return (
+    <li className="flex items-center justify-between gap-2 text-sm">
+      <span className="min-w-0 truncate">{conn.displayName}</span>
+      <span className="flex shrink-0 items-center gap-2">
+        <StatusBadge status={conn.status} />
+        {canManage &&
+          (confirming ? (
+            <span className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => void remove()}
+                disabled={busy}
+                aria-label="Confirm disconnect"
+                className="text-danger hover:opacity-80"
+              >
+                {busy ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Check className="size-3.5" />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirming(false)}
+                aria-label="Cancel"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-3.5" />
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirming(true)}
+              aria-label="Disconnect"
+              title="Disconnect (removes this source's data)"
+              className="text-muted-foreground hover:text-danger"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          ))}
+      </span>
+    </li>
+  );
+}
+
+function ConnectSheet({
+  provider,
+  orgId,
+  onClose,
+}: {
+  provider: ProviderMeta | null;
+  orgId: string;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [name, setName] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  // Reset the form whenever a different provider's sheet opens.
+  React.useEffect(() => {
+    if (provider) {
+      setName(`${provider.name.split(" ")[0]} — production`);
+      setError(null);
+      setBusy(false);
+    }
+  }, [provider]);
+
+  async function add() {
+    if (!provider || name.trim().length === 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await createConnection(orgId, provider.id, name.trim());
+      onClose();
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Sheet open={!!provider} onOpenChange={(open) => !open && onClose()}>
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
+        {provider && (
+          <>
+            <SheetHeader>
+              <SheetTitle>Connect {provider.name}</SheetTitle>
+              <SheetDescription>
+                Follow the steps, then add the connection. Atlas requests read-only access only.
+              </SheetDescription>
+            </SheetHeader>
+
+            <div className="mt-6 space-y-6">
+              {provider.id === "aws" ? <AwsSetup /> : <GithubSetup />}
+
+              <div className="space-y-2 border-t border-border pt-4">
+                <label htmlFor="conn-name" className="text-sm font-medium">
+                  Connection name
+                </label>
+                <Input
+                  id="conn-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Production account"
+                />
+                <p className="text-xs text-muted-foreground">
+                  This adds the connection. Live verification (credentials) is the next step once
+                  your {provider.id === "aws" ? "role" : "App"} is set up.
+                </p>
+                {error ? (
+                  <p role="alert" className="text-sm text-danger">
+                    {error}
+                  </p>
+                ) : null}
+                <Button onClick={() => void add()} disabled={busy || name.trim().length === 0}>
+                  {busy ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                  Add connection
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}

@@ -6,8 +6,7 @@ import { Boxes, Cloud, Github, Sparkles, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CodeBlock } from "@/components/ui/code-block";
-import { Steps, Step } from "@/components/patterns/steps";
+import { AwsSetup, GithubSetup } from "@/components/integrations/provider-setup";
 import { seedDemo } from "@/lib/browser-api";
 
 /**
@@ -135,99 +134,18 @@ function ConnectSource() {
           </TabsList>
 
           <TabsContent value="aws" className="pt-4">
-            <AwsInstructions />
+            <AwsSetup />
           </TabsContent>
           <TabsContent value="github" className="pt-4">
-            <GithubInstructions />
+            <GithubSetup />
           </TabsContent>
         </Tabs>
+        <p className="mt-4 text-xs text-muted-foreground">
+          Live verification needs real credentials. Just evaluating? Load the sample data above.
+          Full setup lives on the <span className="font-medium text-foreground">Integrations</span>{" "}
+          page.
+        </p>
       </CardContent>
     </Card>
-  );
-}
-
-const AWS_POLICY = `{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "AtlasReadOnlyCore",
-      "Effect": "Allow",
-      "Action": [
-        "ec2:Describe*", "lambda:List*", "lambda:GetFunctionConfiguration",
-        "ecs:List*", "ecs:Describe*", "ecr:DescribeRepositories",
-        "elasticloadbalancing:Describe*", "route53:List*", "route53:Get*",
-        "rds:Describe*", "dynamodb:List*", "dynamodb:DescribeTable",
-        "s3:ListAllMyBuckets", "s3:GetBucketLocation", "s3:GetBucketTagging",
-        "elasticache:Describe*",
-        "iam:GetRole", "iam:ListRolePolicies", "iam:GetRolePolicy",
-        "iam:ListAttachedRolePolicies", "iam:GetPolicy", "iam:GetPolicyVersion"
-      ],
-      "Resource": "*"
-    }
-  ]
-}`;
-
-const GITHUB_PERMS = `metadata: read
-contents: read
-pull_requests: read
-actions: read
-members: read`;
-
-function InlineCode({ children }: { children: React.ReactNode }) {
-  return <code className="rounded bg-muted px-1 py-0.5 text-xs">{children}</code>;
-}
-
-function AwsInstructions() {
-  return (
-    <div className="space-y-5">
-      <Steps>
-        <Step title="Create a read-only IAM role">
-          In the AWS console, create an IAM role that Atlas assumes. It grants only{" "}
-          <InlineCode>Describe*</InlineCode> / <InlineCode>List*</InlineCode> /{" "}
-          <InlineCode>Get*</InlineCode> — no mutating actions exist in the policy, so Atlas is
-          read-only by construction.
-        </Step>
-        <Step title="Trust Atlas with your External ID">
-          Set the role&apos;s trust policy to allow Atlas&apos;s principal, conditioned on your
-          unique <strong>External ID</strong> (confused-deputy defense). Atlas generates the
-          External ID when you add the connection.
-        </Step>
-        <Step title="Paste the Role ARN and verify">
-          Back in Atlas, paste the role ARN. Atlas runs a live permission probe — a missing
-          permission is reported as a fixable gap, never a silent failure.
-        </Step>
-      </Steps>
-      <CodeBlock label="Least-privilege policy" code={AWS_POLICY} />
-      <p className="text-xs text-muted-foreground">
-        Live verification needs a real AWS role. If you&apos;re just evaluating Atlas, load the
-        sample data above instead.
-      </p>
-    </div>
-  );
-}
-
-function GithubInstructions() {
-  return (
-    <div className="space-y-5">
-      <Steps>
-        <Step title="Install the Atlas GitHub App">
-          Install the Atlas App on your organization and select the repositories to index. Atlas
-          requests read-only scopes only.
-        </Step>
-        <Step title="Atlas indexes structure, not code">
-          From each repo Atlas reads CODEOWNERS (ownership), dependency manifests (packages), and
-          workflows (deploy targets) — enough to connect code to the infrastructure it ships to,
-          without storing your source.
-        </Step>
-        <Step title="Confirm the installation">
-          Back in Atlas, confirm the installation. The graph fills in as the first sync runs.
-        </Step>
-      </Steps>
-      <CodeBlock label="Required read permissions" code={GITHUB_PERMS} />
-      <p className="text-xs text-muted-foreground">
-        Live indexing needs an App installation. If you&apos;re just evaluating Atlas, load the
-        sample data above instead.
-      </p>
-    </div>
   );
 }

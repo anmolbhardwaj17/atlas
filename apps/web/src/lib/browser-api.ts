@@ -69,6 +69,54 @@ export async function seedDemo(orgId: string): Promise<DemoSeedResult> {
   return body.data;
 }
 
+export interface ConnectionSummary {
+  id: string;
+  provider: string;
+  displayName: string;
+  status: string;
+}
+
+/** Create a connection for a provider (Integrations hub). Admin-only server-side. */
+export async function createConnection(
+  orgId: string,
+  provider: string,
+  displayName: string,
+): Promise<ConnectionSummary> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/connections`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "X-Atlas-Org": orgId,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ provider, displayName }),
+  });
+  const body = (await res.json().catch(() => null)) as {
+    data?: ConnectionSummary;
+    error?: { message?: string };
+  } | null;
+  if (!res.ok || !body?.data) {
+    throw new Error(body?.error?.message ?? `Couldn't add the connection (${res.status}).`);
+  }
+  return body.data;
+}
+
+/** Disconnect a source (purges its graph data server-side). Admin-only. */
+export async function deleteConnection(orgId: string, id: string): Promise<void> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/connections/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+    throw new Error(body?.error?.message ?? `Couldn't disconnect (${res.status}).`);
+  }
+}
+
 /** The SSE event union the /ai messages endpoint streams (mirrors AnswerEvent). */
 export type AskEvent =
   | { type: "retrieval"; nodesConsidered: number; intent: string }

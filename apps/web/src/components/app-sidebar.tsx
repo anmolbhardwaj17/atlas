@@ -8,6 +8,7 @@ import {
   Boxes,
   Waypoints,
   Sparkles,
+  Plug,
   Settings,
   ChevronsUpDown,
   LogOut,
@@ -55,6 +56,12 @@ const NAV = [
     match: (p: string) => p.startsWith("/explore"),
   },
   { href: "/ask", label: "Ask AI", icon: Sparkles, match: (p: string) => p.startsWith("/ask") },
+  {
+    href: "/integrations",
+    label: "Integrations",
+    icon: Plug,
+    match: (p: string) => p.startsWith("/integrations"),
+  },
   {
     href: "/settings",
     label: "Settings",
