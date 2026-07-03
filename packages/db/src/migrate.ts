@@ -18,6 +18,7 @@ import { up as up0016 } from "./migrations/0016_multicloud";
 import { up as up0017 } from "./migrations/0017_more_providers";
 import { up as up0018 } from "./migrations/0018_connection_secrets";
 import { up as up0019 } from "./migrations/0019_org_llm_config";
+import { up as up0020 } from "./migrations/0020_llm_provider_openai";
 
 /**
  * Forward-only SQL migration runner (docs/04 §9). Plain `pg`, no ORM. Each
@@ -47,6 +48,7 @@ const MIGRATIONS: ReadonlyArray<{ version: string; statements: string[] }> = [
   { version: "0017_more_providers", statements: up0017 },
   { version: "0018_connection_secrets", statements: up0018 },
   { version: "0019_org_llm_config", statements: up0019 },
+  { version: "0020_llm_provider_openai", statements: up0020 },
 ];
 
 async function main(): Promise<void> {

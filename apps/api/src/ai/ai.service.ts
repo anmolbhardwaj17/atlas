@@ -4,6 +4,7 @@ import { withOrgScope, type Db } from "@atlas/db";
 import {
   answerQuestionStream,
   OpenRouterProvider,
+  ClaudeProvider,
   type AnswerCitation,
   type AnswerEvent,
   type LLMProvider,
@@ -16,9 +17,30 @@ import { ApiException } from "../common/errors";
 import { GraphRetrievalPort } from "./graph-retrieval.port";
 import { LLM_PROVIDER } from "./tokens";
 
+export type LlmProviderId = "openrouter" | "openai" | "anthropic";
+
 export interface LlmConfigDto {
-  provider: "openrouter" | "anthropic";
+  provider: LlmProviderId;
   model: string;
+}
+
+/** Build an LLM provider for a BYO-LLM choice. OpenRouter + OpenAI are OpenAI-compatible (same
+ *  fetch adapter, different endpoint); Anthropic uses the Claude SDK. */
+function buildProvider(
+  provider: LlmProviderId,
+  model: string,
+  apiKey: string,
+  referer: string,
+): LLMProvider {
+  if (provider === "anthropic") return new ClaudeProvider({ apiKey, model });
+  if (provider === "openai") {
+    return new OpenRouterProvider({
+      apiKey,
+      model,
+      endpoint: "https://api.openai.com/v1/chat/completions",
+    });
+  }
+  return new OpenRouterProvider({ apiKey, model, referer, title: "Atlas" });
 }
 
 export interface ConversationDto {
@@ -62,13 +84,16 @@ export class AiService {
     });
   }
 
-  /** Store the org's BYO-LLM: key → encrypted broker, provider+model+ref → org_llm_config. */
+  /** Store the org's BYO-LLM: key → encrypted broker, provider+model+ref → org_llm_config.
+   *  Runs a live probe FIRST (a tiny completion) so a bad key/model is rejected up front and
+   *  never stored — the UI shows success/failure from this. */
   async setLlmConfig(
     orgId: string,
     provider: LlmConfigDto["provider"],
     model: string,
     apiKey: string,
   ): Promise<LlmConfigDto> {
+    await this.verifyLlm(provider, model, apiKey);
     const ref = await this.secrets.put(orgId, { apiKey });
     const oldRef = await withOrgScope(this.db, orgId, async (c) => {
       const { rows } = await c.query<{ secret_ref: string }>(
@@ -98,6 +123,31 @@ export class AiService {
     if (oldRef) await this.secrets.delete(oldRef).catch(() => undefined);
   }
 
+  /** Live probe: a tiny completion to confirm the key + model actually work. Throws a 422 with
+   *  the provider's error (bad key → 401, unknown/tool-less model → 4xx) so save fails clearly. */
+  private async verifyLlm(provider: LlmProviderId, model: string, apiKey: string): Promise<void> {
+    const probe = buildProvider(provider, model, apiKey, this.env.WEB_ORIGIN);
+    try {
+      let ok = false;
+      for await (const ev of probe.complete({
+        system: "You are a connectivity check.",
+        messages: [{ role: "user", content: "Reply with the single word: OK" }],
+        maxTokens: 8,
+        temperature: 0,
+      })) {
+        if (ev.type === "token" || ev.type === "stop") ok = true;
+        if (ev.type === "stop") break;
+      }
+      if (!ok) throw new Error("the model returned no response");
+    } catch (err) {
+      throw new ApiException(
+        422,
+        "connection_verification_failed",
+        `Model test failed: ${err instanceof Error ? err.message : "unknown error"}`,
+      );
+    }
+  }
+
   /** Pick the narrator: the org's BYO-LLM (OpenRouter) if configured + key resolves, else the
    *  env default (Claude when ANTHROPIC_API_KEY is set, otherwise the dev mock). */
   private async resolveProvider(orgId: string): Promise<LLMProvider> {
@@ -108,15 +158,14 @@ export class AiService {
       );
       return rows[0];
     });
-    if (cfg?.provider === "openrouter") {
+    if (
+      cfg?.provider === "openrouter" ||
+      cfg?.provider === "openai" ||
+      cfg?.provider === "anthropic"
+    ) {
       const material = await this.secrets.get(cfg.secret_ref);
       if (material.apiKey) {
-        return new OpenRouterProvider({
-          apiKey: material.apiKey,
-          model: cfg.model,
-          referer: this.env.WEB_ORIGIN,
-          title: "Atlas",
-        });
+        return buildProvider(cfg.provider, cfg.model, material.apiKey, this.env.WEB_ORIGIN);
       }
     }
     return this.llm;

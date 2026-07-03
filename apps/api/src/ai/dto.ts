@@ -6,11 +6,11 @@ export const CreateConversationSchema = z
 
 export const AskSchema = z.object({ message: z.string().min(1).max(2000) }).strict();
 
-/** BYO-LLM config (docs/10 §3). Currently OpenRouter (OpenAI-compatible). The key goes to the
- *  encrypted Secrets Broker, never persisted in plaintext. */
+/** BYO-LLM config (docs/10 §3). One of OpenRouter / OpenAI (both OpenAI-compatible) or Anthropic.
+ *  The key goes to the encrypted Secrets Broker, never persisted in plaintext. */
 export const SetLlmConfigSchema = z
   .object({
-    provider: z.literal("openrouter"),
+    provider: z.enum(["openrouter", "openai", "anthropic"]),
     model: z.string().trim().min(1).max(200),
     apiKey: z.string().trim().min(1).max(400),
   })
