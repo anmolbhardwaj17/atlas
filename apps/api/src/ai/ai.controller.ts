@@ -20,11 +20,13 @@ import type { AuthedRequest } from "../auth/auth.types";
 import { AiService } from "./ai.service";
 import { AskSchema, CreateConversationSchema, SetLlmConfigSchema } from "./dto";
 
-/** Minimal raw response for manual SSE (avoids a hard fastify type dep). */
+/** Minimal raw response for manual SSE (avoids a hard fastify type dep). `hijack` tells Fastify
+ *  we own the socket, so it won't try to send/close its own reply mid-stream. */
 interface SseReply {
+  hijack?: () => void;
   raw: {
     writeHead(status: number, headers: Record<string, string>): void;
-    write(chunk: string): void;
+    write(chunk: string): boolean;
     end(): void;
   };
 }
@@ -92,11 +94,25 @@ export class AiController {
   ): Promise<void> {
     const { message } = parseBody(AskSchema, body);
     const orgId = org(req).id;
+    // Take the socket from Fastify so it doesn't try to send/close its own reply after we start
+    // streaming (that race can drop the SSE connection mid-answer -> "stream interrupted").
+    reply.hijack?.();
     reply.raw.writeHead(200, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
+      "X-Accel-Buffering": "no", // don't let any proxy buffer the stream
     });
+    // Flush a comment immediately so the connection is live during retrieval, and keep it alive
+    // with a heartbeat (retrieval over a remote DB can be idle for seconds before the first token).
+    reply.raw.write(": open\n\n");
+    const heartbeat = setInterval(() => {
+      try {
+        reply.raw.write(": ping\n\n");
+      } catch {
+        clearInterval(heartbeat);
+      }
+    }, 15_000);
     try {
       for await (const ev of this.ai.askStream(orgId, id, message)) {
         reply.raw.write(`event: ${ev.type}\ndata: ${JSON.stringify(ev)}\n\n`);
@@ -108,6 +124,8 @@ export class AiController {
       reply.raw.write(
         `event: error\ndata: ${JSON.stringify({ type: "error", message: message || "The AI request failed." })}\n\n`,
       );
+    } finally {
+      clearInterval(heartbeat);
     }
     reply.raw.end();
   }
