@@ -14,6 +14,8 @@ export { MockLLMProvider, streamText } from "./mock-provider";
 export type { MockResponder } from "./mock-provider";
 export { ClaudeProvider } from "./claude-provider";
 export type { ClaudeConfig } from "./claude-provider";
+export { OpenRouterProvider } from "./openrouter-provider";
+export type { OpenRouterConfig } from "./openrouter-provider";
 export { SYSTEM_PROMPT, PROMPT_VERSION, honestAbsence } from "./prompt";
 export type {
   RetrievalPort,
