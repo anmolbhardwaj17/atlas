@@ -274,6 +274,21 @@ function Flow({
     return hidden;
   }, [collapsed, childrenOf]);
 
+  // Open PRs contained per repo, for the "N open PR" badge. The map already filters to open PRs
+  // server-side, so any CONTAINS child that's a PR node is open.
+  const openPrByRepo = useMemo(() => {
+    const byId = new Map(data.nodes.map((n) => [n.id, n]));
+    const counts = new Map<string, number>();
+    for (const e of data.edges) {
+      if (e.type !== "CONTAINS") continue;
+      const child = byId.get(e.to);
+      if (child && child.kind.endsWith(".pullrequest")) {
+        counts.set(e.from, (counts.get(e.from) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [data]);
+
   const layout = useMemo(() => {
     const visibleNodes = data.nodes.filter(
       (n) => active.has(grouping.keyOf(n)) && connectedIds.has(n.id) && !hiddenSet.has(n.id),
@@ -281,26 +296,44 @@ function Flow({
     const ids = new Set(visibleNodes.map((n) => n.id));
     const visibleEdges = data.edges.filter((e) => ids.has(e.from) && ids.has(e.to));
     const l = buildLayout(visibleNodes, visibleEdges, grouping);
-    // Attach collapse state to any node that contains others (drives the ⊕/⊖ toggle).
+    // Attach collapse state (drives the ⊕/⊖ toggle) + an open-PR count so repos with in-flight
+    // work are spottable without expanding each one. The map already filters to open PRs, so any
+    // CONTAINS child that's a PR node is open.
     l.nodes = l.nodes.map((nd) => {
       if (nd.type !== "resource") return nd;
       const kids = childrenOf.get(nd.id);
-      if (!kids || kids.length === 0) return nd;
+      const openPrCount = openPrByRepo.get(nd.id) ?? 0;
+      if ((!kids || kids.length === 0) && openPrCount === 0) return nd;
       return {
         ...nd,
         data: {
           ...nd.data,
-          collapse: {
-            hasChildren: true,
-            collapsed: collapsed.has(nd.id),
-            hiddenCount: kids.length,
-            onToggle: () => onToggleCollapse(nd.id),
-          },
+          openPrCount,
+          ...(kids && kids.length > 0
+            ? {
+                collapse: {
+                  hasChildren: true,
+                  collapsed: collapsed.has(nd.id),
+                  hiddenCount: kids.length,
+                  onToggle: () => onToggleCollapse(nd.id),
+                },
+              }
+            : {}),
         },
       };
     });
     return l;
-  }, [data, active, grouping, hiddenSet, collapsed, childrenOf, connectedIds, onToggleCollapse]);
+  }, [
+    data,
+    active,
+    grouping,
+    hiddenSet,
+    collapsed,
+    childrenOf,
+    connectedIds,
+    onToggleCollapse,
+    openPrByRepo,
+  ]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layout.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layout.edges);
