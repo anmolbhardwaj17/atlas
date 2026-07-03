@@ -38,7 +38,7 @@ async function bootstrap(): Promise<void> {
   // The web app calls the API from the browser (Bearer token) - allow its origin (docs/08 §3).
   app.enableCors({
     origin: env.WEB_ORIGIN,
-    methods: ["GET", "POST", "PATCH", "DELETE"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["authorization", "content-type", "x-atlas-org", "idempotency-key"],
   });
   app.enableShutdownHooks(); // run OnApplicationShutdown (closes the PG pool)
