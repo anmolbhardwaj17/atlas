@@ -8,7 +8,7 @@ export {
   ensureBucket,
 } from "./supabase-storage";
 export { nullSecretAccessor, EnvSecretAccessor, silentLogger, consoleLogger } from "./runtime";
-export { InMemorySecretBroker } from "./secret-broker";
+export { InMemorySecretBroker, DbSecretBroker } from "./secret-broker";
 export type { SecretBroker } from "./secret-broker";
 export { MockConnector } from "./mock-connector";
 export type { MockResource, MockScope, MockControl } from "./mock-connector";

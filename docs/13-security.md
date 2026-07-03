@@ -230,6 +230,8 @@ flowchart TB
 | Webhook signing secrets | Secrets Manager | rotated |
 | Internal signing keys (JWT) | Secrets Manager / KMS | rotated, with key-id (kid) rollover |
 
+**Broker implementations (DD-1a):** the Broker interface (`put`/`get`/`delete`, returning an opaque `secret_ref`) has three impls: (1) **AWS Secrets Manager (KMS)** — the managed cloud impl (A53); (2) **DB-backed encrypted store** (`connection_secrets`, migration `0018`) — secrets AES-256-GCM encrypted at rest with a key from env (`SECRET_ENCRYPTION_KEY`, **never in the DB**), org-scoped by RLS (the ref is `db:<org>:<uuid>`), for self-hosted/dev-durable use where a KMS isn't wired; (3) **in-memory** — dev-only, wiped on boot (no key set). All three keep BR-CONN-1: `connections.secret_ref` is only a pointer. The encrypted store fails **closed** — a wrong key or tampered ciphertext returns empty, never a partial/secret value.
+
 **Rules:** secrets **never** in source, env-baked images, logs, traces, error messages, DTOs (`08` AP-3 — responses show `secretConfigured:true`), or the graph (SEC-6). **Log scrubbing** redacts known secret patterns (`02` AR-7). Secret access is itself audited.
 
 ---
