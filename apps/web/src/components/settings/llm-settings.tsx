@@ -5,22 +5,106 @@ import { Sparkles, Loader2, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/cn";
+import { ProviderIcon } from "@/components/settings/provider-icon";
 import { setLlmSettings, deleteLlmSettings, type LlmSettings } from "@/lib/browser-api";
 
-const DEFAULT_MODEL = "anthropic/claude-sonnet-4";
-// A few good OpenRouter model ids to suggest; users can type any (openrouter.ai/models).
-const SUGGESTED = [
-  DEFAULT_MODEL,
-  "openai/gpt-4o",
-  "google/gemini-2.0-flash-001",
-  "meta-llama/llama-3.3-70b-instruct",
-  "deepseek/deepseek-chat",
+type Model = { id: string; label: string };
+type Group = { title: string; models: Model[] };
+interface ProviderCfg {
+  id: string;
+  label: string;
+  keyUrl: string;
+  keyPlaceholder: string;
+  defaultModel: string;
+  groups: Group[];
+}
+
+// Curated per provider. OpenRouter `:free` models cost $0 (rate-limited); low-cost picks are a few
+// cents / million tokens. Groups become tagged sections in the model dropdown.
+const PROVIDERS: ProviderCfg[] = [
+  {
+    id: "openrouter",
+    label: "OpenRouter",
+    keyUrl: "https://openrouter.ai/keys",
+    keyPlaceholder: "sk-or-...",
+    defaultModel: "openrouter/free",
+    groups: [
+      {
+        title: "Free · $0, rate-limited",
+        models: [
+          { id: "openrouter/free", label: "Auto (free router)" },
+          { id: "meta-llama/llama-3.3-70b-instruct:free", label: "Llama 3.3 70B" },
+          { id: "openai/gpt-oss-120b:free", label: "GPT-OSS 120B" },
+          { id: "qwen/qwen3-next-80b-a3b-instruct:free", label: "Qwen3 80B" },
+          { id: "google/gemma-4-31b-it:free", label: "Gemma 4 31B" },
+          { id: "nousresearch/hermes-3-llama-3.1-405b:free", label: "Hermes 3 405B" },
+        ],
+      },
+      {
+        title: "Low cost · pennies, best answers",
+        models: [
+          { id: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash" },
+          { id: "openai/gpt-4o-mini", label: "GPT-4o mini" },
+          { id: "anthropic/claude-3.5-haiku", label: "Claude 3.5 Haiku" },
+          { id: "meta-llama/llama-3.1-8b-instruct", label: "Llama 3.1 8B" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "openai",
+    label: "OpenAI",
+    keyUrl: "https://platform.openai.com/api-keys",
+    keyPlaceholder: "sk-...",
+    defaultModel: "gpt-4o-mini",
+    groups: [
+      { title: "Low cost", models: [{ id: "gpt-4o-mini", label: "GPT-4o mini" }] },
+      {
+        title: "Premium",
+        models: [
+          { id: "gpt-4o", label: "GPT-4o" },
+          { id: "o1-mini", label: "o1-mini (reasoning)" },
+          { id: "o3-mini", label: "o3-mini (reasoning)" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "anthropic",
+    label: "Anthropic",
+    keyUrl: "https://console.anthropic.com/settings/keys",
+    keyPlaceholder: "sk-ant-...",
+    defaultModel: "claude-3-5-haiku-latest",
+    groups: [
+      { title: "Low cost", models: [{ id: "claude-3-5-haiku-latest", label: "Claude 3.5 Haiku" }] },
+      {
+        title: "Premium",
+        models: [{ id: "claude-3-5-sonnet-latest", label: "Claude 3.5 Sonnet" }],
+      },
+    ],
+  },
 ];
 
+const DEFAULT_PROVIDER: ProviderCfg = PROVIDERS.find((p) => p.id === "openrouter") ?? {
+  id: "openrouter",
+  label: "OpenRouter",
+  keyUrl: "https://openrouter.ai/keys",
+  keyPlaceholder: "sk-or-...",
+  defaultModel: "openrouter/free",
+  groups: [],
+};
+const providerOf = (id: string): ProviderCfg =>
+  PROVIDERS.find((p) => p.id === id) ?? DEFAULT_PROVIDER;
+
+const SELECT_CLASS =
+  "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+
 /**
- * BYO-LLM: point Ask AI at your own model via OpenRouter (docs/10 §3). The key is sent once to
- * be stored encrypted server-side; it's never returned or shown again (only provider + model are).
- * Admin-only. Without this, Ask AI uses the platform default.
+ * BYO-LLM: point Ask AI at your own model (docs/10 §3). Pick a provider — OpenRouter (one key,
+ * any model incl. free), OpenAI, or Anthropic — paste that provider's key + pick a model. On save
+ * we run a live test call and only store on success. The key is encrypted server-side and never
+ * shown again. Admin-only. Without this, Ask AI uses the platform default.
  */
 export function LlmSettingsCard({
   orgId,
@@ -30,23 +114,33 @@ export function LlmSettingsCard({
   initial: LlmSettings | null;
 }) {
   const [current, setCurrent] = React.useState<LlmSettings | null>(initial);
-  const [model, setModel] = React.useState(initial?.model ?? DEFAULT_MODEL);
+  const [provider, setProvider] = React.useState<string>(initial?.provider ?? "openrouter");
+  const [model, setModel] = React.useState(initial?.model ?? providerOf(provider).defaultModel);
   const [apiKey, setApiKey] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [msg, setMsg] = React.useState<{ tone: "ok" | "warn"; text: string } | null>(null);
 
+  const pcfg = providerOf(provider);
+  const knownIds = pcfg.groups.flatMap((g) => g.models.map((m) => m.id));
+
+  function switchProvider(id: string) {
+    setProvider(id);
+    setModel(providerOf(id).defaultModel);
+    setMsg(null);
+  }
+
   async function save() {
     if (!model.trim() || !apiKey.trim()) {
-      setMsg({ tone: "warn", text: "Enter a model and your OpenRouter API key." });
+      setMsg({ tone: "warn", text: `Enter a model and your ${pcfg.label} API key.` });
       return;
     }
     setBusy(true);
     setMsg(null);
     try {
-      const saved = await setLlmSettings(orgId, model.trim(), apiKey.trim());
+      const saved = await setLlmSettings(orgId, provider, model.trim(), apiKey.trim());
       setCurrent(saved);
       setApiKey("");
-      setMsg({ tone: "ok", text: `Saved - Ask AI now uses ${saved.model} via OpenRouter.` });
+      setMsg({ tone: "ok", text: `Tested + saved - Ask AI now uses ${saved.model}.` });
     } catch (e) {
       setMsg({ tone: "warn", text: e instanceof Error ? e.message : "Couldn't save the model." });
     } finally {
@@ -78,62 +172,102 @@ export function LlmSettingsCard({
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Bring your own model for Ask AI via{" "}
-          <a
-            href="https://openrouter.ai/keys"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-0.5 font-medium text-foreground underline underline-offset-2"
-          >
-            OpenRouter <ExternalLink className="size-3" />
-          </a>
-          . Atlas answers stay grounded in your graph and cited - the model only narrates. Your key
-          is stored encrypted and never shown again.
+          Bring your own model for Ask AI. Answers stay grounded in your graph and cited - the model
+          only narrates. Your key is tested, stored encrypted, and never shown again.
         </p>
 
         <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
           {current ? (
-            <span>
-              Currently using <span className="font-medium">{current.model}</span> via OpenRouter.
+            <span className="inline-flex items-center gap-1.5">
+              Currently using <span className="font-medium">{current.model}</span> via
+              <ProviderIcon id={current.provider} className="size-3.5" />
+              {providerOf(current.provider).label}.
             </span>
           ) : (
             <span className="text-muted-foreground">
-              Using the platform default. Add an OpenRouter key to use your own model.
+              Using the platform default. Add a key below to use your own model.
             </span>
           )}
         </div>
 
+        {/* Provider selector with brand icons. */}
+        <div className="inline-flex rounded-lg border border-border bg-muted/40 p-0.5 text-xs">
+          {PROVIDERS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => switchProvider(p.id)}
+              aria-pressed={provider === p.id}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-3 py-1 font-medium transition-colors",
+                provider === p.id
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <ProviderIcon id={p.id} className="size-3.5" />
+              {p.label}
+            </button>
+          ))}
+        </div>
+
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">Model</span>
-            <Input
-              list="openrouter-models"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              placeholder="anthropic/claude-sonnet-4"
-            />
-            <datalist id="openrouter-models">
-              {SUGGESTED.map((m) => (
-                <option key={m} value={m} />
-              ))}
-            </datalist>
-          </label>
-          <label className="space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">OpenRouter API key</span>
+            <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              {pcfg.label} API key
+              <a
+                href={pcfg.keyUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-0.5 text-foreground underline underline-offset-2"
+              >
+                get one <ExternalLink className="size-3" />
+              </a>
+            </span>
             <Input
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder={current ? "•••••••• (enter to replace)" : "sk-or-..."}
+              placeholder={current ? "•••••••• (enter to replace)" : pcfg.keyPlaceholder}
               autoComplete="off"
             />
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-xs font-medium text-muted-foreground">Model</span>
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              aria-label="Model"
+              className={SELECT_CLASS}
+            >
+              {/* Preserve a saved/custom model that isn't in the curated list. */}
+              {!knownIds.includes(model) ? <option value={model}>{model}</option> : null}
+              {pcfg.groups.map((g) => (
+                <optgroup key={g.title} label={g.title}>
+                  {g.models.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
           </label>
         </div>
 
         <div className="flex items-center gap-2">
           <Button onClick={() => void save()} disabled={busy} size="sm">
-            {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-            {current ? "Update model" : "Save model"}
+            {busy ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Testing…
+              </>
+            ) : current ? (
+              "Update model"
+            ) : (
+              "Test & save"
+            )}
           </Button>
           {current ? (
             <Button onClick={() => void remove()} disabled={busy} size="sm" variant="ghost">

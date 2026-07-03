@@ -207,9 +207,10 @@ export async function getLlmSettings(orgId: string): Promise<LlmSettings | null>
   return body?.data ?? null;
 }
 
-/** Save the org's OpenRouter model + key (key → encrypted store server-side). Admin-only. */
+/** Save the org's model + key (key → encrypted store; tested server-side first). Admin-only. */
 export async function setLlmSettings(
   orgId: string,
+  provider: string,
   model: string,
   apiKey: string,
 ): Promise<LlmSettings> {
@@ -222,7 +223,7 @@ export async function setLlmSettings(
       "X-Atlas-Org": orgId,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ provider: "openrouter", model, apiKey }),
+    body: JSON.stringify({ provider, model, apiKey }),
   });
   const body = (await res.json().catch(() => null)) as {
     data?: LlmSettings;
