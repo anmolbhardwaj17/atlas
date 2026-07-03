@@ -190,6 +190,64 @@ export async function deleteConnection(orgId: string, id: string): Promise<void>
   }
 }
 
+export interface LlmSettings {
+  provider: string;
+  model: string;
+}
+
+/** The org's BYO-LLM config (never the key). Null when using the platform default. */
+export async function getLlmSettings(orgId: string): Promise<LlmSettings | null> {
+  const token = await getClientToken();
+  if (!token) return null;
+  const res = await fetch(`${apiUrl()}/ai/settings`, {
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) return null;
+  const body = (await res.json().catch(() => null)) as { data?: LlmSettings | null } | null;
+  return body?.data ?? null;
+}
+
+/** Save the org's OpenRouter model + key (key → encrypted store server-side). Admin-only. */
+export async function setLlmSettings(
+  orgId: string,
+  model: string,
+  apiKey: string,
+): Promise<LlmSettings> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/ai/settings`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "X-Atlas-Org": orgId,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ provider: "openrouter", model, apiKey }),
+  });
+  const body = (await res.json().catch(() => null)) as {
+    data?: LlmSettings;
+    error?: { message?: string };
+  } | null;
+  if (!res.ok || !body?.data) {
+    throw new Error(body?.error?.message ?? `Couldn't save the model (${res.status}).`);
+  }
+  return body.data;
+}
+
+/** Remove the org's BYO-LLM (fall back to the platform default). Admin-only. */
+export async function deleteLlmSettings(orgId: string): Promise<void> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/ai/settings`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+    throw new Error(body?.error?.message ?? `Couldn't remove the model (${res.status}).`);
+  }
+}
+
 /** The SSE event union the /ai messages endpoint streams (mirrors AnswerEvent). */
 export type AskEvent =
   | { type: "retrieval"; nodesConsidered: number; intent: string }

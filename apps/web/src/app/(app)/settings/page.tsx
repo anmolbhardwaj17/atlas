@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/certainty";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { AuditLog } from "@/components/settings/audit-log";
+import { LlmSettingsCard } from "@/components/settings/llm-settings";
+import type { LlmSettings } from "@/lib/browser-api";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +36,7 @@ export default async function SettingsPage() {
   const shell = await requireShell();
   const auth = { token: shell.token, orgId: shell.orgId };
   // Server-fetch everything with the reliable server session (no client auth race).
-  const [conns, members, invites] = await Promise.all([
+  const [conns, members, invites, llm] = await Promise.all([
     apiGet<ApiOk<ConnectionDto[]>>("/connections", auth).then((r) => r.body?.data ?? []),
     apiGet<ApiOk<MemberDto[]>>(`/orgs/${shell.orgId}/members`, auth).then(
       (r) => r.body?.data ?? [],
@@ -42,6 +44,7 @@ export default async function SettingsPage() {
     apiGet<ApiOk<InvitationDto[]>>(`/orgs/${shell.orgId}/invitations`, auth).then(
       (r) => r.body?.data ?? [],
     ),
+    apiGet<ApiOk<LlmSettings | null>>("/ai/settings", auth).then((r) => r.body?.data ?? null),
   ]);
 
   return (
@@ -101,6 +104,10 @@ export default async function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {shell.role === "Owner" || shell.role === "Admin" ? (
+        <LlmSettingsCard orgId={shell.orgId} initial={llm} />
+      ) : null}
 
       <OrgPanel orgId={shell.orgId} initialMembers={members} initialInvites={invites} />
 
