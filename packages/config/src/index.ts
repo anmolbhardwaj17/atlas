@@ -48,6 +48,11 @@ export const EnvSchema = z.object({
   // they survive restarts). Unset ⇒ fall back to the in-memory broker (dev-only, wiped on boot).
   SECRET_ENCRYPTION_KEY: optionalString,
 
+  // Auto-refresh cadence: re-sync each connected source whose last sync is older than this many
+  // minutes (docs/06 §11, the in-process dev slice of the Scheduler). 0 = disabled. Needs durable
+  // secrets (SECRET_ENCRYPTION_KEY) so a sync can resolve credentials without a reconnect.
+  SYNC_INTERVAL_MINUTES: z.coerce.number().int().min(0).max(1440).default(0),
+
   // Browser origin allowed to call the API (CORS). The web app calls the API
   // client-side (Bearer token), so this must list the web origin. Default = local web.
   WEB_ORIGIN: z.string().url().default("http://localhost:4291"),
