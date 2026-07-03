@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { MockLLMProvider } from "@atlas/ai";
 import type { AnswerEvent } from "@atlas/ai";
+import { InMemorySecretBroker } from "@atlas/ingest";
+import { loadEnv } from "@atlas/config";
 import { GraphService } from "../graph/graph.service";
 import { PostgresSearchProvider } from "../search/postgres-search.provider";
 import { GraphRetrievalPort } from "./graph-retrieval.port";
@@ -37,7 +39,13 @@ suite("G3.5 AiService", () => {
 
   const makeAi = (narration: string): AiService => {
     const port = new GraphRetrievalPort(new GraphService(app), new PostgresSearchProvider(app));
-    return new AiService(app, port, new MockLLMProvider(narration));
+    return new AiService(
+      app,
+      port,
+      new MockLLMProvider(narration),
+      new InMemorySecretBroker(),
+      loadEnv({}),
+    );
   };
 
   beforeAll(() => {

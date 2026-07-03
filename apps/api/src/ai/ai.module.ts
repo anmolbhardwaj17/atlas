@@ -1,6 +1,7 @@
 import { Module, type Provider } from "@nestjs/common";
 import { ClaudeProvider, MockLLMProvider } from "@atlas/ai";
 import { AuthModule } from "../auth/auth.module";
+import { ConnectionsModule } from "../connections/connections.module";
 import { GraphService } from "../graph/graph.service";
 import { SEARCH_PROVIDER } from "../search/search.provider";
 import { PostgresSearchProvider } from "../search/postgres-search.provider";
@@ -31,7 +32,8 @@ const searchProvider: Provider = {
 };
 
 @Module({
-  imports: [AuthModule],
+  // ConnectionsModule exports SECRET_BROKER (for per-org BYO-LLM key resolution).
+  imports: [AuthModule, ConnectionsModule],
   controllers: [AiController],
   providers: [GraphService, searchProvider, GraphRetrievalPort, AiService, llmProvider],
 })

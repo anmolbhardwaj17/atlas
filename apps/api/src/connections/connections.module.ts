@@ -69,5 +69,7 @@ const connectorRegistryProvider: Provider = {
     connectorRegistryProvider,
     SyncWorkerBootstrap,
   ],
+  // Exported so the AI module can resolve per-org BYO-LLM keys through the same broker.
+  exports: [SECRET_BROKER],
 })
 export class ConnectionsModule {}

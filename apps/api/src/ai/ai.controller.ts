@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Param, Post, Req, Res, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Req,
+  Res,
+  UseGuards,
+} from "@nestjs/common";
 import { AuthGuard } from "../auth/auth.guard";
 import { TenantScopeGuard } from "../auth/tenant-scope.guard";
 import { RolesGuard } from "../auth/roles.guard";
@@ -7,7 +18,7 @@ import { ApiException } from "../common/errors";
 import { parseBody } from "../common/validation";
 import type { AuthedRequest } from "../auth/auth.types";
 import { AiService } from "./ai.service";
-import { AskSchema, CreateConversationSchema } from "./dto";
+import { AskSchema, CreateConversationSchema, SetLlmConfigSchema } from "./dto";
 
 /** Minimal raw response for manual SSE (avoids a hard fastify type dep). */
 interface SseReply {
@@ -27,6 +38,30 @@ interface SseReply {
 @UseGuards(AuthGuard, TenantScopeGuard, RolesGuard)
 export class AiController {
   constructor(private readonly ai: AiService) {}
+
+  /** BYO-LLM config for the org (docs/10 §3). GET is Member (the UI shows model/provider,
+   *  never the key); PUT/DELETE are Admin. */
+  @Get("settings")
+  @Roles("Member")
+  async getSettings(
+    @Req() req: AuthedRequest,
+  ): Promise<{ provider: string; model: string } | null> {
+    return this.ai.getLlmConfig(org(req).id);
+  }
+
+  @Put("settings")
+  @Roles("Admin")
+  async setSettings(@Req() req: AuthedRequest, @Body() body: unknown): Promise<unknown> {
+    const { provider, model, apiKey } = parseBody(SetLlmConfigSchema, body);
+    return this.ai.setLlmConfig(org(req).id, provider, model, apiKey);
+  }
+
+  @Delete("settings")
+  @Roles("Admin")
+  async deleteSettings(@Req() req: AuthedRequest): Promise<{ ok: true }> {
+    await this.ai.deleteLlmConfig(org(req).id);
+    return { ok: true };
+  }
 
   @Post("conversations")
   @Roles("Member")
