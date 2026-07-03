@@ -22,10 +22,11 @@ interface ChatMessage {
   error: string | null;
 }
 
-const EXAMPLES = [
-  "What is the blast radius of the prod-orders service?",
-  "What does the checkout service depend on?",
-  "What changed in the last week?",
+// Fallback when we can't derive data-aware suggestions (e.g. nothing connected yet).
+const FALLBACK_EXAMPLES = [
+  "What do I have connected?",
+  "Who are the top contributors this month?",
+  "What changed recently?",
 ];
 
 /**
@@ -36,9 +37,11 @@ const EXAMPLES = [
 export function AskChat({
   orgId,
   initialQuestion,
+  suggestions = [],
 }: {
   orgId: string;
   initialQuestion?: string | undefined;
+  suggestions?: string[];
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -106,7 +109,7 @@ export function AskChat({
     <div className="flex h-[calc(100dvh-7rem)] min-h-[420px] flex-col">
       <div className="flex-1 space-y-5 overflow-y-auto pr-1">
         {messages.length === 0 ? (
-          <EmptyState onPick={(q) => void ask(q)} />
+          <EmptyState onPick={(q) => void ask(q)} suggestions={suggestions} />
         ) : (
           messages.map((m, i) =>
             m.role === "user" ? (
@@ -248,7 +251,14 @@ function TypingDots() {
   );
 }
 
-function EmptyState({ onPick }: { onPick: (q: string) => void }) {
+function EmptyState({
+  onPick,
+  suggestions,
+}: {
+  onPick: (q: string) => void;
+  suggestions: string[];
+}) {
+  const questions = suggestions.length > 0 ? suggestions : FALLBACK_EXAMPLES;
   return (
     <div className="py-8">
       <div className="mb-3 flex items-center gap-2 text-foreground">
@@ -256,11 +266,11 @@ function EmptyState({ onPick }: { onPick: (q: string) => void }) {
         <h2 className="text-lg font-semibold">Ask Atlas</h2>
       </div>
       <p className="max-w-lg text-sm text-muted-foreground">
-        Ask about your infrastructure, dependencies, and deploys. Every answer is grounded in your
-        graph - cited, confidence-tiered, and honest when it doesn’t know.
+        Ask about your infrastructure, code, and deploys. Every answer is grounded in your graph -
+        cited, confidence-tiered, and honest when it doesn’t know.
       </p>
       <div className="mt-5 flex flex-col gap-2">
-        {EXAMPLES.map((q) => (
+        {questions.map((q) => (
           <button
             key={q}
             onClick={() => onPick(q)}
