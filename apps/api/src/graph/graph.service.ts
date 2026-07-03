@@ -630,6 +630,12 @@ export class GraphService {
   async graph(orgId: string, q: GraphQuery): Promise<GraphResult> {
     return withOrgScope(this.db, orgId, async (c) => {
       const where = ["status <> 'deleted'"];
+      // The map shows current infrastructure + in-flight work: open PRs only. Merged/declined
+      // PRs are history (hundreds of them) and just clutter the canvas.
+      where.push(
+        `((kind NOT LIKE '%.pullrequest' AND kind NOT LIKE '%.pull_request')
+           OR attributes->>'state' = 'OPEN')`,
+      );
       const params: unknown[] = [];
       const p = (v: unknown): string => `$${params.push(v)}`;
       if (q.kind) where.push(`kind = ${p(q.kind)}`);
