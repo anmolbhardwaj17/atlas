@@ -301,6 +301,7 @@ function toDto(row: ConnectionRow | undefined): ConnectionDto {
     config: row.config,
     health: row.health,
     secretConfigured: row.secret_ref !== null,
+    demo: row.config?.demo === true,
     lastSyncedAt: row.last_synced_at?.toISOString() ?? null,
     createdAt: row.created_at.toISOString(),
   };

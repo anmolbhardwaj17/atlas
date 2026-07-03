@@ -27,6 +27,8 @@ export interface ConnectionDto {
   config: Record<string, unknown>;
   health: Record<string, unknown>;
   secretConfigured: boolean;
+  /** Sample/demo connection (from the demo seed) — not a real syncable source. */
+  demo: boolean;
   lastSyncedAt: string | null;
   createdAt: string;
 }

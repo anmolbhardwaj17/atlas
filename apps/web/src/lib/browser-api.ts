@@ -74,6 +74,8 @@ export interface ConnectionSummary {
   provider: string;
   displayName: string;
   status: string;
+  /** Sample/demo connection — not a real syncable source (skip in Fetch latest). */
+  demo?: boolean;
 }
 
 /** Create a connection for a provider (Integrations hub). Admin-only server-side. */

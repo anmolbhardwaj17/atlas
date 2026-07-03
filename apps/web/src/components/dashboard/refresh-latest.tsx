@@ -23,7 +23,7 @@ export function RefreshLatest({ orgId }: { orgId: string }) {
     setMsg(null);
     try {
       const active = (await listConnections(orgId)).filter(
-        (c) => c.status === "connected" || c.status === "degraded",
+        (c) => !c.demo && (c.status === "connected" || c.status === "degraded"),
       );
       if (active.length === 0) {
         setMsg({ tone: "warn", text: "No connected sources to refresh yet." });

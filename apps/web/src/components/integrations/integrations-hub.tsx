@@ -192,7 +192,7 @@ function ConnectionRow({
   const [syncing, setSyncing] = React.useState(false);
   const [note, setNote] = React.useState<{ tone: "ok" | "warn"; text: string } | null>(null);
 
-  const canSync = conn.status === "connected" || conn.status === "degraded";
+  const canSync = !conn.demo && (conn.status === "connected" || conn.status === "degraded");
 
   async function remove() {
     setBusy(true);
@@ -230,6 +230,11 @@ function ConnectionRow({
       <div className="flex items-center justify-between gap-2">
         <span className="min-w-0 truncate">{conn.displayName}</span>
         <span className="flex shrink-0 items-center gap-2">
+          {conn.demo ? (
+            <span className="rounded-full border border-transparent bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Sample
+            </span>
+          ) : null}
           <StatusBadge status={conn.status} />
           {canManage && canSync && !confirming ? (
             <button

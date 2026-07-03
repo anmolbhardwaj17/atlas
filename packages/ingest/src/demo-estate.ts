@@ -484,8 +484,10 @@ async function ensureConnection(
     );
     if (existing.rows[0]) return existing.rows[0].id;
     const { rows } = await c.query<{ id: string }>(
-      `INSERT INTO connections (org_id, provider, display_name, status)
-       VALUES ($1, $2, $3, 'connected') RETURNING id`,
+      // `config.demo` marks these as sample connections so the UI can skip them in the
+      // Fetch-latest flow (no real credentials → they'd only ever say "reconnect").
+      `INSERT INTO connections (org_id, provider, display_name, status, config)
+       VALUES ($1, $2, $3, 'connected', '{"demo":true}'::jsonb) RETURNING id`,
       [orgId, provider, name],
     );
     return firstId(rows);
