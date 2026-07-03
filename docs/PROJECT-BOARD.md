@@ -222,6 +222,9 @@
 
 ---
 
+## 🗂️ Planned deep-dives (captured feature plans, not yet scheduled)
+- **Security & Vulnerability Intelligence** → `docs/plans/security-vulnerabilities.md` — "exposed AND vulnerable" toxic-combination over code+cloud; free OSV path first (manifest parsing → OSV → CVE nodes), cloud-posture rules on the AWS graph. Steps 1–2 buildable on Bitbucket today; toxic-combo needs AWS. Strong Siemba fit.
+
 ## ⏸️ Backlog (Phase-1+ — deferred, from roadmap `docs/15` §8)
 - v1.1 Trust & Depth: richer inference, culprit-PR ranking (US-6), saved views/deep-links
 - v1.2 Enterprise on-ramp: multi-account AWS, **domain auto-join (`hd`)**, real-time CloudTrail ingestion
