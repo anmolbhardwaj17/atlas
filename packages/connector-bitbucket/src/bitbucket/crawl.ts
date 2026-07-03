@@ -116,15 +116,18 @@ export async function* discoverRepo(
     // PRs not permitted — skip
   }
 
-  // MERGED pull requests raised in the last 30 days (shipped work → contribution + repo
-  // activity). Paginated within the window but capped per repo so a hyper-active repo can't
-  // fill the graph — the current-state graph keeps a recent, useful slice, not full history.
+  // MERGED pull requests active in the last 30 days (shipped work → contribution + repo
+  // activity). Window + sort by `updated_on` (last activity = the merge), NOT `created_on`: a
+  // PR opened weeks ago but merged today is *recent activity*, and sorting by created_on would
+  // rank it below the per-repo cap in a busy repo and miss it. updated_on ⊇ created_on for the
+  // window (creation is an update), so the created-date insights still see everything they need.
+  // Capped per repo so a hyper-active repo keeps a recent slice, not full history.
   try {
     const since = new Date(Date.now() - PR_WINDOW_DAYS * 86400 * 1000).toISOString();
     let count = 0;
     for await (const pr of client.paginate<Json>(
       `/repositories/${workspace}/${repoSlug}/pullrequests`,
-      { params: { state: "MERGED", sort: "-created_on", q: `created_on >= "${since}"` } },
+      { params: { state: "MERGED", sort: "-updated_on", q: `updated_on >= "${since}"` } },
     )) {
       if (count >= MERGED_PR_CAP) break;
       count += 1;
