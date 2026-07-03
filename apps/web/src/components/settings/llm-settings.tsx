@@ -20,34 +20,31 @@ interface ProviderCfg {
   groups: Group[];
 }
 
-// Curated per provider. OpenRouter `:free` models cost $0 (rate-limited); low-cost picks are a few
-// cents / million tokens. Groups become tagged sections in the model dropdown.
+// Curated per provider. OpenRouter model ids are VERIFIED against the live catalogue + a real
+// completion (openrouter.ai/models). NOTE: OpenRouter's $0 `:free` models are heavily rate-limited
+// and often return empty/429 — deliberately not offered here; the low-cost ones are pennies + reliable.
 const PROVIDERS: ProviderCfg[] = [
   {
     id: "openrouter",
     label: "OpenRouter",
     keyUrl: "https://openrouter.ai/keys",
     keyPlaceholder: "sk-or-...",
-    defaultModel: "openrouter/free",
+    defaultModel: "openai/gpt-4o-mini",
     groups: [
       {
-        title: "Free · $0, rate-limited",
+        title: "Cheapest · ~$0.02 / M tokens",
         models: [
-          { id: "openrouter/free", label: "Auto (free router)" },
-          { id: "meta-llama/llama-3.3-70b-instruct:free", label: "Llama 3.3 70B" },
-          { id: "openai/gpt-oss-120b:free", label: "GPT-OSS 120B" },
-          { id: "qwen/qwen3-next-80b-a3b-instruct:free", label: "Qwen3 80B" },
-          { id: "google/gemma-4-31b-it:free", label: "Gemma 4 31B" },
-          { id: "nousresearch/hermes-3-llama-3.1-405b:free", label: "Hermes 3 405B" },
+          { id: "meta-llama/llama-3.1-8b-instruct", label: "Llama 3.1 8B" },
+          { id: "mistralai/mistral-nemo", label: "Mistral Nemo" },
         ],
       },
       {
-        title: "Low cost · pennies, best answers",
+        title: "Low cost · pennies, reliable",
         models: [
-          { id: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash" },
           { id: "openai/gpt-4o-mini", label: "GPT-4o mini" },
-          { id: "anthropic/claude-3.5-haiku", label: "Claude 3.5 Haiku" },
-          { id: "meta-llama/llama-3.1-8b-instruct", label: "Llama 3.1 8B" },
+          { id: "deepseek/deepseek-chat", label: "DeepSeek V3" },
+          { id: "anthropic/claude-3-haiku", label: "Claude 3 Haiku" },
+          { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash" },
         ],
       },
     ],
@@ -64,7 +61,6 @@ const PROVIDERS: ProviderCfg[] = [
         title: "Premium",
         models: [
           { id: "gpt-4o", label: "GPT-4o" },
-          { id: "o1-mini", label: "o1-mini (reasoning)" },
           { id: "o3-mini", label: "o3-mini (reasoning)" },
         ],
       },
@@ -91,7 +87,7 @@ const DEFAULT_PROVIDER: ProviderCfg = PROVIDERS.find((p) => p.id === "openrouter
   label: "OpenRouter",
   keyUrl: "https://openrouter.ai/keys",
   keyPlaceholder: "sk-or-...",
-  defaultModel: "openrouter/free",
+  defaultModel: "openai/gpt-4o-mini",
   groups: [],
 };
 const providerOf = (id: string): ProviderCfg =>

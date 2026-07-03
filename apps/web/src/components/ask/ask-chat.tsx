@@ -19,6 +19,8 @@ interface ChatMessage {
   confidence: string | null;
   caveats: string[];
   streaming: boolean;
+  /** Waiting phase before tokens arrive, for a smooth loading state. */
+  phase: "searching" | "thinking" | "answering";
   error: string | null;
 }
 
@@ -62,13 +64,14 @@ export function AskChat({
     void getConversation(orgId, conversationId).then((c) => {
       if (!live || !c) return;
       setMessages(
-        c.messages.map((m) => ({
+        c.messages.map((m): ChatMessage => ({
           role: m.role === "assistant" ? "assistant" : "user",
           text: m.content,
           citations: m.citations ?? [],
           confidence: m.confidence,
           caveats: [],
           streaming: false,
+          phase: "answering",
           error: null,
         })),
       );
@@ -92,6 +95,7 @@ export function AskChat({
         confidence: null,
         caveats: [],
         streaming: false,
+        phase: "answering",
         error: null,
       },
       {
@@ -101,6 +105,7 @@ export function AskChat({
         confidence: null,
         caveats: [],
         streaming: true,
+        phase: "searching",
         error: null,
       },
     ]);
@@ -183,8 +188,11 @@ export function AskChat({
 
 function applyEvent(ev: AskEvent, patch: (fn: (m: ChatMessage) => ChatMessage) => void) {
   switch (ev.type) {
+    case "retrieval":
+      patch((m) => ({ ...m, phase: "thinking" }));
+      break;
     case "token":
-      patch((m) => ({ ...m, text: m.text + ev.text }));
+      patch((m) => ({ ...m, text: m.text + ev.text, phase: "answering" }));
       break;
     case "citation":
       patch((m) => ({
@@ -234,7 +242,15 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
             {message.error}
           </p>
         ) : message.text.length === 0 && message.streaming ? (
-          <TypingDots />
+          <span className="flex items-center gap-2 text-sm text-muted-foreground">
+            <TypingDots />
+            {message.phase === "thinking" ? "Thinking…" : "Searching your graph…"}
+          </span>
+        ) : message.text.length === 0 && !message.streaming ? (
+          <p className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
+            The model returned no answer — it may be rate-limited or unavailable. Try a different
+            model in Settings.
+          </p>
         ) : (
           <p
             className={`whitespace-pre-wrap text-sm ${honest ? "text-muted-foreground" : "text-foreground"}`}

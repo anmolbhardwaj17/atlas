@@ -102,8 +102,12 @@ export class AiController {
         reply.raw.write(`event: ${ev.type}\ndata: ${JSON.stringify(ev)}\n\n`);
       }
     } catch (err) {
-      const message = err instanceof ApiException ? err.message : "The AI request failed.";
-      reply.raw.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
+      // Surface the real reason (model 429/404, bad key, etc.) — include `type` so the client
+      // renders it instead of silently swallowing an untyped event.
+      const message = err instanceof ApiException ? err.message : (err as Error).message;
+      reply.raw.write(
+        `event: error\ndata: ${JSON.stringify({ type: "error", message: message || "The AI request failed." })}\n\n`,
+      );
     }
     reply.raw.end();
   }
