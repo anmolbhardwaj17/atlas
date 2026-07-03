@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Send, Sparkles } from "lucide-react";
 import { ConfidenceBadge } from "@/components/certainty";
-import { createConversation, streamAsk, type AskEvent } from "@/lib/browser-api";
+import { createConversation, getConversation, streamAsk, type AskEvent } from "@/lib/browser-api";
 
 interface Citation {
   number: number;
@@ -38,16 +38,45 @@ export function AskChat({
   orgId,
   initialQuestion,
   suggestions = [],
+  conversationId,
+  onCreated,
 }: {
   orgId: string;
   initialQuestion?: string | undefined;
   suggestions?: string[];
+  /** When set, reopen this past conversation (load its messages). */
+  conversationId?: string | undefined;
+  /** Fired when a NEW conversation is created (so the sidebar can add + select it). */
+  onCreated?: ((id: string, title: string) => void) | undefined;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const convoRef = useRef<string | null>(null);
+  const convoRef = useRef<string | null>(conversationId ?? null);
   const autoAsked = useRef(false);
+
+  // Reopen a past conversation: load its persisted turns.
+  useEffect(() => {
+    if (!conversationId) return;
+    let live = true;
+    void getConversation(orgId, conversationId).then((c) => {
+      if (!live || !c) return;
+      setMessages(
+        c.messages.map((m) => ({
+          role: m.role === "assistant" ? "assistant" : "user",
+          text: m.content,
+          citations: m.citations ?? [],
+          confidence: m.confidence,
+          caveats: [],
+          streaming: false,
+          error: null,
+        })),
+      );
+    });
+    return () => {
+      live = false;
+    };
+  }, [orgId, conversationId]);
 
   async function ask(question: string) {
     const q = question.trim();
@@ -80,7 +109,11 @@ export function AskChat({
       setMessages((m) => m.map((msg, i) => (i === m.length - 1 ? fn(msg) : msg)));
 
     try {
-      if (!convoRef.current) convoRef.current = await createConversation(orgId);
+      const isNew = !convoRef.current;
+      if (isNew) {
+        convoRef.current = await createConversation(orgId, q);
+        if (convoRef.current) onCreated?.(convoRef.current, q);
+      }
       if (!convoRef.current) {
         patchLast((msg) => ({ ...msg, streaming: false, error: "Couldn’t start a conversation." }));
         return;
@@ -105,8 +138,8 @@ export function AskChat({
   }, [initialQuestion, ask]);
 
   return (
-    // Fill the content area (viewport − header − page padding) so the input pins to the bottom.
-    <div className="flex h-[calc(100dvh-7rem)] min-h-[420px] flex-col">
+    // Fill the workspace column so the input pins to the bottom.
+    <div className="flex h-full min-h-[420px] flex-col">
       <div className="flex-1 space-y-5 overflow-y-auto pr-1">
         {messages.length === 0 ? (
           <EmptyState onPick={(q) => void ask(q)} suggestions={suggestions} />

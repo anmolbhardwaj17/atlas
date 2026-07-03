@@ -267,8 +267,8 @@ export type AskEvent =
   | { type: "done"; grounded: boolean; citations: number }
   | { type: "error"; message: string };
 
-/** Create a conversation, returning its id (or null on failure). */
-export async function createConversation(orgId: string): Promise<string | null> {
+/** Create a conversation (optionally titled by the first question), returning its id or null. */
+export async function createConversation(orgId: string, title?: string): Promise<string | null> {
   const token = await getClientToken();
   if (!token) return null;
   const res = await fetch(`${apiUrl()}/ai/conversations`, {
@@ -278,11 +278,58 @@ export async function createConversation(orgId: string): Promise<string | null> 
       "X-Atlas-Org": orgId,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({}),
+    body: JSON.stringify(title ? { title: title.slice(0, 200) } : {}),
   });
   if (!res.ok) return null;
   const body = (await res.json()) as { data: { id: string } };
   return body.data?.id ?? null;
+}
+
+export interface ConversationSummary {
+  id: string;
+  title: string | null;
+  createdAt: string;
+}
+
+/** Recent conversations for the history sidebar. */
+export async function listConversations(orgId: string): Promise<ConversationSummary[]> {
+  const token = await getClientToken();
+  if (!token) return [];
+  const res = await fetch(`${apiUrl()}/ai/conversations`, {
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) return [];
+  const body = (await res.json().catch(() => null)) as { data?: ConversationSummary[] } | null;
+  return body?.data ?? [];
+}
+
+export interface ConversationMessage {
+  role: string;
+  content: string;
+  citations: Array<{
+    number: number;
+    kind: "node" | "edge";
+    id: string;
+    confidence: string | null;
+  }>;
+  confidence: string | null;
+}
+
+/** Load a conversation's messages (for reopening from history). */
+export async function getConversation(
+  orgId: string,
+  id: string,
+): Promise<{ id: string; title: string | null; messages: ConversationMessage[] } | null> {
+  const token = await getClientToken();
+  if (!token) return null;
+  const res = await fetch(`${apiUrl()}/ai/conversations/${id}`, {
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) return null;
+  const body = (await res.json().catch(() => null)) as {
+    data?: { id: string; title: string | null; messages: ConversationMessage[] };
+  } | null;
+  return body?.data ?? null;
 }
 
 /**

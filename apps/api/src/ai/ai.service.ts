@@ -187,6 +187,24 @@ export class AiService {
     });
   }
 
+  /** Recent conversations for the history sidebar (newest first). */
+  async listConversations(
+    orgId: string,
+  ): Promise<Array<{ id: string; title: string | null; createdAt: string }>> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      const { rows } = await c.query<{ id: string; title: string | null; created_at: Date }>(
+        `SELECT id, title, created_at FROM ai_conversations
+          WHERE org_id = $1 ORDER BY created_at DESC LIMIT 50`,
+        [orgId],
+      );
+      return rows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        createdAt: r.created_at.toISOString(),
+      }));
+    });
+  }
+
   async getConversation(orgId: string, id: string): Promise<ConversationDto> {
     return withOrgScope(this.db, orgId, async (c) => {
       const conv = await this.loadConversation(c, id);

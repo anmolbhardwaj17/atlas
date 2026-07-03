@@ -1,6 +1,7 @@
 import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
-import { AskChat } from "@/components/ask/ask-chat";
+import { AskWorkspace } from "@/components/ask/ask-workspace";
+import type { ConversationSummary } from "@/lib/browser-api";
 
 export const dynamic = "force-dynamic";
 
@@ -53,11 +54,18 @@ export default async function AskPage({
   const { q } = await searchParams;
   const initial = Array.isArray(q) ? q[0] : q;
 
-  const summary = (
-    await apiGet<ApiOk<SummaryLite>>("/summary", { token: shell.token, orgId: shell.orgId })
-  ).body?.data;
+  const auth = { token: shell.token, orgId: shell.orgId };
+  const [summaryRes, convosRes] = await Promise.all([
+    apiGet<ApiOk<SummaryLite>>("/summary", auth),
+    apiGet<ApiOk<ConversationSummary[]>>("/ai/conversations", auth),
+  ]);
 
   return (
-    <AskChat orgId={shell.orgId} initialQuestion={initial} suggestions={suggestions(summary)} />
+    <AskWorkspace
+      orgId={shell.orgId}
+      initialQuestion={initial}
+      suggestions={suggestions(summaryRes.body?.data)}
+      initialConversations={convosRes.body?.data ?? []}
+    />
   );
 }

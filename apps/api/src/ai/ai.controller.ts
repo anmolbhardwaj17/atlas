@@ -70,6 +70,12 @@ export class AiController {
     return this.ai.createConversation(org(req).id, req.auth?.userId ?? null, title);
   }
 
+  @Get("conversations")
+  @Roles("Member")
+  async listConversations(@Req() req: AuthedRequest): Promise<unknown> {
+    return this.ai.listConversations(org(req).id);
+  }
+
   @Get("conversations/:id")
   @Roles("Member")
   async get(@Req() req: AuthedRequest, @Param("id") id: string): Promise<unknown> {
