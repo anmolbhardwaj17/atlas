@@ -5,7 +5,7 @@
  * the MockLLMProvider covers the engine logic. Model + key are per-env config.
  */
 import Anthropic from "@anthropic-ai/sdk";
-import type { CompleteRequest, LLMEvent, LLMProvider } from "./llm";
+import type { ChatMessage, CompleteRequest, LLMEvent, LLMProvider } from "./llm";
 
 export interface ClaudeConfig {
   apiKey?: string;
@@ -28,7 +28,7 @@ export class ClaudeProvider implements LLMProvider {
       system: req.system,
       max_tokens: req.maxTokens,
       temperature: req.temperature,
-      messages: req.messages.map((m) => ({ role: m.role, content: m.content })),
+      messages: req.messages.map(toClaudeMessage),
       ...(req.tools && req.tools.length > 0
         ? {
             tools: req.tools.map((t) => ({
@@ -42,6 +42,7 @@ export class ClaudeProvider implements LLMProvider {
 
     // Accumulate streamed tool-call JSON per content block; emit on block stop.
     const toolBlocks = new Map<number, { id: string; name: string; json: string }>();
+    let stopReason = "end";
 
     for await (const event of stream) {
       if (event.type === "content_block_start" && event.content_block.type === "tool_use") {
@@ -63,10 +64,33 @@ export class ClaudeProvider implements LLMProvider {
           toolBlocks.delete(event.index);
           yield { type: "tool_call", id: block.id, name: block.name, input: safeJson(block.json) };
         }
+      } else if (event.type === "message_delta" && event.delta.stop_reason) {
+        // "tool_use" tells the loop the model wants to call tools; "end_turn" = it's done.
+        stopReason = event.delta.stop_reason;
       }
     }
-    yield { type: "stop", reason: "end" };
+    yield { type: "stop", reason: stopReason };
   }
+}
+
+/** Map our tool-turn ChatMessage → an Anthropic MessageParam (DD-P1-1). Anthropic carries a
+ *  tool result as a `tool_result` block inside a USER message. */
+function toClaudeMessage(m: ChatMessage): Anthropic.MessageParam {
+  if (m.role === "tool") {
+    return {
+      role: "user",
+      content: [{ type: "tool_result", tool_use_id: m.toolCallId, content: m.content }],
+    };
+  }
+  if (m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0) {
+    const blocks: Array<Anthropic.TextBlockParam | Anthropic.ToolUseBlockParam> = [];
+    if (m.content) blocks.push({ type: "text", text: m.content });
+    for (const tc of m.toolCalls) {
+      blocks.push({ type: "tool_use", id: tc.id, name: tc.name, input: tc.input });
+    }
+    return { role: "assistant", content: blocks };
+  }
+  return { role: m.role, content: m.content };
 }
 
 function safeJson(s: string): Record<string, unknown> {

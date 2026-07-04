@@ -9,14 +9,24 @@
  * prompt, and the retrieval port. Planner (G3.2), context+grounding (G3.3), the answer
  * pipeline + eval (G3.4), and SSE endpoints (G3.5) build on it.
  */
-export type { LLMProvider, CompleteRequest, LLMEvent, ChatMessage, ToolSpec } from "./llm";
+export type { LLMProvider, CompleteRequest, LLMEvent, ChatMessage, ToolCall, ToolSpec } from "./llm";
 export { MockLLMProvider, streamText } from "./mock-provider";
 export type { MockResponder } from "./mock-provider";
 export { ClaudeProvider } from "./claude-provider";
 export type { ClaudeConfig } from "./claude-provider";
 export { OpenRouterProvider } from "./openrouter-provider";
 export type { OpenRouterConfig } from "./openrouter-provider";
-export { SYSTEM_PROMPT, PROMPT_VERSION, honestAbsence } from "./prompt";
+export {
+  SYSTEM_PROMPT,
+  PROMPT_VERSION,
+  PLANNER_SYSTEM,
+  PLANNER_PROMPT_VERSION,
+  honestAbsence,
+} from "./prompt";
+export { TOOL_SPECS, TOOL_NAMES, runTool } from "./tools";
+export type { ToolOutcome } from "./tools";
+export { retrievalLoop, collectLoop, ContextAccumulator } from "./loop";
+export type { RetrievalStep, LoopResult } from "./loop";
 export type {
   RetrievalPort,
   SearchHit,

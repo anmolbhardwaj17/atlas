@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Send } from "lucide-react";
+import { Send, Check } from "lucide-react";
 import { ConfidenceBadge } from "@/components/certainty";
 import { AtlasAiMark } from "@/components/brand";
 import { createConversation, getConversation, streamAsk, type AskEvent } from "@/lib/browser-api";
@@ -22,7 +22,29 @@ interface ChatMessage {
   streaming: boolean;
   /** Waiting phase before tokens arrive, for a smooth loading state. */
   phase: "searching" | "thinking" | "answering";
+  /** Live "show your work" trace of the agentic retrieval loop's tool calls. */
+  steps: string[];
   error: string | null;
+}
+
+/** Friendly label for a retrieval tool (the agentic loop's "show your work" trace). */
+function toolLabel(tool: string): string {
+  switch (tool) {
+    case "search":
+      return "Searched the graph";
+    case "get_node":
+      return "Read a node";
+    case "get_neighbors":
+      return "Read relationships";
+    case "traverse":
+      return "Traced impact";
+    case "timeline":
+      return "Checked recent changes";
+    case "estate_overview":
+      return "Read estate overview";
+    default:
+      return `Ran ${tool}`;
+  }
 }
 
 // Fallback when we can't derive data-aware suggestions (e.g. nothing connected yet).
@@ -73,6 +95,7 @@ export function AskChat({
           caveats: [],
           streaming: false,
           phase: "answering",
+          steps: [],
           error: null,
         })),
       );
@@ -97,6 +120,7 @@ export function AskChat({
         caveats: [],
         streaming: false,
         phase: "answering",
+        steps: [],
         error: null,
       },
       {
@@ -107,6 +131,7 @@ export function AskChat({
         caveats: [],
         streaming: true,
         phase: "searching",
+        steps: [],
         error: null,
       },
     ]);
@@ -189,6 +214,16 @@ export function AskChat({
 
 function applyEvent(ev: AskEvent, patch: (fn: (m: ChatMessage) => ChatMessage) => void) {
   switch (ev.type) {
+    case "retrieval_step": {
+      const label = toolLabel(ev.tool);
+      patch((m) => ({
+        ...m,
+        phase: "searching",
+        // de-dupe consecutive identical labels so the trace reads cleanly
+        steps: m.steps[m.steps.length - 1] === label ? m.steps : [...m.steps, label],
+      }));
+      break;
+    }
     case "retrieval":
       patch((m) => ({ ...m, phase: "thinking" }));
       break;
@@ -241,10 +276,22 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
             {message.error}
           </p>
         ) : message.text.length === 0 && message.streaming ? (
-          <span className="flex items-center gap-2 text-sm text-muted-foreground">
-            <TypingDots />
-            {message.phase === "thinking" ? "Thinking…" : "Searching your graph…"}
-          </span>
+          <div className="space-y-1.5">
+            <span className="flex items-center gap-2 text-sm text-muted-foreground">
+              <TypingDots />
+              {message.phase === "thinking" ? "Thinking…" : "Searching your graph…"}
+            </span>
+            {message.steps.length > 0 && (
+              <ul className="space-y-0.5 pl-1">
+                {message.steps.map((s, i) => (
+                  <li key={i} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Check size={11} className="shrink-0 text-success" />
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         ) : message.text.length === 0 && !message.streaming ? (
           <p className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
             The model returned no answer — it may be rate-limited or unavailable. Try a different

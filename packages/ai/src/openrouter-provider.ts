@@ -5,7 +5,7 @@
  * config** (users bring their own key), never baked into the image. Like ClaudeProvider it's a
  * NARRATOR constrained by retrieved context (P1/AE-4), never the source of truth.
  */
-import type { CompleteRequest, LLMEvent, LLMProvider } from "./llm";
+import type { ChatMessage, CompleteRequest, LLMEvent, LLMProvider } from "./llm";
 
 export interface OpenRouterConfig {
   apiKey: string;
@@ -50,7 +50,7 @@ export class OpenRouterProvider implements LLMProvider {
       model: this.config.model,
       messages: [
         { role: "system", content: req.system },
-        ...req.messages.map((m) => ({ role: m.role, content: m.content })),
+        ...req.messages.map(toOpenAiMessage),
       ],
       temperature: req.temperature,
       max_tokens: req.maxTokens,
@@ -136,4 +136,23 @@ function safeJson(s: string): Record<string, unknown> {
   } catch {
     return {};
   }
+}
+
+/** Map our tool-turn ChatMessage → the OpenAI chat message shape (DD-P1-1). */
+function toOpenAiMessage(m: ChatMessage): Record<string, unknown> {
+  if (m.role === "tool") {
+    return { role: "tool", tool_call_id: m.toolCallId, content: m.content };
+  }
+  if (m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0) {
+    return {
+      role: "assistant",
+      content: m.content || null,
+      tool_calls: m.toolCalls.map((tc) => ({
+        id: tc.id,
+        type: "function",
+        function: { name: tc.name, arguments: JSON.stringify(tc.input) },
+      })),
+    };
+  }
+  return { role: m.role, content: m.content };
 }

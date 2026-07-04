@@ -66,6 +66,51 @@ describe("OpenRouterProvider", () => {
     expect(tool).toEqual({ type: "tool_call", id: "t1", name: "search", input: { q: "db" } });
   });
 
+  it("maps tool-turn messages to OpenAI tool_calls + role:tool (DD-P1-1)", async () => {
+    let sent: { messages: Array<Record<string, unknown>> } | null = null;
+    const capturing = (async (_url: string, init: RequestInit) => {
+      sent = JSON.parse(init.body as string) as { messages: Array<Record<string, unknown>> };
+      const body = new ReadableStream<Uint8Array>({
+        start(c) {
+          c.enqueue(
+            new TextEncoder().encode(
+              `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "stop" }] })}\n`,
+            ),
+          );
+          c.close();
+        },
+      });
+      return new Response(body, { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const p = new OpenRouterProvider({ apiKey: "k", model: "x", fetchImpl: capturing });
+    await collect(
+      p.complete({
+        system: "s",
+        messages: [
+          { role: "user", content: "q" },
+          {
+            role: "assistant",
+            content: "",
+            toolCalls: [{ id: "t1", name: "search", input: { q: "db" } }],
+          },
+          { role: "tool", toolCallId: "t1", name: "search", content: "[node1]" },
+        ],
+        maxTokens: 50,
+        temperature: 0,
+      }),
+    );
+    const msgs = sent!.messages;
+    expect(msgs[0]).toMatchObject({ role: "system" });
+    expect(msgs[2]).toMatchObject({
+      role: "assistant",
+      tool_calls: [
+        { id: "t1", type: "function", function: { name: "search", arguments: '{"q":"db"}' } },
+      ],
+    });
+    expect(msgs[3]).toEqual({ role: "tool", tool_call_id: "t1", content: "[node1]" });
+  });
+
   it("throws a clear error on a non-200", async () => {
     const p = new OpenRouterProvider({
       apiKey: "bad",

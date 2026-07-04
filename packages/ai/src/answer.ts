@@ -10,11 +10,25 @@
  */
 import type { LLMProvider } from "./llm";
 import type { RetrievalPort } from "./retrieval-port";
-import { plan, type Intent } from "./planner";
+import { plan, classifyIntent, type Intent } from "./planner";
 import { orchestrate } from "./retrieval";
 import { buildContext, type BuiltContext, type Cite } from "./context";
 import { groundingGate } from "./grounding";
 import { SYSTEM_PROMPT, honestAbsence } from "./prompt";
+import { retrievalLoop, collectLoop } from "./loop";
+
+/**
+ * Router (DD-P1-2): open-ended intents go through the agentic tool-loop when the provider can
+ * plan with tools; canonical intents keep their fast deterministic path (unchanged). The mock
+ * provider (dev/CI) always uses the fast path — the loop needs a real tool-calling model.
+ */
+const AGENTIC_INTENTS = new Set<Intent>(["lookup", "architecture"]);
+const NO_MATCH =
+  "I searched your graph but couldn't find anything matching that — it may not be connected, or it's named differently.";
+function agenticRoute(question: string, llm: LLMProvider): Intent | null {
+  const intent = classifyIntent(question);
+  return AGENTIC_INTENTS.has(intent) && llm.name !== "mock" ? intent : null;
+}
 
 export type OverallConfidence = "observed" | "inferred-high" | "inferred-low" | "insufficient";
 
@@ -48,6 +62,15 @@ type Prepared =
   | { grounded: true; intent: Intent; built: BuiltContext };
 
 async function prepare(deps: AnswerDeps, orgId: string, question: string): Promise<Prepared> {
+  // Agentic path (non-streaming): gather via the tool-loop, ignoring the live step trace.
+  const agenticIntent = agenticRoute(question, deps.llm);
+  if (agenticIntent) {
+    const loop = await collectLoop({ port: deps.port, llm: deps.llm }, orgId, question);
+    return loop.grounded
+      ? { grounded: true, intent: agenticIntent, built: loop.built }
+      : { grounded: false, intent: agenticIntent, reason: NO_MATCH };
+  }
+  // Fast path (deterministic, unchanged).
   const p = await plan(deps.port, orgId, question);
   const retrieval = await orchestrate(deps.port, orgId, p);
   const gate = groundingGate(retrieval);
@@ -92,6 +115,7 @@ export async function answerQuestion(
 }
 
 export type AnswerEvent =
+  | { type: "retrieval_step"; hop: number; tool: string; summary: string }
   | { type: "retrieval"; nodesConsidered: number; intent: Intent }
   | { type: "token"; text: string }
   | { type: "citation"; citation: AnswerCitation }
@@ -104,7 +128,24 @@ export async function* answerQuestionStream(
   orgId: string,
   question: string,
 ): AsyncIterable<AnswerEvent> {
-  const prep = await prepare(deps, orgId, question);
+  // Route: agentic path streams its retrieval steps live (show-your-work); fast path is deterministic.
+  let prep: Prepared;
+  const agenticIntent = agenticRoute(question, deps.llm);
+  if (agenticIntent) {
+    const gen = retrievalLoop({ port: deps.port, llm: deps.llm }, orgId, question);
+    let next = await gen.next();
+    while (!next.done) {
+      const s = next.value;
+      yield { type: "retrieval_step", hop: s.hop, tool: s.tool, summary: s.summary };
+      next = await gen.next();
+    }
+    const loop = next.value;
+    prep = loop.grounded
+      ? { grounded: true, intent: agenticIntent, built: loop.built }
+      : { grounded: false, intent: agenticIntent, reason: NO_MATCH };
+  } else {
+    prep = await prepare(deps, orgId, question);
+  }
 
   if (!prep.grounded) {
     yield { type: "retrieval", nodesConsidered: 0, intent: prep.intent };

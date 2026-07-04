@@ -263,6 +263,7 @@ export async function deleteLlmSettings(orgId: string): Promise<void> {
 
 /** The SSE event union the /ai messages endpoint streams (mirrors AnswerEvent). */
 export type AskEvent =
+  | { type: "retrieval_step"; hop: number; tool: string; summary: string }
   | { type: "retrieval"; nodesConsidered: number; intent: string }
   | { type: "token"; text: string }
   | {
