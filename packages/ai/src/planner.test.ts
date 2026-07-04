@@ -93,6 +93,14 @@ describe("classifyIntent (canonical questions, docs/10 §4.2)", () => {
     ["What should I fix first?", "advisory"],
     ["Give me recommendations for my estate", "advisory"],
     ["Review my security posture", "advisory"],
+    // Pleasantries → smalltalk (friendly reply, no graph search).
+    ["thank you", "smalltalk"],
+    ["thanks!", "smalltalk"],
+    ["hi", "smalltalk"],
+    ["hey", "smalltalk"],
+    ["how are you", "smalltalk"],
+    ["cool", "smalltalk"],
+    ["bye", "smalltalk"],
   ];
   it.each(cases)("%s → %s", (q, intent) => {
     expect(classifyIntent(q)).toBe(intent);
@@ -101,6 +109,11 @@ describe("classifyIntent (canonical questions, docs/10 §4.2)", () => {
   it("keeps entity dependency questions on the traversal path (not estate)", () => {
     // "how many services depend on X" must still resolve the entity, not the estate snapshot.
     expect(classifyIntent("What depends on the payments service?")).toBe("dependents");
+  });
+
+  it("does not treat a real question prefixed with a pleasantry as smalltalk", () => {
+    // "thanks, who owns X" is still the real question — smalltalk is anchored to the whole message.
+    expect(classifyIntent("thanks, who are the top contributors?")).toBe("estate");
   });
 });
 

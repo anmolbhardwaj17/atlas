@@ -10,7 +10,7 @@
  */
 import type { LLMProvider } from "./llm";
 import type { RetrievalPort } from "./retrieval-port";
-import { plan, classifyIntent, type Intent } from "./planner";
+import { plan, classifyIntent, smalltalkReply, type Intent } from "./planner";
 import { orchestrate } from "./retrieval";
 import { buildContext, buildAdvisoryContext, type BuiltContext, type Cite } from "./context";
 import { groundingGate } from "./grounding";
@@ -125,6 +125,17 @@ export async function answerQuestion(
   question: string,
   signal?: AbortSignal,
 ): Promise<Answer> {
+  if (classifyIntent(question) === "smalltalk") {
+    return {
+      grounded: true,
+      text: smalltalkReply(question),
+      citations: [],
+      confidence: "observed",
+      caveats: [],
+      uncitedClaims: [],
+      nodesConsidered: 0,
+    };
+  }
   const prep = await prepare(deps, orgId, question, signal);
   if (!prep.grounded) {
     return {
@@ -165,6 +176,13 @@ export async function* answerQuestionStream(
   question: string,
   signal?: AbortSignal,
 ): AsyncIterable<AnswerEvent> {
+  // Pleasantries ("hi", "thanks") get a warm reply, not a graph search / honest-absence.
+  if (classifyIntent(question) === "smalltalk") {
+    yield { type: "retrieval", nodesConsidered: 0, intent: "smalltalk" };
+    yield { type: "token", text: smalltalkReply(question) };
+    yield { type: "done", grounded: true, citations: 0 };
+    return;
+  }
   // Route: agentic path streams its retrieval steps live (show-your-work); fast path is deterministic.
   let prep: Prepared;
   const agenticIntent = agenticRoute(question, deps.llm);

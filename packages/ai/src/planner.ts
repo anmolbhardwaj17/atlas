@@ -18,6 +18,7 @@ export type Intent =
   | "estate"
   | "advisory"
   | "lookup"
+  | "smalltalk"
   | "out_of_scope";
 
 export interface ResolvedEntity {
@@ -37,6 +38,26 @@ export interface RetrievalPlan {
 
 const OUT_OF_SCOPE =
   /\b(capital of|the weather|meaning of life|who is the|tell me a joke|write me|president|stock price)\b/i;
+
+// Pleasantries / conversational filler — the whole message is a greeting/thanks/etc. (anchored so
+// "thanks, who owns X" is still treated as the real question). Answered warmly, no graph search.
+const SMALLTALK =
+  /^\s*(hi+|hey+|hello+|hola|yo|sup|howdy|thanks?|thank you|thankyou|thx|ty|cheers|appreciate (it|you|that)|nice|cool|great|awesome|amazing|perfect|brilliant|ok(ay)?|k|got it|gotcha|understood|good (morning|afternoon|evening|night)|how are you|how'?s it going|what'?s up|whats up|good job|well done|bye|goodbye|see (ya|you)|later)\b[\s!.?]*$/i;
+
+/** A warm, non-graph reply for pleasantries (greetings/thanks/etc.) — keeps Atlas friendly instead
+ *  of answering "I don't have that data" to "thank you". */
+export function smalltalkReply(question: string): string {
+  const q = question.toLowerCase();
+  if (/\b(thank|thanks|thx|ty|cheers|appreciate)\b/.test(q))
+    return 'You\'re welcome! Happy to help. Ask me anything about your infrastructure, code, or deploys — like "who are the top contributors?" or "what should I fix first?"';
+  if (/\b(bye|goodbye|see (ya|you)|later)\b/.test(q))
+    return "See you! I'll be right here whenever you want to understand your estate.";
+  if (/\bhow (are|'?s)|how'?s it going|what'?s up|whats up|how are you\b/.test(q))
+    return "I'm here and ready to help you make sense of your infrastructure and code. What would you like to know?";
+  if (/\b(nice|cool|great|awesome|amazing|perfect|brilliant|good job|well done|ok(ay)?|k|got it|gotcha|understood)\b/.test(q))
+    return "Glad that helped! Let me know what else you'd like to explore.";
+  return 'Hi! I\'m Atlas — your engineering intelligence assistant. Ask me anything about your infrastructure, code, or deploys, like "how many repositories do I have?" or "what needs attention?"';
+}
 
 /** Ordered rules — first match wins (docs/10 §4.2 intent table). */
 const INTENT_RULES: Array<{ intent: Intent; re: RegExp }> = [
@@ -119,6 +140,7 @@ const INTENT_RULES: Array<{ intent: Intent; re: RegExp }> = [
 ];
 
 export function classifyIntent(question: string): Intent {
+  if (SMALLTALK.test(question)) return "smalltalk";
   if (OUT_OF_SCOPE.test(question)) return "out_of_scope";
   for (const rule of INTENT_RULES) if (rule.re.test(question)) return rule.intent;
   return "lookup"; // default: try to resolve an entity; the grounding gate handles absence
