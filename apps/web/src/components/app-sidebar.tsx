@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Boxes,
   Waypoints,
+  Lightbulb,
   Plug,
   Settings,
   ChevronsUpDown,
@@ -57,6 +58,12 @@ const NAV = [
   },
   // Ask Atlas carries its own brand mark (the green sphere), not a lucide glyph.
   { href: "/ask", label: "Ask Atlas", icon: null, match: (p: string) => p.startsWith("/ask") },
+  {
+    href: "/insights",
+    label: "Insights",
+    icon: Lightbulb,
+    match: (p: string) => p.startsWith("/insights"),
+  },
   {
     href: "/integrations",
     label: "Integrations",

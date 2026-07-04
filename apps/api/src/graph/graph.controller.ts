@@ -6,6 +6,7 @@ import { Roles } from "../auth/roles.decorator";
 import { ApiException } from "../common/errors";
 import { parseBody } from "../common/validation";
 import type { AuthedRequest } from "../auth/auth.types";
+import { guidanceFor } from "@atlas/ai";
 import { GraphService } from "./graph.service";
 import {
   EdgesQuerySchema,
@@ -35,6 +36,27 @@ export class GraphController {
   @Roles("Member")
   async summary(@Req() req: AuthedRequest): Promise<unknown> {
     return this.graph.summary(org(req).id);
+  }
+
+  /**
+   * Insights (Atlas Knowledge Engine P4 slice): the graph's grounded findings enriched with the
+   * advisory knowledge pack's guidance (why it matters / how to fix). Proactive, personalized —
+   * every card is a fact Atlas proves + best-practice guidance, and links into an Ask Atlas thread.
+   */
+  @Get("insights")
+  @Roles("Member")
+  async insights(@Req() req: AuthedRequest): Promise<unknown> {
+    const s = await this.graph.summary(org(req).id);
+    return s.findings.map((f) => ({
+      id: f.id,
+      severity: f.severity,
+      category: f.category,
+      title: f.title,
+      detail: f.detail,
+      href: f.href,
+      ...(f.count !== undefined ? { count: f.count } : {}),
+      guidance: guidanceFor(f.category),
+    }));
   }
 
   @Get("graph")
