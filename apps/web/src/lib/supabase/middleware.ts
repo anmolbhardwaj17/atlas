@@ -25,7 +25,15 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     },
   });
 
-  // Touch the user to trigger a refresh if the access token is near expiry.
-  await supabase.auth.getUser();
+  // Touch the user to trigger a refresh if the access token is near expiry. If Supabase itself is
+  // unreachable (outage / paused project → network `fetch failed`), fail soft: pass the request
+  // through with whatever cookies exist rather than throwing, which would 500 *every* route. The
+  // server-side auth guards then treat the request as unauthenticated and redirect to /login,
+  // instead of the whole app crashing on a transient upstream blip.
+  try {
+    await supabase.auth.getUser();
+  } catch {
+    // Swallow — a reachability failure is not an auth decision. Downstream guards handle no-session.
+  }
   return response;
 }

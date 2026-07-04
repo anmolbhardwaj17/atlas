@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Inject,
   Param,
   Post,
   Put,
@@ -10,6 +11,8 @@ import {
   Res,
   UseGuards,
 } from "@nestjs/common";
+import type { Env } from "@atlas/config";
+import { ENV } from "../core/tokens";
 import { AuthGuard } from "../auth/auth.guard";
 import { TenantScopeGuard } from "../auth/tenant-scope.guard";
 import { RolesGuard } from "../auth/roles.guard";
@@ -39,7 +42,10 @@ interface SseReply {
 @Controller("ai")
 @UseGuards(AuthGuard, TenantScopeGuard, RolesGuard)
 export class AiController {
-  constructor(private readonly ai: AiService) {}
+  constructor(
+    private readonly ai: AiService,
+    @Inject(ENV) private readonly env: Env,
+  ) {}
 
   /** BYO-LLM config for the org (docs/10 §3). GET is Member (the UI shows model/provider,
    *  never the key); PUT/DELETE are Admin. */
@@ -102,6 +108,11 @@ export class AiController {
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
       "X-Accel-Buffering": "no", // don't let any proxy buffer the stream
+      // Hijacking bypasses Fastify's CORS hook, so the streamed response would ship WITHOUT
+      // `Access-Control-Allow-Origin` — the browser then blocks the cross-origin body ("Failed to
+      // fetch" -> "stream interrupted"). Set it ourselves to match the app origin (docs/08 §3).
+      "Access-Control-Allow-Origin": this.env.WEB_ORIGIN,
+      Vary: "Origin",
     });
     // Flush a comment immediately so the connection is live during retrieval, and keep it alive
     // with a heartbeat (retrieval over a remote DB can be idle for seconds before the first token).

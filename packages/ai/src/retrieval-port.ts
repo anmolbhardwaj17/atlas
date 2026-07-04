@@ -66,6 +66,37 @@ export interface TraversalOpts {
   minConfidence?: "observed" | "inferred-high" | "inferred-low";
 }
 
+/**
+ * A whole-org aggregate snapshot (docs/plans/ai-knowledge-engine — P0 estate slice). These are
+ * COMPUTED facts (counts/rankings over many nodes), not single graph nodes — the context builder
+ * cites them as computed facts, not to one node id. Reuses the dashboard summary aggregation
+ * (GraphService.summary), so Ask AI and the dashboard agree by construction.
+ */
+export interface EstateOverview {
+  inventory: {
+    resources: number;
+    relationships: number;
+    services: number;
+    datastores: number;
+    environments: number;
+    clouds: number;
+    accounts: number;
+    repositories: number;
+    projects: number;
+    pipelines: number;
+    contributors: number;
+    pullRequests: number;
+  };
+  crossBoundary: { crossCloud: number; crossAccount: number };
+  /** PR-activity leaderboards over the last 30 days (name + count). */
+  topContributors: Array<{ name: string; count: number }>;
+  mostActiveRepos: Array<{ name: string; count: number }>;
+  pipelineCoverage: { withPipeline: number; total: number };
+  /** "Needs attention" facts the graph proves (title + severity for the estate summary). */
+  findings: Array<{ title: string; severity: string; count?: number }>;
+  sources: { total: number; healthy: number; lastSyncAt: string | null };
+}
+
 export interface RetrievalPort {
   search(orgId: string, q: string, limit: number): Promise<SearchHit[]>;
   getNode(orgId: string, id: string): Promise<RetrievedNode | null>;
@@ -78,4 +109,6 @@ export interface RetrievalPort {
     kinds: string[] | null,
     limit: number,
   ): Promise<TimelineChange[]>;
+  /** Whole-org aggregate snapshot for estate/aggregate questions (P0 estate slice). */
+  estateOverview(orgId: string): Promise<EstateOverview>;
 }

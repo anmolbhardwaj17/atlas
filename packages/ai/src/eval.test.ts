@@ -66,8 +66,34 @@ function port(hasEntity: boolean): RetrievalPort {
     async timeline() {
       return [];
     },
+    async estateOverview() {
+      return EMPTY_ESTATE;
+    },
   };
 }
+
+const EMPTY_ESTATE = {
+  inventory: {
+    resources: 0,
+    relationships: 0,
+    services: 0,
+    datastores: 0,
+    environments: 0,
+    clouds: 0,
+    accounts: 0,
+    repositories: 0,
+    projects: 0,
+    pipelines: 0,
+    contributors: 0,
+    pullRequests: 0,
+  },
+  crossBoundary: { crossCloud: 0, crossAccount: 0 },
+  topContributors: [],
+  mostActiveRepos: [],
+  pipelineCoverage: { withPipeline: 0, total: 0 },
+  findings: [],
+  sources: { total: 0, healthy: 0, lastSyncAt: null },
+};
 
 const provider = (r: MockResponder | string): MockLLMProvider => new MockLLMProvider(r);
 

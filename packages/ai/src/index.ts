@@ -27,6 +27,7 @@ export type {
   TraversalOpts,
   ViaEdge,
   TimelineChange,
+  EstateOverview,
 } from "./retrieval-port";
 export { classifyIntent, extractTerms, resolveEntity, plan } from "./planner";
 export type { Intent, RetrievalPlan, ResolvedEntity } from "./planner";

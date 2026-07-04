@@ -7,10 +7,22 @@ import { apiUrl } from "@/lib/env";
  * these run in the browser because they need live streaming / keystroke latency.
  */
 export async function getClientToken(): Promise<string | null> {
+  const supabase = createClient();
   const {
     data: { session },
-  } = await createClient().auth.getSession();
-  return session?.access_token ?? null;
+  } = await supabase.auth.getSession();
+  if (!session) return null;
+  // `getSession()` returns whatever is in storage — which can be an already-expired access token
+  // (Supabase tokens live ~1h; a tab left open past that, or a backgrounded tab whose auto-refresh
+  // timer didn't fire, holds a stale one). Sending an expired Bearer makes the API 401, which the
+  // client surfaces as "Couldn't start a conversation." / empty search. Refresh proactively when
+  // the token is expired or within 60s of it.
+  const now = Math.floor(Date.now() / 1000);
+  if (session.expires_at && session.expires_at - now < 60) {
+    const { data } = await supabase.auth.refreshSession();
+    return data.session?.access_token ?? session.access_token;
+  }
+  return session.access_token;
 }
 
 export interface SearchHit {
@@ -257,7 +269,7 @@ export type AskEvent =
       type: "citation";
       citation: {
         number: number;
-        kind: "node" | "edge";
+        kind: "node" | "edge" | "computed";
         id: string;
         confidence: string | null;
         provenanceUrl: string;
@@ -308,7 +320,7 @@ export interface ConversationMessage {
   content: string;
   citations: Array<{
     number: number;
-    kind: "node" | "edge";
+    kind: "node" | "edge" | "computed";
     id: string;
     confidence: string | null;
   }>;

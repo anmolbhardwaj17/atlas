@@ -62,9 +62,38 @@ function port(overrides: Partial<RetrievalPort> = {}): RetrievalPort {
     async timeline() {
       return [];
     },
+    async estateOverview() {
+      return ESTATE;
+    },
     ...overrides,
   };
 }
+
+const ESTATE = {
+  inventory: {
+    resources: 45,
+    relationships: 60,
+    services: 3,
+    datastores: 2,
+    environments: 2,
+    clouds: 1,
+    accounts: 1,
+    repositories: 12,
+    projects: 2,
+    pipelines: 8,
+    contributors: 7,
+    pullRequests: 5,
+  },
+  crossBoundary: { crossCloud: 0, crossAccount: 0 },
+  topContributors: [
+    { name: "Sahil Saleem", count: 14 },
+    { name: "Anmol", count: 9 },
+  ],
+  mostActiveRepos: [{ name: "gpt-idor-service", count: 9 }],
+  pipelineCoverage: { withPipeline: 8, total: 12 },
+  findings: [{ title: "4 repositories have no CI/CD pipeline", severity: "medium", count: 4 }],
+  sources: { total: 2, healthy: 2, lastSyncAt: "2026-07-04T10:00:00Z" },
+};
 
 const blastPlan: RetrievalPlan = {
   intent: "blast_radius",
@@ -128,5 +157,29 @@ describe("groundingGate (DD-4 / US-11)", () => {
     expect(groundingGate({ intent: "timeline", mention: null, ambiguous: false }).grounded).toBe(
       true,
     );
+  });
+});
+
+describe("estate (P0 aggregate slice)", () => {
+  it("loads the whole-org snapshot for the estate intent", async () => {
+    const r = await orchestrate(port(), "o", { intent: "estate", question: "how many repos" });
+    expect(r.estate?.inventory.repositories).toBe(12);
+    expect(r.estate?.topContributors[0]?.name).toBe("Sahil Saleem");
+  });
+
+  it("builds grounded, cited estate context (computed A-markers)", async () => {
+    const r = await orchestrate(port(), "o", { intent: "estate", question: "top contributors" });
+    expect(groundingGate(r).grounded).toBe(true);
+    const built = buildContext("o", r);
+    expect(built.context).toContain("ESTATE OVERVIEW");
+    expect(built.context).toContain("Sahil Saleem=14");
+    expect(built.context).toContain("8 of 12 repositories have a CI/CD pipeline");
+    expect(built.cites.some((c) => c.kind === "computed" && c.marker === "A1")).toBe(true);
+  });
+
+  it("refuses honestly when the snapshot fails to load", () => {
+    const g = groundingGate({ intent: "estate", mention: null, ambiguous: false });
+    expect(g.grounded).toBe(false);
+    expect(g.reason).toMatch(/estate overview/);
   });
 });

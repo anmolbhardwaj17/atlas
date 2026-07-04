@@ -27,6 +27,17 @@ export function groundingGate(result: RetrievalResult): Grounding {
   // Timeline ran its window query — even an empty window ("nothing changed") is grounded.
   if (result.intent === "timeline") return { grounded: true };
 
+  // Estate answers from the whole-org snapshot; grounded as long as the snapshot loaded (even a
+  // near-empty estate is a truthful "you have almost nothing connected yet" answer).
+  if (result.intent === "estate") {
+    return result.estate
+      ? { grounded: true }
+      : {
+          grounded: false,
+          reason: "I couldn't load your estate overview — the graph may still be syncing.",
+        };
+  }
+
   if (!result.rootNode) {
     const what = result.mention ? `"${result.mention}"` : "that";
     return {

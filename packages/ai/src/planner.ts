@@ -15,6 +15,7 @@ export type Intent =
   | "architecture"
   | "timeline"
   | "culprit"
+  | "estate"
   | "lookup"
   | "out_of_scope";
 
@@ -58,6 +59,37 @@ const INTENT_RULES: Array<{ intent: Intent; re: RegExp }> = [
     re: /\bwhat.*(chang|happened|new|deployed).*(this week|today|recently|since|lately)\b/i,
   },
   { intent: "timeline", re: /\bwhat changed\b/i },
+  // Aggregate / ranking / whole-estate questions → the org overview (counts, leaderboards,
+  // findings, coverage). These are the dashboard-style questions the fixed entity planner can't
+  // answer; they resolve to a computed snapshot, not a single node (P0 estate slice).
+  { intent: "estate", re: /\b(how many|number of|count of|how much)\b/i },
+  {
+    intent: "estate",
+    re: /\b(top|most[- ]active|busiest|leading|biggest)\b[^?]*\b(contributor|contributors|committer|committers|author|authors|developer|developers|repo|repos|repositor\w*|service|services)\b/i,
+  },
+  {
+    intent: "estate",
+    re: /\b(who|which)\b[^?]*\b(top|most|leading|busiest)\b[^?]*\b(contribut|committ|author|develop)/i,
+  },
+  { intent: "estate", re: /\bcontributors?\b/i },
+  {
+    intent: "estate",
+    re: /\b(what|which)\b[^?]*\b(do i have|have i (got|connected)|is connected|are connected|am i (running|using))\b/i,
+  },
+  {
+    intent: "estate",
+    re: /\b(overview|snapshot|at a glance)\b[^?]*\b(estate|infra\w*|system|setup|environment|org|everything|graph)\b/i,
+  },
+  {
+    intent: "estate",
+    re: /\b(needs? attention|what should i (look at|fix|prioriti|worry)|any (issues|problems|findings)|whats? wrong)\b/i,
+  },
+  { intent: "estate", re: /\b(most|least) (active|connected|used|busy|changed)\b/i },
+  {
+    intent: "estate",
+    re: /\b(repos?|repositor\w*)\b[^?]*\b(no|without|missing|lack\w*)\b[^?]*\b(ci\/?cd|pipeline|workflow)\b/i,
+  },
+  { intent: "estate", re: /\b(pipeline|ci\/?cd) coverage\b/i },
   {
     intent: "architecture",
     re: /\b(explain|describe|overview of).*(architecture|system|setup)\b/i,
@@ -207,6 +239,8 @@ export async function plan(
   const intent = classifyIntent(question);
   if (intent === "out_of_scope") return { intent, question };
   if (intent === "timeline") return { intent, question, window: { sinceDays: 7 } };
+  // Estate answers from the whole-org snapshot — no entity to resolve, so skip the search hops.
+  if (intent === "estate") return { intent, question };
 
   const entity = await resolveEntity(port, orgId, question);
   const base: RetrievalPlan = { intent, question };

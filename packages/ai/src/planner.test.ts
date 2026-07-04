@@ -42,6 +42,30 @@ function fakePort(nodes: Array<{ id: string; kind: string; name: string }>): Ret
     async timeline() {
       return [];
     },
+    async estateOverview() {
+      return {
+        inventory: {
+          resources: 0,
+          relationships: 0,
+          services: 0,
+          datastores: 0,
+          environments: 0,
+          clouds: 0,
+          accounts: 0,
+          repositories: 0,
+          projects: 0,
+          pipelines: 0,
+          contributors: 0,
+          pullRequests: 0,
+        },
+        crossBoundary: { crossCloud: 0, crossAccount: 0 },
+        topContributors: [],
+        mostActiveRepos: [],
+        pipelineCoverage: { withPipeline: 0, total: 0 },
+        findings: [],
+        sources: { total: 0, healthy: 0, lastSyncAt: null },
+      };
+    },
   };
 }
 
@@ -55,9 +79,22 @@ describe("classifyIntent (canonical questions, docs/10 §4.2)", () => {
     ["Which PR caused the outage?", "culprit"],
     ["Who owns checkout?", "lookup"],
     ["What is the capital of France?", "out_of_scope"],
+    // Aggregate / estate questions (P0 slice) — these used to fall to `lookup` and fail.
+    ["Who are the top contributors on Bitbucket?", "estate"],
+    ["Who are the top contributors this month?", "estate"],
+    ["How many repositories are there?", "estate"],
+    ["What do I have connected?", "estate"],
+    ["Which repositories have no CI/CD pipeline?", "estate"],
+    ["What needs attention?", "estate"],
+    ["Which are my most active repositories?", "estate"],
   ];
   it.each(cases)("%s → %s", (q, intent) => {
     expect(classifyIntent(q)).toBe(intent);
+  });
+
+  it("keeps entity dependency questions on the traversal path (not estate)", () => {
+    // "how many services depend on X" must still resolve the entity, not the estate snapshot.
+    expect(classifyIntent("What depends on the payments service?")).toBe("dependents");
   });
 });
 

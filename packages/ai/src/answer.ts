@@ -21,7 +21,7 @@ export type OverallConfidence = "observed" | "inferred-high" | "inferred-low" | 
 export interface AnswerCitation {
   number: number;
   marker: string;
-  kind: "node" | "edge";
+  kind: "node" | "edge" | "computed";
   id: string;
   confidence: string | null;
   provenanceUrl: string;
@@ -151,9 +151,10 @@ async function narrate(deps: AnswerDeps, context: string, question: string): Pro
   return parts.join("").trim();
 }
 
-const MARKER_RE = /\[([NE]\d+)\]/g;
+const MARKER_RE = /\[([NEA]\d+)\]/g;
 
-/** Bind markers → real ids (DD-5), deterministic; unknown markers are dropped. */
+/** Bind markers → real ids (DD-5), deterministic; unknown markers are dropped. `A` markers are
+ *  computed/aggregate facts whose provenance is the estate summary, not a single node/edge. */
 export function bindCitations(narration: string, cites: Cite[]): AnswerCitation[] {
   const byMarker = new Map(cites.map((c) => [c.marker, c]));
   const out: AnswerCitation[] = [];
@@ -170,13 +171,16 @@ export function bindCitations(narration: string, cites: Cite[]): AnswerCitation[
       kind: cite.kind,
       id: cite.id,
       confidence: cite.confidence,
-      provenanceUrl: `/api/v1/${cite.kind === "edge" ? "edges" : "nodes"}/${cite.id}`,
+      provenanceUrl:
+        cite.kind === "computed"
+          ? "/api/v1/summary"
+          : `/api/v1/${cite.kind === "edge" ? "edges" : "nodes"}/${cite.id}`,
     });
   }
   return out;
 }
 
-const HAS_MARKER = /\[[NE]\d+\]/;
+const HAS_MARKER = /\[[NEA]\d+\]/;
 /** L5: factual-looking sentences with no citation marker. A hedge/absence sentence is fine. */
 export function detectUncitedClaims(narration: string): string[] {
   const HEDGE = /\b(I don't|I'm not|not certain|no data|couldn't find|cannot|outside)\b/i;

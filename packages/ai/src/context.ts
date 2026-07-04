@@ -10,7 +10,8 @@ import type { RetrievalResult } from "./retrieval";
 
 export interface Cite {
   marker: string;
-  kind: "node" | "edge";
+  /** `computed` = an aggregate fact (a count/ranking over many nodes), not a single node/edge. */
+  kind: "node" | "edge" | "computed";
   id: string;
   confidence: string | null;
 }
@@ -96,10 +97,75 @@ export function buildContext(orgId: string, result: RetrievalResult): BuiltConte
     (c) => `  ${c.at} ${c.changeKind} ${c.changeType}: ${compact(c.entity)}`,
   );
 
+  // Estate overview: whole-org aggregate facts (counts/rankings/coverage/findings). Each is a
+  // COMPUTED fact over many nodes (not a single node), so it gets an `A` marker citing the
+  // computation, not one node id. Only non-empty sections are rendered.
+  const estateLines: string[] = [];
+  if (result.estate) {
+    const e = result.estate;
+    let a = 0;
+    const acite = (id: string, line: string): void => {
+      a += 1;
+      const marker = `A${a}`;
+      cites.push({ marker, kind: "computed", id, confidence: "observed" });
+      estateLines.push(`  ${marker} (cite:${id}) ${line}`);
+    };
+    const inv = e.inventory;
+    acite(
+      "estate:inventory",
+      `inventory: repositories=${inv.repositories} services=${inv.services} datastores=${inv.datastores} pipelines=${inv.pipelines} openPullRequests=${inv.pullRequests} contributors=${inv.contributors} clouds=${inv.clouds} accounts=${inv.accounts} environments=${inv.environments} totalResources=${inv.resources} totalRelationships=${inv.relationships}`,
+    );
+    if (e.topContributors.length) {
+      acite(
+        "estate:contributors",
+        `top contributors (last 30d, by pull requests raised): ${e.topContributors
+          .map((c) => `${c.name ?? "unknown"}=${c.count}`)
+          .join(", ")}`,
+      );
+    }
+    if (e.mostActiveRepos.length) {
+      acite(
+        "estate:active_repos",
+        `most active repositories (last 30d, by pull requests): ${e.mostActiveRepos
+          .map((r) => `${r.name ?? "unknown"}=${r.count}`)
+          .join(", ")}`,
+      );
+    }
+    if (e.pipelineCoverage.total > 0) {
+      acite(
+        "estate:pipeline_coverage",
+        `pipeline coverage: ${e.pipelineCoverage.withPipeline} of ${e.pipelineCoverage.total} repositories have a CI/CD pipeline`,
+      );
+    }
+    if (e.crossBoundary.crossCloud || e.crossBoundary.crossAccount) {
+      acite(
+        "estate:cross_boundary",
+        `cross-boundary edges: crossCloud=${e.crossBoundary.crossCloud} crossAccount=${e.crossBoundary.crossAccount}`,
+      );
+    }
+    if (e.findings.length) {
+      acite(
+        "estate:findings",
+        `needs attention: ${e.findings
+          .map((f) => `[${f.severity}] ${f.title}${f.count !== undefined ? ` (${f.count})` : ""}`)
+          .join("; ")}`,
+      );
+    }
+    acite(
+      "estate:sources",
+      `connected sources: ${e.sources.total} (${e.sources.healthy} healthy)${e.sources.lastSyncAt ? `, last sync ${e.sources.lastSyncAt}` : ""}`,
+    );
+  }
+
   const sections: string[] = [`[CONTEXT — org:${orgId} — these are the ONLY facts you may use]`];
   if (nodeLines.length) sections.push("NODES:", ...nodeLines);
   if (edgeLines.length) sections.push("EDGES:", ...edgeLines);
   if (timelineLines.length) sections.push("CHANGES:", ...timelineLines);
+  if (estateLines.length)
+    sections.push(
+      "ESTATE OVERVIEW (aggregate facts computed from your synced graph — state these figures directly and cite the marker):",
+      ...estateLines,
+    );
   if (notes.length) sections.push("FRESHNESS:", ...notes.map((n) => `  ${n}`));
   sections.push("[END CONTEXT]");
 

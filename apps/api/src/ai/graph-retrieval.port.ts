@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import type {
+  EstateOverview,
   RetrievalPort,
   RetrievedEdge,
   RetrievedNode,
@@ -89,6 +90,51 @@ export class GraphRetrievalPort implements RetrievalPort {
     if (kinds && kinds.length > 0) q.kinds = kinds.join(",");
     const res = await this.graph.timeline(orgId, q);
     return res.data as TimelineChange[];
+  }
+
+  /**
+   * Whole-org aggregate snapshot for estate/aggregate questions (P0 estate slice). Reuses the
+   * dashboard summary aggregation so Ask AI and the dashboard report identical figures — the AI
+   * never recomputes counts a different way (single source of truth). Org-scoped by GraphService.
+   */
+  async estateOverview(orgId: string): Promise<EstateOverview> {
+    const s = await this.graph.summary(orgId);
+    return {
+      inventory: {
+        resources: s.inventory.resources,
+        relationships: s.inventory.relationships,
+        services: s.inventory.services,
+        datastores: s.inventory.datastores,
+        environments: s.inventory.environments,
+        clouds: s.inventory.clouds,
+        accounts: s.inventory.accounts,
+        repositories: s.inventory.repositories,
+        projects: s.inventory.projects,
+        pipelines: s.inventory.pipelines,
+        contributors: s.inventory.contributors,
+        pullRequests: s.inventory.pullRequests,
+      },
+      crossBoundary: {
+        crossCloud: s.crossBoundary.crossCloud,
+        crossAccount: s.crossBoundary.crossAccount,
+      },
+      topContributors: s.insights.topContributors.map((c) => ({ name: c.name, count: c.count })),
+      mostActiveRepos: s.insights.mostActiveRepos.map((r) => ({ name: r.name, count: r.count })),
+      pipelineCoverage: {
+        withPipeline: s.insights.pipelineCoverage.withPipeline,
+        total: s.insights.pipelineCoverage.total,
+      },
+      findings: s.findings.map((f) => ({
+        title: f.title,
+        severity: f.severity,
+        ...(f.count !== undefined ? { count: f.count } : {}),
+      })),
+      sources: {
+        total: s.trust.sources,
+        healthy: s.trust.healthySources,
+        lastSyncAt: s.trust.lastSyncAt,
+      },
+    };
   }
 }
 

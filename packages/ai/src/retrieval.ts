@@ -6,6 +6,7 @@
  */
 import type { RetrievalPlan } from "./planner";
 import type {
+  EstateOverview,
   RetrievalPort,
   RetrievedEdge,
   RetrievedNode,
@@ -22,6 +23,8 @@ export interface RetrievalResult {
   traversal?: Traversal;
   edges?: RetrievedEdge[];
   timeline?: TimelineChange[];
+  /** Whole-org aggregate snapshot for `estate` intent (P0 estate slice). */
+  estate?: EstateOverview;
 }
 
 function isoDaysAgo(days: number): string {
@@ -44,6 +47,11 @@ export async function orchestrate(
 
   if (plan.intent === "timeline") {
     result.timeline = await port.timeline(orgId, isoDaysAgo(plan.window?.sinceDays ?? 7), null, 50);
+    return result;
+  }
+
+  if (plan.intent === "estate") {
+    result.estate = await port.estateOverview(orgId);
     return result;
   }
 
