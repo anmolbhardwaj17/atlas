@@ -28,11 +28,15 @@ const MAX_NODE_BUDGET = 500;
 const NODE_COLS = `id, urn, kind, name, provider, region, status, confidence, attributes, tags,
   first_seen, last_seen`;
 
-/** Kinds that Explore treats as non-estate (activity + people + per-repo CI sub-resources).
- *  Hidden from the browse list and from the Source/Type facet options. */
+/** Kinds that Explore treats as non-estate (activity + people + per-repo CI sub-resources, plus
+ *  dependency-intelligence records - external packages and their vulnerabilities, which number in
+ *  the hundreds and belong in Insights/blast-radius, not the estate browser). Hidden from the
+ *  default browse list and the Source/Type facet options; an explicit ?kind can still target them
+ *  (so finding deep-links like /explore?kind=security.vulnerability keep working). */
 const ESTATE_KIND_EXCLUSIONS = `kind NOT LIKE '%.pullrequest' AND kind NOT LIKE '%.pull_request'
   AND kind NOT LIKE '%.user' AND kind NOT LIKE '%.team'
-  AND kind NOT LIKE '%.pipeline' AND kind NOT LIKE '%.workflow'`;
+  AND kind NOT LIKE '%.pipeline' AND kind NOT LIKE '%.workflow'
+  AND kind <> 'external.package' AND kind <> 'security.vulnerability'`;
 
 export interface NodeListResult {
   data: NodeDto[];
@@ -761,6 +765,12 @@ export class GraphService {
         `((kind NOT LIKE '%.pullrequest' AND kind NOT LIKE '%.pull_request')
            OR attributes->>'state' = 'OPEN')`,
       );
+      // External packages + their vulnerabilities are dependency-intelligence supporting data
+      // (hundreds of nodes) - they'd swamp the estate map (and, being freshly synced, sort to the
+      // top). Keep the canvas about infrastructure + code; an explicit ?kind can still target them.
+      if (!q.kind) {
+        where.push(`kind <> 'external.package' AND kind <> 'security.vulnerability'`);
+      }
       const params: unknown[] = [];
       const p = (v: unknown): string => `$${params.push(v)}`;
       if (q.kind) where.push(`kind = ${p(q.kind)}`);
