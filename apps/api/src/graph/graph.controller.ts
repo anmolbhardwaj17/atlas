@@ -47,16 +47,36 @@ export class GraphController {
   @Roles("Member")
   async insights(@Req() req: AuthedRequest): Promise<unknown> {
     const s = await this.graph.summary(org(req).id);
-    return s.findings.map((f) => ({
-      id: f.id,
-      severity: f.severity,
-      category: f.category,
-      title: f.title,
-      detail: f.detail,
-      href: f.href,
-      ...(f.count !== undefined ? { count: f.count } : {}),
-      guidance: guidanceFor(f.category),
-    }));
+    return {
+      // Estate at a glance — live counts (recomputed each load, so it reflects the latest sync).
+      stats: {
+        repositories: s.inventory.repositories,
+        services: s.inventory.services,
+        datastores: s.inventory.datastores,
+        pipelines: s.inventory.pipelines,
+        contributors: s.inventory.contributors,
+        openPullRequests: s.inventory.pullRequests,
+        pipelineCoverage: s.insights.pipelineCoverage,
+        crossBoundary: s.crossBoundary.crossCloud + s.crossBoundary.crossAccount,
+      },
+      lastSyncAt: s.trust.lastSyncAt,
+      // Needs attention — grounded findings + best-practice guidance (advisory knowledge pack).
+      findings: s.findings.map((f) => ({
+        id: f.id,
+        severity: f.severity,
+        category: f.category,
+        title: f.title,
+        detail: f.detail,
+        href: f.href,
+        ...(f.count !== undefined ? { count: f.count } : {}),
+        guidance: guidanceFor(f.category),
+      })),
+      // Highlights — positive, informational leaderboards (always something to show).
+      highlights: {
+        topContributors: s.insights.topContributors,
+        mostActiveRepos: s.insights.mostActiveRepos,
+      },
+    };
   }
 
   @Get("graph")
