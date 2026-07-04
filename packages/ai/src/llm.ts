@@ -47,6 +47,9 @@ export interface CompleteRequest {
   maxTokens: number;
   /** Low for grounded narration, not creativity (L3, docs/10 §4.6). */
   temperature: number;
+  /** Abort the in-flight model call (user cancelled / disconnected) — providers pass it to the
+   *  underlying request so work + cost stop server-side, not just client-side (WS cancel). */
+  signal?: AbortSignal;
 }
 
 export interface LLMProvider {

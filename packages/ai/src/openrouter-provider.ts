@@ -74,6 +74,7 @@ export class OpenRouterProvider implements LLMProvider {
         ...(this.config.title ? { "X-Title": this.config.title } : {}),
       },
       body: JSON.stringify(body),
+      ...(req.signal ? { signal: req.signal } : {}),
     });
     if (!res.ok || !res.body) {
       const detail = await res.text().catch(() => "");

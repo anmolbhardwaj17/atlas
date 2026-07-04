@@ -23,22 +23,25 @@ export class ClaudeProvider implements LLMProvider {
   }
 
   async *complete(req: CompleteRequest): AsyncIterable<LLMEvent> {
-    const stream = this.client.messages.stream({
-      model: this.model,
-      system: req.system,
-      max_tokens: req.maxTokens,
-      temperature: req.temperature,
-      messages: req.messages.map(toClaudeMessage),
-      ...(req.tools && req.tools.length > 0
-        ? {
-            tools: req.tools.map((t) => ({
-              name: t.name,
-              description: t.description,
-              input_schema: t.inputSchema as Anthropic.Tool.InputSchema,
-            })),
-          }
-        : {}),
-    });
+    const stream = this.client.messages.stream(
+      {
+        model: this.model,
+        system: req.system,
+        max_tokens: req.maxTokens,
+        temperature: req.temperature,
+        messages: req.messages.map(toClaudeMessage),
+        ...(req.tools && req.tools.length > 0
+          ? {
+              tools: req.tools.map((t) => ({
+                name: t.name,
+                description: t.description,
+                input_schema: t.inputSchema as Anthropic.Tool.InputSchema,
+              })),
+            }
+          : {}),
+      },
+      req.signal ? { signal: req.signal } : undefined,
+    );
 
     // Accumulate streamed tool-call JSON per content block; emit on block stop.
     const toolBlocks = new Map<number, { id: string; name: string; json: string }>();

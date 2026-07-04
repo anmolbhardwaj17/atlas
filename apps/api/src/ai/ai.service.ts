@@ -239,6 +239,7 @@ export class AiService {
     orgId: string,
     conversationId: string,
     message: string,
+    signal?: AbortSignal,
   ): AsyncIterable<AnswerEvent> {
     await withOrgScope(this.db, orgId, (c) => this.loadConversation(c, conversationId));
     await withOrgScope(this.db, orgId, (c) =>
@@ -249,16 +250,21 @@ export class AiService {
     let text = "";
     const citations: AnswerCitation[] = [];
     let confidence: string | null = null;
-    for await (const ev of answerQuestionStream({ port: this.port, llm }, orgId, message)) {
-      if (ev.type === "token") text += ev.text;
-      else if (ev.type === "citation") citations.push(ev.citation);
-      else if (ev.type === "confidence") confidence = ev.overall;
-      yield ev;
+    try {
+      for await (const ev of answerQuestionStream({ port: this.port, llm }, orgId, message, signal)) {
+        if (ev.type === "token") text += ev.text;
+        else if (ev.type === "citation") citations.push(ev.citation);
+        else if (ev.type === "confidence") confidence = ev.overall;
+        yield ev;
+      }
+    } finally {
+      // Persist even a partial answer (cancel/disconnect) so the turn isn't left dangling.
+      if (text) {
+        await withOrgScope(this.db, orgId, (c) =>
+          this.insertMessage(c, orgId, conversationId, "assistant", text, citations, confidence),
+        );
+      }
     }
-
-    await withOrgScope(this.db, orgId, (c) =>
-      this.insertMessage(c, orgId, conversationId, "assistant", text, citations, confidence),
-    );
   }
 
   private async loadConversation(

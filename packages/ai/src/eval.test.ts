@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { answerQuestion } from "./answer";
+import { answerQuestion, answerQuestionStream } from "./answer";
 import { MockLLMProvider } from "./mock-provider";
 import type { MockResponder } from "./mock-provider";
 import type { RetrievalPort, RetrievedNode, Traversal } from "./retrieval-port";
@@ -162,5 +162,108 @@ describe("AI eval — adversarial (tempt hallucination)", () => {
       "what depends on prod-orders",
     );
     expect(ans.uncitedClaims).toEqual([]);
+  });
+});
+
+// --- P1 golden + adversarial: estate (aggregate) + agentic loop route ---
+
+const POP_ESTATE = {
+  ...EMPTY_ESTATE,
+  inventory: { ...EMPTY_ESTATE.inventory, repositories: 12, contributors: 7 },
+  topContributors: [{ name: "Mohit", count: 87 }],
+  pipelineCoverage: { withPipeline: 8, total: 12 },
+};
+function estatePort(): RetrievalPort {
+  return {
+    ...port(true),
+    async estateOverview() {
+      return POP_ESTATE;
+    },
+  };
+}
+/** A provider that behaves like a real (tool-calling) model so the router uses the agentic loop. */
+function agentProvider(responder: MockResponder): MockLLMProvider {
+  const p = new MockLLMProvider(responder);
+  Object.defineProperty(p, "name", { value: "openrouter:test", configurable: true });
+  return p;
+}
+
+describe("AI eval — estate/aggregate (P0 golden)", () => {
+  it("answers a count/ranking question from the computed snapshot, cited to the computation", async () => {
+    const narration =
+      "You have 12 repositories [A1]. Your top contributor is Mohit with 87 PRs [A2].";
+    const ans = await answerQuestion(
+      { port: estatePort(), llm: provider(narration) },
+      "o",
+      "how many repositories are there and who are the top contributors",
+    );
+    expect(ans.grounded).toBe(true);
+    expect(ans.confidence).toBe("observed");
+    expect(ans.citations.every((c) => c.kind === "computed")).toBe(true);
+    expect(ans.citations.find((c) => c.marker === "A1")?.provenanceUrl).toBe("/api/v1/summary");
+    expect(ans.uncitedClaims).toEqual([]);
+  });
+
+  it("adversarial: a fabricated uncited aggregate is flagged (L5)", async () => {
+    const narration =
+      "You have 12 repositories [A1]. You also run 3 secret shadow clusters that appear nowhere.";
+    const ans = await answerQuestion(
+      { port: estatePort(), llm: provider(narration) },
+      "o",
+      "how many repositories are there",
+    );
+    expect(ans.grounded).toBe(true);
+    expect(ans.uncitedClaims.some((c) => /shadow clusters/.test(c))).toBe(true);
+  });
+});
+
+describe("AI eval — agentic loop route (P1)", () => {
+  // Planner calls (req has tools) gather; the narration call (no tools) writes the cited answer.
+  const responder =
+    (toolCall: { id: string; name: string; input: Record<string, unknown> }, text: string): MockResponder =>
+    (req) => {
+      if (req.tools && req.tools.length > 0) {
+        // one gather hop, then stop
+        return req.messages.some((m) => m.role === "tool")
+          ? [{ type: "stop", reason: "end_turn" }]
+          : [{ type: "tool_call", ...toolCall }, { type: "stop", reason: "tool_calls" }];
+      }
+      return [
+        { type: "token", text },
+        { type: "stop", reason: "end" },
+      ];
+    };
+
+  it("routes an open-ended lookup through the tool loop → grounded + cited", async () => {
+    const ans = await answerQuestion(
+      {
+        port: port(true),
+        llm: agentProvider(
+          responder({ id: "c1", name: "get_node", input: { id: "rds1" } }, "prod-orders [N1] is an RDS instance."),
+        ),
+      },
+      "o",
+      "tell me about prod-orders",
+    );
+    expect(ans.grounded).toBe(true);
+    expect(ans.citations.map((c) => c.id)).toContain("rds1");
+  });
+
+  it("streams retrieval_step events for the loop's tool calls (show-your-work)", async () => {
+    const events: string[] = [];
+    for await (const ev of answerQuestionStream(
+      {
+        port: port(true),
+        llm: agentProvider(
+          responder({ id: "c1", name: "get_node", input: { id: "rds1" } }, "prod-orders [N1]."),
+        ),
+      },
+      "o",
+      "tell me about prod-orders",
+    )) {
+      events.push(ev.type);
+    }
+    expect(events).toContain("retrieval_step");
+    expect(events).toContain("done");
   });
 });

@@ -165,6 +165,7 @@ export async function* retrievalLoop(
   deps: { port: RetrievalPort; llm: LLMProvider },
   orgId: string,
   question: string,
+  signal?: AbortSignal,
 ): AsyncGenerator<RetrievalStep, LoopResult> {
   const acc = new ContextAccumulator();
   const steps: RetrievalStep[] = [];
@@ -173,6 +174,7 @@ export async function* retrievalLoop(
   let toolCalls = 0;
 
   for (let hop = 1; hop <= MAX_HOPS; hop++) {
+    if (signal?.aborted) break;
     const calls: ToolCall[] = [];
     for await (const ev of deps.llm.complete({
       system: PLANNER_SYSTEM,
@@ -180,6 +182,7 @@ export async function* retrievalLoop(
       tools: TOOL_SPECS,
       maxTokens: 512,
       temperature: 0,
+      ...(signal ? { signal } : {}),
     })) {
       if (ev.type === "tool_call") calls.push({ id: ev.id, name: ev.name, input: ev.input });
       // planner tokens are "thinking about which tool" — not shown to the user.
@@ -225,8 +228,9 @@ export async function collectLoop(
   deps: { port: RetrievalPort; llm: LLMProvider },
   orgId: string,
   question: string,
+  signal?: AbortSignal,
 ): Promise<LoopResult> {
-  const gen = retrievalLoop(deps, orgId, question);
+  const gen = retrievalLoop(deps, orgId, question, signal);
   let next = await gen.next();
   while (!next.done) next = await gen.next();
   return next.value;

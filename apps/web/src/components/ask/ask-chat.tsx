@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Send, Check } from "lucide-react";
+import { Send, Check, Square } from "lucide-react";
 import { ConfidenceBadge } from "@/components/certainty";
 import { AtlasAiMark } from "@/components/brand";
-import { createConversation, getConversation, streamAsk, type AskEvent } from "@/lib/browser-api";
+import { createConversation, getConversation, streamAskWS, type AskEvent } from "@/lib/browser-api";
 
 interface Citation {
   number: number;
@@ -79,6 +79,9 @@ export function AskChat({
   const [busy, setBusy] = useState(false);
   const convoRef = useRef<string | null>(conversationId ?? null);
   const autoAsked = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const stop = () => abortRef.current?.abort();
 
   // Reopen a past conversation: load its persisted turns.
   useEffect(() => {
@@ -139,6 +142,8 @@ export function AskChat({
     const patchLast = (fn: (msg: ChatMessage) => ChatMessage) =>
       setMessages((m) => m.map((msg, i) => (i === m.length - 1 ? fn(msg) : msg)));
 
+    const ac = new AbortController();
+    abortRef.current = ac;
     try {
       const isNew = !convoRef.current;
       if (isNew) {
@@ -149,13 +154,19 @@ export function AskChat({
         patchLast((msg) => ({ ...msg, streaming: false, error: "Couldn’t start a conversation." }));
         return;
       }
-      for await (const ev of streamAsk(orgId, convoRef.current, q)) {
+      for await (const ev of streamAskWS(orgId, convoRef.current, q, ac.signal)) {
         applyEvent(ev, patchLast);
       }
       patchLast((msg) => ({ ...msg, streaming: false }));
     } catch {
-      patchLast((msg) => ({ ...msg, streaming: false, error: "The stream was interrupted." }));
+      // A user-initiated stop ends the stream cleanly; only a real failure is an error.
+      patchLast((msg) => ({
+        ...msg,
+        streaming: false,
+        error: ac.signal.aborted ? null : "The stream was interrupted.",
+      }));
     } finally {
+      abortRef.current = null;
       setBusy(false);
     }
   }
@@ -200,13 +211,24 @@ export function AskChat({
           disabled={busy}
           className="flex-1 rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
         />
-        <button
-          type="submit"
-          disabled={busy || input.trim().length === 0}
-          className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-        >
-          <Send size={15} /> Ask
-        </button>
+        {busy ? (
+          <button
+            type="button"
+            onClick={stop}
+            aria-label="Stop generating"
+            className="flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/60"
+          >
+            <Square size={13} className="fill-current" /> Stop
+          </button>
+        ) : (
+          <button
+            type="submit"
+            disabled={input.trim().length === 0}
+            className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+          >
+            <Send size={15} /> Ask
+          </button>
+        )}
       </form>
     </div>
   );

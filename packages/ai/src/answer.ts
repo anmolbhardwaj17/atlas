@@ -61,11 +61,16 @@ type Prepared =
   | { grounded: false; intent: Intent; reason: string }
   | { grounded: true; intent: Intent; built: BuiltContext };
 
-async function prepare(deps: AnswerDeps, orgId: string, question: string): Promise<Prepared> {
+async function prepare(
+  deps: AnswerDeps,
+  orgId: string,
+  question: string,
+  signal?: AbortSignal,
+): Promise<Prepared> {
   // Agentic path (non-streaming): gather via the tool-loop, ignoring the live step trace.
   const agenticIntent = agenticRoute(question, deps.llm);
   if (agenticIntent) {
-    const loop = await collectLoop({ port: deps.port, llm: deps.llm }, orgId, question);
+    const loop = await collectLoop({ port: deps.port, llm: deps.llm }, orgId, question, signal);
     return loop.grounded
       ? { grounded: true, intent: agenticIntent, built: loop.built }
       : { grounded: false, intent: agenticIntent, reason: NO_MATCH };
@@ -88,8 +93,9 @@ export async function answerQuestion(
   deps: AnswerDeps,
   orgId: string,
   question: string,
+  signal?: AbortSignal,
 ): Promise<Answer> {
-  const prep = await prepare(deps, orgId, question);
+  const prep = await prepare(deps, orgId, question, signal);
   if (!prep.grounded) {
     return {
       grounded: false,
@@ -101,7 +107,7 @@ export async function answerQuestion(
       nodesConsidered: 0,
     };
   }
-  const narration = await narrate(deps, prep.built.context, question);
+  const narration = await narrate(deps, prep.built.context, question, signal);
   const citations = bindCitations(narration, prep.built.cites);
   return {
     grounded: true,
@@ -127,12 +133,13 @@ export async function* answerQuestionStream(
   deps: AnswerDeps,
   orgId: string,
   question: string,
+  signal?: AbortSignal,
 ): AsyncIterable<AnswerEvent> {
   // Route: agentic path streams its retrieval steps live (show-your-work); fast path is deterministic.
   let prep: Prepared;
   const agenticIntent = agenticRoute(question, deps.llm);
   if (agenticIntent) {
-    const gen = retrievalLoop({ port: deps.port, llm: deps.llm }, orgId, question);
+    const gen = retrievalLoop({ port: deps.port, llm: deps.llm }, orgId, question, signal);
     let next = await gen.next();
     while (!next.done) {
       const s = next.value;
@@ -144,7 +151,7 @@ export async function* answerQuestionStream(
       ? { grounded: true, intent: agenticIntent, built: loop.built }
       : { grounded: false, intent: agenticIntent, reason: NO_MATCH };
   } else {
-    prep = await prepare(deps, orgId, question);
+    prep = await prepare(deps, orgId, question, signal);
   }
 
   if (!prep.grounded) {
@@ -162,6 +169,7 @@ export async function* answerQuestionStream(
     messages: [{ role: "user", content: userMessage(prep.built.context, question) }],
     maxTokens: deps.maxTokens ?? 1024,
     temperature: 0,
+    ...(signal ? { signal } : {}),
   })) {
     if (ev.type === "token") {
       parts.push(ev.text);
@@ -179,13 +187,19 @@ export async function* answerQuestionStream(
   yield { type: "done", grounded: true, citations: citations.length };
 }
 
-async function narrate(deps: AnswerDeps, context: string, question: string): Promise<string> {
+async function narrate(
+  deps: AnswerDeps,
+  context: string,
+  question: string,
+  signal?: AbortSignal,
+): Promise<string> {
   const parts: string[] = [];
   for await (const ev of deps.llm.complete({
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: userMessage(context, question) }],
     maxTokens: deps.maxTokens ?? 1024,
     temperature: 0,
+    ...(signal ? { signal } : {}),
   })) {
     if (ev.type === "token") parts.push(ev.text);
   }

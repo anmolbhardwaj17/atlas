@@ -6,6 +6,7 @@ import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 import { Logger } from "@nestjs/common";
 import { loadEnv } from "@atlas/config";
 import { AppModule } from "./app.module";
+import { registerAskSocket } from "./ai/ask-socket";
 
 /**
  * API entrypoint (docs/02 §3). Fastify adapter per docs/02 DD-3.
@@ -42,6 +43,8 @@ async function bootstrap(): Promise<void> {
     allowedHeaders: ["authorization", "content-type", "x-atlas-org", "idempotency-key"],
   });
   app.enableShutdownHooks(); // run OnApplicationShutdown (closes the PG pool)
+  await app.init(); // resolve providers before registering the raw WS route below
+  await registerAskSocket(app); // live Ask AI channel (WebSocket) alongside the REST/SSE API
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
   Logger.log(`API listening on :${env.PORT}`, "Bootstrap");
 }

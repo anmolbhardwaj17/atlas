@@ -398,3 +398,98 @@ export async function* streamAsk(
     }
   }
 }
+
+/**
+ * WebSocket answer stream (docs/plans/…p1-design §9.1). Auth is sent as the first frame (never in
+ * the URL). Same `AskEvent` shape as SSE, so the caller's loop is identical. `signal` → a `cancel`
+ * frame that stops the answer server-side (tool-loop + LLM cost), not just the client read.
+ * Falls back to `streamAsk` (SSE) if the socket can't reach `ready` (proxies / WS-blocked networks).
+ */
+export async function* streamAskWS(
+  orgId: string,
+  conversationId: string,
+  message: string,
+  signal?: AbortSignal,
+): AsyncGenerator<AskEvent> {
+  const token = await getClientToken();
+  if (!token) {
+    yield { type: "error", message: "Not signed in." };
+    return;
+  }
+  if (typeof WebSocket === "undefined") {
+    yield* streamAsk(orgId, conversationId, message, signal);
+    return;
+  }
+
+  const url = `${apiUrl().replace(/^http/, "ws")}/ai/ws`;
+  const ws = new WebSocket(url);
+  const queue: AskEvent[] = [];
+  let closed = false;
+  let ready = false;
+  let handshakeFailed = false;
+  let wake: (() => void) | null = null;
+  const bump = (): void => {
+    wake?.();
+    wake = null;
+  };
+
+  ws.onopen = () => ws.send(JSON.stringify({ t: "auth", token, orgId }));
+  ws.onmessage = (e) => {
+    let msg: AskEvent | { t?: string };
+    try {
+      msg = JSON.parse(String(e.data)) as AskEvent | { t?: string };
+    } catch {
+      return;
+    }
+    if ("t" in msg && msg.t === "ready") {
+      ready = true;
+      ws.send(JSON.stringify({ t: "ask", conversationId, message }));
+      return;
+    }
+    queue.push(msg as AskEvent);
+    bump();
+  };
+  ws.onerror = () => {
+    if (!ready) handshakeFailed = true;
+    closed = true;
+    bump();
+  };
+  ws.onclose = () => {
+    closed = true;
+    bump();
+  };
+  const onAbort = (): void => {
+    try {
+      ws.send(JSON.stringify({ t: "cancel" }));
+      ws.close();
+    } catch {
+      /* already gone */
+    }
+  };
+  signal?.addEventListener("abort", onAbort);
+
+  try {
+    while (true) {
+      while (queue.length) {
+        const ev = queue.shift() as AskEvent;
+        yield ev;
+        if (ev.type === "done") return;
+      }
+      if (closed) break;
+      await new Promise<void>((r) => {
+        wake = r;
+      });
+    }
+    // Never reached ready and no events → the socket failed the handshake; fall back to SSE.
+    if (handshakeFailed && !ready) {
+      yield* streamAsk(orgId, conversationId, message, signal);
+    }
+  } finally {
+    signal?.removeEventListener("abort", onAbort);
+    try {
+      ws.close();
+    } catch {
+      /* noop */
+    }
+  }
+}
