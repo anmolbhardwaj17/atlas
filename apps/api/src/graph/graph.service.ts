@@ -312,6 +312,9 @@ export class GraphService {
         emptyProjects,
         contributors,
         mostActiveRepos,
+        vulnSeverity,
+        topVulnPkg,
+        sprawl,
       ] = await Promise.all([
         c.query<{ category: string; n: number }>(
           `SELECT nk.category, count(*)::int AS n
@@ -425,6 +428,59 @@ export class GraphService {
             GROUP BY r.name ORDER BY n DESC, r.name LIMIT 5`,
           [prSince],
         ),
+        // ── Dependency intelligence (docs/plans/security-vulnerabilities.md) ──────
+        // Known vulnerabilities by severity + how many distinct packages they hit.
+        c.query<{ severity: string | null; vulns: number; packages: number }>(
+          `SELECT v.attributes->>'severity' AS severity,
+                  count(DISTINCT v.id)::int AS vulns,
+                  count(DISTINCT a.to_node_id)::int AS packages
+             FROM nodes v
+             JOIN edges a ON a.from_node_id = v.id AND a.type = 'AFFECTS' AND a.status = 'active'
+            WHERE v.kind = 'security.vulnerability' AND v.status <> 'deleted'
+            GROUP BY v.attributes->>'severity'`,
+        ),
+        // Blast radius: the vulnerable package used by the most repositories - one upgrade,
+        // many repos fixed. `worst` is the highest severity among the vulns affecting it.
+        c.query<{
+          id: string;
+          name: string | null;
+          ecosystem: string | null;
+          vulns: number;
+          repos: number;
+          worst_rank: number;
+        }>(
+          `SELECT pkg.id, pkg.name, pkg.attributes->>'ecosystem' AS ecosystem,
+                  count(DISTINCT v.id)::int AS vulns,
+                  count(DISTINCT dep.from_node_id)::int AS repos,
+                  min(CASE v.attributes->>'severity'
+                        WHEN 'critical' THEN 0 WHEN 'high' THEN 1
+                        WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END) AS worst_rank
+             FROM nodes pkg
+             JOIN edges a ON a.to_node_id = pkg.id AND a.type = 'AFFECTS' AND a.status = 'active'
+             JOIN nodes v ON v.id = a.from_node_id AND v.kind = 'security.vulnerability'
+             LEFT JOIN edges dep ON dep.to_node_id = pkg.id
+                   AND dep.type = 'DEPENDS_ON_PKG' AND dep.status = 'active'
+            WHERE pkg.kind = 'external.package' AND pkg.status <> 'deleted'
+            GROUP BY pkg.id, pkg.name, pkg.attributes->>'ecosystem'
+            ORDER BY repos DESC, vulns DESC LIMIT 1`,
+        ),
+        // Dependency sprawl: one package pinned to many different versions across repos - an
+        // inconsistency + a harder single upgrade path. The per-repo version lives in the
+        // DEPENDS_ON_PKG edge's provenance evidence (edges carry no attributes column, docs/05).
+        c.query<{ id: string; name: string | null; versions: number; repos: number }>(
+          `SELECT pkg.id, pkg.name,
+                  count(DISTINCT pv.evidence->>'version')::int AS versions,
+                  count(DISTINCT dep.from_node_id)::int AS repos
+             FROM nodes pkg
+             JOIN edges dep ON dep.to_node_id = pkg.id
+                   AND dep.type = 'DEPENDS_ON_PKG' AND dep.status = 'active'
+             JOIN provenance pv ON pv.id = dep.provenance_id
+            WHERE pkg.kind = 'external.package' AND pkg.status <> 'deleted'
+              AND pv.evidence->>'version' IS NOT NULL
+            GROUP BY pkg.id, pkg.name
+           HAVING count(DISTINCT pv.evidence->>'version') >= 3
+            ORDER BY versions DESC LIMIT 1`,
+        ),
       ]);
 
       const code = codeCounts.rows[0];
@@ -477,6 +533,9 @@ export class GraphService {
           name: r.name ?? "unknown",
           count: r.n,
         })),
+        vulnSeverity: vulnSeverity.rows,
+        topVulnPkg: topVulnPkg.rows[0] ?? null,
+        sprawl: sprawl.rows[0] ?? null,
       };
     });
 
@@ -575,6 +634,61 @@ export class GraphService {
         count: base.emptyProjects,
       });
     }
+    // ── Dependency intelligence findings (docs/plans/security-vulnerabilities.md) ──
+    // Vulnerabilities in dependencies, ranked by real impact: severity + blast radius.
+    const sevCount = (s: string): number =>
+      base.vulnSeverity
+        .filter((r) => (r.severity ?? "unknown") === s)
+        .reduce((n, r) => n + r.vulns, 0);
+    const critical = sevCount("critical");
+    const high = sevCount("high");
+    const medium = sevCount("medium");
+    const totalVulns = base.vulnSeverity.reduce((n, r) => n + r.vulns, 0);
+    const affectedPkgs = base.vulnSeverity.reduce((n, r) => n + r.packages, 0);
+    if (totalVulns > 0) {
+      const serious = critical + high;
+      findings.push({
+        id: "vulnerabilities",
+        severity: serious > 0 ? "high" : medium > 0 ? "medium" : "low",
+        category: "Vulnerabilities",
+        title: `${totalVulns} known ${totalVulns > 1 ? "vulnerabilities" : "vulnerability"} in your dependencies`,
+        detail:
+          serious > 0
+            ? `${serious} high-severity across ${affectedPkgs} package${affectedPkgs > 1 ? "s" : ""}. Upgrade to a patched version to close them.`
+            : `Across ${affectedPkgs} package${affectedPkgs > 1 ? "s" : ""}. Upgrade to a patched version to close them.`,
+        href: "/explore?kind=security.vulnerability",
+        count: totalVulns,
+      });
+    }
+    // Blast radius: a vulnerable package many repos depend on - one upgrade fixes them all.
+    const vp = base.topVulnPkg;
+    const SEV_BY_RANK = ["critical", "high", "medium", "low", "unknown"];
+    if (vp && vp.repos >= 2) {
+      const worst = SEV_BY_RANK[vp.worst_rank] ?? "unknown";
+      findings.push({
+        id: `vuln-blast-${vp.id}`,
+        severity: vp.worst_rank <= 1 ? "high" : vp.worst_rank === 2 ? "medium" : "low",
+        category: "Blast radius",
+        title: `${vp.name} is vulnerable and used by ${vp.repos} repositories`,
+        detail: `A ${worst}-severity dependency with wide blast radius - a single upgrade fixes all ${vp.repos} repos at once.`,
+        href: `/explore/${vp.id}/impact`,
+        count: vp.repos,
+      });
+    }
+    // Dependency sprawl: the same package pinned to many versions across the estate.
+    const sp = base.sprawl;
+    if (sp) {
+      findings.push({
+        id: `sprawl-${sp.id}`,
+        severity: "low",
+        category: "Dependency sprawl",
+        title: `${sp.name} is pinned to ${sp.versions} different versions`,
+        detail: `${sp.repos} repos use ${sp.versions} versions of the same package - inconsistent, and a harder single upgrade path.`,
+        href: `/explore/${sp.id}`,
+        count: sp.versions,
+      });
+    }
+
     const rank = { high: 0, medium: 1, low: 2 };
     findings.sort((a, b) => rank[a.severity] - rank[b.severity]);
 

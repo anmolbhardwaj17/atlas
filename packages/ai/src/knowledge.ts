@@ -43,6 +43,18 @@ const GUIDANCE: Record<string, Guidance> = {
     pillar: "reliability",
     source: "AWS Well-Architected — Reliability",
   },
+  vulnerabilities: {
+    why: "A known vulnerability (CVE/GHSA) in a dependency is code an attacker already has a documented exploit for — it ships to production with your app, and the blast radius is every repo that pulls the package in.",
+    fix: "Upgrade each affected package to its patched (fixed) version; prioritise critical/high severity and packages many repos share, and add dependency scanning to CI so new ones surface at PR time, not in production.",
+    pillar: "security",
+    source: "OWASP A06:2021 — Vulnerable & Outdated Components",
+  },
+  "dependency sprawl": {
+    why: "The same package pinned to many different versions across repos means inconsistent behaviour, duplicated review effort, and a harder, riskier single upgrade when a vulnerability lands in that package.",
+    fix: "Converge on one supported version (a shared/catalog version or a renovate-style policy), and remove unused or wildly outdated pins so a future security upgrade is one change, not a scavenger hunt.",
+    pillar: "hygiene",
+    source: "Dependency management best practice (SLSA / supply-chain)",
+  },
   "source health": {
     why: "A degraded or disconnected source means the graph is going stale for that provider — answers and findings silently drift from reality.",
     fix: "Reconnect the source / rotate its credentials and re-sync so coverage is current; check the connector's least-privilege role is still valid.",

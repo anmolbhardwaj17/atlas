@@ -20,6 +20,8 @@ export interface BitbucketClient {
   request<T>(path: string, opts?: BitbucketRequestOptions): Promise<BitbucketResponse<T>>;
   /** Yield `values[]` across pages, following the body's `next` URL. */
   paginate<T>(path: string, opts?: BitbucketRequestOptions): AsyncIterable<T>;
+  /** Raw file text at a revision (the `src` endpoint returns text, not JSON). `null` if absent. */
+  content(workspace: string, repoSlug: string, revision: string, path: string): Promise<string | null>;
 }
 
 export interface FetchBitbucketClientDeps {
@@ -79,6 +81,28 @@ export class FetchBitbucketClient implements BitbucketClient {
         throw new BitbucketHttpError(res.status, path);
       }
       await this.sleep(waitMs);
+    }
+  }
+
+  async content(
+    workspace: string,
+    repoSlug: string,
+    revision: string,
+    path: string,
+  ): Promise<string | null> {
+    // GET /repositories/{ws}/{repo}/src/{revision}/{path} → raw file text (not JSON). Best-effort:
+    // a missing file / permission issue yields null, never fails the crawl.
+    const url = this.resolve(
+      `/repositories/${workspace}/${repoSlug}/src/${encodeURIComponent(revision)}/${path}`,
+    );
+    try {
+      const res = await fetch(url, {
+        headers: { Authorization: this.authHeader, "User-Agent": "atlas-connector" },
+      });
+      if (!res.ok) return null;
+      return await res.text();
+    } catch {
+      return null;
     }
   }
 

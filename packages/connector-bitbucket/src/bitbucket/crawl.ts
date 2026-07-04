@@ -2,6 +2,7 @@ import type { ResourceRef } from "@atlas/connector-sdk";
 import type { BitbucketClient } from "./client";
 import { withContext, type AtlasContext } from "../modules/context";
 import { userKeyOf } from "../modules/nodes";
+import { parseManifest, MANIFEST_PATHS } from "../parsers/manifest";
 
 /**
  * Live discovery over the Bitbucket REST API (docs/07b). Each discover* generator yields a
@@ -83,10 +84,35 @@ export async function* discoverRepo(
   const ctx = { workspace, repoSlug };
 
   const repo = (await client.request<Json>(`/repositories/${workspace}/${repoSlug}`)).data;
+
+  // Dependency manifests (docs/plans/security-vulnerabilities.md) — fetch a few well-known files
+  // from the default branch; parse → package nodes + DEPENDS_ON_PKG edges (the OSV stage then
+  // turns those into vulnerabilities). Best-effort: a missing/forbidden file is simply skipped.
+  const branch = s((repo.mainbranch as Json | undefined)?.name) || "main";
+  const manifests: Array<{ path: string; content: string }> = [];
+  for (const path of MANIFEST_PATHS) {
+    const content = await client.content(workspace, repoSlug, branch, path);
+    if (content != null) manifests.push({ path, content });
+  }
+
   yield {
     ref: { scopeKey, externalId: `repo:${repoSlug}`, kind: "bitbucket.repository" },
-    payload: withContext(repo, ctx),
+    payload: withContext({ ...repo, _manifests: manifests }, ctx),
   };
+
+  // The dependency (external.package) nodes the repo's DEPENDS_ON_PKG edges point at.
+  const seenPkg = new Set<string>();
+  for (const m of manifests) {
+    for (const dep of parseManifest(m.path, m.content)) {
+      const key = `${dep.ecosystem}:${dep.name}`;
+      if (seenPkg.has(key)) continue;
+      seenPkg.add(key);
+      yield {
+        ref: { scopeKey, externalId: `pkg:${key}`, kind: "external.package" },
+        payload: { ecosystem: dep.ecosystem, name: dep.name, version: dep.version },
+      };
+    }
+  }
 
   // Deployment environments → pipeline (deploy-target) nodes. Absent/forbidden ⇒ skip.
   try {

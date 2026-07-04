@@ -2,7 +2,7 @@ import type { EdgeUpsert, NodeUpsert, Signal } from "@atlas/connector-sdk";
 import { repositoryNode, repositorySignals, repositoryEdges } from "./repository";
 import { pipelineNode, pipelineSignals, pipelineEdges } from "./pipeline";
 import { pullRequestNode, pullRequestSignals, pullRequestEdges } from "./pull-request";
-import { projectNode, userNode, noSignals, noEdges } from "./nodes";
+import { projectNode, userNode, packageNode, noSignals, noEdges } from "./nodes";
 
 /**
  * Pure raw→graph transforms, one per Bitbucket node kind (mirrors the GitHub connector's
@@ -20,6 +20,12 @@ export const BITBUCKET_MODULES: BitbucketModule[] = [
   {
     kind: "bitbucket.project",
     normalize: projectNode,
+    extractSignals: noSignals,
+    observedEdges: noEdges,
+  },
+  {
+    kind: "external.package",
+    normalize: packageNode,
     extractSignals: noSignals,
     observedEdges: noEdges,
   },

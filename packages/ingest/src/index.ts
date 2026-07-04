@@ -1,5 +1,15 @@
 export { runStagedSync } from "./sync-runner";
 export type { RunnerDeps, SyncRunRecord, SyncResult, SyncStats } from "./sync-runner";
+export { runOsvEnrichment } from "./osv-enrichment";
+export type { OsvEnrichmentDeps, OsvEnrichmentResult } from "./osv-enrichment";
+export { OsvClient, pkgKey } from "./osv";
+export type {
+  OsvEcosystem,
+  OsvQueryPkg,
+  OsvVulnerability,
+  PackageVulns,
+  VulnSeverity,
+} from "./osv";
 export { InMemorySnapshotStore } from "./snapshot-store";
 export type { SnapshotStore } from "./snapshot-store";
 export {

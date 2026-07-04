@@ -42,6 +42,15 @@ export function pullRequestUrn(workspace: string, repoSlug: string, id: number |
   return `bitbucket:${slug(workspace, "workspace")}:pullrequest/${slug(repoSlug, "repo slug")}/${n}`;
 }
 
+/**
+ * External dependency package — the SHARED, cross-provider vocabulary node (same scheme the GitHub
+ * connector uses), so a Bitbucket repo and a GitHub repo depending on the same package resolve to
+ * ONE package node. `external:<ecosystem>:package:<name>`.
+ */
+export function packageUrn(ecosystem: string, name: string): string {
+  return `external:${req(ecosystem, "ecosystem").toLowerCase()}:package:${req(name, "package name")}`;
+}
+
 export function userUrn(workspace: string, key: string): string {
   return `bitbucket:${slug(workspace, "workspace")}:user/${slug(key, "user key")}`;
 }

@@ -6,6 +6,7 @@
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc -p tsconfig.build.json && (tsc -p tsconfig.build.json --watch --preserveWatchOutput --incremental & node --watch dist/main.js)",
     "start": "node dist/main.js",
+    "sync": "tsx scripts/sync.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -31,6 +32,7 @@
   "devDependencies": {
     "@types/node": "^22.10.2",
     "@types/pg": "^8.11.10",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   }

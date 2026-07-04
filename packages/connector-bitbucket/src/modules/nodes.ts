@@ -1,5 +1,5 @@
 import type { EdgeUpsert, NodeUpsert, Signal } from "@atlas/connector-sdk";
-import { projectUrn, userUrn } from "../urn";
+import { projectUrn, userUrn, packageUrn } from "../urn";
 import { readContext, str } from "./context";
 
 /**
@@ -47,3 +47,20 @@ export function userNode(payload: unknown): NodeUpsert {
 
 export const noSignals = (): Signal[] => [];
 export const noEdges = (): EdgeUpsert[] => [];
+
+/**
+ * External dependency package (docs/plans/security-vulnerabilities.md) — the shared, cross-provider
+ * `external.package` node a repo's DEPENDS_ON_PKG edge points at (no `_atlas` context needed; the
+ * URN is `external:<ecosystem>:package:<name>`). The OSV stage later attaches vulnerabilities to it.
+ */
+export function packageNode(payload: unknown): NodeUpsert {
+  const p = payload as { ecosystem?: string; name?: string; version?: string | null };
+  const ecosystem = p.ecosystem ?? "unknown";
+  const name = p.name ?? "unknown";
+  return {
+    urn: packageUrn(ecosystem, name),
+    kind: "external.package",
+    displayName: name,
+    attributes: { ecosystem, name, version: p.version ?? null },
+  };
+}

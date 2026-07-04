@@ -1,6 +1,7 @@
 import type { Connection, Connector } from "@atlas/connector-sdk";
 import { runInference, ALL_RULES } from "@atlas/inference";
 import { runStagedSync, type RunnerDeps, type SyncRunRecord } from "./sync-runner";
+import { runOsvEnrichment } from "./osv-enrichment";
 import { silentLogger } from "./runtime";
 import type { Job, JobQueue } from "./queue";
 
@@ -39,6 +40,21 @@ export function createSyncHandler(deps: SyncWorkerDeps): (job: Job<SyncJobData>)
     if (!connector) throw new Error(`no connector for provider "${connection.provider}"`);
     const run: SyncRunRecord = { id: runId, orgId, connectionId, type };
     const result = await runStagedSync(deps, connector, connection, run);
+
+    // Enrich stage: query OSV.dev for vulnerabilities affecting the just-persisted packages.
+    // Best-effort (docs/plans/security-vulnerabilities.md) — a transient OSV outage or a graph
+    // with no packages must never fail the sync.
+    if (result.status !== "failed") {
+      try {
+        const osv = await runOsvEnrichment({ db: deps.db }, orgId);
+        logger.info(
+          `osv after sync ${runId}: scanned ${osv.packagesScanned} pkgs, ` +
+            `found ${osv.vulnerabilitiesFound} vulns (${osv.affectsEdges} affects edges)`,
+        );
+      } catch (err) {
+        logger.error(`osv enrichment after sync ${runId} failed: ${(err as Error).message}`);
+      }
+    }
 
     // Infer stage: derive cross-source edges from the just-persisted nodes/signals.
     if (result.status !== "failed") {

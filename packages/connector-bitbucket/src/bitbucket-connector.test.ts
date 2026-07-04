@@ -15,6 +15,8 @@ class FakeClient implements BitbucketClient {
     private readonly reqs: Record<string, unknown>,
     private readonly pages: Record<string, unknown[]>,
     private readonly throwOn: Record<string, number> = {},
+    /** `${repoSlug}/${path}` → raw file text (manifest fetching). */
+    private readonly contents: Record<string, string> = {},
   ) {}
   async request<T>(path: string): Promise<{ status: number; data: T; headers: Headers }> {
     const key = path.split("?")[0]!;
@@ -26,6 +28,14 @@ class FakeClient implements BitbucketClient {
     const key = path.split("?")[0]! + state;
     if (this.throwOn[key]) throw new BitbucketHttpError(this.throwOn[key]!, key);
     for (const v of this.pages[key] ?? []) yield v as T;
+  }
+  async content(
+    _workspace: string,
+    repoSlug: string,
+    _revision: string,
+    path: string,
+  ): Promise<string | null> {
+    return this.contents[`${repoSlug}/${path}`] ?? null;
   }
 }
 
@@ -128,6 +138,48 @@ describe("BitbucketConnector crawl", () => {
     );
     expect(edges).toContain(
       "OWNED_BY bitbucket:acme:pullrequest/mobile-app/231 -> bitbucket:acme:user/diego",
+    );
+  });
+});
+
+describe("BitbucketConnector — dependency manifests (SCA)", () => {
+  it("emits external.package nodes + DEPENDS_ON_PKG edges from a repo's manifests", async () => {
+    const c = new FakeClient(
+      {
+        "/repositories/acme/api": {
+          slug: "api",
+          name: "API",
+          project: { key: "PLATFORM" },
+          mainbranch: { name: "main" },
+        },
+      },
+      {
+        "/repositories/acme": [{ slug: "api" }],
+        "/workspaces/acme/projects": [],
+        "/workspaces/acme/members": [],
+        "/repositories/acme/api/environments/": [],
+        "/repositories/acme/api/pullrequests?state=OPEN": [],
+      },
+      {},
+      { "api/package.json": JSON.stringify({ dependencies: { lodash: "4.17.11" } }) },
+    );
+    const bb = connector(c);
+    const ctx: CrawlContext = { connection: conn, run, secrets, log: console as never };
+    const plan = await bb.plan(conn, run);
+
+    const nodes: string[] = [];
+    const edges: string[] = [];
+    for (const scope of plan.scopes) {
+      for await (const ref of bb.discover(scope, ctx)) {
+        const raw = await bb.fetchDetail(ref, ctx);
+        nodes.push(bb.normalize(raw).urn);
+        for (const e of bb.observedEdges(raw)) edges.push(`${e.type} ${e.fromUrn} -> ${e.toUrn}`);
+      }
+    }
+
+    expect(nodes).toContain("external:npm:package:lodash");
+    expect(edges).toContain(
+      "DEPENDS_ON_PKG bitbucket:acme:repository/api -> external:npm:package:lodash",
     );
   });
 });

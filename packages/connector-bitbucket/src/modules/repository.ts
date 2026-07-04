@@ -1,6 +1,7 @@
 import type { EdgeUpsert, NodeUpsert, Signal } from "@atlas/connector-sdk";
-import { projectUrn, repositoryUrn } from "../urn";
+import { projectUrn, repositoryUrn, packageUrn } from "../urn";
 import { readContext, obj, str } from "./context";
+import { parseManifest } from "../parsers/manifest";
 
 /**
  * A Bitbucket repository → bitbucket.repository node. Observed edges: the repo's project
@@ -44,15 +45,34 @@ export function repositorySignals(payload: unknown): Signal[] {
 export function repositoryEdges(payload: unknown): EdgeUpsert[] {
   const { workspace } = readContext(payload);
   const slug = str(payload, "slug");
-  const project = obj(payload, "project");
-  const projectKey = str(project, "key");
-  if (!slug || !projectKey) return [];
-  return [
-    {
+  if (!slug) return [];
+  const self = repositoryUrn(workspace, slug);
+  const edges: EdgeUpsert[] = [];
+
+  // project CONTAINS repo
+  const projectKey = str(obj(payload, "project"), "key");
+  if (projectKey) {
+    edges.push({
       type: "CONTAINS",
       fromUrn: projectUrn(workspace, projectKey),
-      toUrn: repositoryUrn(workspace, slug),
+      toUrn: self,
       origin: "observed",
-    },
-  ];
+    });
+  }
+
+  // repo DEPENDS_ON_PKG <package> (from the dependency manifests fetched in discover).
+  const manifests = (payload as { _manifests?: Array<{ path: string; content: string }> })
+    ._manifests;
+  for (const m of manifests ?? []) {
+    for (const dep of parseManifest(m.path, m.content)) {
+      edges.push({
+        type: "DEPENDS_ON_PKG",
+        fromUrn: self,
+        toUrn: packageUrn(dep.ecosystem, dep.name),
+        origin: "observed",
+        attributes: { version: dep.version, manifest: m.path },
+      });
+    }
+  }
+  return edges;
 }

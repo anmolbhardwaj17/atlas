@@ -337,16 +337,20 @@ async function persistEdge(
   // Skip unresolved endpoints / self-edges (the inference engine handles forward refs, G1).
   if (!fromId || !toId || fromId === toId) return false;
 
+  // Edge metadata (e.g. a DEPENDS_ON_PKG's dependency `version`) has no column on `edges` by
+  // design — it lives in the edge's provenance evidence (docs/05). Store it so downstream
+  // queries (dependency sprawl) can read it back.
   const prov = await c.query<{ id: string }>(
-    "INSERT INTO provenance (org_id, source, sync_run_id, confidence) VALUES ($1,$2,$3,'observed') RETURNING id",
-    [run.orgId, `edge:${edge.type}`, run.id],
+    "INSERT INTO provenance (org_id, source, sync_run_id, confidence, evidence) VALUES ($1,$2,$3,'observed',$4) RETURNING id",
+    [run.orgId, `edge:${edge.type}`, run.id, JSON.stringify(edge.attributes ?? {})],
   );
   await c.query(
     `INSERT INTO edges
        (org_id, from_node_id, to_node_id, type, origin, confidence, provenance_id, last_seen, last_sync_run_id)
      VALUES ($1,$2,$3,$4,'observed','observed',$5, now(), $6)
      ON CONFLICT (org_id, from_node_id, to_node_id, type, inference_rule_id) DO UPDATE SET
-       last_seen = now(), last_sync_run_id = EXCLUDED.last_sync_run_id, status = 'active'`,
+       last_seen = now(), last_sync_run_id = EXCLUDED.last_sync_run_id, status = 'active',
+       provenance_id = EXCLUDED.provenance_id`,
     [run.orgId, fromId, toId, edge.type, prov.rows[0]?.id, run.id],
   );
   return true;

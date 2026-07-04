@@ -1,6 +1,8 @@
 # Plan — Security & Vulnerability Intelligence
 
-> **Status:** 📋 Planned (not started). Captured 2026-07-04.
+> **Status:** 🟢 **Phase 1 BUILT (2026-07-05)** — dependency intelligence is live end-to-end against the real Siemba Bitbucket graph: manifest parsing → `external.package` nodes + `DEPENDS_ON_PKG` edges → OSV.dev enrichment → `security.vulnerability` nodes + `AFFECTS` edges → severity/blast-radius/sprawl findings in the dashboard + Ask AI (cited, with knowledge-pack guidance). **Phase 2 (the "exposed AND vulnerable" toxic combination) is still parked on AWS** — the cloud-posture half. Captured 2026-07-04.
+>
+> **Phase 1 build map:** OSV client `packages/ingest/src/osv.ts` · enrichment stage `packages/ingest/src/osv-enrichment.ts` (post-crawl, best-effort, wired in `sync-worker.ts`) · Bitbucket manifest parsing `packages/connector-bitbucket/src/parsers/manifest.ts` (npm/pypi/go/maven incl. `pom.xml`) + `client.content()` + `crawl.ts` fetch + `DEPENDS_ON_PKG` edges · node kind migration `0022_vulnerability` · findings (Vulnerabilities / Blast radius / Dependency sprawl) in `graph.service.ts summary()` · guidance in `packages/ai/src/knowledge.ts`.
 > **Why Atlas is uniquely good at this:** it already holds **code + cloud + exposure** in one graph, so it can answer the *reachability/prioritization* question no single-purpose scanner can — the "toxic combination," not a wall of 500 CVEs.
 
 ---
@@ -42,10 +44,10 @@ Plus **cloud posture (CSPM) from the existing AWS crawl** — no extra tool: pub
 
 ## Build steps (all-real, no-extra-account path first)
 
-1. **Dependency graph** — add **manifest parsing** to connectors (fetch `package.json` / `requirements.txt` / `go.mod` / `pom.xml` per repo → `package` nodes + `DEPENDS_ON` edges). *Buildable now against real Bitbucket repos* — this is the missing input (the Bitbucket connector currently crawls repos/PRs/pipelines/users, not file contents).
-2. **OSV enrichment** — package nodes → OSV → `vulnerability` nodes + `AFFECTS` edges (real CVEs, free).
-3. **Findings + prioritization** — a "Security" surface: findings ranked by severity; the **exposed-AND-vulnerable** toxic combination (needs AWS); cloud-posture inference rules (public SG / S3 / wildcard IAM) over the AWS graph.
-4. **Ask AI + dashboard** — "What are my most critical vulnerabilities?", "Which internet-exposed services have known CVEs?" — cited answers.
+1. ✅ **Dependency graph** — manifest parsing in the Bitbucket connector (fetches `package.json` / `requirements.txt` / `go.mod` / `pom.xml` per repo via `client.content()` → `external.package` nodes + `DEPENDS_ON_PKG` edges, versions on the edge). Cross-provider URN (`external:<ecosystem>:package:<name>`) shared with GitHub.
+2. ✅ **OSV enrichment** — a post-crawl stage (`runOsvEnrichment`, not a connector/rule — it does network I/O) queries OSV.dev per `package@version` → `security.vulnerability` nodes + observed `AFFECTS` edges (each with a provenance row `osv:<id>`). Best-effort: an OSV outage never fails the sync.
+3. 🟢 **Findings (Phase-1 half done)** — dashboard/Insights findings: **Vulnerabilities** (severity-ranked), **Blast radius** (a vulnerable package many repos share — one upgrade fixes N), **Dependency sprawl** (one package pinned to many versions). ⏳ The **exposed-AND-vulnerable** toxic combination + cloud-posture rules (public SG / S3 / wildcard IAM) are **Phase 2 (needs AWS)**.
+4. ✅ **Ask AI + dashboard** — findings flow into Insights + Ask AI automatically (they're `Finding`s); the advisory path explains each via the knowledge pack (`vulnerabilities`, `dependency sprawl`, `blast radius`). "Exposed AND vulnerable" answers arrive with AWS.
 
 ## Sequencing vs. current data
 
