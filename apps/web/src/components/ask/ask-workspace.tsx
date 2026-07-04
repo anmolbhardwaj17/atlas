@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { AskChat } from "@/components/ask/ask-chat";
@@ -20,15 +20,18 @@ export function AskWorkspace({
   initialQuestion,
   suggestions,
   initialConversations,
+  initialConversationId,
 }: {
   orgId: string;
   initialQuestion?: string | undefined;
   suggestions: string[];
   initialConversations: ConversationSummary[];
+  /** From the /ask/:chatId route — open this conversation on load. */
+  initialConversationId?: string | undefined;
 }) {
   const [conversations, setConversations] = useState(initialConversations);
-  const [conversationId, setConversationId] = useState<string | undefined>(undefined);
-  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | undefined>(initialConversationId);
+  const [highlightId, setHighlightId] = useState<string | null>(initialConversationId ?? null);
   const [epoch, setEpoch] = useState(0); // bumps to force a fresh chat on "New chat"
   const [collapsed, setCollapsed] = useState(false);
 
@@ -58,22 +61,43 @@ export function AskWorkspace({
     setConversationId(undefined);
     setEpoch((e) => e + 1);
     setHighlightId(null);
+    window.history.pushState(null, "", "/ask");
   }
   function openConversation(id: string) {
     setConversationId(id);
     setHighlightId(id);
+    window.history.pushState(null, "", `/ask/${id}`);
   }
-  // The current chat created its conversation: reflect it in the sidebar + highlight, but DON'T
-  // touch conversationId/epoch — the chat stays mounted so its streaming answer survives.
+  // The current chat created its conversation: reflect it in the sidebar + highlight + URL, but
+  // DON'T touch conversationId/epoch — the chat stays mounted so its streaming answer survives.
+  // (replaceState updates the address bar via the history API only — no React re-render/remount.)
   function onCreated(id: string, title: string) {
     setConversations((prev) => [{ id, title, createdAt: "" }, ...prev.filter((c) => c.id !== id)]);
     setHighlightId(id);
+    window.history.replaceState(null, "", `/ask/${id}`);
   }
+
+  // Keep browser back/forward in sync with the open conversation.
+  useEffect(() => {
+    const onPop = (): void => {
+      const m = window.location.pathname.match(/^\/ask\/([^/]+)/);
+      if (m) {
+        setConversationId(m[1]);
+        setHighlightId(m[1] ?? null);
+      } else {
+        setConversationId(undefined);
+        setHighlightId(null);
+        setEpoch((e) => e + 1);
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   return (
     <div className="flex h-[calc(100dvh-7rem)] min-h-[420px] gap-5">
       {collapsed ? (
-        <aside className="hidden shrink-0 flex-col items-center gap-2 md:flex">
+        <aside className="hidden shrink-0 flex-col items-center gap-2 border-r border-border pr-3 md:flex">
           <button
             type="button"
             onClick={() => setCollapsed(false)}
@@ -92,7 +116,7 @@ export function AskWorkspace({
           </button>
         </aside>
       ) : (
-        <aside className="hidden w-56 shrink-0 flex-col md:flex">
+        <aside className="hidden w-56 shrink-0 flex-col border-r border-border pr-5 md:flex">
           <div className="mb-2 flex items-center gap-1.5">
             <button
               type="button"
