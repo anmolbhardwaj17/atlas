@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Send, Check, Square } from "lucide-react";
 import { ConfidenceBadge } from "@/components/certainty";
@@ -77,6 +77,9 @@ export function AskChat({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  // True while a reopened conversation's turns are being fetched (show a skeleton, not the
+  // empty state) — fixes the "click a chat → blank flash → answer pops in" jank.
+  const [loadingConversation, setLoadingConversation] = useState<boolean>(!!conversationId);
   const convoRef = useRef<string | null>(conversationId ?? null);
   const autoAsked = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -85,24 +88,32 @@ export function AskChat({
 
   // Reopen a past conversation: load its persisted turns.
   useEffect(() => {
-    if (!conversationId) return;
+    if (!conversationId) {
+      setLoadingConversation(false);
+      return;
+    }
     let live = true;
-    void getConversation(orgId, conversationId).then((c) => {
-      if (!live || !c) return;
-      setMessages(
-        c.messages.map((m): ChatMessage => ({
-          role: m.role === "assistant" ? "assistant" : "user",
-          text: m.content,
-          citations: m.citations ?? [],
-          confidence: m.confidence,
-          caveats: [],
-          streaming: false,
-          phase: "answering",
-          steps: [],
-          error: null,
-        })),
-      );
-    });
+    setLoadingConversation(true);
+    void getConversation(orgId, conversationId)
+      .then((c) => {
+        if (!live || !c) return;
+        setMessages(
+          c.messages.map((m): ChatMessage => ({
+            role: m.role === "assistant" ? "assistant" : "user",
+            text: m.content,
+            citations: m.citations ?? [],
+            confidence: m.confidence,
+            caveats: [],
+            streaming: false,
+            phase: "answering",
+            steps: [],
+            error: null,
+          })),
+        );
+      })
+      .finally(() => {
+        if (live) setLoadingConversation(false);
+      });
     return () => {
       live = false;
     };
@@ -185,7 +196,11 @@ export function AskChat({
   return (
     // Fill the workspace column so the input pins to the bottom.
     <div className="flex h-full min-h-[420px] flex-col">
-      {title ? (
+      {loadingConversation ? (
+        <div className="mb-3 shrink-0 border-b border-border pb-2.5">
+          <div className="h-4 w-56 max-w-[60%] animate-pulse rounded bg-muted" />
+        </div>
+      ) : title ? (
         <div className="mb-3 shrink-0 border-b border-border pb-2.5">
           <h2 className="truncate text-sm font-semibold text-foreground" title={title}>
             {title}
@@ -193,7 +208,9 @@ export function AskChat({
         </div>
       ) : null}
       <div className="flex-1 space-y-5 overflow-y-auto pr-1">
-        {messages.length === 0 ? (
+        {loadingConversation ? (
+          <ConversationSkeleton />
+        ) : messages.length === 0 ? (
           <EmptyState onPick={(q) => void ask(q)} suggestions={suggestions} />
         ) : (
           messages.map((m, i) =>
@@ -218,7 +235,7 @@ export function AskChat({
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask about your infrastructure…"
           aria-label="Ask a question"
-          disabled={busy}
+          disabled={busy || loadingConversation}
           className="flex-1 rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
         />
         {busy ? (
@@ -290,7 +307,7 @@ function applyEvent(ev: AskEvent, patch: (fn: (m: ChatMessage) => ChatMessage) =
 function UserBubble({ text }: { text: string }) {
   return (
     <div className="flex justify-end">
-      <div className="max-w-[80%] rounded-lg bg-foreground px-3.5 py-2 text-sm text-background">
+      <div className="max-w-[80%] rounded-lg bg-success px-3.5 py-2 text-sm text-white">
         {text}
       </div>
     </div>
@@ -304,7 +321,7 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
     <div className="flex gap-3">
       <AtlasAiMark
         size={24}
-        className={`mt-0.5 size-6 shrink-0 ${thinking ? "animate-pulse" : ""}`}
+        className={`mt-0.5 size-6 shrink-0 ${thinking ? "animate-ai-pulse" : ""}`}
       />
       <div className="min-w-0 flex-1 space-y-2">
         {message.error ? (
@@ -313,7 +330,7 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
           </p>
         ) : message.text.length === 0 && message.streaming ? (
           <div className="space-y-1.5">
-            <span className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="flex min-h-6 items-center gap-2 text-sm text-muted-foreground">
               <TypingDots />
               {message.phase === "thinking" ? "Thinking…" : "Searching your graph…"}
             </span>
@@ -364,7 +381,7 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
                       ? `/explore/edge/${c.id}`
                       : `/explore/${c.id}`
                 }
-                className="inline-flex items-center gap-1 rounded-sm bg-primary/15 px-1.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/25"
+                className="inline-flex items-center gap-1 rounded-sm bg-muted/60 px-1.5 py-0.5 text-xs font-normal text-muted-foreground hover:bg-muted hover:text-foreground"
                 title={`Source ${c.number}${c.confidence ? ` · ${c.confidence}` : ""}`}
               >
                 [{c.number}]
@@ -381,6 +398,29 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
  *  rendered as numbered chips below, not meant to be read inline. */
 function cleanMarkers(text: string): string {
   return text.replace(/\s?\[[NEA]\d+\]/g, "");
+}
+
+/** Render the model's light markdown inline: **bold** and `code`. Incomplete markers (mid-stream)
+ *  stay literal until closed. Newlines/bullets are handled by the paragraph's whitespace-pre-wrap. */
+function renderMarkdown(text: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  const re = /\*\*(.+?)\*\*|`([^`]+)`/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let key = 0;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    if (m[1] !== undefined) out.push(<strong key={key++}>{m[1]}</strong>);
+    else
+      out.push(
+        <code key={key++} className="rounded bg-muted px-1 py-0.5 text-[0.85em]">
+          {m[2]}
+        </code>,
+      );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
 }
 
 /** Smooth typewriter reveal that keeps pace with the stream (catch-up per tick), for a natural
@@ -401,18 +441,37 @@ function TypewriterText({ text, streaming }: { text: string; streaming: boolean 
   const caret = streaming || shown < text.length;
   return (
     <>
-      {text.slice(0, shown)}
+      {renderMarkdown(text.slice(0, shown))}
       {caret && <span className="ml-0.5 animate-pulse">▌</span>}
     </>
   );
 }
 
+/** Placeholder while a reopened conversation's turns are fetched — a question + answer shimmer. */
+function ConversationSkeleton() {
+  return (
+    <div className="space-y-5" aria-label="Loading conversation" aria-busy="true">
+      <div className="flex justify-end">
+        <div className="h-9 w-2/5 animate-pulse rounded-lg bg-muted" />
+      </div>
+      <div className="flex gap-3">
+        <div className="mt-0.5 size-6 shrink-0 animate-pulse rounded-full bg-muted" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="h-4 w-full animate-pulse rounded bg-muted" />
+          <div className="h-4 w-11/12 animate-pulse rounded bg-muted" />
+          <div className="h-4 w-3/5 animate-pulse rounded bg-muted" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TypingDots() {
   return (
-    <span className="inline-flex gap-1 py-1" aria-label="Thinking">
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.2s]" />
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.1s]" />
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted" />
+    <span className="inline-flex items-center gap-1 leading-none" aria-label="Thinking">
+      <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.2s]" />
+      <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.1s]" />
+      <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60" />
     </span>
   );
 }

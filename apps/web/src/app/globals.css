@@ -123,3 +123,18 @@
       "calt" 1;
   }
 }
+
+/* AI "thinking" pulse — a subtle SIZE pulse (scale), not the opacity fade of Tailwind's
+   animate-pulse. Used on the Atlas AI mark while a response is being prepared. */
+@keyframes ai-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.18);
+  }
+}
+.animate-ai-pulse {
+  animation: ai-pulse 1.1s ease-in-out infinite;
+}
