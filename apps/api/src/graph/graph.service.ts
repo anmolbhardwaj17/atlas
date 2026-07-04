@@ -298,191 +298,202 @@ export class GraphService {
     // contribution + repo activity (open or merged); a PR opened long ago doesn't count as
     // recent activity. ISO strings sort chronologically → a lexicographic >= is a correct filter.
     const prSince = new Date(Date.now() - 30 * 86400 * 1000).toISOString();
-    const base = await withOrgScope(this.db, orgId, async (c) => {
-      const [
-        cats,
-        meta,
-        edgeCount,
-        conns,
-        cross,
-        blast,
-        stale,
-        codeCounts,
-        noPipeline,
-        emptyProjects,
-        contributors,
-        mostActiveRepos,
-        vulnSeverity,
-        topVulnPkg,
-        sprawl,
-      ] = await Promise.all([
-        c.query<{ category: string; n: number }>(
-          `SELECT nk.category, count(*)::int AS n
-             FROM nodes nd JOIN node_kinds nk ON nk.kind = nd.kind
-            WHERE nd.status <> 'deleted' GROUP BY nk.category`,
-        ),
-        // Minimal columns for env inference + distinct clouds/accounts (bounded).
-        c.query<{
-          name: string | null;
-          urn: string;
-          provider: string;
-          account_ref: string | null;
-          tags: Record<string, unknown>;
-          attributes: Record<string, unknown>;
-        }>(
-          `SELECT name, urn, provider, account_ref, tags, attributes
-             FROM nodes WHERE status <> 'deleted' LIMIT 5000`,
-        ),
-        c.query<{ n: number }>("SELECT count(*)::int AS n FROM edges WHERE status = 'active'"),
-        c.query<{
-          id: string;
-          provider: string;
-          display_name: string;
-          status: string;
-          last_synced_at: Date | null;
-        }>(
-          `SELECT id, provider, display_name, status, last_synced_at
-             FROM connections WHERE deleted_at IS NULL ORDER BY created_at`,
-        ),
-        // Cross-boundary edges (cloud→cloud spanning a provider or account boundary).
-        c.query<{ pf: string; af: string | null; pt: string; at2: string | null }>(
-          `SELECT split_part(nf.urn, ':', 1) AS pf, nf.account_ref AS af,
-                  split_part(nt.urn, ':', 1) AS pt, nt.account_ref AS at2
-             FROM edges e
-             JOIN nodes nf ON nf.id = e.from_node_id
-             JOIN nodes nt ON nt.id = e.to_node_id
-            WHERE e.status = 'active'
-              AND split_part(nf.urn, ':', 1) IN ('aws','azure','gcp')
-              AND split_part(nt.urn, ':', 1) IN ('aws','azure','gcp')
-              AND (split_part(nf.urn, ':', 1) <> split_part(nt.urn, ':', 1)
-                   OR (nf.account_ref IS NOT NULL AND nt.account_ref IS NOT NULL
-                       AND nf.account_ref <> nt.account_ref))`,
-        ),
-        // Highest in-degree over impact edges - the biggest single point of failure.
-        c.query<{ id: string; name: string | null; kind: string; deg: number }>(
-          `SELECT e.to_node_id AS id, nd.name, nd.kind, count(*)::int AS deg
-             FROM edges e JOIN nodes nd ON nd.id = e.to_node_id
-            WHERE e.status = 'active' AND e.type = ANY($1)
-            GROUP BY e.to_node_id, nd.name, nd.kind
-            ORDER BY deg DESC LIMIT 1`,
-          [impact],
-        ),
-        c.query<{ n: number }>("SELECT count(*)::int AS n FROM nodes WHERE status = 'stale'"),
-        // Code inventory (repos / projects / pipelines / people / PRs) - makes the dashboard
-        // meaningful for a code-heavy org, not just cloud infra.
-        c.query<{
-          repositories: number;
-          projects: number;
-          pipelines: number;
-          contributors: number;
-          pull_requests: number;
-        }>(
-          `SELECT
-             count(*) FILTER (WHERE kind LIKE '%.repository')::int AS repositories,
-             count(*) FILTER (WHERE kind LIKE '%.project')::int AS projects,
-             count(*) FILTER (WHERE kind LIKE '%.pipeline' OR kind LIKE '%.workflow')::int AS pipelines,
-             count(*) FILTER (WHERE kind LIKE '%.user' OR kind LIKE '%.team')::int AS contributors,
-             count(*) FILTER (
-               WHERE (kind LIKE '%.pullrequest' OR kind LIKE '%.pull_request')
-                 AND (attributes->>'state' IS NULL OR attributes->>'state' = 'OPEN')
-             )::int AS pull_requests
-           FROM nodes WHERE status <> 'deleted'`,
-        ),
-        // Repos with no CI/CD pipeline (no CONTAINS→pipeline) - a hygiene finding.
-        c.query<{ n: number }>(
-          `SELECT count(*)::int AS n FROM nodes r
-            WHERE r.kind LIKE '%.repository' AND r.status <> 'deleted'
-              AND NOT EXISTS (
-                SELECT 1 FROM edges e JOIN nodes p ON p.id = e.to_node_id
-                 WHERE e.from_node_id = r.id AND e.type = 'CONTAINS'
-                   AND (p.kind LIKE '%.pipeline' OR p.kind LIKE '%.workflow'))`,
-        ),
-        // Projects that contain no repositories.
-        c.query<{ n: number }>(
-          `SELECT count(*)::int AS n FROM nodes pr
-            WHERE pr.kind LIKE '%.project' AND pr.status <> 'deleted'
-              AND NOT EXISTS (
-                SELECT 1 FROM edges e JOIN nodes r ON r.id = e.to_node_id
-                 WHERE e.from_node_id = pr.id AND e.type = 'CONTAINS'
-                   AND r.kind LIKE '%.repository')`,
-        ),
-        // Top contributors by PRs raised (open + merged) in the last 90 days.
-        c.query<{ name: string | null; n: number }>(
-          `SELECT u.name, count(*)::int AS n
-             FROM edges e
-             JOIN nodes pr ON pr.id = e.from_node_id AND pr.kind LIKE '%.pullrequest'
-               AND pr.attributes->>'createdOn' >= $1
-             JOIN nodes u ON u.id = e.to_node_id AND (u.kind LIKE '%.user' OR u.kind LIKE '%.team')
-            WHERE e.type = 'OWNED_BY' AND e.status = 'active'
-            GROUP BY u.name ORDER BY n DESC, u.name LIMIT 5`,
-          [prSince],
-        ),
-        // Most active repositories by PRs raised (open + merged) in the last 90 days.
-        c.query<{ name: string | null; n: number }>(
-          `SELECT r.name, count(*)::int AS n
-             FROM edges e
-             JOIN nodes r ON r.id = e.from_node_id AND r.kind LIKE '%.repository'
-             JOIN nodes pr ON pr.id = e.to_node_id AND pr.kind LIKE '%.pullrequest'
-               AND pr.attributes->>'createdOn' >= $1
-            WHERE e.type = 'CONTAINS' AND e.status = 'active'
-            GROUP BY r.name ORDER BY n DESC, r.name LIMIT 5`,
-          [prSince],
-        ),
-        // ── Dependency intelligence (docs/plans/security-vulnerabilities.md) ──────
-        // Known vulnerabilities by severity + how many distinct packages they hit.
-        c.query<{ severity: string | null; vulns: number; packages: number }>(
-          `SELECT v.attributes->>'severity' AS severity,
-                  count(DISTINCT v.id)::int AS vulns,
-                  count(DISTINCT a.to_node_id)::int AS packages
-             FROM nodes v
-             JOIN edges a ON a.from_node_id = v.id AND a.type = 'AFFECTS' AND a.status = 'active'
-            WHERE v.kind = 'security.vulnerability' AND v.status <> 'deleted'
-            GROUP BY v.attributes->>'severity'`,
-        ),
-        // Blast radius: the vulnerable package used by the most repositories - one upgrade,
-        // many repos fixed. `worst` is the highest severity among the vulns affecting it.
-        c.query<{
-          id: string;
-          name: string | null;
-          ecosystem: string | null;
-          vulns: number;
-          repos: number;
-          worst_rank: number;
-        }>(
-          `SELECT pkg.id, pkg.name, pkg.attributes->>'ecosystem' AS ecosystem,
-                  count(DISTINCT v.id)::int AS vulns,
-                  count(DISTINCT dep.from_node_id)::int AS repos,
-                  min(CASE v.attributes->>'severity'
-                        WHEN 'critical' THEN 0 WHEN 'high' THEN 1
-                        WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END) AS worst_rank
-             FROM nodes pkg
-             JOIN edges a ON a.to_node_id = pkg.id AND a.type = 'AFFECTS' AND a.status = 'active'
-             JOIN nodes v ON v.id = a.from_node_id AND v.kind = 'security.vulnerability'
-             LEFT JOIN edges dep ON dep.to_node_id = pkg.id
-                   AND dep.type = 'DEPENDS_ON_PKG' AND dep.status = 'active'
-            WHERE pkg.kind = 'external.package' AND pkg.status <> 'deleted'
-            GROUP BY pkg.id, pkg.name, pkg.attributes->>'ecosystem'
-            ORDER BY repos DESC, vulns DESC LIMIT 1`,
-        ),
-        // Dependency sprawl: one package pinned to many different versions across repos - an
-        // inconsistency + a harder single upgrade path. The per-repo version lives in the
-        // DEPENDS_ON_PKG edge's provenance evidence (edges carry no attributes column, docs/05).
-        c.query<{ id: string; name: string | null; versions: number; repos: number }>(
-          `SELECT pkg.id, pkg.name,
-                  count(DISTINCT pv.evidence->>'version')::int AS versions,
-                  count(DISTINCT dep.from_node_id)::int AS repos
-             FROM nodes pkg
-             JOIN edges dep ON dep.to_node_id = pkg.id
-                   AND dep.type = 'DEPENDS_ON_PKG' AND dep.status = 'active'
-             JOIN provenance pv ON pv.id = dep.provenance_id
-            WHERE pkg.kind = 'external.package' AND pkg.status <> 'deleted'
-              AND pv.evidence->>'version' IS NOT NULL
-            GROUP BY pkg.id, pkg.name
-           HAVING count(DISTINCT pv.evidence->>'version') >= 3
-            ORDER BY versions DESC LIMIT 1`,
-        ),
-      ]);
+    // Fan the dashboard's independent aggregates across three org-scoped connections. A single
+    // pooled client runs queries one-at-a-time (node-postgres serialises on a connection), so ~15
+    // sequential round-trips to a remote DB cost seconds; three parallel scopes cut wall-time ~3x.
+    // Each scope sets its own atlas.current_org GUC — RLS still enforces isolation (R8).
+    const scope = <T>(fn: (c: PoolClient) => Promise<T>): Promise<T> =>
+      withOrgScope(this.db, orgId, fn);
+    const [grpInventory, grpTopology, grpPeopleVulns] = await Promise.all([
+      scope(async (c) => {
+        const [cats, meta, edgeCount, codeCounts, stale] = await Promise.all([
+          c.query<{ category: string; n: number }>(
+            `SELECT nk.category, count(*)::int AS n
+               FROM nodes nd JOIN node_kinds nk ON nk.kind = nd.kind
+              WHERE nd.status <> 'deleted' GROUP BY nk.category`,
+          ),
+          // Minimal columns for env inference + distinct clouds/accounts (bounded).
+          c.query<{
+            name: string | null;
+            urn: string;
+            provider: string;
+            account_ref: string | null;
+            tags: Record<string, unknown>;
+            attributes: Record<string, unknown>;
+          }>(
+            `SELECT name, urn, provider, account_ref, tags, attributes
+               FROM nodes WHERE status <> 'deleted' LIMIT 5000`,
+          ),
+          c.query<{ n: number }>("SELECT count(*)::int AS n FROM edges WHERE status = 'active'"),
+          // Code inventory (repos / projects / pipelines / people / PRs) - makes the dashboard
+          // meaningful for a code-heavy org, not just cloud infra.
+          c.query<{
+            repositories: number;
+            projects: number;
+            pipelines: number;
+            contributors: number;
+            pull_requests: number;
+          }>(
+            `SELECT
+               count(*) FILTER (WHERE kind LIKE '%.repository')::int AS repositories,
+               count(*) FILTER (WHERE kind LIKE '%.project')::int AS projects,
+               count(*) FILTER (WHERE kind LIKE '%.pipeline' OR kind LIKE '%.workflow')::int AS pipelines,
+               count(*) FILTER (WHERE kind LIKE '%.user' OR kind LIKE '%.team')::int AS contributors,
+               count(*) FILTER (
+                 WHERE (kind LIKE '%.pullrequest' OR kind LIKE '%.pull_request')
+                   AND (attributes->>'state' IS NULL OR attributes->>'state' = 'OPEN')
+               )::int AS pull_requests
+             FROM nodes WHERE status <> 'deleted'`,
+          ),
+          c.query<{ n: number }>("SELECT count(*)::int AS n FROM nodes WHERE status = 'stale'"),
+        ]);
+        return { cats, meta, edgeCount, codeCounts, stale };
+      }),
+      scope(async (c) => {
+        const [conns, cross, blast, noPipeline, emptyProjects] = await Promise.all([
+          c.query<{
+            id: string;
+            provider: string;
+            display_name: string;
+            status: string;
+            last_synced_at: Date | null;
+          }>(
+            `SELECT id, provider, display_name, status, last_synced_at
+               FROM connections WHERE deleted_at IS NULL ORDER BY created_at`,
+          ),
+          // Cross-boundary edges (cloud→cloud spanning a provider or account boundary).
+          c.query<{ pf: string; af: string | null; pt: string; at2: string | null }>(
+            `SELECT split_part(nf.urn, ':', 1) AS pf, nf.account_ref AS af,
+                    split_part(nt.urn, ':', 1) AS pt, nt.account_ref AS at2
+               FROM edges e
+               JOIN nodes nf ON nf.id = e.from_node_id
+               JOIN nodes nt ON nt.id = e.to_node_id
+              WHERE e.status = 'active'
+                AND split_part(nf.urn, ':', 1) IN ('aws','azure','gcp')
+                AND split_part(nt.urn, ':', 1) IN ('aws','azure','gcp')
+                AND (split_part(nf.urn, ':', 1) <> split_part(nt.urn, ':', 1)
+                     OR (nf.account_ref IS NOT NULL AND nt.account_ref IS NOT NULL
+                         AND nf.account_ref <> nt.account_ref))`,
+          ),
+          // Highest in-degree over impact edges - the biggest single point of failure.
+          c.query<{ id: string; name: string | null; kind: string; deg: number }>(
+            `SELECT e.to_node_id AS id, nd.name, nd.kind, count(*)::int AS deg
+               FROM edges e JOIN nodes nd ON nd.id = e.to_node_id
+              WHERE e.status = 'active' AND e.type = ANY($1)
+              GROUP BY e.to_node_id, nd.name, nd.kind
+              ORDER BY deg DESC LIMIT 1`,
+            [impact],
+          ),
+          // Repos with no CI/CD pipeline (no CONTAINS→pipeline) - a hygiene finding.
+          c.query<{ n: number }>(
+            `SELECT count(*)::int AS n FROM nodes r
+              WHERE r.kind LIKE '%.repository' AND r.status <> 'deleted'
+                AND NOT EXISTS (
+                  SELECT 1 FROM edges e JOIN nodes p ON p.id = e.to_node_id
+                   WHERE e.from_node_id = r.id AND e.type = 'CONTAINS'
+                     AND (p.kind LIKE '%.pipeline' OR p.kind LIKE '%.workflow'))`,
+          ),
+          // Projects that contain no repositories.
+          c.query<{ n: number }>(
+            `SELECT count(*)::int AS n FROM nodes pr
+              WHERE pr.kind LIKE '%.project' AND pr.status <> 'deleted'
+                AND NOT EXISTS (
+                  SELECT 1 FROM edges e JOIN nodes r ON r.id = e.to_node_id
+                   WHERE e.from_node_id = pr.id AND e.type = 'CONTAINS'
+                     AND r.kind LIKE '%.repository')`,
+          ),
+        ]);
+        return { conns, cross, blast, noPipeline, emptyProjects };
+      }),
+      scope(async (c) => {
+        const [contributors, mostActiveRepos, vulnSeverity, topVulnPkg, sprawl] = await Promise.all(
+          [
+            // Top contributors by PRs raised (open + merged) in the last 90 days.
+            c.query<{ name: string | null; n: number }>(
+              `SELECT u.name, count(*)::int AS n
+               FROM edges e
+               JOIN nodes pr ON pr.id = e.from_node_id AND pr.kind LIKE '%.pullrequest'
+                 AND pr.attributes->>'createdOn' >= $1
+               JOIN nodes u ON u.id = e.to_node_id AND (u.kind LIKE '%.user' OR u.kind LIKE '%.team')
+              WHERE e.type = 'OWNED_BY' AND e.status = 'active'
+              GROUP BY u.name ORDER BY n DESC, u.name LIMIT 5`,
+              [prSince],
+            ),
+            // Most active repositories by PRs raised (open + merged) in the last 90 days.
+            c.query<{ name: string | null; n: number }>(
+              `SELECT r.name, count(*)::int AS n
+               FROM edges e
+               JOIN nodes r ON r.id = e.from_node_id AND r.kind LIKE '%.repository'
+               JOIN nodes pr ON pr.id = e.to_node_id AND pr.kind LIKE '%.pullrequest'
+                 AND pr.attributes->>'createdOn' >= $1
+              WHERE e.type = 'CONTAINS' AND e.status = 'active'
+              GROUP BY r.name ORDER BY n DESC, r.name LIMIT 5`,
+              [prSince],
+            ),
+            // ── Dependency intelligence (docs/plans/security-vulnerabilities.md) ──────
+            // Known vulnerabilities by severity + how many distinct packages they hit.
+            c.query<{ severity: string | null; vulns: number; packages: number }>(
+              `SELECT v.attributes->>'severity' AS severity,
+                    count(DISTINCT v.id)::int AS vulns,
+                    count(DISTINCT a.to_node_id)::int AS packages
+               FROM nodes v
+               JOIN edges a ON a.from_node_id = v.id AND a.type = 'AFFECTS' AND a.status = 'active'
+              WHERE v.kind = 'security.vulnerability' AND v.status <> 'deleted'
+              GROUP BY v.attributes->>'severity'`,
+            ),
+            // Blast radius: the vulnerable package used by the most repositories - one upgrade,
+            // many repos fixed. `worst_rank` is the highest severity among the vulns affecting it.
+            c.query<{
+              id: string;
+              name: string | null;
+              ecosystem: string | null;
+              vulns: number;
+              repos: number;
+              worst_rank: number;
+            }>(
+              `SELECT pkg.id, pkg.name, pkg.attributes->>'ecosystem' AS ecosystem,
+                    count(DISTINCT v.id)::int AS vulns,
+                    count(DISTINCT dep.from_node_id)::int AS repos,
+                    min(CASE v.attributes->>'severity'
+                          WHEN 'critical' THEN 0 WHEN 'high' THEN 1
+                          WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END) AS worst_rank
+               FROM nodes pkg
+               JOIN edges a ON a.to_node_id = pkg.id AND a.type = 'AFFECTS' AND a.status = 'active'
+               JOIN nodes v ON v.id = a.from_node_id AND v.kind = 'security.vulnerability'
+               LEFT JOIN edges dep ON dep.to_node_id = pkg.id
+                     AND dep.type = 'DEPENDS_ON_PKG' AND dep.status = 'active'
+              WHERE pkg.kind = 'external.package' AND pkg.status <> 'deleted'
+              GROUP BY pkg.id, pkg.name, pkg.attributes->>'ecosystem'
+              ORDER BY repos DESC, vulns DESC LIMIT 1`,
+            ),
+            // Dependency sprawl: one package pinned to many different versions across repos - an
+            // inconsistency + a harder single upgrade path. The per-repo version lives in the
+            // DEPENDS_ON_PKG edge's provenance evidence (edges carry no attributes column, docs/05).
+            c.query<{ id: string; name: string | null; versions: number; repos: number }>(
+              `SELECT pkg.id, pkg.name,
+                    count(DISTINCT pv.evidence->>'version')::int AS versions,
+                    count(DISTINCT dep.from_node_id)::int AS repos
+               FROM nodes pkg
+               JOIN edges dep ON dep.to_node_id = pkg.id
+                     AND dep.type = 'DEPENDS_ON_PKG' AND dep.status = 'active'
+               JOIN provenance pv ON pv.id = dep.provenance_id
+              WHERE pkg.kind = 'external.package' AND pkg.status <> 'deleted'
+                AND pv.evidence->>'version' IS NOT NULL
+              GROUP BY pkg.id, pkg.name
+             HAVING count(DISTINCT pv.evidence->>'version') >= 3
+              ORDER BY versions DESC LIMIT 1`,
+            ),
+          ],
+        );
+        return { contributors, mostActiveRepos, vulnSeverity, topVulnPkg, sprawl };
+      }),
+    ]);
 
+    const { cats, meta, edgeCount, codeCounts, stale } = grpInventory;
+    const { conns, cross, blast, noPipeline, emptyProjects } = grpTopology;
+    const { contributors, mostActiveRepos, vulnSeverity, topVulnPkg, sprawl } = grpPeopleVulns;
+
+    const base = (() => {
       const code = codeCounts.rows[0];
       const catN = (names: string[]): number =>
         cats.rows.filter((r) => names.includes(r.category)).reduce((s, r) => s + r.n, 0);
@@ -537,7 +548,7 @@ export class GraphService {
         topVulnPkg: topVulnPkg.rows[0] ?? null,
         sprawl: sprawl.rows[0] ?? null,
       };
-    });
+    })();
 
     // ── Findings (severity-ranked, cited) ──────────────────────────────────────
     const findings: Finding[] = [];
