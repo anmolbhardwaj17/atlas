@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AtlasLogo } from "@/components/brand";
 
 /** Sign-in screen (docs/09 login, docs/12 §2.1). One button → Supabase-hosted
  *  Google OAuth. Supabase redirects to /auth/callback to complete the session. */
@@ -29,9 +30,7 @@ export default function LoginPage() {
     <main className="grid min-h-dvh place-items-center bg-muted/40 p-6">
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center text-center">
-          <div className="mb-2 grid size-11 place-items-center rounded-xl bg-primary text-lg font-bold text-primary-foreground">
-            A
-          </div>
+          <AtlasLogo size={44} className="mb-2 size-11" />
           <CardTitle className="text-xl">Welcome to Atlas</CardTitle>
           <CardDescription>Engineering Intelligence Platform</CardDescription>
         </CardHeader>

@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Send, Sparkles } from "lucide-react";
+import { Send } from "lucide-react";
 import { ConfidenceBadge } from "@/components/certainty";
+import { AtlasAiMark } from "@/components/brand";
 import { createConversation, getConversation, streamAsk, type AskEvent } from "@/lib/browser-api";
 
 interface Citation {
   number: number;
-  kind: "node" | "edge";
+  kind: "node" | "edge" | "computed";
   id: string;
   confidence: string | null;
 }
@@ -233,9 +234,7 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
   const honest = message.confidence === "insufficient";
   return (
     <div className="flex gap-3">
-      <div className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md bg-card text-primary">
-        <Sparkles size={14} />
-      </div>
+      <AtlasAiMark size={24} className="mt-0.5 size-6 shrink-0" />
       <div className="min-w-0 flex-1 space-y-2">
         {message.error ? (
           <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
@@ -276,7 +275,13 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
             {message.citations.map((c) => (
               <Link
                 key={`${c.kind}-${c.number}`}
-                href={c.kind === "edge" ? `/explore/edge/${c.id}` : `/explore/${c.id}`}
+                href={
+                  c.kind === "computed"
+                    ? "/dashboard"
+                    : c.kind === "edge"
+                      ? `/explore/edge/${c.id}`
+                      : `/explore/${c.id}`
+                }
                 className="inline-flex items-center gap-1 rounded-sm bg-primary/15 px-1.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/25"
                 title={`Source ${c.number}${c.confidence ? ` · ${c.confidence}` : ""}`}
               >
@@ -310,8 +315,8 @@ function EmptyState({
   const questions = suggestions.length > 0 ? suggestions : FALLBACK_EXAMPLES;
   return (
     <div className="py-8">
-      <div className="mb-3 flex items-center gap-2 text-foreground">
-        <Sparkles size={18} className="text-primary" />
+      <div className="mb-3 flex items-center gap-1.5 text-foreground">
+        <AtlasAiMark size={24} className="-ml-1 size-6 shrink-0" />
         <h2 className="text-lg font-semibold">Ask Atlas</h2>
       </div>
       <p className="max-w-lg text-sm text-muted-foreground">

@@ -7,13 +7,13 @@ import {
   LayoutDashboard,
   Boxes,
   Waypoints,
-  Sparkles,
   Plug,
   Settings,
   ChevronsUpDown,
   LogOut,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { AtlasLogo, AtlasAiMark } from "@/components/brand";
 import {
   Sidebar,
   SidebarContent,
@@ -55,7 +55,8 @@ const NAV = [
     icon: Boxes,
     match: (p: string) => p.startsWith("/explore"),
   },
-  { href: "/ask", label: "Ask AI", icon: Sparkles, match: (p: string) => p.startsWith("/ask") },
+  // Ask AI carries its own brand mark (the green sphere), not a lucide glyph.
+  { href: "/ask", label: "Ask AI", icon: null, match: (p: string) => p.startsWith("/ask") },
   {
     href: "/integrations",
     label: "Integrations",
@@ -88,9 +89,7 @@ export function AppSidebar({ orgName, email }: { orgName: string; email: string 
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/dashboard">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-                  A
-                </div>
+                <AtlasLogo size={32} spin className="size-8 shrink-0" />
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">Atlas</span>
                   <span className="truncate text-xs text-muted-foreground">{orgName}</span>
@@ -110,7 +109,7 @@ export function AppSidebar({ orgName, email }: { orgName: string; email: string 
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton asChild isActive={item.match(pathname)} tooltip={item.label}>
                     <Link href={item.href}>
-                      <item.icon />
+                      {item.icon ? <item.icon /> : <AtlasAiMark size={16} className="size-4" />}
                       <span>{item.label}</span>
                     </Link>
                   </SidebarMenuButton>

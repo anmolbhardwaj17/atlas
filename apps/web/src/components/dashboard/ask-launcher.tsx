@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { AtlasAiMark } from "@/components/brand";
 
 /**
  * The "Ask Atlas" hero (docs/09 §5.2) - the AI is the interface (P1), so the home invites a
@@ -32,10 +33,8 @@ export function AskLauncher() {
         aria-hidden
       />
       <div className="relative">
-        <div className="mb-1.5 flex items-center gap-2.5">
-          <span className="grid size-7 place-items-center rounded-lg bg-primary/10 text-primary">
-            <Sparkles className="size-4" />
-          </span>
+        <div className="mb-1.5 flex items-center gap-1.5">
+          <AtlasAiMark size={26} className="-ml-1 size-[26px] shrink-0" />
           <h2 className="text-base font-semibold">Ask Atlas</h2>
         </div>
         <p className="mb-4 max-w-xl text-sm text-muted-foreground">
