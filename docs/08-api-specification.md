@@ -373,7 +373,10 @@ The heart of the read API. All responses carry **provenance + confidence** (AP-4
 { "message":"What breaks if the checkout-processor Lambda is deleted?" }
 ```
 ```
-// SSE stream (event: token | citation | confidence | retrieval | done | error)
+// SSE stream (event: retrieval_step | retrieval | token | citation | confidence | done | error)
+event: retrieval_step
+data: {"hop":1,"tool":"search","summary":"3 candidate(s): orders-db (aws.rds.instance) [n1]…"}
+
 event: retrieval
 data: {"nodesConsidered":12,"traversals":["blast-radius:node_lam_77"]}
 
@@ -393,7 +396,9 @@ data: {"overall":"inferred-high","caveats":["eu-west-1/rds scope is stale since 
 event: done
 data: {"messageId":"msg_77...","citations":4}
 ```
-> The AI response **must** carry `citation` + `confidence` events (FR-6.2/6.3, P4/P3); on insufficient grounding it streams an honest-absence message (US-11) and `confidence: insufficient`, never fabricates. Contract detail in `10`.
+> The AI response **must** carry `citation` + `confidence` events (FR-6.2/6.3, P4/P3); on insufficient grounding it streams an honest-absence message (US-11) and `confidence: insufficient`, never fabricates. Contract detail in `10`. `retrieval_step` events (the agentic loop's "show your work", FR-6.7) stream the tool calls the model made to gather context.
+>
+> **WebSocket transport (`GET /ai/ws`, DD-P1-5).** The same answer-event union is also served over a WebSocket — the live conversation channel (REST stays for CRUD). It adds **cancellation** (`{t:"cancel"}` aborts the tool-loop + LLM server-side, not just the client read) and smoother multi-event streaming for the agentic loop. Auth is a first frame `{t:"auth", token, orgId}` (never in the URL; verified by the same JWT verifier + membership check as the guards, R8); origin pinned to `WEB_ORIGIN`; ping/pong heartbeat. Client message: `{t:"ask", conversationId, message}`. The web client tries WS and falls back to this SSE endpoint if the socket can't connect. Design: `docs/plans/ai-knowledge-engine-p1-design.md` §9.1.
 
 ### 10.3 Timeline — "what changed" (US-5)
 | Method | Path | Purpose |
@@ -545,7 +550,7 @@ flowchart LR
 
 - **OQ-API-1** Active-org via header (`X-Atlas-Org`) vs path (`/orgs/{id}/...`) for *data* endpoints — current: header for data, path for org-management. Revisit if public API lands.
 - **OQ-API-2** Public/partner API + API keys + GraphQL — Phase-1+ (`00` roadmap, A35).
-- **OQ-API-3** SSE vs WebSocket for AI if bidirectional features arrive (`02` OQ-ARCH-5) — SSE for MVP.
+- **OQ-API-3** ~~SSE vs WebSocket for AI if bidirectional features arrive~~ — **RESOLVED (DD-P1-5):** both. SSE remains the simple/fallback path; a WebSocket (`/ai/ws`) is the live conversation channel once bidirectional needs arrived (cancel/interrupt for the agentic loop). See §10.2 + `docs/plans/ai-knowledge-engine-p1-design.md` §9.1.
 - **OQ-API-4** Whether `/timeline` is a distinct endpoint or a view over `/nodes`+`/ai` retrieval — kept distinct for caching (revisit with `09`).
 - **OQ-API-5** Rate-limit tiers per plan (`18`) — set with pricing.
 
