@@ -3,12 +3,12 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Send, Check, Square } from "lucide-react";
-import { ConfidenceBadge } from "@/components/certainty";
 import { AtlasAiMark } from "@/components/brand";
 import { createConversation, getConversation, streamAskWS, type AskEvent } from "@/lib/browser-api";
 
 interface Citation {
   number: number;
+  marker: string;
   kind: "node" | "edge" | "computed";
   id: string;
   confidence: string | null;
@@ -24,7 +24,16 @@ interface ChatMessage {
   phase: "searching" | "thinking" | "answering";
   /** Live "show your work" trace of the agentic retrieval loop's tool calls. */
   steps: string[];
+  /** True for a live-streamed turn (→ typewriter); false for a reopened/persisted turn (instant). */
+  live: boolean;
   error: string | null;
+}
+
+/** Deep-link a citation to its evidence, by kind. */
+function citationHref(c: Citation): string {
+  if (c.kind === "computed") return "/dashboard";
+  if (c.kind === "edge") return `/explore/edge/${c.id}`;
+  return `/explore/${c.id}`;
 }
 
 /** Friendly label for a retrieval tool (the agentic loop's "show your work" trace). */
@@ -107,6 +116,7 @@ export function AskChat({
             streaming: false,
             phase: "answering",
             steps: [],
+            live: false,
             error: null,
           })),
         );
@@ -135,6 +145,7 @@ export function AskChat({
         streaming: false,
         phase: "answering",
         steps: [],
+        live: false,
         error: null,
       },
       {
@@ -146,6 +157,7 @@ export function AskChat({
         streaming: true,
         phase: "searching",
         steps: [],
+        live: true,
         error: null,
       },
     ]);
@@ -286,6 +298,7 @@ function applyEvent(ev: AskEvent, patch: (fn: (m: ChatMessage) => ChatMessage) =
           ...m.citations,
           {
             number: ev.citation.number,
+            marker: ev.citation.marker,
             kind: ev.citation.kind,
             id: ev.citation.id,
             confidence: ev.citation.confidence,
@@ -307,7 +320,7 @@ function applyEvent(ev: AskEvent, patch: (fn: (m: ChatMessage) => ChatMessage) =
 function UserBubble({ text }: { text: string }) {
   return (
     <div className="flex justify-end">
-      <div className="max-w-[80%] rounded-lg bg-success px-3.5 py-2 text-sm text-white">
+      <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-foreground px-3.5 py-2 text-sm text-background">
         {text}
       </div>
     </div>
@@ -317,6 +330,7 @@ function UserBubble({ text }: { text: string }) {
 function AssistantBubble({ message }: { message: ChatMessage }) {
   const honest = message.confidence === "insufficient";
   const thinking = message.streaming && message.text.length === 0;
+  const citeByMarker = new Map(message.citations.map((c) => [c.marker, c]));
   return (
     <div className="flex gap-3">
       <AtlasAiMark
@@ -352,9 +366,14 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
           </p>
         ) : (
           <p
-            className={`whitespace-pre-wrap text-sm ${honest ? "text-muted-foreground" : "text-foreground"}`}
+            className={`whitespace-pre-wrap text-sm leading-relaxed ${honest ? "text-muted-foreground" : "text-foreground"}`}
           >
-            <TypewriterText text={cleanMarkers(message.text)} streaming={message.streaming} />
+            <TypewriterText
+              text={message.text}
+              live={message.live}
+              streaming={message.streaming}
+              cites={citeByMarker}
+            />
           </p>
         )}
 
@@ -368,65 +387,75 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
           </ul>
         )}
 
-        {(message.citations.length > 0 || (message.confidence && !message.streaming)) && (
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            {message.confidence && <ConfidenceBadge tier={message.confidence} />}
-            {message.citations.map((c) => (
-              <Link
-                key={`${c.kind}-${c.number}`}
-                href={
-                  c.kind === "computed"
-                    ? "/dashboard"
-                    : c.kind === "edge"
-                      ? `/explore/edge/${c.id}`
-                      : `/explore/${c.id}`
-                }
-                className="inline-flex items-center gap-1 rounded-sm bg-muted/60 px-1.5 py-0.5 text-xs font-normal text-muted-foreground hover:bg-muted hover:text-foreground"
-                title={`Source ${c.number}${c.confidence ? ` · ${c.confidence}` : ""}`}
-              >
-                [{c.number}]
-              </Link>
-            ))}
-          </div>
-        )}
+        {message.confidence && !message.streaming ? (
+          <TrustHint tier={message.confidence} sources={message.citations.length} />
+        ) : null}
       </div>
     </div>
   );
 }
 
-/** Strip raw citation markers ([A1]/[N2]/[E3]) from displayed text — they're binding metadata,
- *  rendered as numbered chips below, not meant to be read inline. */
-function cleanMarkers(text: string): string {
-  return text.replace(/\s?\[[NEA]\d+\]/g, "");
-}
-
-/** Render the model's light markdown inline: **bold** and `code`. Incomplete markers (mid-stream)
- *  stay literal until closed. Newlines/bullets are handled by the paragraph's whitespace-pre-wrap. */
-function renderMarkdown(text: string): ReactNode[] {
+/**
+ * Render the model's light markdown inline — **bold**, `code`, and citation markers ([A1]/[N2]/…)
+ * as small clickable superscript numbers tied to the exact claim (the "proper" way to cite, à la
+ * Perplexity). Incomplete markers mid-stream stay literal; a marker with no resolved citation yet
+ * (citations arrive after the tokens) is hidden until it resolves.
+ */
+function renderRich(text: string, cites: Map<string, Citation>): ReactNode[] {
   const out: ReactNode[] = [];
-  const re = /\*\*(.+?)\*\*|`([^`]+)`/g;
+  const re = /\*\*(.+?)\*\*|`([^`]+)`|\[([NEA]\d+)\]/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let key = 0;
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) out.push(text.slice(last, m.index));
-    if (m[1] !== undefined) out.push(<strong key={key++}>{m[1]}</strong>);
-    else
+    if (m[1] !== undefined) {
+      out.push(<strong key={key++}>{m[1]}</strong>);
+    } else if (m[2] !== undefined) {
       out.push(
         <code key={key++} className="rounded bg-muted px-1 py-0.5 text-[0.85em]">
           {m[2]}
         </code>,
       );
+    } else {
+      const c = cites.get(m[3] as string);
+      if (c) {
+        out.push(
+          <Link
+            key={key++}
+            href={citationHref(c)}
+            title={`Source ${c.number}${c.confidence ? ` · ${c.confidence}` : ""}`}
+            className="mx-px inline-flex h-3.5 min-w-3.5 items-center justify-center rounded bg-muted px-0.5 align-super text-[10px] font-medium text-muted-foreground transition-colors hover:bg-foreground hover:text-background"
+          >
+            {c.number}
+          </Link>,
+        );
+      }
+      // unresolved marker → hidden (dropped) until its citation arrives
+    }
     last = m.index + m[0].length;
   }
   if (last < text.length) out.push(text.slice(last));
   return out;
 }
 
-/** Smooth typewriter reveal that keeps pace with the stream (catch-up per tick), for a natural
- *  "AI typing" feel even when tokens arrive in bursts (e.g. over the WebSocket). */
-function TypewriterText({ text, streaming }: { text: string; streaming: boolean }) {
-  const [shown, setShown] = useState(() => (streaming ? 0 : text.length));
+/**
+ * Smooth typewriter reveal that keeps pace with the stream. Animates only for LIVE turns (`live`);
+ * reopened/persisted turns render instantly. Renders through `renderRich` so bold + inline
+ * citations appear as the text lands.
+ */
+function TypewriterText({
+  text,
+  live,
+  streaming,
+  cites,
+}: {
+  text: string;
+  live: boolean;
+  streaming: boolean;
+  cites: Map<string, Citation>;
+}) {
+  const [shown, setShown] = useState(() => (live ? 0 : text.length));
   useEffect(() => {
     if (shown >= text.length) return;
     const id = window.setInterval(() => {
@@ -441,9 +470,38 @@ function TypewriterText({ text, streaming }: { text: string; streaming: boolean 
   const caret = streaming || shown < text.length;
   return (
     <>
-      {renderMarkdown(text.slice(0, shown))}
+      {renderRich(text.slice(0, shown), cites)}
       {caret && <span className="ml-0.5 animate-pulse">▌</span>}
     </>
+  );
+}
+
+/**
+ * Quiet trust line (replaces the loud badge + floating chip row): a small colored dot + label, and
+ * a subtle source count. The brand green appears only as the tiny "observed" dot — not a full pill.
+ */
+const TRUST_FALLBACK = { dot: "bg-muted-foreground", label: "No grounded data" };
+const TRUST: Record<string, { dot: string; label: string }> = {
+  observed: { dot: "bg-success", label: "Observed" },
+  "inferred-high": { dot: "bg-warning", label: "Inferred" },
+  "inferred-low": { dot: "bg-warning", label: "Inferred · low confidence" },
+  advisory: { dot: "bg-primary", label: "Recommendation" },
+  insufficient: TRUST_FALLBACK,
+};
+function TrustHint({ tier, sources }: { tier: string; sources: number }) {
+  const t = TRUST[tier] ?? TRUST_FALLBACK;
+  return (
+    <div className="flex items-center gap-2 pt-0.5 text-xs text-muted-foreground">
+      <span className="inline-flex items-center gap-1.5">
+        <span className={`size-1.5 rounded-full ${t.dot}`} />
+        {t.label}
+      </span>
+      {sources > 0 ? (
+        <span className="text-muted-foreground/70">
+          · {sources} source{sources > 1 ? "s" : ""}
+        </span>
+      ) : null}
+    </div>
   );
 }
 

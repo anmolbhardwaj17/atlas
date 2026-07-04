@@ -270,6 +270,7 @@ export type AskEvent =
       type: "citation";
       citation: {
         number: number;
+        marker: string;
         kind: "node" | "edge" | "computed";
         id: string;
         confidence: string | null;
@@ -321,6 +322,7 @@ export interface ConversationMessage {
   content: string;
   citations: Array<{
     number: number;
+    marker: string;
     kind: "node" | "edge" | "computed";
     id: string;
     confidence: string | null;

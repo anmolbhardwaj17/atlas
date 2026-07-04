@@ -36,10 +36,8 @@ export function AskWorkspace({
   const [collapsed, setCollapsed] = useState(false);
 
   const chatKey = conversationId ?? `new-${epoch}`;
-  // Pin the conversation you're currently in above a "Recent" divider; the rest are history.
-  const active = highlightId ? conversations.find((c) => c.id === highlightId) : undefined;
-  const past = conversations.filter((c) => c.id !== highlightId);
 
+  // Conversation row — highlighted in place when it's the one you're viewing (not pinned to top).
   const row = (c: ConversationSummary) => (
     <button
       key={c.id}
@@ -137,23 +135,16 @@ export function AskWorkspace({
               <PanelLeftClose className="size-4" />
             </button>
           </div>
+          <div className="mb-1 flex items-center border-t border-border px-1 pb-1 pt-2">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Recent
+            </span>
+          </div>
           <div className="flex-1 space-y-0.5 overflow-y-auto">
-            {active ? (
-              <>
-                {row(active)}
-                <div className="my-2 flex items-center gap-2 px-1">
-                  <div className="h-px flex-1 bg-border" />
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Recent
-                  </span>
-                  <div className="h-px flex-1 bg-border" />
-                </div>
-              </>
-            ) : null}
-            {past.length === 0 && !active ? (
+            {conversations.length === 0 ? (
               <p className="px-2 py-4 text-xs text-muted-foreground">No conversations yet.</p>
             ) : (
-              past.map((c) => row(c))
+              conversations.map((c) => row(c))
             )}
           </div>
         </aside>
