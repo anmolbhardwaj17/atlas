@@ -134,8 +134,11 @@ The planner classifies the question into a **retrieval intent** and emits a plan
 | **Architecture** | "explain our architecture" (US-7) | service-centric subgraph (`08` `/graph/subgraph`) |
 | **Change/Timeline** | "what changed this week" (US-5) | `/timeline` window |
 | **Culprit** | "which PR caused…" (US-6) | `CHANGED_BY` edges in window, ranked |
+| **Estate** | "how many repos / top contributors / what needs attention" | whole-org aggregate snapshot (`estateOverview`) — counts, leaderboards, coverage, findings; rendered as **computed** facts (`A`-markers), not single nodes |
 | **Lookup/explore** | "how does checkout work / who owns it" (US-10) | hybrid search → node detail + neighbors + CODEOWNERS |
 | **Out-of-scope** | general knowledge / unconnected data | → honest-absence (US-11), no LLM fabrication |
+
+> **Estate intent (aggregate questions)** is the first slice of the **Agentic Graph-RAG** evolution (`docs/plans/ai-knowledge-engine.md` P0). Aggregate/ranking questions ("how many…", "top contributors", "most active…", "what needs attention") don't map to a single entity, so they resolve to a computed org snapshot reusing the dashboard aggregation (`GraphService.summary`) — Ask AI and the dashboard therefore report identical figures. These are **computed facts** (over many nodes), cited to the computation via `A`-markers (a third citation kind alongside node/edge), still grounded + confidence-tiered. Subsequent slices (P1) generalise this into a bounded tool-calling retrieval loop.
 
 **Entity resolution:** question mentions ("checkout-processor", "the orders database") are resolved to node ids via **hybrid search** (`11`) + exact URN/name match. Ambiguous mentions → the engine retrieves candidates and either disambiguates (asks) or narrates over the top candidates with citations (never silently picks one — mirrors `05` P3).
 
