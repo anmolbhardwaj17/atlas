@@ -55,8 +55,8 @@ const NAV = [
     icon: Boxes,
     match: (p: string) => p.startsWith("/explore"),
   },
-  // Ask AI carries its own brand mark (the green sphere), not a lucide glyph.
-  { href: "/ask", label: "Ask AI", icon: null, match: (p: string) => p.startsWith("/ask") },
+  // Ask Atlas carries its own brand mark (the green sphere), not a lucide glyph.
+  { href: "/ask", label: "Ask Atlas", icon: null, match: (p: string) => p.startsWith("/ask") },
   {
     href: "/integrations",
     label: "Integrations",

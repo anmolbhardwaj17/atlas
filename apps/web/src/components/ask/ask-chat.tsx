@@ -179,9 +179,19 @@ export function AskChat({
     }
   }, [initialQuestion, ask]);
 
+  // The current conversation's title = its first question (how createConversation titles it).
+  const title = messages.find((m) => m.role === "user")?.text;
+
   return (
     // Fill the workspace column so the input pins to the bottom.
     <div className="flex h-full min-h-[420px] flex-col">
+      {title ? (
+        <div className="mb-3 shrink-0 border-b border-border pb-2.5">
+          <h2 className="truncate text-sm font-semibold text-foreground" title={title}>
+            {title}
+          </h2>
+        </div>
+      ) : null}
       <div className="flex-1 space-y-5 overflow-y-auto pr-1">
         {messages.length === 0 ? (
           <EmptyState onPick={(q) => void ask(q)} suggestions={suggestions} />
@@ -280,7 +290,7 @@ function applyEvent(ev: AskEvent, patch: (fn: (m: ChatMessage) => ChatMessage) =
 function UserBubble({ text }: { text: string }) {
   return (
     <div className="flex justify-end">
-      <div className="max-w-[80%] rounded-lg bg-primary/15 px-3.5 py-2 text-sm text-foreground">
+      <div className="max-w-[80%] rounded-lg bg-foreground px-3.5 py-2 text-sm text-background">
         {text}
       </div>
     </div>
@@ -289,9 +299,13 @@ function UserBubble({ text }: { text: string }) {
 
 function AssistantBubble({ message }: { message: ChatMessage }) {
   const honest = message.confidence === "insufficient";
+  const thinking = message.streaming && message.text.length === 0;
   return (
     <div className="flex gap-3">
-      <AtlasAiMark size={24} className="mt-0.5 size-6 shrink-0" />
+      <AtlasAiMark
+        size={24}
+        className={`mt-0.5 size-6 shrink-0 ${thinking ? "animate-pulse" : ""}`}
+      />
       <div className="min-w-0 flex-1 space-y-2">
         {message.error ? (
           <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
@@ -323,8 +337,7 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
           <p
             className={`whitespace-pre-wrap text-sm ${honest ? "text-muted-foreground" : "text-foreground"}`}
           >
-            {message.text}
-            {message.streaming && <span className="ml-0.5 animate-pulse">▌</span>}
+            <TypewriterText text={cleanMarkers(message.text)} streaming={message.streaming} />
           </p>
         )}
 
@@ -361,6 +374,36 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
         )}
       </div>
     </div>
+  );
+}
+
+/** Strip raw citation markers ([A1]/[N2]/[E3]) from displayed text — they're binding metadata,
+ *  rendered as numbered chips below, not meant to be read inline. */
+function cleanMarkers(text: string): string {
+  return text.replace(/\s?\[[NEA]\d+\]/g, "");
+}
+
+/** Smooth typewriter reveal that keeps pace with the stream (catch-up per tick), for a natural
+ *  "AI typing" feel even when tokens arrive in bursts (e.g. over the WebSocket). */
+function TypewriterText({ text, streaming }: { text: string; streaming: boolean }) {
+  const [shown, setShown] = useState(() => (streaming ? 0 : text.length));
+  useEffect(() => {
+    if (shown >= text.length) return;
+    const id = window.setInterval(() => {
+      setShown((s) => {
+        const next = Math.min(text.length, s + Math.max(1, Math.ceil((text.length - s) / 10)));
+        if (next >= text.length) window.clearInterval(id);
+        return next;
+      });
+    }, 18);
+    return () => window.clearInterval(id);
+  }, [text]);
+  const caret = streaming || shown < text.length;
+  return (
+    <>
+      {text.slice(0, shown)}
+      {caret && <span className="ml-0.5 animate-pulse">▌</span>}
+    </>
   );
 }
 
