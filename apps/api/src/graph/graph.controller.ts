@@ -43,24 +43,24 @@ export class GraphController {
    * advisory knowledge pack's guidance (why it matters / how to fix). Proactive, personalized —
    * every card is a fact Atlas proves + best-practice guidance, and links into an Ask Atlas thread.
    */
+  /**
+   * Insights (Atlas Knowledge Engine) — the ADVISORY / action layer (distinct from the dashboard's
+   * status glance). Returns the graph's grounded findings enriched with the advisory knowledge
+   * pack's guidance (why/fix/pillar/source), plus an action-framed summary (severity counts +
+   * CI/CD coverage as an opportunity). Recomputed live, so it reflects the latest sync.
+   */
   @Get("insights")
   @Roles("Member")
   async insights(@Req() req: AuthedRequest): Promise<unknown> {
     const s = await this.graph.summary(org(req).id);
+    const bySeverity = { high: 0, medium: 0, low: 0 };
+    for (const f of s.findings) bySeverity[f.severity] += 1;
     return {
-      // Estate at a glance — live counts (recomputed each load, so it reflects the latest sync).
-      stats: {
-        repositories: s.inventory.repositories,
-        services: s.inventory.services,
-        datastores: s.inventory.datastores,
-        pipelines: s.inventory.pipelines,
-        contributors: s.inventory.contributors,
-        openPullRequests: s.inventory.pullRequests,
+      summary: {
+        total: s.findings.length,
+        ...bySeverity,
         pipelineCoverage: s.insights.pipelineCoverage,
-        crossBoundary: s.crossBoundary.crossCloud + s.crossBoundary.crossAccount,
       },
-      lastSyncAt: s.trust.lastSyncAt,
-      // Needs attention — grounded findings + best-practice guidance (advisory knowledge pack).
       findings: s.findings.map((f) => ({
         id: f.id,
         severity: f.severity,
@@ -71,11 +71,6 @@ export class GraphController {
         ...(f.count !== undefined ? { count: f.count } : {}),
         guidance: guidanceFor(f.category),
       })),
-      // Highlights — positive, informational leaderboards (always something to show).
-      highlights: {
-        topContributors: s.insights.topContributors,
-        mostActiveRepos: s.insights.mostActiveRepos,
-      },
     };
   }
 

@@ -185,10 +185,23 @@ function TrustPulse({ trust, inv }: { trust: Summary["trust"]; inv: Summary["inv
 }
 
 function NeedsAttention({ findings }: { findings: Finding[] }) {
+  // The dashboard only teases the top findings; the full advisory treatment (why/how‑to‑fix,
+  // Ask Atlas) lives in Insights.
+  const shown = findings.slice(0, 3);
   return (
     <Card>
       <CardContent className="p-5">
-        <h2 className="mb-3 text-base font-semibold">Needs attention</h2>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-base font-semibold">Needs attention</h2>
+          {findings.length > 0 ? (
+            <Link
+              href="/insights"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              View in Insights <ChevronRight className="size-3.5" />
+            </Link>
+          ) : null}
+        </div>
         {findings.length === 0 ? (
           <div className="flex items-center gap-3 rounded-md border border-border bg-muted/30 px-4 py-6 text-sm">
             <CheckCircle2 className="size-5 text-success" />
@@ -200,11 +213,21 @@ function NeedsAttention({ findings }: { findings: Finding[] }) {
             </div>
           </div>
         ) : (
-          <ul className="space-y-2">
-            {findings.map((f) => (
-              <FindingRow key={f.id} f={f} />
-            ))}
-          </ul>
+          <>
+            <ul className="space-y-2">
+              {shown.map((f) => (
+                <FindingRow key={f.id} f={f} />
+              ))}
+            </ul>
+            <Link
+              href="/insights"
+              className="mt-3 block text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {findings.length > shown.length
+                ? `+${findings.length - shown.length} more · see how to fix in Insights →`
+                : "See how to fix these in Insights →"}
+            </Link>
+          </>
         )}
       </CardContent>
     </Card>

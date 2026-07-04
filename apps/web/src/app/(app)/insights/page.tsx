@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 interface Finding {
   id: string;
-  severity: string;
+  severity: "high" | "medium" | "low";
   category: string;
   title: string;
   detail: string;
@@ -19,22 +19,14 @@ interface Finding {
   guidance: { why: string; fix: string; pillar: string; source: string } | null;
 }
 interface InsightsData {
-  stats: {
-    repositories: number;
-    services: number;
-    datastores: number;
-    pipelines: number;
-    contributors: number;
-    openPullRequests: number;
+  summary: {
+    total: number;
+    high: number;
+    medium: number;
+    low: number;
     pipelineCoverage: { withPipeline: number; total: number };
-    crossBoundary: number;
   };
-  lastSyncAt: string | null;
   findings: Finding[];
-  highlights: {
-    topContributors: Array<{ name: string; count: number }>;
-    mostActiveRepos: Array<{ name: string; count: number }>;
-  };
 }
 
 const PILLAR: Record<string, string> = {
@@ -45,11 +37,18 @@ const PILLAR: Record<string, string> = {
   hygiene: "Hygiene",
   operations: "Operations",
 };
+const SEV_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
+const SEV_DOT: Record<string, string> = {
+  high: "bg-danger",
+  medium: "bg-warning",
+  low: "bg-inferred-low",
+};
 
 /**
- * Insights (Atlas Knowledge Engine). Atlas's proactive surface: an estate-at-a-glance, the graph's
- * grounded findings paired with the advisory knowledge pack's guidance, and positive highlights.
- * All recomputed live from the latest sync, so new findings appear as the estate changes.
+ * Insights (Atlas Knowledge Engine) — the ADVISORY / action layer. Distinct from the dashboard
+ * (status glance): this is where you come to *improve*. Every grounded finding is paired with the
+ * knowledge pack's guidance (why it matters / how to fix / source) and opens an Ask Atlas advisory
+ * thread. Action‑framed, prioritised by severity.
  */
 export default async function InsightsPage() {
   const shell = await requireShell();
@@ -57,62 +56,73 @@ export default async function InsightsPage() {
     token: shell.token,
     orgId: shell.orgId,
   });
-  const data = res.body?.data;
-  const stats = data?.stats;
-  const findings = data?.findings ?? [];
-  const highlights = data?.highlights;
-  const coverage = stats?.pipelineCoverage;
-  const coveragePct =
-    coverage && coverage.total > 0 ? Math.round((coverage.withPipeline / coverage.total) * 100) : 0;
+  const summary = res.body?.data?.summary;
+  const findings = [...(res.body?.data?.findings ?? [])].sort(
+    (a, b) => (SEV_ORDER[a.severity] ?? 3) - (SEV_ORDER[b.severity] ?? 3),
+  );
+  const cov = summary?.pipelineCoverage;
+  const covPct = cov && cov.total > 0 ? Math.round((cov.withPipeline / cov.total) * 100) : null;
+  const covGap = cov ? cov.total - cov.withPipeline : 0;
 
   return (
-    <div className="w-full space-y-8">
+    <div className="w-full space-y-6">
       <header className="space-y-1">
         <h1 className="text-xl font-semibold">Insights</h1>
-        <p className="max-w-xl text-sm text-muted-foreground">
-          What Atlas sees across your estate — recomputed live from your latest sync. Grounded
-          findings with best-practice guidance, plus highlights. Ask Atlas to go deeper on anything.
+        <p className="max-w-2xl text-sm text-muted-foreground">
+          What to act on — grounded findings with best‑practice guidance on how to fix and optimise.
+          Recomputed live from your latest sync. Ask Atlas to go deeper on any of them.
         </p>
       </header>
 
-      {/* Estate at a glance */}
-      {stats ? (
-        <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          <StatTile label="Repositories" value={stats.repositories} />
-          <StatTile label="Services" value={stats.services} />
-          <StatTile label="Datastores" value={stats.datastores} />
-          <StatTile label="Pipelines" value={stats.pipelines} />
-          <StatTile label="Contributors" value={stats.contributors} />
-          <StatTile label="Open PRs" value={stats.openPullRequests} />
-          <StatTile
-            label="CI/CD coverage"
-            value={`${coveragePct}%`}
-            sub={`${stats.pipelineCoverage.withPipeline} of ${stats.pipelineCoverage.total} repos`}
-          />
-          <StatTile label="Cross-boundary" value={stats.crossBoundary} />
-        </section>
+      {/* Action-framed summary strip (not a status dump — the dashboard covers status). */}
+      {summary && (summary.total > 0 || covGap > 0) ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {summary.total > 0 ? (
+            <span className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm">
+              <span className="font-medium text-foreground">{summary.total} to act on</span>
+              <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                {summary.high > 0 ? <SevCount dot="bg-danger" n={summary.high} label="high" /> : null}
+                {summary.medium > 0 ? (
+                  <SevCount dot="bg-warning" n={summary.medium} label="medium" />
+                ) : null}
+                {summary.low > 0 ? (
+                  <SevCount dot="bg-inferred-low" n={summary.low} label="low" />
+                ) : null}
+              </span>
+            </span>
+          ) : null}
+          {covPct !== null && covGap > 0 ? (
+            <Link
+              href={`/ask?q=${encodeURIComponent("How do I improve my CI/CD pipeline coverage?")}`}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              CI/CD coverage{" "}
+              <span className="font-medium text-foreground">{covPct}%</span> · {covGap} repos to
+              cover <ArrowRight className="size-3.5" />
+            </Link>
+          ) : null}
+        </div>
       ) : null}
 
-      {/* Needs attention */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-foreground">
-          Needs attention{findings.length ? ` · ${findings.length}` : ""}
-        </h2>
-        {findings.length === 0 ? (
-          <Card>
-            <CardContent className="py-10 text-center">
-              <AtlasAiMark size={26} className="mx-auto mb-3 size-6" />
-              <p className="text-sm text-muted-foreground">
-                Nothing needs attention right now — the graph doesn&apos;t flag any issues.
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          findings.map((it) => (
+      {/* The findings — the core of the advisory layer. */}
+      {findings.length === 0 ? (
+        <Card>
+          <CardContent className="py-14 text-center">
+            <AtlasAiMark size={28} className="mx-auto mb-3 size-7" />
+            <p className="text-sm text-muted-foreground">
+              Nothing needs attention right now — the graph doesn&apos;t flag any issues. You&apos;re
+              in good shape.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {findings.map((it) => (
             <Card key={it.id}>
               <CardContent className="space-y-3 p-5">
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2">
+                    <span className={`size-2 rounded-full ${SEV_DOT[it.severity] ?? "bg-muted"}`} />
                     <SeverityBadge severity={it.severity} />
                     {it.guidance?.pillar ? (
                       <span className="text-xs text-muted-foreground">
@@ -157,83 +167,18 @@ export default async function InsightsPage() {
                 </div>
               </CardContent>
             </Card>
-          ))
-        )}
-      </section>
-
-      {/* Highlights */}
-      {highlights &&
-      (highlights.topContributors.length > 0 || highlights.mostActiveRepos.length > 0) ? (
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-foreground">Highlights</h2>
-          <div className="grid gap-3 md:grid-cols-2">
-            <Leaderboard
-              title="Top contributors"
-              sub="last 30 days · by PRs raised"
-              rows={highlights.topContributors}
-              unit="PRs"
-            />
-            <Leaderboard
-              title="Most active repositories"
-              sub="last 30 days · by PRs"
-              rows={highlights.mostActiveRepos}
-              unit="PRs"
-            />
-          </div>
-        </section>
-      ) : null}
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function StatTile({ label, value, sub }: { label: string; value: number | string; sub?: string }) {
+function SevCount({ dot, n, label }: { dot: string; n: number; label: string }) {
   return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="text-2xl font-semibold tabular-nums text-foreground">{value}</div>
-        <div className="mt-0.5 text-xs text-muted-foreground">{label}</div>
-        {sub ? <div className="mt-0.5 text-[11px] text-muted-foreground/70">{sub}</div> : null}
-      </CardContent>
-    </Card>
-  );
-}
-
-function Leaderboard({
-  title,
-  sub,
-  rows,
-  unit,
-}: {
-  title: string;
-  sub: string;
-  rows: Array<{ name: string; count: number }>;
-  unit: string;
-}) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="mb-3">
-          <h3 className="text-sm font-medium text-foreground">{title}</h3>
-          <p className="text-[11px] text-muted-foreground/70">{sub}</p>
-        </div>
-        {rows.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No data yet.</p>
-        ) : (
-          <ol className="space-y-1.5">
-            {rows.map((r, i) => (
-              <li key={`${r.name}-${i}`} className="flex items-center gap-2 text-sm">
-                <span className="w-4 shrink-0 text-xs tabular-nums text-muted-foreground">
-                  {i + 1}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-foreground">{r.name ?? "unknown"}</span>
-                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                  {r.count} {unit}
-                </span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </CardContent>
-    </Card>
+    <span className="inline-flex items-center gap-1">
+      <span className={`size-1.5 rounded-full ${dot}`} />
+      {n} {label}
+    </span>
   );
 }
