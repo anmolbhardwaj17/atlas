@@ -87,6 +87,12 @@ describe("classifyIntent (canonical questions, docs/10 §4.2)", () => {
     ["Which repositories have no CI/CD pipeline?", "estate"],
     ["What needs attention?", "estate"],
     ["Which are my most active repositories?", "estate"],
+    // Advisory / optimisation (P2) — "how to fix/improve", not just "what is".
+    ["How do I improve my CI/CD setup?", "advisory"],
+    ["How can I make my infrastructure more secure?", "advisory"],
+    ["What should I fix first?", "advisory"],
+    ["Give me recommendations for my estate", "advisory"],
+    ["Review my security posture", "advisory"],
   ];
   it.each(cases)("%s → %s", (q, intent) => {
     expect(classifyIntent(q)).toBe(intent);

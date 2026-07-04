@@ -267,3 +267,48 @@ describe("AI eval — agentic loop route (P1)", () => {
     expect(events).toContain("done");
   });
 });
+
+// --- P2: advisory answers (fact/advice separation) ---
+
+const ADVISORY_ESTATE = {
+  ...EMPTY_ESTATE,
+  inventory: { ...EMPTY_ESTATE.inventory, repositories: 12 },
+  findings: [
+    { title: "4 repositories have no CI/CD pipeline", severity: "medium", category: "Code hygiene", count: 4 },
+    { title: "payments-service is a single point of failure", severity: "medium", category: "Blast radius" },
+  ],
+};
+function advisoryPort(): RetrievalPort {
+  return {
+    ...port(true),
+    async estateOverview() {
+      return ADVISORY_ESTATE;
+    },
+  };
+}
+
+describe("AI eval — advisory (P2)", () => {
+  it("turns grounded findings into cited facts + a labelled recommendation (advisory tier)", async () => {
+    const narration =
+      "You have 4 repositories with no CI/CD pipeline [A1]. Recommendation: add a pipeline that builds and tests on every PR before merge.";
+    const ans = await answerQuestion(
+      { port: advisoryPort(), llm: provider(narration) },
+      "o",
+      "how do I improve my setup",
+    );
+    expect(ans.grounded).toBe(true);
+    expect(ans.confidence).toBe("advisory");
+    expect(ans.citations.some((c) => c.marker === "A1")).toBe(true);
+  });
+
+  it("does not invent problems when the graph flags no findings (good outcome)", async () => {
+    const narration = "Good news — the graph doesn't currently flag any issues to act on.";
+    const ans = await answerQuestion(
+      { port: estatePort(), llm: provider(narration) },
+      "o",
+      "what should I fix",
+    );
+    expect(ans.grounded).toBe(true);
+    expect(ans.confidence).toBe("advisory");
+  });
+});

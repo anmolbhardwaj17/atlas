@@ -21,8 +21,13 @@ export {
   PROMPT_VERSION,
   PLANNER_SYSTEM,
   PLANNER_PROMPT_VERSION,
+  ADVISORY_SYSTEM,
+  ADVISORY_PROMPT_VERSION,
   honestAbsence,
 } from "./prompt";
+export { buildAdvisoryContext } from "./context";
+export { guidanceFor, KNOWLEDGE_PACK_VERSION } from "./knowledge";
+export type { Guidance } from "./knowledge";
 export { TOOL_SPECS, TOOL_NAMES, runTool } from "./tools";
 export type { ToolOutcome } from "./tools";
 export { retrievalLoop, collectLoop, ContextAccumulator } from "./loop";

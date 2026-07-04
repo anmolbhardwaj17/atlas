@@ -23,7 +23,7 @@ const ESTATE: EstateOverview = {
   topContributors: [{ name: "Mohit", count: 87 }],
   mostActiveRepos: [{ name: "api-backend", count: 49 }],
   pipelineCoverage: { withPipeline: 8, total: 12 },
-  findings: [{ title: "4 repos have no CI/CD", severity: "medium", count: 4 }],
+  findings: [{ title: "4 repos have no CI/CD", severity: "medium", category: "Code hygiene", count: 4 }],
   sources: { total: 2, healthy: 2, lastSyncAt: "2026-07-04T10:00:00Z" },
 };
 

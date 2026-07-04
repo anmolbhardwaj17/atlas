@@ -92,8 +92,8 @@ export interface EstateOverview {
   topContributors: Array<{ name: string; count: number }>;
   mostActiveRepos: Array<{ name: string; count: number }>;
   pipelineCoverage: { withPipeline: number; total: number };
-  /** "Needs attention" facts the graph proves (title + severity for the estate summary). */
-  findings: Array<{ title: string; severity: string; count?: number }>;
+  /** "Needs attention" facts the graph proves. `category` keys into the advisory knowledge pack. */
+  findings: Array<{ title: string; severity: string; category: string; count?: number }>;
   sources: { total: number; healthy: number; lastSyncAt: string | null };
 }
 

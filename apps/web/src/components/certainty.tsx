@@ -24,6 +24,8 @@ const TIER: Record<string, TierStyle> = {
   "inferred-high": { label: "inferred · high", variant: "secondary" },
   "inferred-low": { label: "inferred · low", variant: "outline" },
   insufficient: TIER_FALLBACK,
+  // Advisory = a recommendation grounded in cited facts, not an observed fact itself (P2).
+  advisory: { label: "recommendation", variant: "outline", className: "text-primary" },
 };
 
 export function ConfidenceBadge({ tier, evidence }: { tier: string; evidence?: string }) {

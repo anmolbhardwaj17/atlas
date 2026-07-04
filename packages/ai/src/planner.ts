@@ -16,6 +16,7 @@ export type Intent =
   | "timeline"
   | "culprit"
   | "estate"
+  | "advisory"
   | "lookup"
   | "out_of_scope";
 
@@ -59,6 +60,22 @@ const INTENT_RULES: Array<{ intent: Intent; re: RegExp }> = [
     re: /\bwhat.*(chang|happened|new|deployed).*(this week|today|recently|since|lately)\b/i,
   },
   { intent: "timeline", re: /\bwhat changed\b/i },
+  // Advisory / optimisation questions → grounded findings + best-practice guidance (P2). These
+  // must come BEFORE the estate "needs attention" rule: "what should I FIX" is advice ("how"),
+  // whereas "what needs attention" is a listing (estate). Recommendations, not a fixed traversal.
+  {
+    intent: "advisory",
+    re: /\b(how (do|can|should) i|how to|help me)\b[^?]*\b(optimi[sz]|improv|secur|harden|reduce|lower|cut|fix|better|cheaper|faster|safer|resilien|tighten|clean up)/i,
+  },
+  { intent: "advisory", re: /\b(recommend|recommendation|suggest\w*|advice|advise|best[- ]practice)s?\b/i },
+  {
+    intent: "advisory",
+    re: /\bwhat should i (do|fix|improve|prioriti[sz]e?|address|change|tackle|worry about)\b/i,
+  },
+  {
+    intent: "advisory",
+    re: /\b(review|audit|assess|evaluate)\b[^?]*\b(my|our|the)\b[^?]*\b(setup|infra\w*|security|posture|estate|architecture|repos?|hygiene)\b/i,
+  },
   // Aggregate / ranking / whole-estate questions → the org overview (counts, leaderboards,
   // findings, coverage). These are the dashboard-style questions the fixed entity planner can't
   // answer; they resolve to a computed snapshot, not a single node (P0 estate slice).
@@ -239,8 +256,8 @@ export async function plan(
   const intent = classifyIntent(question);
   if (intent === "out_of_scope") return { intent, question };
   if (intent === "timeline") return { intent, question, window: { sinceDays: 7 } };
-  // Estate answers from the whole-org snapshot — no entity to resolve, so skip the search hops.
-  if (intent === "estate") return { intent, question };
+  // Estate + advisory answer from the whole-org snapshot/findings — no entity to resolve.
+  if (intent === "estate" || intent === "advisory") return { intent, question };
 
   const entity = await resolveEntity(port, orgId, question);
   const base: RetrievalPlan = { intent, question };

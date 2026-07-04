@@ -12,9 +12,9 @@ import type { LLMProvider } from "./llm";
 import type { RetrievalPort } from "./retrieval-port";
 import { plan, classifyIntent, type Intent } from "./planner";
 import { orchestrate } from "./retrieval";
-import { buildContext, type BuiltContext, type Cite } from "./context";
+import { buildContext, buildAdvisoryContext, type BuiltContext, type Cite } from "./context";
 import { groundingGate } from "./grounding";
-import { SYSTEM_PROMPT, honestAbsence } from "./prompt";
+import { SYSTEM_PROMPT, ADVISORY_SYSTEM, honestAbsence } from "./prompt";
 import { retrievalLoop, collectLoop } from "./loop";
 
 /**
@@ -30,7 +30,12 @@ function agenticRoute(question: string, llm: LLMProvider): Intent | null {
   return AGENTIC_INTENTS.has(intent) && llm.name !== "mock" ? intent : null;
 }
 
-export type OverallConfidence = "observed" | "inferred-high" | "inferred-low" | "insufficient";
+export type OverallConfidence =
+  | "observed"
+  | "inferred-high"
+  | "inferred-low"
+  | "insufficient"
+  | "advisory";
 
 export interface AnswerCitation {
   number: number;
@@ -59,7 +64,15 @@ export interface AnswerDeps {
 
 type Prepared =
   | { grounded: false; intent: Intent; reason: string }
-  | { grounded: true; intent: Intent; built: BuiltContext };
+  | {
+      grounded: true;
+      intent: Intent;
+      built: BuiltContext;
+      /** Narrator system prompt — the closed-context narrator, or the advisory narrator (P2). */
+      system: string;
+      /** Advisory answers are recommendations → the `advisory` confidence tier, not a fact tier. */
+      advisory: boolean;
+    };
 
 async function prepare(
   deps: AnswerDeps,
@@ -72,17 +85,34 @@ async function prepare(
   if (agenticIntent) {
     const loop = await collectLoop({ port: deps.port, llm: deps.llm }, orgId, question, signal);
     return loop.grounded
-      ? { grounded: true, intent: agenticIntent, built: loop.built }
+      ? { grounded: true, intent: agenticIntent, built: loop.built, system: SYSTEM_PROMPT, advisory: false }
       : { grounded: false, intent: agenticIntent, reason: NO_MATCH };
   }
-  // Fast path (deterministic, unchanged).
   const p = await plan(deps.port, orgId, question);
+  // Advisory (P2): grounded findings + knowledge-pack guidance → labelled recommendations.
+  if (p.intent === "advisory") {
+    const estate = await deps.port.estateOverview(orgId);
+    return {
+      grounded: true,
+      intent: "advisory",
+      built: buildAdvisoryContext(orgId, estate),
+      system: ADVISORY_SYSTEM,
+      advisory: true,
+    };
+  }
+  // Fast path (deterministic, unchanged).
   const retrieval = await orchestrate(deps.port, orgId, p);
   const gate = groundingGate(retrieval);
   if (!gate.grounded) {
     return { grounded: false, intent: p.intent, reason: gate.reason ?? "I don't have that data." };
   }
-  return { grounded: true, intent: p.intent, built: buildContext(orgId, retrieval) };
+  return {
+    grounded: true,
+    intent: p.intent,
+    built: buildContext(orgId, retrieval),
+    system: SYSTEM_PROMPT,
+    advisory: false,
+  };
 }
 
 function userMessage(context: string, question: string): string {
@@ -107,13 +137,13 @@ export async function answerQuestion(
       nodesConsidered: 0,
     };
   }
-  const narration = await narrate(deps, prep.built.context, question, signal);
+  const narration = await narrate(deps, prep.built.context, question, prep.system, signal);
   const citations = bindCitations(narration, prep.built.cites);
   return {
     grounded: true,
     text: narration,
     citations,
-    confidence: scoreConfidence(citations, prep.built.cites),
+    confidence: prep.advisory ? "advisory" : scoreConfidence(citations, prep.built.cites),
     caveats: prep.built.freshnessNotes,
     uncitedClaims: detectUncitedClaims(narration),
     nodesConsidered: prep.built.nodesConsidered,
@@ -148,7 +178,7 @@ export async function* answerQuestionStream(
     }
     const loop = next.value;
     prep = loop.grounded
-      ? { grounded: true, intent: agenticIntent, built: loop.built }
+      ? { grounded: true, intent: agenticIntent, built: loop.built, system: SYSTEM_PROMPT, advisory: false }
       : { grounded: false, intent: agenticIntent, reason: NO_MATCH };
   } else {
     prep = await prepare(deps, orgId, question, signal);
@@ -165,7 +195,7 @@ export async function* answerQuestionStream(
   yield { type: "retrieval", nodesConsidered: prep.built.nodesConsidered, intent: prep.intent };
   const parts: string[] = [];
   for await (const ev of deps.llm.complete({
-    system: SYSTEM_PROMPT,
+    system: prep.system,
     messages: [{ role: "user", content: userMessage(prep.built.context, question) }],
     maxTokens: deps.maxTokens ?? 1024,
     temperature: 0,
@@ -181,7 +211,7 @@ export async function* answerQuestionStream(
   for (const citation of citations) yield { type: "citation", citation };
   yield {
     type: "confidence",
-    overall: scoreConfidence(citations, prep.built.cites),
+    overall: prep.advisory ? "advisory" : scoreConfidence(citations, prep.built.cites),
     caveats: prep.built.freshnessNotes,
   };
   yield { type: "done", grounded: true, citations: citations.length };
@@ -191,11 +221,12 @@ async function narrate(
   deps: AnswerDeps,
   context: string,
   question: string,
+  system: string,
   signal?: AbortSignal,
 ): Promise<string> {
   const parts: string[] = [];
   for await (const ev of deps.llm.complete({
-    system: SYSTEM_PROMPT,
+    system,
     messages: [{ role: "user", content: userMessage(context, question) }],
     maxTokens: deps.maxTokens ?? 1024,
     temperature: 0,

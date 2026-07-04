@@ -7,6 +7,8 @@
  * states them faithfully.
  */
 import type { RetrievalResult } from "./retrieval";
+import type { EstateOverview } from "./retrieval-port";
+import { guidanceFor } from "./knowledge";
 
 export interface Cite {
   marker: string;
@@ -175,6 +177,52 @@ export function buildContext(orgId: string, result: RetrievalResult): BuiltConte
     nodesConsidered: nodeMarker.size,
     freshnessNotes: notes,
   };
+}
+
+/**
+ * Advisory context (P2): the graph's FINDINGS as cited facts (computed `A`-markers) + the knowledge
+ * pack's GUIDANCE as clearly-separated reference for recommendations. The narrator (ADVISORY_SYSTEM)
+ * turns each cited finding into a labelled recommendation — facts stay cited, advice stays advice.
+ */
+export function buildAdvisoryContext(orgId: string, estate: EstateOverview): BuiltContext {
+  const cites: Cite[] = [];
+  const findingLines: string[] = [];
+  const guidanceLines: string[] = [];
+  const seenCats = new Set<string>();
+
+  estate.findings.forEach((f, i) => {
+    const marker = `A${i + 1}`;
+    cites.push({ marker, kind: "computed", id: `finding:${f.category}:${i}`, confidence: "observed" });
+    findingLines.push(
+      `  ${marker} (cite:finding) [${f.severity}] ${f.title}${f.count !== undefined ? ` (${f.count})` : ""} — category: ${f.category}`,
+    );
+    const cat = f.category.toLowerCase();
+    if (!seenCats.has(cat)) {
+      seenCats.add(cat);
+      const g = guidanceFor(f.category);
+      if (g) {
+        guidanceLines.push(
+          `  ${f.category} [${g.pillar}] — why: ${g.why} fix: ${g.fix} (source: ${g.source})`,
+        );
+      }
+    }
+  });
+
+  const sections: string[] = [`[CONTEXT — org:${orgId} — these are the ONLY facts you may use]`];
+  if (findingLines.length) {
+    sections.push("FINDINGS (issues the graph proves — these are FACTS; cite the marker):", ...findingLines);
+  } else {
+    sections.push("FINDINGS: none — the graph does not currently flag any issues.");
+  }
+  if (guidanceLines.length) {
+    sections.push(
+      "GUIDANCE (best-practice reference for your recommendations — NOT customer facts):",
+      ...guidanceLines,
+    );
+  }
+  sections.push("[END CONTEXT]");
+
+  return { context: sections.join("\n"), cites, nodesConsidered: cites.length, freshnessNotes: [] };
 }
 
 /** Compact single-line JSON-ish rendering (token-frugal; untrusted data stays delimited). */

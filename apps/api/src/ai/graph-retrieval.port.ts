@@ -127,6 +127,7 @@ export class GraphRetrievalPort implements RetrievalPort {
       findings: s.findings.map((f) => ({
         title: f.title,
         severity: f.severity,
+        category: f.category,
         ...(f.count !== undefined ? { count: f.count } : {}),
       })),
       sources: {
