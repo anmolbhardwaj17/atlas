@@ -6,7 +6,7 @@
  */
 import type { ConnectorLogger, SecretAccessor } from "@atlas/connector-sdk";
 import { AwsConnector } from "./aws-connector";
-import { StsCredentialProvider } from "./credentials";
+import { StsCredentialProvider, StsStaticCredentialResolver } from "./credentials";
 import { DISCOVERERS } from "./discoverers";
 import { probeFromDiscoverer } from "./aws/discoverer";
 
@@ -16,6 +16,7 @@ export function createAwsConnector(opts: {
 }): AwsConnector {
   return new AwsConnector({
     credentials: new StsCredentialProvider(),
+    staticCredentials: new StsStaticCredentialResolver(),
     secrets: opts.secrets,
     probes: DISCOVERERS.map(probeFromDiscoverer),
     ...(opts.logger ? { logger: opts.logger } : {}),

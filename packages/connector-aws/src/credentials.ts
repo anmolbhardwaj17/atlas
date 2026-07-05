@@ -6,15 +6,22 @@
  * attributable in the CUSTOMER's CloudTrail. The returned creds are ≤1h and held in
  * memory only — never persisted (A23, P8).
  */
-import { STSClient, AssumeRoleCommand, type AssumeRoleCommandOutput } from "@aws-sdk/client-sts";
+import {
+  STSClient,
+  AssumeRoleCommand,
+  GetCallerIdentityCommand,
+  type AssumeRoleCommandOutput,
+} from "@aws-sdk/client-sts";
 import { accountFromArn } from "./config";
 
-/** Short-lived STS credentials (in-memory only). */
+/** AWS credentials held in memory for a run. `sessionToken` is present for AssumeRole
+ *  (temporary) creds and absent for static IAM-user keys (docs/06 §2). */
 export interface AwsTempCredentials {
   accessKeyId: string;
   secretAccessKey: string;
-  sessionToken: string;
-  /** ISO-8601 expiry; the SDK refreshes before this during a long sync. */
+  /** Present only for temporary (AssumeRole) credentials; omitted for static IAM-user keys. */
+  sessionToken?: string;
+  /** ISO-8601 expiry; the SDK refreshes before this during a long sync. Null for static keys. */
   expiration: string | null;
 }
 
@@ -97,6 +104,73 @@ export class StsCredentialProvider implements CredentialProvider {
       },
     };
   }
+}
+
+/**
+ * Resolves STATIC IAM-user credentials (access key + secret key) into the same AssumedRole shape
+ * the crawl uses. It validates the keys and derives the account id via STS GetCallerIdentity, so
+ * downstream discoverers/probes are identical whether creds came from AssumeRole or static keys.
+ * Chosen when a connection is configured with access keys instead of an assumable role.
+ */
+export interface StaticCredentialInput {
+  accessKeyId: string;
+  secretAccessKey: string;
+  signal?: AbortSignal;
+}
+
+export interface StaticCredentialResolver {
+  resolve(input: StaticCredentialInput): Promise<AssumedRole>;
+}
+
+export class StsStaticCredentialResolver implements StaticCredentialResolver {
+  constructor(private readonly clientFactory?: (input: StaticCredentialInput) => STSClient) {}
+
+  async resolve(input: StaticCredentialInput): Promise<AssumedRole> {
+    const client =
+      this.clientFactory?.(input) ??
+      new STSClient({
+        region: process.env.AWS_REGION ?? "us-east-1",
+        credentials: { accessKeyId: input.accessKeyId, secretAccessKey: input.secretAccessKey },
+      });
+    let account: string | undefined;
+    try {
+      const command = new GetCallerIdentityCommand({});
+      const out = input.signal
+        ? await client.send(command, { abortSignal: input.signal })
+        : await client.send(command);
+      account = out.Account;
+    } catch (err) {
+      throw new AssumeRoleError(staticCredsMessage(err), err);
+    } finally {
+      client.destroy();
+    }
+    if (!account || !/^\d{12}$/.test(account)) {
+      throw new AssumeRoleError("Could not determine the AWS account id from these credentials.");
+    }
+    return {
+      accountId: account,
+      credentials: {
+        accessKeyId: input.accessKeyId,
+        secretAccessKey: input.secretAccessKey,
+        expiration: null,
+      },
+    };
+  }
+}
+
+/** Map an STS GetCallerIdentity error to a customer-actionable message for static keys. */
+export function staticCredsMessage(err: unknown): string {
+  const name = (err as { name?: string })?.name ?? "";
+  if (/InvalidClientTokenId|SignatureDoesNotMatch|UnrecognizedClient|AuthFailure/i.test(name)) {
+    return "AWS rejected these access keys. Check the Access Key ID and Secret Access Key are correct and still active.";
+  }
+  if (/AccessDenied/i.test(name)) {
+    return "These keys were accepted but lack sts:GetCallerIdentity — attach a read-only policy (e.g. ReadOnlyAccess/SecurityAudit) to the IAM user.";
+  }
+  const msg = (err as { message?: string })?.message;
+  return msg
+    ? `Could not validate the AWS access keys: ${msg}`
+    : "Could not validate the AWS access keys.";
 }
 
 /** Map an STS error to a customer-actionable message (docs/06 §2, US-1 negative). */

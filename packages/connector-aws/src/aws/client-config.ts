@@ -7,7 +7,8 @@ import type { AwsTempCredentials } from "../credentials";
 
 export interface AwsClientConfig {
   region: string;
-  credentials: { accessKeyId: string; secretAccessKey: string; sessionToken: string };
+  /** `sessionToken` is present for AssumeRole creds and omitted for static IAM-user keys. */
+  credentials: { accessKeyId: string; secretAccessKey: string; sessionToken?: string };
   retryMode: "adaptive";
   maxAttempts: number;
 }
@@ -18,7 +19,8 @@ export function clientConfig(creds: AwsTempCredentials, region: string): AwsClie
     credentials: {
       accessKeyId: creds.accessKeyId,
       secretAccessKey: creds.secretAccessKey,
-      sessionToken: creds.sessionToken,
+      // Only set sessionToken when present — the SDK rejects an empty token on static keys.
+      ...(creds.sessionToken ? { sessionToken: creds.sessionToken } : {}),
     },
     retryMode: "adaptive",
     maxAttempts: 5,

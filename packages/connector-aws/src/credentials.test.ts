@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { mockClient } from "aws-sdk-client-mock";
-import { STSClient, AssumeRoleCommand } from "@aws-sdk/client-sts";
+import { STSClient, AssumeRoleCommand, GetCallerIdentityCommand } from "@aws-sdk/client-sts";
 import {
   StsCredentialProvider,
+  StsStaticCredentialResolver,
   AssumeRoleError,
   buildSessionName,
   assumeRoleMessage,
+  staticCredsMessage,
 } from "./credentials";
 
 const stsMock = mockClient(STSClient);
@@ -89,6 +91,51 @@ describe("StsCredentialProvider", () => {
         sessionName: "s",
       }),
     ).rejects.toThrow(/no credentials/i);
+  });
+});
+
+describe("StsStaticCredentialResolver", () => {
+  beforeEach(() => stsMock.reset());
+
+  it("validates static keys via GetCallerIdentity and returns account id + keys (no session token)", async () => {
+    stsMock.on(GetCallerIdentityCommand).resolves({
+      Account: "123456789012",
+      Arn: "arn:aws:iam::123456789012:user/atlas-readonly",
+    });
+    const resolver = new StsStaticCredentialResolver();
+    const out = await resolver.resolve({ accessKeyId: "AKIA_X", secretAccessKey: "sekret" });
+    expect(out.accountId).toBe("123456789012");
+    expect(out.credentials.accessKeyId).toBe("AKIA_X");
+    expect(out.credentials.secretAccessKey).toBe("sekret");
+    expect(out.credentials.sessionToken).toBeUndefined();
+    expect(out.credentials.expiration).toBeNull();
+  });
+
+  it("wraps rejected keys into an actionable AssumeRoleError", async () => {
+    stsMock
+      .on(GetCallerIdentityCommand)
+      .rejects(Object.assign(new Error("bad"), { name: "InvalidClientTokenId" }));
+    const resolver = new StsStaticCredentialResolver();
+    await expect(
+      resolver.resolve({ accessKeyId: "bad", secretAccessKey: "bad" }),
+    ).rejects.toBeInstanceOf(AssumeRoleError);
+  });
+
+  it("errors when no account id comes back", async () => {
+    stsMock.on(GetCallerIdentityCommand).resolves({});
+    const resolver = new StsStaticCredentialResolver();
+    await expect(resolver.resolve({ accessKeyId: "A", secretAccessKey: "S" })).rejects.toThrow(
+      /account id/i,
+    );
+  });
+});
+
+describe("staticCredsMessage", () => {
+  it("maps key-rejection errors to actionable text", () => {
+    expect(staticCredsMessage({ name: "InvalidClientTokenId" })).toMatch(/rejected|access keys/i);
+    expect(staticCredsMessage({ name: "SignatureDoesNotMatch" })).toMatch(/rejected|access keys/i);
+    expect(staticCredsMessage({ name: "AccessDenied" })).toMatch(/GetCallerIdentity|read-only/i);
+    expect(staticCredsMessage({ message: "boom" })).toMatch(/boom/);
   });
 });
 

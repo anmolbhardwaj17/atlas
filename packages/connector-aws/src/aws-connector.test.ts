@@ -1,7 +1,13 @@
 import { describe, it, expect } from "vitest";
 import type { Connection, SecretAccessor } from "@atlas/connector-sdk";
 import { AwsConnector } from "./aws-connector";
-import { AssumeRoleError, type AssumeRoleInput, type CredentialProvider } from "./credentials";
+import {
+  AssumeRoleError,
+  type AssumeRoleInput,
+  type CredentialProvider,
+  type StaticCredentialInput,
+  type StaticCredentialResolver,
+} from "./credentials";
 import type { PermissionProbe } from "./permission-probe";
 
 const ACCT = "123456789012";
@@ -131,3 +137,73 @@ describe("AwsConnector.verify", () => {
 function c2(credentials: CredentialProvider): AwsConnector {
   return new AwsConnector({ credentials, secrets: okSecrets });
 }
+
+// ── Static access-key auth mode (no roleArn; keys are the secret) ──────────────
+const keysConn = (overrides: Partial<Connection> = {}): Connection =>
+  conn({ config: { regions: ["us-east-1"] }, ...overrides });
+
+const keysSecrets: SecretAccessor = {
+  get: async () => ({ accessKeyId: "AKIA_TEST", secretAccessKey: "shhh" }),
+};
+
+function okStatic(captured?: (i: StaticCredentialInput) => void): StaticCredentialResolver {
+  return {
+    resolve: async (input) => {
+      captured?.(input);
+      return {
+        accountId: ACCT,
+        credentials: {
+          accessKeyId: input.accessKeyId,
+          secretAccessKey: input.secretAccessKey,
+          expiration: null,
+        },
+      };
+    },
+  };
+}
+
+describe("AwsConnector.verify — static access keys (keys mode)", () => {
+  it("validates the keys via the static resolver and returns connected", async () => {
+    let seen: StaticCredentialInput | undefined;
+    const c = new AwsConnector({
+      credentials: okCreds(),
+      staticCredentials: okStatic((i) => (seen = i)),
+      secrets: keysSecrets,
+      probes: [probe("ec2", "ec2:DescribeInstances", "ok")],
+    });
+    expect(await c.verify(keysConn())).toEqual({ status: "connected" });
+    expect(seen?.accessKeyId).toBe("AKIA_TEST");
+    expect(seen?.secretAccessKey).toBe("shhh");
+  });
+
+  it("returns error when AWS rejects the keys (resolver throws)", async () => {
+    const c = new AwsConnector({
+      credentials: okCreds(),
+      staticCredentials: {
+        resolve: async () => {
+          throw new AssumeRoleError("AWS rejected these access keys.");
+        },
+      },
+      secrets: keysSecrets,
+    });
+    const r = await c.verify(keysConn());
+    expect(r.status).toBe("error");
+    expect(r.message).toMatch(/rejected these access keys/i);
+  });
+
+  it("returns error when the keys secret is missing/empty", async () => {
+    const c = new AwsConnector({
+      credentials: okCreds(),
+      staticCredentials: okStatic(),
+      secrets: { get: async () => ({}) },
+    });
+    expect((await c.verify(keysConn())).status).toBe("error");
+  });
+
+  it("returns error when keys mode is used but no static resolver is wired", async () => {
+    const c = new AwsConnector({ credentials: okCreds(), secrets: keysSecrets });
+    const r = await c.verify(keysConn());
+    expect(r.status).toBe("error");
+    expect(r.message).toMatch(/not supported/i);
+  });
+});

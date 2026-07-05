@@ -30,6 +30,7 @@ import {
   buildSessionName,
   type AssumedRole,
   type CredentialProvider,
+  type StaticCredentialResolver,
 } from "./credentials";
 import { isAccessDenied, type PermissionProbe, type ProbeInput } from "./permission-probe";
 import { SERVICE_MODULES, MODULE_BY_KIND, type ServiceModule } from "./services";
@@ -44,9 +45,11 @@ const NOOP_LOGGER: ConnectorLogger = {
 };
 
 export interface AwsConnectorDeps {
-  /** Performs sts:AssumeRole (real STS impl in prod; fake in tests). */
+  /** Performs sts:AssumeRole (real STS impl in prod; fake in tests). Used in `role` auth mode. */
   credentials: CredentialProvider;
-  /** Resolves the External ID from the Secrets Broker by `secret_ref`. */
+  /** Resolves + validates static IAM-user access keys (STS GetCallerIdentity). Used in `keys` mode. */
+  staticCredentials?: StaticCredentialResolver;
+  /** Resolves the connection secret (External ID, or the access keys) from the Secrets Broker. */
   secrets: SecretAccessor;
   /** Per-service read probes for permission detection (supplied by I1.3 discoverers). */
   probes?: PermissionProbe[];
@@ -56,6 +59,7 @@ export interface AwsConnectorDeps {
 export class AwsConnector implements Connector {
   readonly provider = "aws" as const;
   private readonly creds: CredentialProvider;
+  private readonly staticCreds: StaticCredentialResolver | undefined;
   private readonly secrets: SecretAccessor;
   private readonly probes: PermissionProbe[];
   private readonly log: ConnectorLogger;
@@ -67,9 +71,61 @@ export class AwsConnector implements Connector {
 
   constructor(deps: AwsConnectorDeps) {
     this.creds = deps.credentials;
+    this.staticCreds = deps.staticCredentials;
     this.secrets = deps.secrets;
     this.probes = deps.probes ?? [];
     this.log = deps.logger ?? NOOP_LOGGER;
+  }
+
+  /**
+   * Resolve the run/verify credentials for a connection, branching on its auth mode (docs/06 §2):
+   * - `role` — read the External ID secret + assume the configured role (temporary creds).
+   * - `keys` — read the static access keys secret + validate them via STS GetCallerIdentity.
+   * Both return the same {credentials, accountId} shape, so the crawl is identical downstream.
+   */
+  private async resolveCredentials(
+    conn: Connection,
+    secrets: SecretAccessor,
+    sessionName: string,
+    signal?: AbortSignal,
+  ): Promise<AssumedRole> {
+    const cfg = parseAwsConfig(conn.config);
+    if (!conn.secretRef) {
+      throw new AssumeRoleError(
+        cfg.authMode === "keys"
+          ? "No access keys are configured for this AWS connection."
+          : "No External ID is configured for this AWS connection.",
+      );
+    }
+    const secret = await secrets.get(conn.secretRef);
+
+    if (cfg.authMode === "keys") {
+      if (!this.staticCreds) {
+        throw new AssumeRoleError("Static AWS access keys are not supported in this build.");
+      }
+      const accessKeyId = (secret.accessKeyId ?? "").trim();
+      const secretAccessKey = secret.secretAccessKey ?? "";
+      if (!accessKeyId || !secretAccessKey) {
+        throw new AssumeRoleError("The connection's AWS access keys are missing or empty.");
+      }
+      return this.staticCreds.resolve({
+        accessKeyId,
+        secretAccessKey,
+        ...(signal ? { signal } : {}),
+      });
+    }
+
+    // role mode
+    if (!cfg.roleArn)
+      throw new AssumeRoleError("No role ARN is configured for this AWS connection.");
+    const externalId = secret.externalId ?? "";
+    if (!externalId) throw new AssumeRoleError("The connection's External ID is missing or empty.");
+    return this.creds.assumeRole({
+      roleArn: cfg.roleArn,
+      externalId,
+      sessionName,
+      ...(signal ? { signal } : {}),
+    });
   }
 
   async verify(conn: Connection): Promise<VerifyResult> {
@@ -89,30 +145,16 @@ export class AwsConnector implements Connector {
       return { status: "error", message: (err as Error).message };
     }
 
-    if (!conn.secretRef) {
-      return { status: "error", message: "No External ID configured for this AWS connection." };
-    }
-    let externalId: string;
-    try {
-      const secret = await this.secrets.get(conn.secretRef);
-      externalId = secret.externalId ?? "";
-    } catch {
-      return { status: "error", message: "Could not resolve the connection's External ID." };
-    }
-    if (!externalId) {
-      return { status: "error", message: "The connection's External ID is missing or empty." };
-    }
-
     let assumed: AssumedRole;
     try {
-      assumed = await this.creds.assumeRole({
-        roleArn: cfg.roleArn,
-        externalId,
-        sessionName: buildSessionName(sessionPrefix, conn.id),
-      });
+      assumed = await this.resolveCredentials(
+        conn,
+        this.secrets,
+        buildSessionName(sessionPrefix, conn.id),
+      );
     } catch (err) {
       if (err instanceof AssumeRoleError) return { status: "error", message: err.message };
-      return { status: "error", message: "AssumeRole failed." };
+      return { status: "error", message: "Could not authenticate to AWS." };
     }
 
     // Permission detection: probe each supported service; AccessDenied → missing perm.
@@ -207,23 +249,16 @@ export class AwsConnector implements Connector {
     return { ref, payload, fetchedAt: new Date().toISOString() };
   }
 
-  /** Resolve (and cache) the run's assumed-role credentials (one AssumeRole per run). */
+  /** Resolve (and cache) the run's credentials once per run (docs/06 §2), for either auth mode. */
   private async assumeForRun(ctx: CrawlContext): Promise<AssumedRole> {
     const existing = this.runCreds.get(ctx.run.id);
     if (existing) return existing;
-    const conn = ctx.connection;
-    const promise = (async (): Promise<AssumedRole> => {
-      const cfg = parseAwsConfig(conn.config);
-      if (!conn.secretRef) throw new Error("No External ID configured for this AWS connection.");
-      const secret = await ctx.secrets.get(conn.secretRef);
-      const externalId = secret.externalId ?? "";
-      if (!externalId) throw new Error("The connection's External ID is missing or empty.");
-      return this.creds.assumeRole({
-        roleArn: cfg.roleArn,
-        externalId,
-        sessionName: buildSessionName("atlas-sync", ctx.run.id),
-      });
-    })();
+    const promise = this.resolveCredentials(
+      ctx.connection,
+      ctx.secrets,
+      buildSessionName("atlas-sync", ctx.run.id),
+      ctx.signal,
+    );
     this.runCreds.set(ctx.run.id, promise);
     return promise;
   }

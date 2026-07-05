@@ -42,22 +42,28 @@ export function AwsSetup() {
   return (
     <div className="space-y-5">
       <Steps>
-        <Step title="Create a read-only IAM role">
-          In the AWS console, create an IAM role that Atlas assumes. It grants only{" "}
+        <Step title="Create a read-only IAM user">
+          In the AWS console, create (or reuse) an IAM user for Atlas and attach a read-only policy
+          - the least-privilege one below, or an AWS-managed policy like{" "}
+          <InlineCode>ReadOnlyAccess</InlineCode> / <InlineCode>SecurityAudit</InlineCode>. Only{" "}
           <InlineCode>Describe*</InlineCode> / <InlineCode>List*</InlineCode> /{" "}
-          <InlineCode>Get*</InlineCode> - no mutating actions exist in the policy, so Atlas is
-          read-only by construction.
+          <InlineCode>Get*</InlineCode> - read-only by construction.
         </Step>
-        <Step title="Trust Atlas with your External ID">
-          Set the role&apos;s trust policy to allow Atlas&apos;s principal, conditioned on your
-          unique <strong>External ID</strong> (confused-deputy defense). Atlas generates the
-          External ID when you add the connection.
+        <Step title="Create an access key">
+          On that user, create an access key (<strong>Access Key ID</strong> +{" "}
+          <strong>Secret Access Key</strong>). Copy them now - AWS shows the secret only once.
         </Step>
-        <Step title="Paste the Role ARN and verify">
-          Back in Atlas, paste the role ARN. Atlas runs a live permission probe - a missing
-          permission is reported as a fixable gap, never a silent failure.
+        <Step title="Paste the keys + regions and verify">
+          Back in Atlas, enter the keys and the regions to crawl. Atlas stores them encrypted, then
+          runs a live permission probe - a missing permission is reported as a fixable gap, never a
+          silent failure.
         </Step>
       </Steps>
+      <p className="text-xs text-muted-foreground">
+        Tip: an assumable read-only role is more secure than long-lived keys - if your team prefers
+        that, use a role whose access keys rotate, or reach out to switch this connection to role
+        auth.
+      </p>
       <CodeBlock label="Least-privilege policy" code={AWS_POLICY} />
     </div>
   );

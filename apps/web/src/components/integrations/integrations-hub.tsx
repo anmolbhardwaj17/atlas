@@ -311,11 +311,17 @@ function ConnectSheet({
   const [workspace, setWorkspace] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [token, setToken] = React.useState("");
+  // AWS (static access-key auth): regions to crawl + the IAM user's access key + secret key.
+  const [regions, setRegions] = React.useState("us-east-1");
+  const [accessKeyId, setAccessKeyId] = React.useState("");
+  const [secretAccessKey, setSecretAccessKey] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Bitbucket is the first live credential flow (email + scoped API token → verify).
-  const needsCreds = provider?.id === "bitbucket";
+  // Live credential flows: Bitbucket (email + API token) and AWS (access key + secret key).
+  const isBitbucket = provider?.id === "bitbucket";
+  const isAws = provider?.id === "aws";
+  const needsCreds = isBitbucket || isAws;
 
   // Reset the form whenever a different provider's sheet opens.
   React.useEffect(() => {
@@ -324,6 +330,9 @@ function ConnectSheet({
       setWorkspace("");
       setEmail("");
       setToken("");
+      setRegions("us-east-1");
+      setAccessKeyId("");
+      setSecretAccessKey("");
       setError(null);
       setBusy(false);
     }
@@ -334,7 +343,7 @@ function ConnectSheet({
     setBusy(true);
     setError(null);
     try {
-      if (needsCreds) {
+      if (isBitbucket) {
         if (!email.trim() || !token.trim()) {
           setError("Enter your Atlassian email and API token.");
           setBusy(false);
@@ -348,6 +357,37 @@ function ConnectSheet({
         });
         if (verified.status === "error") {
           setError("Bitbucket rejected the credentials - check the email, token, and its scopes.");
+          setBusy(false);
+          return;
+        }
+      } else if (isAws) {
+        const regionList = regions
+          .split(",")
+          .map((r) => r.trim().toLowerCase())
+          .filter(Boolean);
+        if (regionList.length === 0) {
+          setError("Enter at least one AWS region (e.g. us-east-1).");
+          setBusy(false);
+          return;
+        }
+        if (!accessKeyId.trim() || !secretAccessKey.trim()) {
+          setError("Enter the Access Key ID and Secret Access Key.");
+          setBusy(false);
+          return;
+        }
+        // authMode 'keys' → the connector uses the access keys directly (no AssumeRole).
+        const conn = await createConnection(orgId, provider.id, name.trim(), {
+          authMode: "keys",
+          regions: regionList,
+        });
+        const verified = await verifyConnection(orgId, conn.id, {
+          accessKeyId: accessKeyId.trim(),
+          secretAccessKey: secretAccessKey.trim(),
+        });
+        if (verified.status === "error") {
+          setError(
+            "AWS rejected the credentials - check the Access Key ID, Secret Access Key, and that the IAM user has read access.",
+          );
           setBusy(false);
           return;
         }
@@ -395,7 +435,7 @@ function ConnectSheet({
                   />
                 </div>
 
-                {needsCreds ? (
+                {isBitbucket ? (
                   <>
                     <div className="space-y-2">
                       <label htmlFor="bb-workspace" className="text-sm font-medium">
@@ -437,6 +477,52 @@ function ConnectSheet({
                       <p className="text-xs text-muted-foreground">
                         Sent once to verify + stored encrypted in the secrets broker - never saved
                         in the database or shown again.
+                      </p>
+                    </div>
+                  </>
+                ) : isAws ? (
+                  <>
+                    <div className="space-y-2">
+                      <label htmlFor="aws-regions" className="text-sm font-medium">
+                        Regions <span className="text-muted-foreground">(comma-separated)</span>
+                      </label>
+                      <Input
+                        id="aws-regions"
+                        value={regions}
+                        onChange={(e) => setRegions(e.target.value)}
+                        placeholder="e.g. us-east-1, eu-west-1"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="aws-access-key" className="text-sm font-medium">
+                        Access Key ID
+                      </label>
+                      <Input
+                        id="aws-access-key"
+                        value={accessKeyId}
+                        onChange={(e) => setAccessKeyId(e.target.value)}
+                        placeholder="AKIA…"
+                        autoComplete="off"
+                        spellCheck={false}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="aws-secret-key" className="text-sm font-medium">
+                        Secret Access Key
+                      </label>
+                      <Input
+                        id="aws-secret-key"
+                        type="password"
+                        value={secretAccessKey}
+                        onChange={(e) => setSecretAccessKey(e.target.value)}
+                        placeholder="Secret access key"
+                        autoComplete="off"
+                        spellCheck={false}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Sent once to verify + stored encrypted in the secrets broker - never saved
+                        in the database or shown again. Use an IAM user with a read-only policy.
                       </p>
                     </div>
                   </>
