@@ -188,7 +188,12 @@ export function InfraMap({ data }: { data: MapData }) {
           />
         </ReactFlowProvider>
         {selected && (
-          <DetailPanel node={selected} data={data} onClose={() => setSelectedId(null)} />
+          <DetailPanel
+            node={selected}
+            data={data}
+            protectedBy={protectedBy.get(selected.id) ?? []}
+            onClose={() => setSelectedId(null)}
+          />
         )}
       </div>
     </div>
@@ -408,16 +413,114 @@ function shortName(n: MapNode): string {
   return n.name ?? n.kind.replace(/^aws\.|^github\.|^external\.|^atlas\.|^bitbucket\./, "");
 }
 
+/** Turn camelCase attribute keys into readable labels ("engineVersion" → "Engine version"). */
+function prettyKey(key: string): string {
+  const words = key
+    .replace(/([A-Z])/g, " $1")
+    .toLowerCase()
+    .trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** ISO date → compact local form; anything else unchanged. */
+function fact(v: unknown): string {
+  const s = String(v);
+  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+    const d = new Date(s);
+    if (!Number.isNaN(d.getTime())) return d.toLocaleDateString();
+  }
+  return s;
+}
+
+// Shown elsewhere in the panel (or pure noise) - excluded from generic key facts.
+const FACT_SKIP = new Set([
+  "region",
+  "accountRef",
+  "health",
+  "tags",
+  "vpcConfig",
+  "role",
+  "isPrivate",
+  "fullName",
+  "description",
+]);
+
+/** Per-kind headline facts, then a generic scalar fallback - the panel should answer
+ *  "what IS this thing" without a jump to Explore. */
+function keyFacts(node: MapNode): Array<[string, string]> {
+  const a = node.attributes ?? {};
+  const get = (k: string): unknown => a[k];
+  const out: Array<[string, string]> = [];
+  const push = (label: string, v: unknown) => {
+    if (v !== undefined && v !== null && v !== "") out.push([label, fact(v)]);
+  };
+
+  switch (node.kind) {
+    case "aws.lambda.function":
+      push("Runtime", get("runtime"));
+      push("Handler", get("handler"));
+      break;
+    case "aws.ec2.instance":
+      push("Type", get("instanceType"));
+      push("State", get("state"));
+      push("Private IP", get("privateIp"));
+      break;
+    case "aws.rds.instance": {
+      const engine = get("engine");
+      const ver = get("engineVersion");
+      push("Engine", engine ? `${String(engine)}${ver ? ` ${String(ver)}` : ""}` : undefined);
+      const host = get("endpointAddress");
+      push("Endpoint", host ? `${String(host)}:${String(get("endpointPort") ?? "")}` : undefined);
+      break;
+    }
+    case "aws.elb":
+      push("Type", get("type"));
+      push("Scheme", get("scheme"));
+      push("DNS", get("dnsName"));
+      break;
+    case "aws.ecs.service": {
+      push("Cluster", get("cluster"));
+      push("Desired tasks", get("desiredCount"));
+      const td = get("taskDefinition");
+      if (typeof td === "string") {
+        const m = /task-definition\/(.+)$/.exec(td);
+        push("Task definition", m?.[1] ?? td);
+      }
+      break;
+    }
+    case "bitbucket.repository":
+      push("Language", get("language"));
+      push("Main branch", get("mainBranch"));
+      push("Updated", get("updatedOn"));
+      break;
+    default:
+      break;
+  }
+
+  // Generic fallback: remaining scalar attributes, capped so the panel stays a panel.
+  const seen = new Set(out.map(([l]) => l.toLowerCase()));
+  for (const [k, v] of Object.entries(a)) {
+    if (out.length >= 6) break;
+    if (FACT_SKIP.has(k) || seen.has(prettyKey(k).toLowerCase())) continue;
+    if (typeof v !== "string" && typeof v !== "number" && typeof v !== "boolean") continue;
+    push(prettyKey(k), v);
+  }
+  return out.slice(0, 6);
+}
+
 function DetailPanel({
   node,
   data,
+  protectedBy,
   onClose,
 }: {
   node: MapNode;
   data: MapData;
+  protectedBy: string[];
   onClose: () => void;
 }) {
   const kindShort = node.kind.replace(/^aws\.|^github\.|^external\.|^atlas\.|^bitbucket\./, "");
+  const facts = keyFacts(node);
 
   const rels = useMemo(() => {
     const byId = new Map(data.nodes.map((n) => [n.id, n]));
@@ -466,12 +569,22 @@ function DetailPanel({
                     ? "text-warning"
                     : "text-success",
               )}
-              title={node.health.reason}
+              title={
+                node.health.checkedAt
+                  ? `checked ${new Date(node.health.checkedAt).toLocaleTimeString()}`
+                  : node.health.reason
+              }
             >
               {node.health.state}
               {node.health.reason ? ` · ${node.health.reason}` : ""}
             </dd>
           </div>
+        ) : null}
+        {facts.map(([label, value]) => (
+          <Row key={label} label={label} value={value} />
+        ))}
+        {protectedBy.length > 0 ? (
+          <Row label="Protected by" value={protectedBy.join(", ")} />
         ) : null}
         {node.region ? <Row label="Region" value={node.region} /> : null}
         {node.accountRef ? <Row label="Account" value={node.accountRef} /> : null}

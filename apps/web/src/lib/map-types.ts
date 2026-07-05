@@ -22,6 +22,8 @@ export interface MapNode {
   environment: string;
   accountRef: string | null;
   health?: NodeHealth | null;
+  /** Full node attributes (the /graph API ships them) - the detail panel's key facts. */
+  attributes?: Record<string, unknown>;
 }
 
 export interface MapEdge {
