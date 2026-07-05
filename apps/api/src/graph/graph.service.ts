@@ -19,6 +19,7 @@ import {
   type NodeRowish,
   type TimelineQuery,
   type TraversalQuery,
+  healthFrom,
 } from "./dto";
 import { inferEnvironment } from "./environment";
 
@@ -354,7 +355,7 @@ export class GraphService {
         return { cats, meta, edgeCount, codeCounts, stale };
       }),
       scope(async (c) => {
-        const [conns, cross, blast, noPipeline, emptyProjects] = await Promise.all([
+        const [conns, cross, blast, noPipeline, emptyProjects, unhealthy] = await Promise.all([
           c.query<{
             id: string;
             provider: string;
@@ -406,8 +407,19 @@ export class GraphService {
                    WHERE e.from_node_id = pr.id AND e.type = 'CONTAINS'
                      AND r.kind LIKE '%.repository')`,
           ),
+          // Runtime health (operational-intelligence Phase B): nodes the health poll marked
+          // degraded/unhealthy, worst first - the "something is broken right now" finding.
+          c.query<{ id: string; name: string | null; state: string; reason: string | null }>(
+            `SELECT id, name, attributes->'health'->>'state' AS state,
+                    attributes->'health'->>'reason' AS reason
+               FROM nodes
+              WHERE status <> 'deleted' AND deleted_at IS NULL
+                AND attributes->'health'->>'state' IN ('degraded', 'unhealthy')
+              ORDER BY CASE attributes->'health'->>'state' WHEN 'unhealthy' THEN 0 ELSE 1 END
+              LIMIT 20`,
+          ),
         ]);
-        return { conns, cross, blast, noPipeline, emptyProjects };
+        return { conns, cross, blast, noPipeline, emptyProjects, unhealthy };
       }),
       scope(async (c) => {
         const [contributors, mostActiveRepos, vulnSeverity, topVulnPkg, sprawl] = await Promise.all(
@@ -494,7 +506,7 @@ export class GraphService {
     ]);
 
     const { cats, meta, edgeCount, codeCounts, stale } = grpInventory;
-    const { conns, cross, blast, noPipeline, emptyProjects } = grpTopology;
+    const { conns, cross, blast, noPipeline, emptyProjects, unhealthy } = grpTopology;
     const { contributors, mostActiveRepos, vulnSeverity, topVulnPkg, sprawl } = grpPeopleVulns;
 
     const base = (() => {
@@ -543,6 +555,7 @@ export class GraphService {
         stale: stale.rows[0]?.n ?? 0,
         noPipeline: noPipeline.rows[0]?.n ?? 0,
         emptyProjects: emptyProjects.rows[0]?.n ?? 0,
+        unhealthyNodes: unhealthy.rows,
         topContributors: contributors.rows.map((r) => ({ name: r.name ?? "unknown", count: r.n })),
         mostActiveRepos: mostActiveRepos.rows.map((r) => ({
           name: r.name ?? "unknown",
@@ -556,6 +569,26 @@ export class GraphService {
 
     // ── Findings (severity-ranked, cited) ──────────────────────────────────────
     const findings: Finding[] = [];
+    // ── Runtime health (operational-intelligence Phase B) - broken-right-now outranks hygiene ──
+    const unhealthyNodes = base.unhealthyNodes ?? [];
+    const brokenCount = unhealthyNodes.filter((n) => n.state === "unhealthy").length;
+    if (unhealthyNodes.length > 0) {
+      const worst = unhealthyNodes[0];
+      findings.push({
+        id: "service-health",
+        severity: brokenCount > 0 ? "high" : "medium",
+        category: "Service health",
+        title:
+          brokenCount > 0
+            ? `${brokenCount} resource${brokenCount > 1 ? "s are" : " is"} unhealthy right now`
+            : `${unhealthyNodes.length} resource${unhealthyNodes.length > 1 ? "s are" : " is"} degraded right now`,
+        detail: worst
+          ? `${worst.name ?? "A resource"}: ${worst.reason ?? worst.state}${unhealthyNodes.length > 1 ? ` (+${unhealthyNodes.length - 1} more)` : ""}`
+          : "",
+        href: worst ? `/explore/${worst.id}` : "/map",
+        count: unhealthyNodes.length,
+      });
+    }
     const STALE_MS = 7 * 24 * 60 * 60 * 1000;
     const now = Date.now();
     for (const conn of base.conns) {
@@ -798,6 +831,7 @@ export class GraphService {
           attributes: r.attributes,
         }),
         accountRef: r.account_ref,
+        health: healthFrom(r.attributes),
       }));
       if (q.environment) mapped = mapped.filter((n) => n.environment === q.environment);
 

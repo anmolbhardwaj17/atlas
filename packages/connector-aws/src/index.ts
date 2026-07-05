@@ -35,6 +35,13 @@ export { createAwsConnector } from "./factory";
 export { DISCOVERERS, DISCOVERER_BY_SERVICE } from "./discoverers";
 export { probeFromDiscoverer, makeRef } from "./aws/discoverer";
 export type { Discoverer, CrawlScopeInput, DiscoveredResource } from "./aws/discoverer";
+export { collectAwsHealth } from "./health-collect";
+export type {
+  HealthState,
+  HealthObservation,
+  HealthCollectInput,
+  HealthCollectResult,
+} from "./health-collect";
 export { withRetry, classifyAwsError } from "./aws/retry";
 export type { AwsErrorClass, RetryOptions } from "./aws/retry";
 export { clientConfig } from "./aws/client-config";

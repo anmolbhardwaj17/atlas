@@ -36,6 +36,7 @@ import { isAccessDenied, type PermissionProbe, type ProbeInput } from "./permiss
 import { SERVICE_MODULES, MODULE_BY_KIND, type ServiceModule } from "./services";
 import type { AwsRawPayload } from "./services/module";
 import { DISCOVERER_BY_SERVICE } from "./discoverers";
+import { collectAwsHealth, type HealthCollectResult } from "./health-collect";
 
 const NOOP_LOGGER: ConnectorLogger = {
   debug: () => undefined,
@@ -135,6 +136,32 @@ export class AwsConnector implements Connector {
   /** Periodic re-check (FR-1.9). Same probe; catches revoked roles / new perm gaps. */
   async health(conn: Connection): Promise<HealthResult> {
     return this.probeConnection(conn, "atlas-health");
+  }
+
+  /**
+   * Runtime health pass (operational-intelligence Phase B): resolve this connection's
+   * credentials and collect point-in-time health observations (ELB target health, ECS
+   * running counts, RDS status, firing CloudWatch alarms) for its configured regions.
+   * Read-only, cheap - callers poll this far more often than a full crawl.
+   */
+  async collectHealth(
+    conn: Connection,
+    secrets: SecretAccessor,
+    signal?: AbortSignal,
+  ): Promise<HealthCollectResult> {
+    const cfg = parseAwsConfig(conn.config);
+    const assumed = await this.resolveCredentials(
+      conn,
+      secrets,
+      buildSessionName("atlas-health", conn.id),
+      signal,
+    );
+    return collectAwsHealth({
+      credentials: assumed.credentials,
+      accountId: assumed.accountId,
+      regions: cfg.regions,
+      ...(signal ? { signal } : {}),
+    });
   }
 
   private async probeConnection(conn: Connection, sessionPrefix: string): Promise<VerifyResult> {

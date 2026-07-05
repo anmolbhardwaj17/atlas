@@ -19,6 +19,7 @@ import { buildLayout } from "@/lib/map-layout";
 import { edgeCrossing, CROSS_COLOR, type MapData, type MapNode } from "@/lib/map-types";
 import { ResourceNode } from "@/components/map/resource-node";
 import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
+import { cn } from "@/lib/cn";
 
 const nodeTypes = { resource: ResourceNode };
 
@@ -354,6 +355,25 @@ function DetailPanel({
       </div>
 
       <dl className="mt-3 space-y-1.5 text-xs">
+        {node.health ? (
+          <div className="flex justify-between gap-3">
+            <dt className="text-muted-foreground">Health</dt>
+            <dd
+              className={cn(
+                "truncate font-medium",
+                node.health.state === "unhealthy"
+                  ? "text-danger"
+                  : node.health.state === "degraded"
+                    ? "text-warning"
+                    : "text-success",
+              )}
+              title={node.health.reason}
+            >
+              {node.health.state}
+              {node.health.reason ? ` · ${node.health.reason}` : ""}
+            </dd>
+          </div>
+        ) : null}
         {node.region ? <Row label="Region" value={node.region} /> : null}
         {node.accountRef ? <Row label="Account" value={node.accountRef} /> : null}
       </dl>

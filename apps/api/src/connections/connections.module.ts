@@ -16,6 +16,7 @@ import { ConnectionService } from "./connection.service";
 import { ConnectionController } from "./connection.controller";
 import { ConnectorRegistry } from "./connector-registry";
 import { SyncWorkerBootstrap } from "./sync-worker.bootstrap";
+import { HealthPollerBootstrap } from "./health-poller.bootstrap";
 import { SyncSchedulerBootstrap } from "./sync-scheduler.bootstrap";
 import { SECRET_BROKER, JOB_QUEUE } from "./tokens";
 
@@ -70,6 +71,7 @@ const connectorRegistryProvider: Provider = {
     connectorRegistryProvider,
     SyncWorkerBootstrap,
     SyncSchedulerBootstrap,
+    HealthPollerBootstrap,
   ],
   // Exported so the AI module can resolve per-org BYO-LLM keys through the same broker.
   exports: [SECRET_BROKER],

@@ -2,6 +2,7 @@ import type { EdgeUpsert, NodeUpsert, Signal } from "@atlas/connector-sdk";
 import { projectUrn, repositoryUrn, packageUrn } from "../urn";
 import { readContext, obj, str } from "./context";
 import { parseManifest } from "../parsers/manifest";
+import { parsePipelineDeploys } from "../parsers/pipeline-deploy";
 
 /**
  * A Bitbucket repository → bitbucket.repository node. Observed edges: the repo's project
@@ -31,15 +32,33 @@ export function repositoryNode(payload: unknown): NodeUpsert {
 export function repositorySignals(payload: unknown): Signal[] {
   const { workspace } = readContext(payload);
   const slug = str(payload, "slug");
+  if (!slug) return [];
+  const self = repositoryUrn(workspace, slug);
+  const signals: Signal[] = [];
+
   const language = str(payload, "language");
-  if (!slug || !language) return [];
-  return [
-    {
-      kind: "repo_language",
-      subjectUrn: repositoryUrn(workspace, slug),
-      data: { language },
-    },
-  ];
+  if (language) {
+    signals.push({ kind: "repo_language", subjectUrn: self, data: { language } });
+  }
+
+  // Deploy evidence from bitbucket-pipelines.yml (fetched in discover, expanded with the
+  // repo's non-secured pipeline/deployment variables) → one signal that R1 turns into
+  // DEPLOYS_TO edges. Emitted only when the file yields concrete evidence.
+  const p = payload as {
+    _pipelineYml?: string | null;
+    _pipelineVars?: Array<{ environment: string | null; vars: Record<string, string> }>;
+  };
+  if (p._pipelineYml) {
+    const deploys = parsePipelineDeploys(p._pipelineYml, p._pipelineVars ?? []);
+    if (deploys.ecrImages.length > 0 || deploys.targets.length > 0) {
+      signals.push({
+        kind: "bitbucket.pipeline.deploy",
+        subjectUrn: self,
+        data: { repo: self, targets: deploys.targets, ecrImages: deploys.ecrImages },
+      });
+    }
+  }
+  return signals;
 }
 
 export function repositoryEdges(payload: unknown): EdgeUpsert[] {

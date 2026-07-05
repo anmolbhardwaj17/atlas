@@ -21,7 +21,12 @@ export interface BitbucketClient {
   /** Yield `values[]` across pages, following the body's `next` URL. */
   paginate<T>(path: string, opts?: BitbucketRequestOptions): AsyncIterable<T>;
   /** Raw file text at a revision (the `src` endpoint returns text, not JSON). `null` if absent. */
-  content(workspace: string, repoSlug: string, revision: string, path: string): Promise<string | null>;
+  content(
+    workspace: string,
+    repoSlug: string,
+    revision: string,
+    path: string,
+  ): Promise<string | null>;
 }
 
 export interface FetchBitbucketClientDeps {

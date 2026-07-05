@@ -3,6 +3,8 @@ export type { RunnerDeps, SyncRunRecord, SyncResult, SyncStats } from "./sync-ru
 export { runOsvEnrichment } from "./osv-enrichment";
 export type { OsvEnrichmentDeps, OsvEnrichmentResult } from "./osv-enrichment";
 export { OsvClient, pkgKey } from "./osv";
+export { applyHealthObservations } from "./health-apply";
+export type { HealthObservationInput, HealthApplyResult } from "./health-apply";
 export type {
   OsvEcosystem,
   OsvQueryPkg,

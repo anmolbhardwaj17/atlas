@@ -117,9 +117,31 @@ export const GraphQuerySchema = z
 export type GraphQuery = z.infer<typeof GraphQuerySchema>;
 
 /** A node in the map view: the read DTO plus its (derived) environment + account grouping. */
+/** Point-in-time runtime health (operational-intelligence Phase B), from attributes.health. */
+export interface NodeHealthDto {
+  state: "healthy" | "degraded" | "unhealthy";
+  reason?: string;
+  checkedAt?: string;
+}
+
 export interface GraphNodeDto extends NodeDto {
   environment: string;
   accountRef: string | null;
+  health: NodeHealthDto | null;
+}
+
+const HEALTH_STATES = new Set(["healthy", "degraded", "unhealthy"]);
+
+/** Extract a valid health annotation from node attributes (unknown/absent → null). */
+export function healthFrom(attributes: Record<string, unknown>): NodeHealthDto | null {
+  const h = attributes["health"] as
+    { state?: unknown; reason?: unknown; checkedAt?: unknown } | undefined;
+  if (!h || typeof h.state !== "string" || !HEALTH_STATES.has(h.state)) return null;
+  return {
+    state: h.state as NodeHealthDto["state"],
+    ...(typeof h.reason === "string" ? { reason: h.reason } : {}),
+    ...(typeof h.checkedAt === "string" ? { checkedAt: h.checkedAt } : {}),
+  };
 }
 
 /** Impact-bearing edge types traversed for blast-radius/dependencies (docs/05 §7.2). */

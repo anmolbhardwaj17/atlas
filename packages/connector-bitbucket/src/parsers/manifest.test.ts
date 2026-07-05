@@ -5,7 +5,10 @@ describe("parseManifest", () => {
   it("npm package.json — deps + devDeps", () => {
     const deps = parseManifest(
       "package.json",
-      JSON.stringify({ dependencies: { lodash: "4.17.11" }, devDependencies: { vitest: "^1.0.0" } }),
+      JSON.stringify({
+        dependencies: { lodash: "4.17.11" },
+        devDependencies: { vitest: "^1.0.0" },
+      }),
     );
     expect(deps).toEqual([
       { ecosystem: "npm", name: "lodash", version: "4.17.11" },

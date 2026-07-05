@@ -33,6 +33,15 @@ export function ResourceNode({ data, selected }: NodeProps) {
   const logo = KIND_LOGO[node.kind];
   const short = kindShort(node.kind);
   const stale = node.status === "stale";
+  // Runtime health (Phase B): unhealthy → red ring, degraded → amber. Unknown = no ring,
+  // never fake green (docs/09 §7).
+  const health = node.health ?? null;
+  const healthRing =
+    health?.state === "unhealthy"
+      ? "border-danger ring-1 ring-danger"
+      : health?.state === "degraded"
+        ? "border-warning ring-1 ring-warning"
+        : null;
 
   return (
     <div
@@ -42,10 +51,14 @@ export function ResourceNode({ data, selected }: NodeProps) {
         "transition-[transform,box-shadow,border-color] hover:-translate-y-0.5 hover:shadow-md",
         selected
           ? "border-foreground ring-1 ring-foreground"
-          : "border-border hover:border-foreground/40",
+          : (healthRing ?? "border-border hover:border-foreground/40"),
         stale && "opacity-60",
       )}
-      title={node.urn}
+      title={
+        health && health.state !== "healthy"
+          ? `${node.urn} — ${health.reason ?? health.state}`
+          : node.urn
+      }
     >
       <Handle
         type="target"
@@ -66,6 +79,25 @@ export function ResourceNode({ data, selected }: NodeProps) {
           {short}
           {node.region ? ` · ${node.region}` : ""}
         </div>
+        {health && health.state !== "healthy" ? (
+          <span
+            className={cn(
+              "mt-1 inline-flex max-w-full items-center gap-1 truncate rounded-full px-1.5 py-px text-[9px] font-medium",
+              health.state === "unhealthy"
+                ? "bg-danger/15 text-danger"
+                : "bg-warning/15 text-warning",
+            )}
+            title={health.reason}
+          >
+            <span
+              className={cn(
+                "size-1.5 shrink-0 animate-pulse rounded-full",
+                health.state === "unhealthy" ? "bg-danger" : "bg-warning",
+              )}
+            />
+            <span className="truncate">{health.reason ?? health.state}</span>
+          </span>
+        ) : null}
         {openPrs > 0 ? (
           <span className="mt-1 inline-flex items-center gap-0.5 rounded-full bg-sky-500/15 px-1.5 py-px text-[9px] font-medium text-sky-600 dark:text-sky-400">
             <GitPullRequest className="size-2.5" />

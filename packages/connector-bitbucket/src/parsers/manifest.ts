@@ -89,7 +89,11 @@ function parsePomXml(content: string): PackageDep[] {
     const groupId = tag(block, "groupId");
     const artifactId = tag(block, "artifactId");
     if (!groupId || !artifactId) continue;
-    out.push({ ecosystem: "maven", name: `${groupId}:${artifactId}`, version: tag(block, "version") });
+    out.push({
+      ecosystem: "maven",
+      name: `${groupId}:${artifactId}`,
+      version: tag(block, "version"),
+    });
   }
   return dedupe(out);
 }

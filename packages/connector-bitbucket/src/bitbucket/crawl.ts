@@ -95,9 +95,67 @@ export async function* discoverRepo(
     if (content != null) manifests.push({ path, content });
   }
 
+  // Deploy evidence (operational-intelligence Phase A): the pipeline file says where this
+  // repo ships (ECR pushes, ecs update-service, lambda update-function-code). Real pipelines
+  // are parameterized, so also collect the NON-SECURED repo + deployment-environment
+  // variables (readable via API; secured ones have no value) — the repository module
+  // substitutes them per environment before extracting targets. Best-effort throughout.
+  const pipelineYml = await client.content(workspace, repoSlug, branch, "bitbucket-pipelines.yml");
+
+  // Environments are also pipeline nodes (yielded below) - collect once.
+  const environments: Json[] = [];
+  try {
+    for await (const env of client.paginate<Json>(
+      `/repositories/${workspace}/${repoSlug}/environments/`,
+    )) {
+      environments.push(env);
+    }
+  } catch {
+    // environments not configured / not permitted — skip this repo's pipelines
+  }
+
+  const varSets: Array<{ environment: string | null; vars: Record<string, string> }> = [];
+  if (pipelineYml) {
+    const repoVars: Record<string, string> = {};
+    try {
+      for await (const v of client.paginate<Json>(
+        `/repositories/${workspace}/${repoSlug}/pipelines_config/variables/`,
+      )) {
+        const key = s(v.key);
+        if (key && v.secured !== true && typeof v.value === "string") repoVars[key] = v.value;
+      }
+    } catch {
+      // pipelines not enabled / not permitted — proceed with what we have
+    }
+    if (Object.keys(repoVars).length > 0) varSets.push({ environment: null, vars: repoVars });
+
+    for (const env of environments) {
+      const uuid = s(env.uuid);
+      if (!uuid) continue;
+      const envVars: Record<string, string> = {};
+      try {
+        for await (const v of client.paginate<Json>(
+          `/repositories/${workspace}/${repoSlug}/deployments_config/environments/${encodeURIComponent(uuid)}/variables`,
+        )) {
+          const key = s(v.key);
+          if (key && v.secured !== true && typeof v.value === "string") envVars[key] = v.value;
+        }
+      } catch {
+        continue;
+      }
+      if (Object.keys(envVars).length > 0) {
+        // Environment vars layer over repo vars (Bitbucket's own precedence).
+        varSets.push({ environment: s(env.name) || uuid, vars: { ...repoVars, ...envVars } });
+      }
+    }
+  }
+
   yield {
     ref: { scopeKey, externalId: `repo:${repoSlug}`, kind: "bitbucket.repository" },
-    payload: withContext({ ...repo, _manifests: manifests }, ctx),
+    payload: withContext(
+      { ...repo, _manifests: manifests, _pipelineYml: pipelineYml, _pipelineVars: varSets },
+      ctx,
+    ),
   };
 
   // The dependency (external.package) nodes the repo's DEPENDS_ON_PKG edges point at.
@@ -114,20 +172,14 @@ export async function* discoverRepo(
     }
   }
 
-  // Deployment environments → pipeline (deploy-target) nodes. Absent/forbidden ⇒ skip.
-  try {
-    for await (const env of client.paginate<Json>(
-      `/repositories/${workspace}/${repoSlug}/environments/`,
-    )) {
-      const id = s(env.uuid) || s(env.name);
-      if (!id) continue;
-      yield {
-        ref: { scopeKey, externalId: `env:${repoSlug}:${id}`, kind: "bitbucket.pipeline" },
-        payload: withContext(env, ctx),
-      };
-    }
-  } catch {
-    // environments not configured / not permitted — skip this repo's pipelines
+  // Deployment environments → pipeline (deploy-target) nodes (collected above).
+  for (const env of environments) {
+    const id = s(env.uuid) || s(env.name);
+    if (!id) continue;
+    yield {
+      ref: { scopeKey, externalId: `env:${repoSlug}:${id}`, kind: "bitbucket.pipeline" },
+      payload: withContext(env, ctx),
+    };
   }
 
   // Open pull requests (in-flight work). Absent/forbidden ⇒ skip.

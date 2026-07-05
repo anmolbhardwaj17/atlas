@@ -53,6 +53,12 @@ export const EnvSchema = z.object({
   // secrets (SECRET_ENCRYPTION_KEY) so a sync can resolve credentials without a reconnect.
   SYNC_INTERVAL_MINUTES: z.coerce.number().int().min(0).max(1440).default(0),
 
+  // Runtime-health poll cadence (operational-intelligence Phase B): cheap read-only checks
+  // (ELB target health, ECS counts, RDS status, firing alarms) annotating nodes with
+  // attributes.health. Far cheaper than a crawl → can run every couple of minutes.
+  // 0 = disabled. Needs durable secrets like the sync scheduler.
+  HEALTH_INTERVAL_MINUTES: z.coerce.number().int().min(0).max(1440).default(0),
+
   // Browser origin allowed to call the API (CORS). The web app calls the API
   // client-side (Bearer token), so this must list the web origin. Default = local web.
   WEB_ORIGIN: z.string().url().default("http://localhost:4291"),
