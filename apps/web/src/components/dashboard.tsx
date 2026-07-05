@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   Boxes,
   Database,
-  Layers,
   Cloud,
   ArrowRight,
   CheckCircle2,
@@ -108,11 +107,6 @@ export async function Dashboard({
         <StatGroup label="Infrastructure">
           <Stat icon={<Boxes className="size-4" />} label="Services" value={inv.services} />
           <Stat icon={<Database className="size-4" />} label="Datastores" value={inv.datastores} />
-          <Stat
-            icon={<Layers className="size-4" />}
-            label="Environments"
-            value={inv.environments}
-          />
           <Stat
             icon={<Cloud className="size-4" />}
             label="Clouds"

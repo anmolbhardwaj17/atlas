@@ -14,61 +14,23 @@ import {
   useReactFlow,
   type NodeMouseHandler,
 } from "@xyflow/react";
-import { X, Info } from "lucide-react";
+import { X } from "lucide-react";
 import { buildLayout } from "@/lib/map-layout";
-import {
-  ENV_LABEL,
-  edgeCrossing,
-  groupingFor,
-  chipVisual,
-  CROSS_COLOR,
-  type ChipVisual,
-  type GroupMode,
-  type Grouping,
-  type MapData,
-  type MapNode,
-} from "@/lib/map-types";
-import { ResourceNode, EnvLaneNode } from "@/components/map/resource-node";
+import { edgeCrossing, CROSS_COLOR, type MapData, type MapNode } from "@/lib/map-types";
+import { ResourceNode } from "@/components/map/resource-node";
 import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
-import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
-import { cn } from "@/lib/cn";
 
-const nodeTypes = { resource: ResourceNode, envLane: EnvLaneNode };
+const nodeTypes = { resource: ResourceNode };
 
 /**
  * Interactive infrastructure map (docs/09 §5.4). Resources as nodes, connections as edges,
- * framed into environment lanes (prod / staging / … / code). Read-first: pan, zoom, filter
- * by environment, click a resource to inspect it and jump to its detail / blast-radius.
- * Certainty is legible per node (solid = observed, faded/ring = inferred) and per edge
- * (solid = observed, dashed = inferred) - P3/P4, mono theme.
+ * laid out as ONE left-to-right architecture flow (entry points → compute → data). Read-first:
+ * pan, zoom, click a resource to inspect it and jump to its detail / blast-radius. Certainty
+ * is legible per node (solid = observed, faded/ring = inferred) and per edge (solid =
+ * observed, dashed = inferred) - P3/P4, mono theme. Environment/cloud/account lane grouping
+ * is disabled for now (single-env estates) - revisit when a customer needs it.
  */
-const GROUP_MODES: { mode: GroupMode; label: string }[] = [
-  { mode: "environment", label: "Environment" },
-  { mode: "cloud", label: "Cloud" },
-  { mode: "account", label: "Account" },
-];
-
-/** One-line explainer of what the lanes mean in the current grouping - updates on selection. */
-const GROUP_HELP: Record<GroupMode, string> = {
-  environment:
-    "Lanes are environments - where each resource runs (Production, Staging, or shared code).",
-  cloud:
-    "Lanes are cloud providers - who runs each resource (AWS, Azure, GCP) plus your code hosts.",
-  account:
-    "Lanes are accounts - the billing & isolation boundary each resource lives in (an AWS account, Azure subscription, or GCP project).",
-};
-
 export function InfraMap({ data }: { data: MapData }) {
-  const [groupMode, setGroupMode] = useState<GroupMode>("environment");
-  const grouping = useMemo(() => groupingFor(groupMode), [groupMode]);
-
-  // The present lane keys for the current grouping, in lane order.
-  const present = useMemo(
-    () => grouping.order([...new Set(data.nodes.map((n) => grouping.keyOf(n)))]),
-    [data.nodes, grouping],
-  );
-
-  const [active, setActive] = useState<Set<string>>(() => new Set(present));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = selectedId ? (data.nodes.find((n) => n.id === selectedId) ?? null) : null;
 
@@ -129,67 +91,17 @@ export function InfraMap({ data }: { data: MapData }) {
     return { crossCloud, crossAccount };
   }, [data]);
 
-  // Reset the lane filter to "all present" whenever the grouping dimension changes.
-  useEffect(() => setActive(new Set(present)), [present]);
-
-  function toggleKey(key: string) {
-    setActive((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next.size === 0 ? new Set(present) : next; // never show nothing
-    });
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Infrastructure map</h1>
           <p className="text-sm text-muted-foreground">
-            Your estate as one graph - across accounts and clouds. Group it, then click a resource
-            to inspect it.
+            Your estate as one flow - traffic enters on the left and moves right through compute
+            into data. Click a resource to inspect it.
           </p>
         </div>
-        {/* Group-by segmented control. */}
-        <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/40 p-0.5 text-xs">
-          {GROUP_MODES.map((g) => (
-            <button
-              key={g.mode}
-              type="button"
-              onClick={() => setGroupMode(g.mode)}
-              aria-pressed={groupMode === g.mode}
-              className={cn(
-                "rounded-md px-2.5 py-1 font-medium transition-colors",
-                groupMode === g.mode
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {g.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Contextual explainer - what the lanes mean in the current grouping. */}
-      <p className="flex items-center gap-1.5 rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-        <Info className="size-3.5 shrink-0" />
-        {GROUP_HELP[groupMode]}
-      </p>
-
-      <div className="flex flex-wrap items-center gap-2">
-        {present.map((key) => (
-          <GroupChip
-            key={key}
-            mode={groupMode}
-            label={grouping.labelOf(key)}
-            visual={chipVisual(groupMode, key)}
-            active={active.has(key)}
-            onToggle={() => toggleKey(key)}
-          />
-        ))}
-        <span className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
+        <span className="flex items-center gap-3 text-xs text-muted-foreground">
           {cross.crossCloud + cross.crossAccount > 0 && (
             <span
               className="flex items-center gap-1.5 rounded-full border border-transparent px-2.5 py-1 font-medium"
@@ -217,8 +129,6 @@ export function InfraMap({ data }: { data: MapData }) {
         <ReactFlowProvider>
           <Flow
             data={data}
-            active={active}
-            grouping={grouping}
             onSelect={setSelectedId}
             childrenOf={childrenOf}
             connectedIds={connectedIds}
@@ -242,8 +152,6 @@ export function InfraMap({ data }: { data: MapData }) {
  */
 function Flow({
   data,
-  active,
-  grouping,
   onSelect,
   childrenOf,
   connectedIds,
@@ -251,8 +159,6 @@ function Flow({
   onToggleCollapse,
 }: {
   data: MapData;
-  active: Set<string>;
-  grouping: Grouping;
   onSelect: (id: string | null) => void;
   childrenOf: Map<string, string[]>;
   connectedIds: Set<string>;
@@ -290,12 +196,10 @@ function Flow({
   }, [data]);
 
   const layout = useMemo(() => {
-    const visibleNodes = data.nodes.filter(
-      (n) => active.has(grouping.keyOf(n)) && connectedIds.has(n.id) && !hiddenSet.has(n.id),
-    );
+    const visibleNodes = data.nodes.filter((n) => connectedIds.has(n.id) && !hiddenSet.has(n.id));
     const ids = new Set(visibleNodes.map((n) => n.id));
     const visibleEdges = data.edges.filter((e) => ids.has(e.from) && ids.has(e.to));
-    const l = buildLayout(visibleNodes, visibleEdges, grouping);
+    const l = buildLayout(visibleNodes, visibleEdges);
     // Attach collapse state (drives the ⊕/⊖ toggle) + an open-PR count so repos with in-flight
     // work are spottable without expanding each one. The map already filters to open PRs, so any
     // CONTAINS child that's a PR node is open.
@@ -323,17 +227,7 @@ function Flow({
       };
     });
     return l;
-  }, [
-    data,
-    active,
-    grouping,
-    hiddenSet,
-    collapsed,
-    childrenOf,
-    connectedIds,
-    onToggleCollapse,
-    openPrByRepo,
-  ]);
+  }, [data, hiddenSet, collapsed, childrenOf, connectedIds, onToggleCollapse, openPrByRepo]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layout.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layout.edges);
@@ -379,84 +273,6 @@ function Flow({
       <Controls showInteractive={false} />
       <MiniMap pannable zoomable nodeColor="hsl(var(--muted-foreground))" />
     </ReactFlow>
-  );
-}
-
-/**
- * A group-by filter chip. Environments carry a semantic hue + dot; clouds carry their brand
- * hue + real logo; accounts stay neutral. Selected = category-coloured fill, off = muted
- * outline (with the category cue still visible so the palette reads even when filtered out).
- */
-function GroupChip({
-  mode,
-  label,
-  visual,
-  active,
-  onToggle,
-}: {
-  mode: GroupMode;
-  label: string;
-  visual: ChipVisual;
-  active: boolean;
-  onToggle: () => void;
-}) {
-  const base =
-    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors";
-  const off = "border-border text-muted-foreground hover:border-foreground/40";
-  const FallbackIcon = visual.fallbackIcon;
-
-  // Cloud lanes: brand hue + real logo, driven inline (brand colours aren't theme tokens).
-  if (mode === "cloud" && visual.brand) {
-    return (
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-pressed={active}
-        className={cn(base, active ? "border-transparent" : off)}
-        style={active ? { color: visual.brand, backgroundColor: `${visual.brand}1F` } : undefined}
-      >
-        {visual.logo && hasCloudIcon(visual.logo) ? (
-          <CloudIcon name={visual.logo} className="size-3.5" />
-        ) : FallbackIcon ? (
-          <FallbackIcon className="size-3.5" />
-        ) : null}
-        {label}
-      </button>
-    );
-  }
-
-  // Environment lanes: semantic hue class + always-visible dot.
-  if (mode === "environment") {
-    return (
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-pressed={active}
-        className={cn(base, active ? visual.activeClass : off)}
-      >
-        {visual.dot && <span className={cn("size-1.5 rounded-full", visual.dot)} />}
-        {label}
-      </button>
-    );
-  }
-
-  // Account (neutral): a neutral *tint* when active - same weight as the coloured lanes, so all
-  // chip types read as "selected" consistently (not a heavy solid fill that stood out).
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-pressed={active}
-      className={cn(base, active ? "border-transparent bg-foreground/10 text-foreground" : off)}
-    >
-      <span
-        className={cn(
-          "size-1.5 rounded-full",
-          active ? "bg-foreground/60" : "bg-muted-foreground/50",
-        )}
-      />
-      {label}
-    </button>
   );
 }
 
@@ -538,7 +354,6 @@ function DetailPanel({
       </div>
 
       <dl className="mt-3 space-y-1.5 text-xs">
-        <Row label="Environment" value={ENV_LABEL[node.environment] ?? node.environment} />
         {node.region ? <Row label="Region" value={node.region} /> : null}
         {node.accountRef ? <Row label="Account" value={node.accountRef} /> : null}
       </dl>
