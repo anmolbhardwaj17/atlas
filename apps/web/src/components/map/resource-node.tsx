@@ -1,7 +1,7 @@
 "use client";
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { ChevronDown, ChevronRight, GitPullRequest } from "lucide-react";
+import { ChevronDown, ChevronRight, GitPullRequest, Shield } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { CloudIcon } from "@/components/cloud-icon";
 import { kindIcon, kindStyle, kindShort, KIND_LOGO } from "@/lib/kind-visual";
@@ -25,10 +25,17 @@ export interface CollapseInfo {
 /** A resource in the infra map: kind icon (colored by type, from `kind-visual`) + name +
  *  region, a certainty dot, and a collapse toggle when it contains other nodes. */
 export function ResourceNode({ data, selected }: NodeProps) {
-  const d = data as { node: MapNode; collapse?: CollapseInfo; openPrCount?: number };
+  const d = data as {
+    node: MapNode;
+    collapse?: CollapseInfo;
+    openPrCount?: number;
+    /** Security groups protecting this node — protection reads as a chip, not canvas rails. */
+    protectedBy?: string[];
+  };
   const node = d.node;
   const collapse = d.collapse;
   const openPrs = d.openPrCount ?? 0;
+  const protectors = d.protectedBy ?? [];
   const Icon = kindIcon(node.kind);
   const logo = KIND_LOGO[node.kind];
   const short = kindShort(node.kind);
@@ -102,6 +109,15 @@ export function ResourceNode({ data, selected }: NodeProps) {
           <span className="mt-1 inline-flex items-center gap-0.5 rounded-full bg-sky-500/15 px-1.5 py-px text-[9px] font-medium text-sky-600 dark:text-sky-400">
             <GitPullRequest className="size-2.5" />
             {openPrs} open PR{openPrs > 1 ? "s" : ""}
+          </span>
+        ) : null}
+        {protectors.length > 0 ? (
+          <span
+            className="ml-1 mt-1 inline-flex items-center gap-0.5 rounded-full bg-muted px-1.5 py-px text-[9px] font-medium text-muted-foreground"
+            title={`Protected by ${protectors.join(", ")}`}
+          >
+            <Shield className="size-2.5" />
+            {protectors.length}
           </span>
         ) : null}
       </div>

@@ -12,6 +12,7 @@ import {
   useNodesState,
   useEdgesState,
   useReactFlow,
+  type Edge,
   type NodeMouseHandler,
 } from "@xyflow/react";
 import { X } from "lucide-react";
@@ -35,13 +36,32 @@ export function InfraMap({ data }: { data: MapData }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = selectedId ? (data.nodes.find((n) => n.id === selectedId) ?? null) : null;
 
+  // Protection is a PROPERTY, not a flow: a security group fanning out to five resources
+  // drew the longest, noisiest rails on the canvas. PROTECTS edges become a shield chip on
+  // the protected node (full list in its detail panel); they never reach the canvas. An SG
+  // whose only edges were PROTECTS then drops off the map automatically (still in Explore).
+  const canvasEdges = useMemo(() => data.edges.filter((e) => e.type !== "PROTECTS"), [data.edges]);
+  const protectedBy = useMemo(() => {
+    const byId = new Map(data.nodes.map((n) => [n.id, n]));
+    const m = new Map<string, string[]>();
+    for (const e of data.edges) {
+      if (e.type !== "PROTECTS") continue;
+      const sg = byId.get(e.from);
+      if (!sg) continue;
+      const arr = m.get(e.to) ?? [];
+      arr.push(shortName(sg));
+      m.set(e.to, arr);
+    }
+    return m;
+  }, [data]);
+
   // Containment hierarchy for drill-down collapse: a node "contains" the nodes it points to
   // via structural edges (project→repo→pipeline/PR; PR→author). `connectedIds` = nodes with
-  // any edge - so isolated workspace members (no PRs) are dropped from the map entirely.
+  // any canvas edge - so isolated nodes are dropped from the map entirely.
   const { childrenOf, connectedIds } = useMemo(() => {
     const children = new Map<string, string[]>();
     const connected = new Set<string>();
-    for (const e of data.edges) {
+    for (const e of canvasEdges) {
       connected.add(e.from);
       connected.add(e.to);
       if (e.type === "CONTAINS" || e.type === "OWNED_BY") {
@@ -51,7 +71,7 @@ export function InfraMap({ data }: { data: MapData }) {
       }
     }
     return { childrenOf: children, connectedIds: connected };
-  }, [data.edges]);
+  }, [canvasEdges]);
 
   // Default = collapsed to top-level containers. Until the user toggles, the effective set is
   // "all containers folded" - computed during render so the FIRST paint is already collapsed
@@ -99,7 +119,7 @@ export function InfraMap({ data }: { data: MapData }) {
           <h1 className="text-xl font-semibold">Infrastructure map</h1>
           <p className="text-sm text-muted-foreground">
             Your estate as one flow - traffic enters on the left and moves right through compute
-            into data. Click a resource to inspect it.
+            into data. Hover a resource to see how it connects; click to inspect it.
           </p>
         </div>
         <span className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -130,6 +150,9 @@ export function InfraMap({ data }: { data: MapData }) {
         <ReactFlowProvider>
           <Flow
             data={data}
+            canvasEdges={canvasEdges}
+            protectedBy={protectedBy}
+            selectedId={selectedId}
             onSelect={setSelectedId}
             childrenOf={childrenOf}
             connectedIds={connectedIds}
@@ -151,8 +174,31 @@ export function InfraMap({ data }: { data: MapData }) {
  * `visibility:hidden` and never fits). We re-layout + re-fit whenever the data or the env
  * filter changes.
  */
+/** Edge decoration for hover/selection: the active node's edges light up and reveal their
+ *  label; everything else fades so the traced path is the only story on screen. */
+function decorateEdges(edges: Edge[], activeId: string | null): Edge[] {
+  if (!activeId) return edges;
+  return edges.map((e) => {
+    const touches = e.source === activeId || e.target === activeId;
+    return {
+      ...e,
+      label: touches ? ((e.data as { label?: string } | undefined)?.label ?? "") : undefined,
+      labelShowBg: true,
+      zIndex: touches ? 7 : (e.zIndex ?? 1),
+      style: {
+        ...e.style,
+        opacity: touches ? 1 : 0.12,
+        strokeWidth: touches ? 2.25 : (e.style?.strokeWidth ?? 1.5),
+      },
+    };
+  });
+}
+
 function Flow({
   data,
+  canvasEdges,
+  protectedBy,
+  selectedId,
   onSelect,
   childrenOf,
   connectedIds,
@@ -160,12 +206,17 @@ function Flow({
   onToggleCollapse,
 }: {
   data: MapData;
+  canvasEdges: MapData["edges"];
+  protectedBy: Map<string, string[]>;
+  selectedId: string | null;
   onSelect: (id: string | null) => void;
   childrenOf: Map<string, string[]>;
   connectedIds: Set<string>;
   collapsed: Set<string>;
   onToggleCollapse: (id: string) => void;
 }) {
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const activeId = hoveredId ?? selectedId;
   // Descendants of any collapsed node are hidden (BFS down the containment tree, cycle-safe).
   const hiddenSet = useMemo(() => {
     const hidden = new Set<string>();
@@ -199,21 +250,22 @@ function Flow({
   const layout = useMemo(() => {
     const visibleNodes = data.nodes.filter((n) => connectedIds.has(n.id) && !hiddenSet.has(n.id));
     const ids = new Set(visibleNodes.map((n) => n.id));
-    const visibleEdges = data.edges.filter((e) => ids.has(e.from) && ids.has(e.to));
+    const visibleEdges = canvasEdges.filter((e) => ids.has(e.from) && ids.has(e.to));
     const l = buildLayout(visibleNodes, visibleEdges);
-    // Attach collapse state (drives the ⊕/⊖ toggle) + an open-PR count so repos with in-flight
-    // work are spottable without expanding each one. The map already filters to open PRs, so any
-    // CONTAINS child that's a PR node is open.
+    // Attach collapse state (drives the ⊕/⊖ toggle), an open-PR count, and the shield chip
+    // (who protects this node) so protection reads on the card, not as canvas rails.
     l.nodes = l.nodes.map((nd) => {
       if (nd.type !== "resource") return nd;
       const kids = childrenOf.get(nd.id);
       const openPrCount = openPrByRepo.get(nd.id) ?? 0;
-      if ((!kids || kids.length === 0) && openPrCount === 0) return nd;
+      const protectors = protectedBy.get(nd.id);
+      if ((!kids || kids.length === 0) && openPrCount === 0 && !protectors) return nd;
       return {
         ...nd,
         data: {
           ...nd.data,
           openPrCount,
+          ...(protectors ? { protectedBy: protectors } : {}),
           ...(kids && kids.length > 0
             ? {
                 collapse: {
@@ -228,7 +280,17 @@ function Flow({
       };
     });
     return l;
-  }, [data, hiddenSet, collapsed, childrenOf, connectedIds, onToggleCollapse, openPrByRepo]);
+  }, [
+    data,
+    canvasEdges,
+    protectedBy,
+    hiddenSet,
+    collapsed,
+    childrenOf,
+    connectedIds,
+    onToggleCollapse,
+    openPrByRepo,
+  ]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layout.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layout.edges);
@@ -236,7 +298,6 @@ function Flow({
 
   useEffect(() => {
     setNodes(layout.nodes);
-    setEdges(layout.edges);
     // Fit AFTER the store has the new nodes and painted them (double rAF) - fitting in the same
     // tick reads the stale store and zooms to the wrong box (the blank first paint).
     let raf2 = 0;
@@ -247,11 +308,20 @@ function Flow({
       cancelAnimationFrame(raf1);
       if (raf2) cancelAnimationFrame(raf2);
     };
-  }, [layout, setNodes, setEdges, fitView]);
+  }, [layout, setNodes, fitView]);
+
+  // Edges re-decorate on hover/selection WITHOUT refitting the viewport.
+  useEffect(() => {
+    setEdges(decorateEdges(layout.edges, activeId));
+  }, [layout, activeId, setEdges]);
 
   const onNodeClick: NodeMouseHandler = (_evt, node) => {
     onSelect(node.type === "resource" ? node.id : null);
   };
+  const onNodeMouseEnter: NodeMouseHandler = (_evt, node) => {
+    if (node.type === "resource") setHoveredId(node.id);
+  };
+  const onNodeMouseLeave: NodeMouseHandler = () => setHoveredId(null);
 
   return (
     <ReactFlow
@@ -259,6 +329,8 @@ function Flow({
       edges={edges}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
+      onNodeMouseEnter={onNodeMouseEnter}
+      onNodeMouseLeave={onNodeMouseLeave}
       nodeTypes={nodeTypes}
       onNodeClick={onNodeClick}
       onPaneClick={() => onSelect(null)}

@@ -67,8 +67,10 @@ export function buildLayout(mapNodes: MapNode[], mapEdges: MapEdge[]): LayoutRes
         type: "smoothstep",
         // Cross-boundary links are the point of a multi-cloud graph → always animate + accent.
         animated: boundary || FLOW_TYPES.has(e.type),
-        label,
-        labelShowBg: true,
+        // No always-on labels: repeated generic captions ("connects to" ×5) are noise and
+        // detach from long paths. The canvas reveals the label on hover/selection instead
+        // (decorateEdges in infra-map); solid-vs-dashed already encodes observed/inferred.
+        data: { label },
         zIndex: boundary ? 5 : 1,
         style: {
           stroke: boundary
