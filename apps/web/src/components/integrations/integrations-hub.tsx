@@ -177,6 +177,15 @@ function ProviderTile({
   );
 }
 
+/** Compact relative time for the sync line ("just now", "5m ago", "3h ago", "2d ago"). */
+function timeAgo(iso: string): string {
+  const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
+
 function ConnectionRow({
   conn,
   orgId,
@@ -189,10 +198,19 @@ function ConnectionRow({
   const router = useRouter();
   const [confirming, setConfirming] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
-  const [syncing, setSyncing] = React.useState(false);
-  const [note, setNote] = React.useState<{ tone: "ok" | "warn"; text: string } | null>(null);
+  const [triggering, setTriggering] = React.useState(false);
+  const [note, setNote] = React.useState<string | null>(null);
 
   const canSync = !conn.demo && (conn.status === "connected" || conn.status === "degraded");
+  const syncing = conn.syncing === true;
+  const missingPerms = conn.health?.missingPermissions ?? [];
+
+  // While a run is in flight, poll so the row flips to "Last synced…" when it lands.
+  React.useEffect(() => {
+    if (!syncing) return;
+    const t = setInterval(() => router.refresh(), 4000);
+    return () => clearInterval(t);
+  }, [syncing, router]);
 
   async function remove() {
     setBusy(true);
@@ -206,22 +224,15 @@ function ConnectionRow({
   }
 
   async function sync() {
-    setSyncing(true);
+    setTriggering(true);
     setNote(null);
     try {
-      const r = await triggerSync(orgId, conn.id);
-      setNote({
-        tone: "ok",
-        text:
-          r.status === "already_running"
-            ? "Already syncing…"
-            : "Sync started - new data lands in a few minutes.",
-      });
-      setTimeout(() => router.refresh(), 1500);
+      await triggerSync(orgId, conn.id);
+      router.refresh(); // the row's live "Syncing…" state takes over from here
     } catch (e) {
-      setNote({ tone: "warn", text: e instanceof Error ? e.message : "Couldn't start a sync." });
+      setNote(e instanceof Error ? e.message : "Couldn't start a sync.");
     } finally {
-      setSyncing(false);
+      setTriggering(false);
     }
   }
 
@@ -240,12 +251,12 @@ function ConnectionRow({
             <button
               type="button"
               onClick={() => void sync()}
-              disabled={syncing}
+              disabled={triggering || syncing}
               aria-label="Sync now"
-              title="Sync now - fetch the latest data"
+              title={syncing ? "Sync in progress" : "Sync now - fetch the latest data"}
               className="text-muted-foreground hover:text-foreground disabled:opacity-50"
             >
-              <RefreshCw className={cn("size-3.5", syncing && "animate-spin")} />
+              <RefreshCw className={cn("size-3.5", (triggering || syncing) && "animate-spin")} />
             </button>
           ) : null}
           {canManage &&
@@ -286,13 +297,36 @@ function ConnectionRow({
             ))}
         </span>
       </div>
-      {note ? (
+      {syncing ? (
+        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Loader2 className="size-3 animate-spin" />
+          Syncing - pulling the latest data…
+        </span>
+      ) : conn.lastSync ? (
         <span
-          className={cn("text-xs", note.tone === "ok" ? "text-muted-foreground" : "text-warning")}
+          className={cn(
+            "text-xs",
+            conn.lastSync.status === "failed" ? "text-danger" : "text-muted-foreground",
+          )}
         >
-          {note.text}
+          {conn.lastSync.status === "failed"
+            ? `Last sync failed ${timeAgo(conn.lastSync.finishedAt)}`
+            : `Last synced ${timeAgo(conn.lastSync.finishedAt)} · ${conn.lastSync.resources} resources`}
+          {conn.lastSync.status === "partial" && conn.lastSync.scopesFailed > 0 ? (
+            <span className="text-warning">
+              {" "}
+              · {conn.lastSync.scopesFailed} scope{conn.lastSync.scopesFailed === 1 ? "" : "s"}{" "}
+              skipped
+            </span>
+          ) : null}
         </span>
       ) : null}
+      {conn.status === "degraded" && missingPerms.length > 0 ? (
+        <span className="text-xs text-warning" title={missingPerms.join(", ")}>
+          Missing read access: <span className="font-mono">{missingPerms.join(", ")}</span>
+        </span>
+      ) : null}
+      {note ? <span className="text-xs text-danger">{note}</span> : null}
     </li>
   );
 }

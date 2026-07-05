@@ -9,6 +9,7 @@ import { SECRET_BROKER, JOB_QUEUE } from "./tokens";
 import type {
   ConnectionDto,
   CreateConnectionBody,
+  LastSyncDto,
   SyncTriggerDto,
   VerifyConnectionBody,
 } from "./dto";
@@ -50,12 +51,85 @@ export class ConnectionService {
       const { rows } = await c.query<ConnectionRow>(
         `SELECT ${SELECT_COLS} FROM connections WHERE deleted_at IS NULL ORDER BY created_at DESC`,
       );
-      return rows.map(toDto);
+      return this.attachSyncInfo(c, rows.map(toDto));
     });
   }
 
   async get(orgId: string, id: string): Promise<ConnectionDto> {
-    return withOrgScope(this.db, orgId, async (c) => toDto(await this.load(c, id)));
+    return withOrgScope(this.db, orgId, async (c) => {
+      const dto = toDto(await this.load(c, id));
+      const [enriched] = await this.attachSyncInfo(c, [dto]);
+      return enriched ?? dto;
+    });
+  }
+
+  /**
+   * Sync visibility (FR-1.5): mark connections with an in-flight run (`syncing`) and attach
+   * the most recent finished run's outcome (`lastSync`) so the hub can show live progress
+   * and "last synced X ago · N resources" honestly - a `partial` run is surfaced as such,
+   * never dressed up as a full success (P3). Runs inside the caller's org-scoped tx (RLS).
+   */
+  private async attachSyncInfo(
+    c: import("pg").PoolClient,
+    dtos: ConnectionDto[],
+  ): Promise<ConnectionDto[]> {
+    if (dtos.length === 0) return dtos;
+    const ids = dtos.map((d) => d.id);
+
+    // Reap orphaned in-flight runs first (self-healing). The dev worker is in-process and
+    // the queue in-memory, so an API restart can strand a run in queued/running forever -
+    // which would both render "Syncing…" as a permanent lie and block new runs via
+    // uq_sync_inflight (BR-SYNC-1). A run queued 15+ min without starting, or running for
+    // 60+ min (a full sync takes minutes), is dead: finalize it as failed, honestly.
+    const reaped = await c.query<{ id: string }>(
+      `UPDATE sync_runs
+         SET status = 'failed', finished_at = now(),
+             scope_result = scope_result || '{"reaped": "in-flight run orphaned (worker lost or restarted)"}'::jsonb
+         WHERE connection_id = ANY($1::uuid[])
+           AND ((status = 'queued' AND created_at < now() - interval '15 minutes')
+             OR (status = 'running' AND started_at < now() - interval '60 minutes'))
+         RETURNING id`,
+      [ids],
+    );
+    for (const r of reaped.rows) this.logger.warn(`reaped orphaned sync_run ${r.id}`);
+
+    const inflight = await c.query<{ connection_id: string }>(
+      `SELECT connection_id FROM sync_runs
+         WHERE connection_id = ANY($1::uuid[]) AND status IN ('queued', 'running')`,
+      [ids],
+    );
+    const syncingIds = new Set(inflight.rows.map((r) => r.connection_id));
+
+    const finished = await c.query<{
+      connection_id: string;
+      status: LastSyncDto["status"];
+      finished_at: Date;
+      stats: Record<string, unknown>;
+    }>(
+      `SELECT DISTINCT ON (connection_id) connection_id, status, finished_at, stats
+         FROM sync_runs
+         WHERE connection_id = ANY($1::uuid[]) AND finished_at IS NOT NULL
+         ORDER BY connection_id, finished_at DESC`,
+      [ids],
+    );
+    const lastByConn = new Map<string, LastSyncDto>(
+      finished.rows.map((r) => [
+        r.connection_id,
+        {
+          status: r.status,
+          finishedAt: r.finished_at.toISOString(),
+          resources: Number(r.stats["persisted"] ?? 0),
+          edges: Number(r.stats["edges"] ?? 0),
+          scopesFailed: Number(r.stats["scopesFailed"] ?? 0),
+        },
+      ]),
+    );
+
+    return dtos.map((d) => ({
+      ...d,
+      syncing: syncingIds.has(d.id),
+      lastSync: lastByConn.get(d.id) ?? null,
+    }));
   }
 
   async verify(orgId: string, id: string, body: VerifyConnectionBody): Promise<ConnectionDto> {
@@ -303,6 +377,9 @@ function toDto(row: ConnectionRow | undefined): ConnectionDto {
     secretConfigured: row.secret_ref !== null,
     demo: row.config?.demo === true,
     lastSyncedAt: row.last_synced_at?.toISOString() ?? null,
+    // Filled by attachSyncInfo on read paths; mutation returns are refreshed by the client.
+    syncing: false,
+    lastSync: null,
     createdAt: row.created_at.toISOString(),
   };
 }

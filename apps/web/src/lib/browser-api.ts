@@ -81,6 +81,15 @@ export async function seedDemo(orgId: string): Promise<DemoSeedResult> {
   return body.data;
 }
 
+/** Outcome of the most recent finished sync run (`partial` = some scopes skipped). */
+export interface LastSyncSummary {
+  status: "succeeded" | "partial" | "failed" | "cancelled";
+  finishedAt: string;
+  resources: number;
+  edges: number;
+  scopesFailed: number;
+}
+
 export interface ConnectionSummary {
   id: string;
   provider: string;
@@ -88,6 +97,12 @@ export interface ConnectionSummary {
   status: string;
   /** Sample/demo connection — not a real syncable source (skip in Fetch latest). */
   demo?: boolean;
+  /** Connector health from verify/sync probes - `missingPermissions` drives the degraded hint. */
+  health?: { missingPermissions?: string[] };
+  /** A sync run is queued/running right now. */
+  syncing?: boolean;
+  /** Most recent finished run, or null if none has completed yet. */
+  lastSync?: LastSyncSummary | null;
 }
 
 /** Create a connection for a provider (Integrations hub). Admin-only server-side. */
