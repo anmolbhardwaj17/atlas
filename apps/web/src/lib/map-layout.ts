@@ -48,42 +48,59 @@ export function buildLayout(mapNodes: MapNode[], mapEdges: MapEdge[]): LayoutRes
   });
 
   // "Flow" edges carry traffic/data → animate them so the map feels alive; structural edges
-  // (CONTAINS/PROTECTS/OWNED_BY/…) stay static so the motion means something.
+  // (CONTAINS/OWNED_BY/…) stay static so the motion means something.
   const FLOW_TYPES = new Set(["CONNECTS_TO", "ROUTES_TO", "DEPLOYS_TO", "STORES_IN", "DEPENDS_ON"]);
 
-  const edges: Edge[] = mapEdges
-    .filter((e) => byId.has(e.from) && byId.has(e.to))
-    .map((e) => {
-      const inferred = e.origin !== "observed";
-      const cross = edgeCrossing(byId.get(e.from), byId.get(e.to));
-      const boundary = cross.crossCloud || cross.crossAccount;
-      const label = boundary
-        ? `${cross.crossCloud ? "cross-cloud" : "cross-account"} · ${e.type.toLowerCase().replace(/_/g, " ")}`
-        : e.type.toLowerCase().replace(/_/g, " ");
-      return {
-        id: e.id,
-        source: e.from,
-        target: e.to,
-        type: "smoothstep",
-        // Cross-boundary links are the point of a multi-cloud graph → always animate + accent.
-        animated: boundary || FLOW_TYPES.has(e.type),
-        // No always-on labels: repeated generic captions ("connects to" ×5) are noise and
-        // detach from long paths. The canvas reveals the label on hover/selection instead
-        // (decorateEdges in infra-map); solid-vs-dashed already encodes observed/inferred.
-        data: { label },
-        zIndex: boundary ? 5 : 1,
-        style: {
-          stroke: boundary
-            ? CROSS_COLOR
-            : inferred
-              ? "hsl(var(--muted-foreground))"
-              : "hsl(var(--foreground))",
-          strokeWidth: boundary ? 2.25 : 1.5,
-          strokeDasharray: inferred && !boundary ? "5 4" : undefined,
-          opacity: boundary ? 1 : inferred ? 0.7 : 0.9,
-        },
-      };
-    });
+  // Merge every edge between the same PAIR of nodes into one drawn line. Two nodes often
+  // relate twice in opposite directions (bucket -stores in-> lambda + lambda -connects to->
+  // bucket); the backward one fights the LR layout and smoothstep wraps it clear around the
+  // row, skewering unrelated cards at handle height. One line per pair, labelled with every
+  // relationship on hover; observed beats inferred for the line style; the detail panel
+  // still lists each relationship individually.
+  const byPair = new Map<string, MapEdge[]>();
+  for (const e of mapEdges) {
+    if (!byId.has(e.from) || !byId.has(e.to)) continue;
+    const key = e.from < e.to ? `${e.from}|${e.to}` : `${e.to}|${e.from}`;
+    const arr = byPair.get(key);
+    if (arr) arr.push(e);
+    else byPair.set(key, [e]);
+  }
+
+  const edges: Edge[] = [...byPair.values()].map((group) => {
+    const primary = group.find((g) => g.origin === "observed") ?? (group[0] as MapEdge);
+    const inferred = group.every((g) => g.origin !== "observed");
+    const cross = edgeCrossing(byId.get(primary.from), byId.get(primary.to));
+    const boundary = cross.crossCloud || cross.crossAccount;
+    const types = [...new Set(group.map((g) => g.type.toLowerCase().replace(/_/g, " ")))].join(
+      " · ",
+    );
+    const label = boundary
+      ? `${cross.crossCloud ? "cross-cloud" : "cross-account"} · ${types}`
+      : types;
+    return {
+      id: primary.id,
+      source: primary.from,
+      target: primary.to,
+      type: "smoothstep",
+      // Cross-boundary links are the point of a multi-cloud graph → always animate + accent.
+      animated: boundary || group.some((g) => FLOW_TYPES.has(g.type)),
+      // No always-on labels: repeated generic captions ("connects to" ×5) are noise and
+      // detach from long paths. The canvas reveals the label on hover/selection instead
+      // (decorateEdges in infra-map); solid-vs-dashed already encodes observed/inferred.
+      data: { label },
+      zIndex: boundary ? 5 : 1,
+      style: {
+        stroke: boundary
+          ? CROSS_COLOR
+          : inferred
+            ? "hsl(var(--muted-foreground))"
+            : "hsl(var(--foreground))",
+        strokeWidth: boundary ? 2.25 : 1.5,
+        strokeDasharray: inferred && !boundary ? "5 4" : undefined,
+        opacity: boundary ? 1 : inferred ? 0.7 : 0.9,
+      },
+    };
+  });
 
   return { nodes: outNodes, edges };
 }
