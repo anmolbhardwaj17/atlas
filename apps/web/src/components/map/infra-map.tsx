@@ -15,7 +15,7 @@ import {
   type Edge,
   type NodeMouseHandler,
 } from "@xyflow/react";
-import { X } from "lucide-react";
+import { Shield, X } from "lucide-react";
 import { buildLayout } from "@/lib/map-layout";
 import { edgeCrossing, CROSS_COLOR, type MapData, type MapNode } from "@/lib/map-types";
 import { ResourceNode } from "@/components/map/resource-node";
@@ -35,12 +35,20 @@ const nodeTypes = { resource: ResourceNode };
 export function InfraMap({ data }: { data: MapData }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = selectedId ? (data.nodes.find((n) => n.id === selectedId) ?? null) : null;
+  // Security overlay: OFF = the clean traffic flow (protection as shield chips only);
+  // ON = security groups return to the canvas with their PROTECTS edges drawn, for the
+  // boundary-audit view. Default off - flow first, boundaries on demand.
+  const [showSecurity, setShowSecurity] = useState(false);
 
   // Protection is a PROPERTY, not a flow: a security group fanning out to five resources
-  // drew the longest, noisiest rails on the canvas. PROTECTS edges become a shield chip on
-  // the protected node (full list in its detail panel); they never reach the canvas. An SG
-  // whose only edges were PROTECTS then drops off the map automatically (still in Explore).
-  const canvasEdges = useMemo(() => data.edges.filter((e) => e.type !== "PROTECTS"), [data.edges]);
+  // drew the longest, noisiest rails on the canvas. By default PROTECTS edges become a
+  // shield chip on the protected node (full list in its detail panel); an SG whose only
+  // edges were PROTECTS then drops off the map automatically (still in Explore). The
+  // Security toggle brings both back.
+  const canvasEdges = useMemo(
+    () => (showSecurity ? data.edges : data.edges.filter((e) => e.type !== "PROTECTS")),
+    [data.edges, showSecurity],
+  );
   const protectedBy = useMemo(() => {
     const byId = new Map(data.nodes.map((n) => [n.id, n]));
     const m = new Map<string, string[]>();
@@ -123,6 +131,25 @@ export function InfraMap({ data }: { data: MapData }) {
           </p>
         </div>
         <span className="flex items-center gap-3 text-xs text-muted-foreground">
+          <button
+            type="button"
+            onClick={() => setShowSecurity((v) => !v)}
+            aria-pressed={showSecurity}
+            title={
+              showSecurity
+                ? "Hide security groups and protection edges"
+                : "Show security groups and what they protect"
+            }
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-medium transition-colors",
+              showSecurity
+                ? "border-transparent bg-foreground text-background"
+                : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
+            )}
+          >
+            <Shield className="size-3.5" />
+            Security
+          </button>
           {cross.crossCloud + cross.crossAccount > 0 && (
             <span
               className="flex items-center gap-1.5 rounded-full border border-transparent px-2.5 py-1 font-medium"
