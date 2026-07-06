@@ -74,21 +74,27 @@ function matches(a: string, b: string): boolean {
   return short.length >= 5 && !GENERIC_TOKENS.has(short) && long.includes(short);
 }
 
-
 /** Split a name into meaningful tokens: separators + camelCase, drop short/generic ones. */
 export function nameTokens(raw: string): Set<string> {
   const parts = raw
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .toLowerCase()
     .split(/[^a-z0-9]+/);
-  return new Set(parts.filter((t) => t.length >= 4 && !GENERIC_TOKENS.has(t)));
+  return new Set(
+    parts
+      .filter((t) => t.length >= 4 && !GENERIC_TOKENS.has(t))
+      // Singular/plural fold: "integrations" (repo) must meet "integration" (workload).
+      .map((t) => (t.length >= 5 && t.endsWith("s") ? t.slice(0, -1) : t)),
+  );
 }
 
 /** Probable (token-level) match: >=2 shared meaningful tokens, or one shared token of
  *  length >=6 (distinctive enough on its own). Returns the shared tokens for evidence. */
-function probableTokens(a: Set<string>, b: Set<string>): string[] {
+function probableTokens(a: Set<string>, b: Set<string>, isRare: (t: string) => boolean): string[] {
   const shared = [...a].filter((t) => b.has(t));
-  if (shared.length >= 2 || shared.some((t) => t.length >= 6)) return shared;
+  // >=2 shared tokens, one long distinctive token, or one SHORT token that is rare across
+  // the org's repos ("chat" names 2 repos → distinctive here; "data" naming 15 would not be).
+  if (shared.length >= 2 || shared.some((t) => t.length >= 6 || isRare(t))) return shared;
   return [];
 }
 
@@ -112,6 +118,15 @@ export const logWorkloadCorrelationRule: Rule = {
       }))
       .filter((r) => r.norm.length >= 4);
 
+    // Token rarity across repos: a short token shared with <=2 repos is distinctive.
+    const tokenRepoCount = new Map<string, number>();
+    for (const r of repoNorm) {
+      for (const t of nameTokens(String(r.node.attributes.slug ?? ""))) {
+        tokenRepoCount.set(t, (tokenRepoCount.get(t) ?? 0) + 1);
+      }
+    }
+    const isRareToken = (t: string): boolean => (tokenRepoCount.get(t) ?? 0) <= 2;
+
     const best = new Map<string, InferredEdge>();
     const keep = (e: InferredEdge): void => {
       const k = `${e.fromUrn}→${e.toUrn}`;
@@ -125,6 +140,9 @@ export const logWorkloadCorrelationRule: Rule = {
       if (!workload || !data.host) continue;
       const norm = normalizeWorkload(workload);
       if (norm.length < 4) continue;
+      // AWS stock solutions (WAF Security Automations etc.) are vendor deployments -
+      // no customer repo ships them; matching them only manufactures noise.
+      if (/^(wafsecurityautomations|waf-|aws-)/i.test(workload)) continue;
 
       // Strong path: normalized substring match. Probable path: shared name tokens -
       // "this repo PROBABLY ships this workload" - always inferred-low, evidence names
@@ -137,7 +155,11 @@ export const logWorkloadCorrelationRule: Rule = {
           : repoNorm
               .map((r) => ({
                 ...r,
-                shared: probableTokens(nameTokens(String(r.node.attributes.slug ?? "")), wlTokens),
+                shared: probableTokens(
+                  nameTokens(String(r.node.attributes.slug ?? "")),
+                  wlTokens,
+                  isRareToken,
+                ),
               }))
               .filter((r) => r.shared.length > 0)
               .slice(0, 3);
