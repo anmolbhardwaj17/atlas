@@ -35,5 +35,5 @@ export default async function MapPage() {
     );
   }
 
-  return <InfraMap data={data} orgId={shell.orgId} />;
+  return <InfraMap data={data} />;
 }
