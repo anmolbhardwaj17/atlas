@@ -24,16 +24,32 @@ export interface LayoutResult {
 export function buildLayout(mapNodes: MapNode[], mapEdges: MapEdge[]): LayoutResult {
   const byId = new Map(mapNodes.map((n) => [n.id, n]));
 
+  // Partition: nodes with a visible edge join the dagre flow; the rest (real estate too -
+  // an unhealthy isolated bucket still matters) go into a labelled shelf below the flow
+  // instead of being silently dropped. People/PR cards stay out of the shelf - they are
+  // code-activity, not infrastructure.
+  const linked = new Set<string>();
+  for (const e of mapEdges) {
+    if (byId.has(e.from) && byId.has(e.to)) {
+      linked.add(e.from);
+      linked.add(e.to);
+    }
+  }
+  const flowNodes = mapNodes.filter((n) => linked.has(n.id));
+  const shelfNodes = mapNodes.filter(
+    (n) => !linked.has(n.id) && !/\.(user|pullrequest|pull_request)$/.test(n.kind),
+  );
+
   const g = new dagre.graphlib.Graph();
   g.setGraph({ rankdir: "LR", nodesep: 26, ranksep: 110, marginx: 16, marginy: 16 });
   g.setDefaultEdgeLabel(() => ({}));
-  for (const n of mapNodes) g.setNode(n.id, { width: NODE_W, height: NODE_H });
+  for (const n of flowNodes) g.setNode(n.id, { width: NODE_W, height: NODE_H });
   for (const e of mapEdges) {
-    if (byId.has(e.from) && byId.has(e.to)) g.setEdge(e.from, e.to);
+    if (linked.has(e.from) && linked.has(e.to)) g.setEdge(e.from, e.to);
   }
   dagre.layout(g);
 
-  const outNodes: Node[] = mapNodes.map((n) => {
+  const outNodes: Node[] = flowNodes.map((n) => {
     const pos = g.node(n.id);
     return {
       id: n.id,
@@ -46,6 +62,54 @@ export function buildLayout(mapNodes: MapNode[], mapEdges: MapEdge[]): LayoutRes
       style: { zIndex: 1 },
     };
   });
+
+  // The shelf: a fixed grid inside a labelled dashed frame, below the flow's bounding box.
+  if (shelfNodes.length > 0) {
+    let maxX = 0;
+    let maxY = 0;
+    for (const nd of outNodes) {
+      maxX = Math.max(maxX, nd.position.x + NODE_W);
+      maxY = Math.max(maxY, nd.position.y + NODE_H);
+    }
+    const GAP_X = 24;
+    const GAP_Y = 20;
+    const PAD = 24;
+    const HEADER = 34;
+    const cols = Math.max(3, Math.min(6, Math.floor((maxX || 900) / (NODE_W + GAP_X)) || 4));
+    const rows = Math.ceil(shelfNodes.length / cols);
+    const shelfW = cols * NODE_W + (cols - 1) * GAP_X + PAD * 2;
+    const shelfH = rows * NODE_H + (rows - 1) * GAP_Y + HEADER + PAD * 2;
+    const shelfY = maxY + 72;
+
+    outNodes.push({
+      id: "shelf-unconnected",
+      type: "envLane",
+      position: { x: 0, y: shelfY },
+      data: { label: "No observed connections yet", count: shelfNodes.length },
+      draggable: false,
+      selectable: false,
+      width: shelfW,
+      height: shelfH,
+      style: { width: shelfW, height: shelfH, zIndex: 0 },
+    });
+    shelfNodes.forEach((n, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      outNodes.push({
+        id: n.id,
+        type: "resource",
+        position: {
+          x: PAD + col * (NODE_W + GAP_X),
+          y: shelfY + HEADER + PAD + row * (NODE_H + GAP_Y),
+        },
+        data: { node: n },
+        draggable: false,
+        width: NODE_W,
+        height: NODE_H,
+        style: { zIndex: 1 },
+      });
+    });
+  }
 
   // "Flow" edges carry traffic/data → animate them so the map feels alive; structural edges
   // (CONTAINS/OWNED_BY/…) stay static so the motion means something.

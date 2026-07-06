@@ -18,11 +18,11 @@ import {
 import { Shield, X } from "lucide-react";
 import { buildLayout } from "@/lib/map-layout";
 import { edgeCrossing, CROSS_COLOR, type MapData, type MapNode } from "@/lib/map-types";
-import { ResourceNode } from "@/components/map/resource-node";
+import { ResourceNode, EnvLaneNode } from "@/components/map/resource-node";
 import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
 import { cn } from "@/lib/cn";
 
-const nodeTypes = { resource: ResourceNode };
+const nodeTypes = { resource: ResourceNode, envLane: EnvLaneNode };
 
 /**
  * Interactive infrastructure map (docs/09 §5.4). Resources as nodes, connections as edges,
@@ -166,20 +166,6 @@ export function InfraMap({ data }: { data: MapData }) {
         </span>
       </div>
 
-      {(() => {
-        const unlinked = data.nodes.filter((n) => !connectedIds.has(n.id)).length;
-        return unlinked > 0 ? (
-          <p className="text-xs text-muted-foreground">
-            {unlinked} resource{unlinked > 1 ? "s" : ""} with no observed connections{" "}
-            {unlinked > 1 ? "are" : "is"} not drawn on the map -{" "}
-            <Link href="/explore" className="underline hover:text-foreground">
-              browse everything in Explore
-            </Link>
-            . Connections appear as syncs and inference discover them.
-          </p>
-        ) : null;
-      })()}
-
       {data.truncated && (
         <p className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
           Showing the most recent {data.nodes.length} resources - the graph is larger. Filter to
@@ -294,7 +280,7 @@ function Flow({
   }, [data]);
 
   const layout = useMemo(() => {
-    const visibleNodes = data.nodes.filter((n) => connectedIds.has(n.id) && !hiddenSet.has(n.id));
+    const visibleNodes = data.nodes.filter((n) => !hiddenSet.has(n.id));
     const ids = new Set(visibleNodes.map((n) => n.id));
     const visibleEdges = canvasEdges.filter((e) => ids.has(e.from) && ids.has(e.to));
     const l = buildLayout(visibleNodes, visibleEdges);
