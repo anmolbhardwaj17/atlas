@@ -13,6 +13,7 @@ import { createBitbucketConnector } from "@atlas/connector-bitbucket";
 import { AuthModule } from "../auth/auth.module";
 import { ENV, PG_POOL } from "../core/tokens";
 import { ConnectionService } from "./connection.service";
+import { NodeMetricsController } from "./node-metrics.controller";
 import { ConnectionController } from "./connection.controller";
 import { ConnectorRegistry } from "./connector-registry";
 import { SyncWorkerBootstrap } from "./sync-worker.bootstrap";
@@ -63,7 +64,7 @@ const connectorRegistryProvider: Provider = {
 
 @Module({
   imports: [AuthModule],
-  controllers: [ConnectionController],
+  controllers: [ConnectionController, NodeMetricsController],
   providers: [
     ConnectionService,
     secretBrokerProvider,

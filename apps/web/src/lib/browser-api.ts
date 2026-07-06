@@ -510,3 +510,27 @@ export async function* streamAskWS(
     }
   }
 }
+
+/** One CloudWatch series for a node (on-demand; nothing stored server-side). */
+export interface MetricSeries {
+  metric: string;
+  label: string;
+  unit: string;
+  points: Array<[string, number]>;
+}
+
+export async function getNodeMetrics(
+  orgId: string,
+  nodeId: string,
+): Promise<{ supported: boolean; series: MetricSeries[] }> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/nodes/${nodeId}/metrics`, {
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  const body = (await res.json().catch(() => null)) as {
+    data?: { supported: boolean; series: MetricSeries[] };
+  } | null;
+  if (!res.ok || !body?.data) return { supported: false, series: [] };
+  return body.data;
+}

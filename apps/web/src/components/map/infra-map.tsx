@@ -21,6 +21,7 @@ import { edgeCrossing, CROSS_COLOR, type MapData, type MapNode } from "@/lib/map
 import { ResourceNode, EnvLaneNode } from "@/components/map/resource-node";
 import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
 import { cn } from "@/lib/cn";
+import { getNodeMetrics, type MetricSeries as MetricSeriesT } from "@/lib/browser-api";
 
 const nodeTypes = { resource: ResourceNode, envLane: EnvLaneNode };
 
@@ -32,7 +33,7 @@ const nodeTypes = { resource: ResourceNode, envLane: EnvLaneNode };
  * observed, dashed = inferred) - P3/P4, mono theme. Environment/cloud/account lane grouping
  * is disabled for now (single-env estates) - revisit when a customer needs it.
  */
-export function InfraMap({ data }: { data: MapData }) {
+export function InfraMap({ data, orgId }: { data: MapData; orgId: string }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = selectedId ? (data.nodes.find((n) => n.id === selectedId) ?? null) : null;
   // Security overlay: OFF = the clean traffic flow (protection as shield chips only);
@@ -191,6 +192,7 @@ export function InfraMap({ data }: { data: MapData }) {
           <DetailPanel
             node={selected}
             data={data}
+            orgId={orgId}
             protectedBy={protectedBy.get(selected.id) ?? []}
             onClose={() => setSelectedId(null)}
           />
@@ -508,14 +510,97 @@ function keyFacts(node: MapNode): Array<[string, string]> {
   return out.slice(0, 6);
 }
 
+/** Tiny dependency-free sparkline (last-24h CloudWatch series). */
+function Sparkline({ points, unit }: { points: Array<[string, number]>; unit: string }) {
+  if (points.length === 0)
+    return <span className="text-[10px] text-muted-foreground">no datapoints</span>;
+  const values = points.map((p) => p[1]);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const W = 132;
+  const H = 28;
+  const path = values
+    .map(
+      (v, i) =>
+        `${i === 0 ? "M" : "L"}${((i / Math.max(values.length - 1, 1)) * W).toFixed(1)},${(H - ((v - min) / range) * H).toFixed(1)}`,
+    )
+    .join(" ");
+  const latest = values[values.length - 1] ?? 0;
+  const fmt =
+    unit === "bytes" && latest > 1024 * 1024
+      ? `${(latest / 1024 / 1024).toFixed(1)} MB`
+      : `${Number.isInteger(latest) ? latest : latest.toFixed(1)}${unit === "%" ? "%" : ""}`;
+  return (
+    <span className="flex items-center gap-2">
+      <svg width={W} height={H} className="shrink-0 text-muted-foreground">
+        <path d={path} fill="none" stroke="currentColor" strokeWidth="1.25" />
+      </svg>
+      <span className="text-[10px] tabular-nums text-foreground">{fmt}</span>
+    </span>
+  );
+}
+
+/** On-demand CloudWatch metrics for the selected node (fetched live, never stored). */
+function MetricsSection({ orgId, nodeId, kind }: { orgId: string; nodeId: string; kind: string }) {
+  const [state, setState] = useState<
+    { phase: "loading" } | { phase: "done"; series: MetricSeriesT[] } | { phase: "off" }
+  >({ phase: "off" });
+
+  useEffect(() => {
+    if (!kind.startsWith("aws.")) {
+      setState({ phase: "off" });
+      return;
+    }
+    let cancelled = false;
+    setState({ phase: "loading" });
+    void getNodeMetrics(orgId, nodeId).then((r) => {
+      if (cancelled) return;
+      setState(r.supported ? { phase: "done", series: r.series } : { phase: "off" });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId, nodeId, kind]);
+
+  if (state.phase === "off") return null;
+  return (
+    <div className="mt-3 border-t border-border pt-3">
+      <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        CloudWatch - last 24h
+      </p>
+      {state.phase === "loading" ? (
+        <p className="text-xs text-muted-foreground">Fetching live metrics…</p>
+      ) : state.series.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          No metrics available (instance may be stopped, or CloudWatch reads not granted).
+        </p>
+      ) : (
+        <dl className="space-y-1.5 text-xs">
+          {state.series.map((sr) => (
+            <div key={sr.metric} className="flex items-center justify-between gap-3">
+              <dt className="shrink-0 text-muted-foreground">{sr.label}</dt>
+              <dd>
+                <Sparkline points={sr.points} unit={sr.unit} />
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  );
+}
+
 function DetailPanel({
   node,
   data,
+  orgId,
   protectedBy,
   onClose,
 }: {
   node: MapNode;
   data: MapData;
+  orgId: string;
   protectedBy: string[];
   onClose: () => void;
 }) {
@@ -593,6 +678,8 @@ function DetailPanel({
         <ConfidenceBadge tier={node.confidence} />
         <FreshnessTag status={node.status} />
       </div>
+
+      <MetricsSection orgId={orgId} nodeId={node.id} kind={node.kind} />
 
       {rels.length > 0 && (
         <div className="mt-3 border-t border-border pt-3">

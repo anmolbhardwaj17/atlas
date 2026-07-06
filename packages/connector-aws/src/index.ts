@@ -37,6 +37,8 @@ export { probeFromDiscoverer, makeRef } from "./aws/discoverer";
 export type { Discoverer, CrawlScopeInput, DiscoveredResource } from "./aws/discoverer";
 export { collectAwsHealth } from "./health-collect";
 export { collectCloudTrailEvents } from "./cloudtrail-collect";
+export { collectNodeMetrics, metricsSupported } from "./metrics-collect";
+export type { MetricSeries, MetricsCollectInput } from "./metrics-collect";
 export type {
   ChangeEvent,
   CloudTrailCollectInput,

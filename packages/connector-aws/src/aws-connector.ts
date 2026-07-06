@@ -38,6 +38,7 @@ import type { AwsRawPayload } from "./services/module";
 import { DISCOVERER_BY_SERVICE } from "./discoverers";
 import { collectAwsHealth, type HealthCollectResult } from "./health-collect";
 import { collectCloudTrailEvents, type CloudTrailCollectResult } from "./cloudtrail-collect";
+import { collectNodeMetrics, metricsSupported, type MetricSeries } from "./metrics-collect";
 
 const NOOP_LOGGER: ConnectorLogger = {
   debug: () => undefined,
@@ -187,6 +188,31 @@ export class AwsConnector implements Connector {
       accountId: assumed.accountId,
       regions: cfg.regions,
       since,
+      ...(signal ? { signal } : {}),
+    });
+  }
+
+  /** On-demand CloudWatch metrics for one node (read-only; nothing persisted). */
+  async collectMetrics(
+    conn: Connection,
+    secrets: SecretAccessor,
+    node: { kind: string; region: string | null; attributes: Record<string, unknown> },
+    hours: number,
+    signal?: AbortSignal,
+  ): Promise<MetricSeries[] | null> {
+    if (!metricsSupported(node.kind) || !node.region) return null;
+    const assumed = await this.resolveCredentials(
+      conn,
+      secrets,
+      buildSessionName("atlas-metrics", conn.id),
+      signal,
+    );
+    return collectNodeMetrics({
+      credentials: assumed.credentials,
+      region: node.region,
+      kind: node.kind,
+      attributes: node.attributes,
+      hours,
       ...(signal ? { signal } : {}),
     });
   }
