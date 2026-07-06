@@ -93,6 +93,12 @@ const GUIDANCE: Record<string, Guidance> = {
     pillar: "security",
     source: "AWS Well-Architected — Security",
   },
+  "security posture": {
+    why: "A world-open security group or an unintentionally internet-facing load balancer is a direct attack surface - anyone on the internet can reach the ports it exposes, and it turns every vulnerability behind it into a remotely exploitable one.",
+    fix: "Restrict ingress CIDRs to known networks (VPN/office/peered VPCs), put internet-facing entry points behind a WAF, and make the scheme match intent - a 'private' load balancer should be internal. Re-verify with the map's Security toggle after each change.",
+    pillar: "security",
+    source: "AWS Well-Architected — Security",
+  },
   cost: {
     why: "Idle or oversized resources bill continuously for capacity you don't use.",
     fix: "Rightsize to observed utilisation, adopt reserved/savings plans for steady workloads, and add lifecycle policies to expire unused storage/snapshots.",

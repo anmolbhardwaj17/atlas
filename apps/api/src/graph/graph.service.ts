@@ -356,20 +356,21 @@ export class GraphService {
         return { cats, meta, edgeCount, codeCounts, stale };
       }),
       scope(async (c) => {
-        const [conns, cross, blast, noPipeline, emptyProjects, unhealthy] = await Promise.all([
-          c.query<{
-            id: string;
-            provider: string;
-            display_name: string;
-            status: string;
-            last_synced_at: Date | null;
-          }>(
-            `SELECT id, provider, display_name, status, last_synced_at
+        const [conns, cross, blast, noPipeline, emptyProjects, openSgs, publicElbs, unhealthy] =
+          await Promise.all([
+            c.query<{
+              id: string;
+              provider: string;
+              display_name: string;
+              status: string;
+              last_synced_at: Date | null;
+            }>(
+              `SELECT id, provider, display_name, status, last_synced_at
                FROM connections WHERE deleted_at IS NULL ORDER BY created_at`,
-          ),
-          // Cross-boundary edges (cloud→cloud spanning a provider or account boundary).
-          c.query<{ pf: string; af: string | null; pt: string; at2: string | null }>(
-            `SELECT split_part(nf.urn, ':', 1) AS pf, nf.account_ref AS af,
+            ),
+            // Cross-boundary edges (cloud→cloud spanning a provider or account boundary).
+            c.query<{ pf: string; af: string | null; pt: string; at2: string | null }>(
+              `SELECT split_part(nf.urn, ':', 1) AS pf, nf.account_ref AS af,
                     split_part(nt.urn, ':', 1) AS pt, nt.account_ref AS at2
                FROM edges e
                JOIN nodes nf ON nf.id = e.from_node_id
@@ -380,47 +381,66 @@ export class GraphService {
                 AND (split_part(nf.urn, ':', 1) <> split_part(nt.urn, ':', 1)
                      OR (nf.account_ref IS NOT NULL AND nt.account_ref IS NOT NULL
                          AND nf.account_ref <> nt.account_ref))`,
-          ),
-          // Highest in-degree over impact edges - the biggest single point of failure.
-          c.query<{ id: string; name: string | null; kind: string; deg: number }>(
-            `SELECT e.to_node_id AS id, nd.name, nd.kind, count(*)::int AS deg
+            ),
+            // Highest in-degree over impact edges - the biggest single point of failure.
+            c.query<{ id: string; name: string | null; kind: string; deg: number }>(
+              `SELECT e.to_node_id AS id, nd.name, nd.kind, count(*)::int AS deg
                FROM edges e JOIN nodes nd ON nd.id = e.to_node_id
               WHERE e.status = 'active' AND e.type = ANY($1)
               GROUP BY e.to_node_id, nd.name, nd.kind
               ORDER BY deg DESC LIMIT 1`,
-            [impact],
-          ),
-          // Repos with no CI/CD pipeline (no CONTAINS→pipeline) - a hygiene finding.
-          c.query<{ n: number }>(
-            `SELECT count(*)::int AS n FROM nodes r
+              [impact],
+            ),
+            // Repos with no CI/CD pipeline (no CONTAINS→pipeline) - a hygiene finding.
+            c.query<{ n: number }>(
+              `SELECT count(*)::int AS n FROM nodes r
               WHERE r.kind LIKE '%.repository' AND r.status <> 'deleted'
                 AND NOT EXISTS (
                   SELECT 1 FROM edges e JOIN nodes p ON p.id = e.to_node_id
                    WHERE e.from_node_id = r.id AND e.type = 'CONTAINS'
                      AND (p.kind LIKE '%.pipeline' OR p.kind LIKE '%.workflow'))`,
-          ),
-          // Projects that contain no repositories.
-          c.query<{ n: number }>(
-            `SELECT count(*)::int AS n FROM nodes pr
+            ),
+            // Projects that contain no repositories.
+            c.query<{ n: number }>(
+              `SELECT count(*)::int AS n FROM nodes pr
               WHERE pr.kind LIKE '%.project' AND pr.status <> 'deleted'
                 AND NOT EXISTS (
                   SELECT 1 FROM edges e JOIN nodes r ON r.id = e.to_node_id
                    WHERE e.from_node_id = pr.id AND e.type = 'CONTAINS'
                      AND r.kind LIKE '%.repository')`,
-          ),
-          // Runtime health (operational-intelligence Phase B): nodes the health poll marked
-          // degraded/unhealthy, worst first - the "something is broken right now" finding.
-          c.query<{ id: string; name: string | null; state: string; reason: string | null }>(
-            `SELECT id, name, attributes->'health'->>'state' AS state,
+            ),
+            // Security posture (Phase E, first slice): SGs with a world-open ingress rule
+            // (0.0.0.0/0 or ::/0) - computed from the crawl's aws.sg.rules signals.
+            c.query<{ id: string; name: string | null; ports: string | null }>(
+              `SELECT n.id, n.name,
+                    string_agg(DISTINCT coalesce(r->>'toPort', 'all'), ', ') AS ports
+               FROM signals s
+               JOIN nodes n ON n.urn = s.subject_urn AND n.deleted_at IS NULL
+               CROSS JOIN LATERAL jsonb_array_elements(s.data->'ingress') AS r
+              WHERE s.kind = 'aws.sg.rules'
+                AND (r->'cidrs' ? '0.0.0.0/0' OR r->'cidrs' ? '::/0')
+              GROUP BY n.id, n.name`,
+            ),
+            // Internet-facing load balancers (the estate's front door - worth stating, and a
+            // 'private'-named one that is internet-facing is a misconfiguration smell).
+            c.query<{ id: string; name: string | null }>(
+              `SELECT id, name FROM nodes
+              WHERE kind = 'aws.elb' AND deleted_at IS NULL AND status <> 'deleted'
+                AND attributes->>'scheme' = 'internet-facing'`,
+            ),
+            // Runtime health (operational-intelligence Phase B): nodes the health poll marked
+            // degraded/unhealthy, worst first - the "something is broken right now" finding.
+            c.query<{ id: string; name: string | null; state: string; reason: string | null }>(
+              `SELECT id, name, attributes->'health'->>'state' AS state,
                     attributes->'health'->>'reason' AS reason
                FROM nodes
               WHERE status <> 'deleted' AND deleted_at IS NULL
                 AND attributes->'health'->>'state' IN ('degraded', 'unhealthy')
               ORDER BY CASE attributes->'health'->>'state' WHEN 'unhealthy' THEN 0 ELSE 1 END
               LIMIT 20`,
-          ),
-        ]);
-        return { conns, cross, blast, noPipeline, emptyProjects, unhealthy };
+            ),
+          ]);
+        return { conns, cross, blast, noPipeline, emptyProjects, openSgs, publicElbs, unhealthy };
       }),
       scope(async (c) => {
         const [contributors, mostActiveRepos, vulnSeverity, topVulnPkg, sprawl] = await Promise.all(
@@ -507,7 +527,8 @@ export class GraphService {
     ]);
 
     const { cats, meta, edgeCount, codeCounts, stale } = grpInventory;
-    const { conns, cross, blast, noPipeline, emptyProjects, unhealthy } = grpTopology;
+    const { conns, cross, blast, noPipeline, emptyProjects, openSgs, publicElbs, unhealthy } =
+      grpTopology;
     const { contributors, mostActiveRepos, vulnSeverity, topVulnPkg, sprawl } = grpPeopleVulns;
 
     const base = (() => {
@@ -557,6 +578,8 @@ export class GraphService {
         noPipeline: noPipeline.rows[0]?.n ?? 0,
         emptyProjects: emptyProjects.rows[0]?.n ?? 0,
         unhealthyNodes: unhealthy.rows,
+        openSgs: openSgs.rows,
+        publicElbs: publicElbs.rows,
         topContributors: contributors.rows.map((r) => ({ name: r.name ?? "unknown", count: r.n })),
         mostActiveRepos: mostActiveRepos.rows.map((r) => ({
           name: r.name ?? "unknown",
@@ -570,6 +593,36 @@ export class GraphService {
 
     // ── Findings (severity-ranked, cited) ──────────────────────────────────────
     const findings: Finding[] = [];
+    // ── Security posture (Phase E, first slice) ──
+    const openSgs2 = base.openSgs ?? [];
+    if (openSgs2.length > 0) {
+      const first = openSgs2[0];
+      findings.push({
+        id: "sg-world-open",
+        severity: "high",
+        category: "Security posture",
+        title: `${openSgs2.length} security group${openSgs2.length > 1 ? "s allow" : " allows"} ingress from the whole internet (0.0.0.0/0)`,
+        detail: openSgs2
+          .map((g) => `${g.name ?? g.id}${g.ports ? ` (port ${g.ports})` : ""}`)
+          .join("; "),
+        href: first ? `/explore/${first.id}` : "/explore?kind=aws.securitygroup",
+        count: openSgs2.length,
+      });
+    }
+    const misnamed = (base.publicElbs ?? []).filter((l) => /private|internal/i.test(l.name ?? ""));
+    if (misnamed.length > 0) {
+      const first = misnamed[0];
+      findings.push({
+        id: "elb-private-but-public",
+        severity: "high",
+        category: "Security posture",
+        title: `${misnamed.length} load balancer${misnamed.length > 1 ? "s are" : " is"} named private/internal but internet-facing`,
+        detail: `${misnamed.map((l) => l.name).join(", ")} - the scheme says internet-facing; either the name or the exposure is wrong.`,
+        href: first ? `/explore/${first.id}` : "/explore?kind=aws.elb",
+        count: misnamed.length,
+      });
+    }
+
     // ── Runtime health (operational-intelligence Phase B) - broken-right-now outranks hygiene ──
     const unhealthyNodes = base.unhealthyNodes ?? [];
     const brokenCount = unhealthyNodes.filter((n) => n.state === "unhealthy").length;
