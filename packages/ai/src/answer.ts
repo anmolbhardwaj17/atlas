@@ -224,8 +224,12 @@ export async function* answerQuestionStream(
   for await (const ev of deps.llm.complete({
     system: prep.system,
     messages: [{ role: "user", content: userMessage(prep.built.context, question) }],
-    maxTokens: deps.maxTokens ?? 1024,
-    temperature: 0,
+    // Narration temperature is deliberately non-zero: the answer is a human explanation of
+    // fixed CONTEXT facts, so warmth/variation here can't fabricate (grounding is enforced by
+    // the closed context + citation gate, not by temperature). The PLANNER/LOOP stay at 0 -
+    // tool selection must be deterministic.
+    maxTokens: deps.maxTokens ?? 1500,
+    temperature: 0.4,
     ...(signal ? { signal } : {}),
   })) {
     if (ev.type === "token") {
@@ -255,8 +259,8 @@ async function narrate(
   for await (const ev of deps.llm.complete({
     system,
     messages: [{ role: "user", content: userMessage(context, question) }],
-    maxTokens: deps.maxTokens ?? 1024,
-    temperature: 0,
+    maxTokens: deps.maxTokens ?? 1500,
+    temperature: 0.4,
     ...(signal ? { signal } : {}),
   })) {
     if (ev.type === "token") parts.push(ev.text);
