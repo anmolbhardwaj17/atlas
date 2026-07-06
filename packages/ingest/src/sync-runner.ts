@@ -252,7 +252,15 @@ async function persistNode(
         status, confidence, last_seen, last_sync_run_id)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'active','observed', now(), $10)
      ON CONFLICT (org_id, urn) DO UPDATE SET
-       name = EXCLUDED.name, provider = EXCLUDED.provider, attributes = EXCLUDED.attributes,
+       name = EXCLUDED.name, provider = EXCLUDED.provider,
+       -- Crawl attributes replace wholesale, but the health poll's out-of-band annotation
+       -- must survive a sync (else every crawl flickers nodes back to health-unknown until
+       -- the next poll tick).
+       attributes = CASE
+         WHEN nodes.attributes ? 'health'
+           THEN EXCLUDED.attributes || jsonb_build_object('health', nodes.attributes->'health')
+         ELSE EXCLUDED.attributes
+       END,
        region = EXCLUDED.region, account_ref = EXCLUDED.account_ref,
        connection_id = EXCLUDED.connection_id, status = 'active', last_seen = now(),
        last_sync_run_id = EXCLUDED.last_sync_run_id
