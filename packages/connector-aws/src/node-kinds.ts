@@ -30,6 +30,7 @@ export const AWS_NODE_KINDS = {
   "aws.ecs.service": { kind: "aws.ecs.service", type: "ecs-service", scope: "region" },
   "aws.ecs.taskdef": { kind: "aws.ecs.taskdef", type: "ecs-taskdef", scope: "region" },
   "aws.ecr.repository": { kind: "aws.ecr.repository", type: "ecr", scope: "region" },
+  "aws.logs.group": { kind: "aws.logs.group", type: "logs", scope: "region" },
   "aws.vpc": { kind: "aws.vpc", type: "vpc", scope: "region" },
   "aws.subnet": { kind: "aws.subnet", type: "subnet", scope: "region" },
   "aws.securitygroup": { kind: "aws.securitygroup", type: "sg", scope: "region" },

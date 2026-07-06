@@ -37,7 +37,7 @@ const NODE_COLS = `id, urn, kind, name, provider, region, status, confidence, at
 const ESTATE_KIND_EXCLUSIONS = `kind NOT LIKE '%.pullrequest' AND kind NOT LIKE '%.pull_request'
   AND kind NOT LIKE '%.user' AND kind NOT LIKE '%.team'
   AND kind NOT LIKE '%.pipeline' AND kind NOT LIKE '%.workflow'
-  AND kind <> 'external.package' AND kind <> 'security.vulnerability'`;
+  AND kind <> 'external.package' AND kind <> 'security.vulnerability' AND kind <> 'aws.logs.group'`;
 
 export interface NodeListResult {
   data: NodeDto[];
@@ -813,6 +813,7 @@ export class GraphService {
            FROM nodes
           WHERE status <> 'deleted' AND deleted_at IS NULL
             AND (kind LIKE 'aws.%' OR kind LIKE 'azure.%' OR kind LIKE 'gcp.%')
+            AND kind <> 'aws.logs.group'
           GROUP BY kind
           ORDER BY count DESC`,
       );
@@ -923,7 +924,9 @@ export class GraphService {
       // (hundreds of nodes) - they'd swamp the estate map (and, being freshly synced, sort to the
       // top). Keep the canvas about infrastructure + code; an explicit ?kind can still target them.
       if (!q.kind) {
-        where.push(`kind <> 'external.package' AND kind <> 'security.vulnerability'`);
+        where.push(
+          `kind <> 'external.package' AND kind <> 'security.vulnerability' AND kind <> 'aws.logs.group'`,
+        );
       }
       const params: unknown[] = [];
       const p = (v: unknown): string => `$${params.push(v)}`;

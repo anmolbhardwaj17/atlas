@@ -7,6 +7,7 @@
  */
 import type { Rule } from "../types";
 import { repoDeploysToRuntimeRule } from "./r1-deploys";
+import { logWorkloadCorrelationRule } from "./r10-log-workloads";
 import { serviceDerivationRule } from "./r4-service";
 import { ownershipPropagationRule } from "./r5-ownership";
 import { prChangesServiceRule } from "./r6-changed";
@@ -23,12 +24,14 @@ export const ALL_RULES: readonly Rule[] = [
   crossBoundaryConnectsRule,
   // Deploy → service chain (dependency-ordered).
   repoDeploysToRuntimeRule,
+  logWorkloadCorrelationRule,
   serviceDerivationRule,
   ownershipPropagationRule,
   prChangesServiceRule,
 ];
 
 export { repoDeploysToRuntimeRule } from "./r1-deploys";
+export { logWorkloadCorrelationRule } from "./r10-log-workloads";
 export { serviceDerivationRule } from "./r4-service";
 export { ownershipPropagationRule } from "./r5-ownership";
 export { prChangesServiceRule } from "./r6-changed";

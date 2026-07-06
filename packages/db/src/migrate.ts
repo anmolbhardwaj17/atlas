@@ -23,6 +23,7 @@ import { up as up0021 } from "./migrations/0021_due_syncs";
 import { up as up0022 } from "./migrations/0022_vulnerability";
 import { up as up0023 } from "./migrations/0023_health_targets";
 import { up as up0024 } from "./migrations/0024_node_events";
+import { up as up0025 } from "./migrations/0025_log_intelligence";
 
 /**
  * Forward-only SQL migration runner (docs/04 §9). Plain `pg`, no ORM. Each
@@ -57,6 +58,7 @@ const MIGRATIONS: ReadonlyArray<{ version: string; statements: string[] }> = [
   { version: "0022_vulnerability", statements: up0022 },
   { version: "0023_health_targets", statements: up0023 },
   { version: "0024_node_events", statements: up0024 },
+  { version: "0025_log_intelligence", statements: up0025 },
 ];
 
 async function main(): Promise<void> {

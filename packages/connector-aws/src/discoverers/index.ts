@@ -17,6 +17,7 @@ import { elbDiscoverer } from "./elb";
 import { route53Discoverer } from "./route53";
 import { s3Discoverer } from "./s3";
 import { iamRoleDiscoverer } from "./iam";
+import { logsDiscoverer } from "./logs";
 
 export const DISCOVERERS: ReadonlyArray<Discoverer> = [
   vpcDiscoverer,
@@ -33,6 +34,7 @@ export const DISCOVERERS: ReadonlyArray<Discoverer> = [
   rdsDiscoverer,
   s3Discoverer,
   iamRoleDiscoverer,
+  logsDiscoverer,
 ];
 
 export const DISCOVERER_BY_SERVICE: ReadonlyMap<string, Discoverer> = new Map(

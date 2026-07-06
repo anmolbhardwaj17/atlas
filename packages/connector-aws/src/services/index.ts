@@ -14,6 +14,7 @@ import type { ServiceModule } from "./module";
 import { vpcModule, subnetModule, securityGroupModule } from "./networking";
 import { ec2Module, lambdaModule } from "./compute";
 import { ecsClusterModule, ecsServiceModule, ecsTaskDefModule, ecrModule } from "./ecs";
+import { logsModule } from "./logs";
 import { elbModule, route53Module } from "./routing";
 import { rdsModule, s3Module } from "./data";
 import { iamRoleModule } from "./identity";
@@ -29,6 +30,7 @@ export const SERVICE_MODULES: ReadonlyArray<ServiceModule> = [
   ecsServiceModule,
   ecsTaskDefModule,
   ecrModule,
+  logsModule,
   elbModule,
   route53Module,
   rdsModule,
