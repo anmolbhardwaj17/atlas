@@ -32,34 +32,21 @@ const nodeTypes = { resource: ResourceNode, envLane: EnvLaneNode };
  * observed, dashed = inferred) - P3/P4, mono theme. Environment/cloud/account lane grouping
  * is disabled for now (single-env estates) - revisit when a customer needs it.
  */
-const CODE_KIND = /\.(project|pipeline|workflow|user|team|pullrequest|pull_request)$/;
+// Activity + containers that were never the point of an INFRA map (browsable in Explore).
+// Repositories are kept: the ones that deploy join the flow, the rest go to a code shelf.
+const NON_MAP_KIND = /\.(project|pipeline|workflow|user|team|pullrequest|pull_request)$/;
 
 export function InfraMap({ data: rawData }: { data: MapData }) {
-  // The infra map is INFRASTRUCTURE-first. The Bitbucket code tree (a project fanning out
-  // to dozens of repos → PRs) is a second graph that only touches infra at the handful of
-  // DEPLOYS_TO bridges; drawn in full it forms a tall column that dominates the canvas and
-  // buries the actual flow. So code nodes are dropped here EXCEPT repositories that bridge
-  // to infra (a DEPLOYS_TO edge) - those stay and attach to the compute they ship to. The
-  // full code graph lives in Explore; a note below says how many repos are there.
-  const { data, hiddenRepos } = useMemo(() => {
-    const bridge = new Set<string>();
-    for (const e of rawData.edges) {
-      if (e.type === "DEPLOYS_TO") {
-        bridge.add(e.from);
-        bridge.add(e.to);
-      }
-    }
-    const keep = (n: MapNode): boolean => {
-      if (n.kind.endsWith(".repository")) return bridge.has(n.id);
-      if (CODE_KIND.test(n.kind)) return false;
-      return true; // infrastructure + bridge repos
-    };
-    const nodes = rawData.nodes.filter(keep);
+  // Drop only the granular code activity (projects/pipelines/PRs/users) - a project fanning
+  // out to its PRs is what buried the flow. EVERY repository stays: a repo that deploys joins
+  // the infra flow beside its compute; a repo with no infra link lands in a compact code
+  // shelf below (buildLayout), so you still see all your repos AND which ones aren't yet
+  // linked to infrastructure - the "missing connection" signal is the point, not hidden.
+  const data = useMemo(() => {
+    const nodes = rawData.nodes.filter((n) => !NON_MAP_KIND.test(n.kind));
     const ids = new Set(nodes.map((n) => n.id));
     const edges = rawData.edges.filter((e) => ids.has(e.from) && ids.has(e.to));
-    const repoTotal = rawData.nodes.filter((n) => n.kind.endsWith(".repository")).length;
-    const repoShown = nodes.filter((n) => n.kind.endsWith(".repository")).length;
-    return { data: { ...rawData, nodes, edges }, hiddenRepos: repoTotal - repoShown };
+    return { ...rawData, nodes, edges };
   }, [rawData]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -155,18 +142,9 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
         <div>
           <h1 className="text-xl font-semibold">Infrastructure map</h1>
           <p className="text-sm text-muted-foreground">
-            Your infrastructure as one flow - traffic enters on the left and moves right through
-            compute into data. Repositories appear where they deploy.
-            {hiddenRepos > 0 ? (
-              <>
-                {" "}
-                <Link href="/explore" className="underline hover:text-foreground">
-                  {hiddenRepos} more {hiddenRepos === 1 ? "repository lives" : "repositories live"}{" "}
-                  in Explore
-                </Link>
-                .
-              </>
-            ) : null}
+            Your estate as one flow - traffic enters on the left and moves right through compute
+            into data. Repositories that deploy sit beside their compute; the rest wait in the code
+            shelf below until a link is found.
           </p>
         </div>
         <span className="flex items-center gap-3 text-xs text-muted-foreground">

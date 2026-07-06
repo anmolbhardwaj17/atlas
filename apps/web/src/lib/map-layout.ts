@@ -36,15 +36,11 @@ export function buildLayout(mapNodes: MapNode[], mapEdges: MapEdge[]): LayoutRes
     }
   }
   const flowNodes = mapNodes.filter((n) => linked.has(n.id));
-  // Shelf keeps runtime estate only: people/PR cards are code-activity, and IAM roles are
-  // identity plumbing (user call) - all still in Explore, and a role that actually wires
-  // into the flow (ASSUMES_ROLE edge visible) still renders there.
-  const shelfNodes = mapNodes.filter(
-    (n) =>
-      !linked.has(n.id) &&
-      !/\.(user|pullrequest|pull_request)$/.test(n.kind) &&
-      n.kind !== "aws.iam.role",
-  );
+  // Two shelves for the unlinked - so an unconnected bucket and an undeployed repo don't
+  // mix. IAM roles stay off (identity plumbing, user call; still in Explore).
+  const unlinked = mapNodes.filter((n) => !linked.has(n.id) && n.kind !== "aws.iam.role");
+  const codeShelf = unlinked.filter((n) => n.kind.endsWith(".repository"));
+  const infraShelf = unlinked.filter((n) => !n.kind.endsWith(".repository"));
 
   const g = new dagre.graphlib.Graph();
   g.setGraph({ rankdir: "LR", nodesep: 26, ranksep: 110, marginx: 16, marginy: 16 });
@@ -69,29 +65,31 @@ export function buildLayout(mapNodes: MapNode[], mapEdges: MapEdge[]): LayoutRes
     };
   });
 
-  // The shelf: a fixed grid inside a labelled dashed frame, below the flow's bounding box.
-  if (shelfNodes.length > 0) {
-    let maxX = 0;
-    let maxY = 0;
-    for (const nd of outNodes) {
-      maxX = Math.max(maxX, nd.position.x + NODE_W);
-      maxY = Math.max(maxY, nd.position.y + NODE_H);
-    }
-    const GAP_X = 24;
-    const GAP_Y = 20;
-    const PAD = 24;
-    const HEADER = 34;
-    const cols = Math.max(3, Math.min(6, Math.floor((maxX || 900) / (NODE_W + GAP_X)) || 4));
+  // Shelves: fixed grids in labelled dashed frames, stacked below the flow's bounding box.
+  let flowMaxX = 0;
+  let cursorY = 0;
+  for (const nd of outNodes) {
+    flowMaxX = Math.max(flowMaxX, nd.position.x + NODE_W);
+    cursorY = Math.max(cursorY, nd.position.y + NODE_H);
+  }
+
+  const GAP_X = 24;
+  const GAP_Y = 20;
+  const PAD = 24;
+  const HEADER = 34;
+  const cols = Math.max(3, Math.min(6, Math.floor((flowMaxX || 900) / (NODE_W + GAP_X)) || 4));
+
+  const addShelf = (id: string, label: string, shelfNodes: MapNode[]): void => {
+    if (shelfNodes.length === 0) return;
     const rows = Math.ceil(shelfNodes.length / cols);
     const shelfW = cols * NODE_W + (cols - 1) * GAP_X + PAD * 2;
     const shelfH = rows * NODE_H + (rows - 1) * GAP_Y + HEADER + PAD * 2;
-    const shelfY = maxY + 72;
-
+    const shelfY = cursorY + 72;
     outNodes.push({
-      id: "shelf-unconnected",
+      id,
       type: "envLane",
       position: { x: 0, y: shelfY },
-      data: { label: "No observed connections yet", count: shelfNodes.length },
+      data: { label, count: shelfNodes.length },
       draggable: false,
       selectable: false,
       width: shelfW,
@@ -99,14 +97,12 @@ export function buildLayout(mapNodes: MapNode[], mapEdges: MapEdge[]): LayoutRes
       style: { width: shelfW, height: shelfH, zIndex: 0 },
     });
     shelfNodes.forEach((n, i) => {
-      const col = i % cols;
-      const row = Math.floor(i / cols);
       outNodes.push({
         id: n.id,
         type: "resource",
         position: {
-          x: PAD + col * (NODE_W + GAP_X),
-          y: shelfY + HEADER + PAD + row * (NODE_H + GAP_Y),
+          x: PAD + (i % cols) * (NODE_W + GAP_X),
+          y: shelfY + HEADER + PAD + Math.floor(i / cols) * (NODE_H + GAP_Y),
         },
         data: { node: n },
         draggable: false,
@@ -115,7 +111,11 @@ export function buildLayout(mapNodes: MapNode[], mapEdges: MapEdge[]): LayoutRes
         style: { zIndex: 1 },
       });
     });
-  }
+    cursorY = shelfY + shelfH;
+  };
+
+  addShelf("shelf-code", "Repositories — no infrastructure link found yet", codeShelf);
+  addShelf("shelf-unconnected", "Infrastructure — no observed connections yet", infraShelf);
 
   // "Flow" edges carry traffic/data → animate them so the map feels alive; structural edges
   // (CONTAINS/OWNED_BY/…) stay static so the motion means something.
