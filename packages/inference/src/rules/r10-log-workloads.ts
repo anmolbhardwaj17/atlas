@@ -37,16 +37,64 @@ export function normalizeWorkload(raw: string): string {
 
 /** A repo matches a workload when normalized forms are equal, or one contains the other
  *  (min 5 chars so "api" can't glue everything together). */
+// Generic tokens that appear in half the estate - shared alone they prove nothing.
+const GENERIC_TOKENS = new Set([
+  "function",
+  "functions",
+  "lambda",
+  "lambdas",
+  "service",
+  "services",
+  "server",
+  "prod",
+  "production",
+  "demo",
+  "pilot",
+  "dev",
+  "test",
+  "stage",
+  "staging",
+  "qa",
+  "aws",
+  "logs",
+  "log",
+  "app",
+  "web",
+  "main",
+  "core",
+]);
+
 function matches(a: string, b: string): boolean {
   if (!a || !b) return false;
   if (a === b) return true;
   const [short, long] = a.length <= b.length ? [a, b] : [b, a];
-  return short.length >= 5 && long.includes(short);
+  // A residue that is itself a generic token proves nothing: env-suffix stripping turns
+  // "lambda-test" into bare "lambda", which would substring-match every Lambda workload
+  // at high confidence (caught live - P3).
+  return short.length >= 5 && !GENERIC_TOKENS.has(short) && long.includes(short);
+}
+
+
+/** Split a name into meaningful tokens: separators + camelCase, drop short/generic ones. */
+export function nameTokens(raw: string): Set<string> {
+  const parts = raw
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/);
+  return new Set(parts.filter((t) => t.length >= 4 && !GENERIC_TOKENS.has(t)));
+}
+
+/** Probable (token-level) match: >=2 shared meaningful tokens, or one shared token of
+ *  length >=6 (distinctive enough on its own). Returns the shared tokens for evidence. */
+function probableTokens(a: Set<string>, b: Set<string>): string[] {
+  const shared = [...a].filter((t) => b.has(t));
+  if (shared.length >= 2 || shared.some((t) => t.length >= 6)) return shared;
+  return [];
 }
 
 export const logWorkloadCorrelationRule: Rule = {
   key: "log_workload_correlation",
-  version: 1,
+  version: 2,
   evaluate(input: InferenceInput): RuleOutput {
     const repos = [
       ...(input.nodesByKind.get("bitbucket.repository") ?? []),
@@ -78,8 +126,24 @@ export const logWorkloadCorrelationRule: Rule = {
       const norm = normalizeWorkload(workload);
       if (norm.length < 4) continue;
 
-      const matchedRepos = repoNorm.filter((r) => matches(r.norm, norm));
+      // Strong path: normalized substring match. Probable path: shared name tokens -
+      // "this repo PROBABLY ships this workload" - always inferred-low, evidence names
+      // the shared tokens so the claim is inspectable (P4).
+      const strong = repoNorm.filter((r) => matches(r.norm, norm));
+      const wlTokens = nameTokens(workload);
+      const probable =
+        strong.length > 0
+          ? []
+          : repoNorm
+              .map((r) => ({
+                ...r,
+                shared: probableTokens(nameTokens(String(r.node.attributes.slug ?? "")), wlTokens),
+              }))
+              .filter((r) => r.shared.length > 0)
+              .slice(0, 3);
+      const matchedRepos = strong.length > 0 ? strong : probable;
       if (matchedRepos.length === 0) continue;
+      const probableOnly = strong.length === 0;
 
       // Resolve the host the log group itself names.
       let hosts: Array<{ node: NodeLite; tier: "inferred-high" | "inferred-low" }> = [];
@@ -113,9 +177,14 @@ export const logWorkloadCorrelationRule: Rule = {
             type: "DEPLOYS_TO",
             fromUrn: repo.node.urn,
             toUrn: h.node.urn,
-            tier: h.tier,
+            // A token-level match is never more than probable, whatever the host says.
+            tier: probableOnly ? "inferred-low" : h.tier,
             evidence: {
               rule: "log-workload",
+              match: probableOnly ? "probable-name-tokens" : "name-substring",
+              ...(probableOnly && "shared" in repo
+                ? { sharedTokens: (repo as { shared: string[] }).shared }
+                : {}),
               logGroup: data.logGroup,
               workload,
               matchedRepoSlug: repo.norm,

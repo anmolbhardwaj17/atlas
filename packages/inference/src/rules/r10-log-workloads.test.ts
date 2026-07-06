@@ -98,4 +98,48 @@ describe("R10 log_workload_correlation", () => {
     const input = buildInput([repo("api"), ec2("i-1")], [wl("api", "api", "unknown")]);
     expect(logWorkloadCorrelationRule.evaluate(input).edges).toEqual([]);
   });
+
+  it("probable token match: shared distinctive token → inferred-low with tokens cited", () => {
+    const svc: NodeLite = {
+      id: "svc",
+      urn: "aws:us-east-1:851725189424:ecs-service:prod/calsaws-backend-api-service",
+      kind: "aws.ecs.service",
+      attributes: {
+        serviceName: "calsaws-backend-api-service",
+        taskDefinition:
+          "arn:aws:ecs:us-east-1:851725189424:task-definition/calsaws-backend-api-df:4",
+      },
+    };
+    const input = buildInput(
+      [repo("api-backend-provapt"), svc],
+      [wl("/ecs/calsaws-backend-api-df", "calsaws-backend-api-df", "ecs")],
+    );
+    const edges = logWorkloadCorrelationRule.evaluate(input).edges;
+    expect(edges).toHaveLength(1);
+    expect(edges[0]).toMatchObject({
+      fromUrn: "bitbucket:siemba:repository/api-backend-provapt",
+      toUrn: svc.urn,
+      tier: "inferred-low",
+    });
+    const ev = edges[0]?.evidence as { match: string; sharedTokens: string[] };
+    expect(ev.match).toBe("probable-name-tokens");
+    expect(ev.sharedTokens).toContain("backend");
+  });
+
+  it("generic tokens alone never create a probable match", () => {
+    const input = buildInput(
+      [repo("lambda-test"), ec2("i-1")],
+      [wl("some-production-function", "some-production-function", "unknown")],
+    );
+    expect(logWorkloadCorrelationRule.evaluate(input).edges).toEqual([]);
+  });
+
+  it("a generic residue after suffix-stripping never strong-matches (lambda-test bug)", () => {
+    const fn = lambda("calsaws-daily-stop-lambda");
+    const input = buildInput(
+      [repo("lambda-test"), fn],
+      [wl("/aws/lambda/calsaws-daily-stop-lambda", "calsaws-daily-stop-lambda", "lambda")],
+    );
+    expect(logWorkloadCorrelationRule.evaluate(input).edges).toEqual([]);
+  });
 });
