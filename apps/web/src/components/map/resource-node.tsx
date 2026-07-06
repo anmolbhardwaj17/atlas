@@ -7,6 +7,16 @@ import { CloudIcon } from "@/components/cloud-icon";
 import { kindIcon, kindStyle, kindShort, KIND_LOGO } from "@/lib/kind-visual";
 import type { MapNode } from "@/lib/map-types";
 
+/** Names truncate in the MIDDLE: the distinctive part of infra names is usually the
+ *  suffix (calsaws-chat-production-OnConnectFunction vs ...-SendMessageFunction), and
+ *  end-truncation made sibling resources visually identical. */
+function middleTruncate(name: string, max = 26): string {
+  if (name.length <= max) return name;
+  const tail = Math.floor((max - 1) / 2);
+  const head = max - 1 - tail;
+  return `${name.slice(0, head)}…${name.slice(-tail)}`;
+}
+
 /** Certainty accent (docs/09 §3.2) - solid = observed fact, ring = inferred, mono only. */
 const CERTAINTY: Record<string, string> = {
   observed: "bg-foreground",
@@ -81,7 +91,9 @@ export function ResourceNode({ data, selected }: NodeProps) {
         {logo ? <CloudIcon name={logo} className="size-[18px]" /> : <Icon className="size-4" />}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-xs font-medium leading-tight">{node.name ?? short}</div>
+        <div className="text-xs font-medium leading-tight" title={node.name ?? short}>
+          {middleTruncate(node.name ?? short)}
+        </div>
         <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">
           {short}
           {node.region ? ` · ${node.region}` : ""}
