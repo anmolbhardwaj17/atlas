@@ -534,3 +534,66 @@ export async function getNodeMetrics(
   if (!res.ok || !body?.data) return { supported: false, series: [] };
   return body.data;
 }
+
+/** Proactive-notification channel status (webhook is write-only; only a masked hint returns). */
+export interface NotificationStatus {
+  configured: boolean;
+  kind: "slack" | null;
+  enabled: boolean;
+  hint: string | null;
+}
+
+async function notifyReq<T>(orgId: string, path: string, method: string): Promise<T> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/notifications${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  const body = (await res.json().catch(() => null)) as {
+    data?: T;
+    error?: { message?: string };
+  } | null;
+  if (!res.ok || body?.data === undefined) {
+    throw new Error(body?.error?.message ?? `Request failed (${res.status}).`);
+  }
+  return body.data;
+}
+
+export async function getNotificationStatus(orgId: string): Promise<NotificationStatus> {
+  return notifyReq<NotificationStatus>(orgId, "", "GET");
+}
+
+export async function setSlackWebhook(
+  orgId: string,
+  webhookUrl: string,
+): Promise<NotificationStatus> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/notifications/slack`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "X-Atlas-Org": orgId,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ webhookUrl }),
+  });
+  const body = (await res.json().catch(() => null)) as {
+    data?: NotificationStatus;
+    error?: { message?: string };
+  } | null;
+  if (!res.ok || !body?.data)
+    throw new Error(body?.error?.message ?? `Couldn't save (${res.status}).`);
+  return body.data;
+}
+
+export async function testNotification(
+  orgId: string,
+): Promise<{ delivered: boolean; message: string }> {
+  return notifyReq<{ delivered: boolean; message: string }>(orgId, "/test", "POST");
+}
+
+export async function disableNotifications(orgId: string): Promise<NotificationStatus> {
+  return notifyReq<NotificationStatus>(orgId, "", "DELETE");
+}

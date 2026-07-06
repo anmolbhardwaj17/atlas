@@ -4,6 +4,7 @@ import { CoreModule } from "./core/core.module";
 import { AuthModule } from "./auth/auth.module";
 import { OrgsModule } from "./orgs/orgs.module";
 import { ConnectionsModule } from "./connections/connections.module";
+import { NotificationsModule } from "./notifications/notifications.module";
 import { GraphModule } from "./graph/graph.module";
 import { SearchModule } from "./search/search.module";
 import { AiModule } from "./ai/ai.module";
@@ -22,6 +23,7 @@ import { HttpExceptionFilter } from "./common/http-exception.filter";
     AuthModule,
     OrgsModule,
     ConnectionsModule,
+    NotificationsModule,
     GraphModule,
     SearchModule,
     AiModule,

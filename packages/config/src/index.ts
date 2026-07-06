@@ -59,6 +59,9 @@ export const EnvSchema = z.object({
   // 0 = disabled. Needs durable secrets like the sync scheduler.
   HEALTH_INTERVAL_MINUTES: z.coerce.number().int().min(0).max(1440).default(0),
 
+  // Proactive-notification dispatch cadence (Slack alerts + daily digest). 0 = disabled.
+  NOTIFY_INTERVAL_MINUTES: z.coerce.number().int().min(0).max(1440).default(0),
+
   // Browser origin allowed to call the API (CORS). The web app calls the API
   // client-side (Bearer token), so this must list the web origin. Default = local web.
   WEB_ORIGIN: z.string().url().default("http://localhost:4291"),
