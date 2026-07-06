@@ -32,7 +32,36 @@ const nodeTypes = { resource: ResourceNode, envLane: EnvLaneNode };
  * observed, dashed = inferred) - P3/P4, mono theme. Environment/cloud/account lane grouping
  * is disabled for now (single-env estates) - revisit when a customer needs it.
  */
-export function InfraMap({ data }: { data: MapData }) {
+const CODE_KIND = /\.(project|pipeline|workflow|user|team|pullrequest|pull_request)$/;
+
+export function InfraMap({ data: rawData }: { data: MapData }) {
+  // The infra map is INFRASTRUCTURE-first. The Bitbucket code tree (a project fanning out
+  // to dozens of repos → PRs) is a second graph that only touches infra at the handful of
+  // DEPLOYS_TO bridges; drawn in full it forms a tall column that dominates the canvas and
+  // buries the actual flow. So code nodes are dropped here EXCEPT repositories that bridge
+  // to infra (a DEPLOYS_TO edge) - those stay and attach to the compute they ship to. The
+  // full code graph lives in Explore; a note below says how many repos are there.
+  const { data, hiddenRepos } = useMemo(() => {
+    const bridge = new Set<string>();
+    for (const e of rawData.edges) {
+      if (e.type === "DEPLOYS_TO") {
+        bridge.add(e.from);
+        bridge.add(e.to);
+      }
+    }
+    const keep = (n: MapNode): boolean => {
+      if (n.kind.endsWith(".repository")) return bridge.has(n.id);
+      if (CODE_KIND.test(n.kind)) return false;
+      return true; // infrastructure + bridge repos
+    };
+    const nodes = rawData.nodes.filter(keep);
+    const ids = new Set(nodes.map((n) => n.id));
+    const edges = rawData.edges.filter((e) => ids.has(e.from) && ids.has(e.to));
+    const repoTotal = rawData.nodes.filter((n) => n.kind.endsWith(".repository")).length;
+    const repoShown = nodes.filter((n) => n.kind.endsWith(".repository")).length;
+    return { data: { ...rawData, nodes, edges }, hiddenRepos: repoTotal - repoShown };
+  }, [rawData]);
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = selectedId ? (data.nodes.find((n) => n.id === selectedId) ?? null) : null;
   // Security overlay: OFF = the clean traffic flow (protection as shield chips only);
@@ -126,8 +155,18 @@ export function InfraMap({ data }: { data: MapData }) {
         <div>
           <h1 className="text-xl font-semibold">Infrastructure map</h1>
           <p className="text-sm text-muted-foreground">
-            Your estate as one flow - traffic enters on the left and moves right through compute
-            into data. Hover a resource to see how it connects; click to inspect it.
+            Your infrastructure as one flow - traffic enters on the left and moves right through
+            compute into data. Repositories appear where they deploy.
+            {hiddenRepos > 0 ? (
+              <>
+                {" "}
+                <Link href="/explore" className="underline hover:text-foreground">
+                  {hiddenRepos} more {hiddenRepos === 1 ? "repository lives" : "repositories live"}{" "}
+                  in Explore
+                </Link>
+                .
+              </>
+            ) : null}
           </p>
         </div>
         <span className="flex items-center gap-3 text-xs text-muted-foreground">
