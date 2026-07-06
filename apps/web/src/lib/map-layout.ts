@@ -36,8 +36,14 @@ export function buildLayout(mapNodes: MapNode[], mapEdges: MapEdge[]): LayoutRes
     }
   }
   const flowNodes = mapNodes.filter((n) => linked.has(n.id));
+  // Shelf keeps runtime estate only: people/PR cards are code-activity, and IAM roles are
+  // identity plumbing (user call) - all still in Explore, and a role that actually wires
+  // into the flow (ASSUMES_ROLE edge visible) still renders there.
   const shelfNodes = mapNodes.filter(
-    (n) => !linked.has(n.id) && !/\.(user|pullrequest|pull_request)$/.test(n.kind),
+    (n) =>
+      !linked.has(n.id) &&
+      !/\.(user|pullrequest|pull_request)$/.test(n.kind) &&
+      n.kind !== "aws.iam.role",
   );
 
   const g = new dagre.graphlib.Graph();
