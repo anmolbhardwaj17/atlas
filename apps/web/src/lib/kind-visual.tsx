@@ -172,6 +172,12 @@ export const KIND_LOGO: Record<string, string> = {
   "aws.apigateway": "aws-api-gateway",
   "aws.iam.role": "aws-iam",
   "github.repository": "github-icon",
+  "github.pull_request": "github-icon",
+  "github.workflow": "github-icon",
+  "bitbucket.repository": "bitbucket",
+  "bitbucket.project": "bitbucket",
+  "bitbucket.pipeline": "bitbucket",
+  "bitbucket.pullrequest": "bitbucket",
 };
 
 export function kindCategory(kind: string): string {
