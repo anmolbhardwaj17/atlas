@@ -242,6 +242,19 @@ export class AiService {
     signal?: AbortSignal,
   ): AsyncIterable<AnswerEvent> {
     await withOrgScope(this.db, orgId, (c) => this.loadConversation(c, conversationId));
+    // Load prior turns BEFORE inserting the new one - cross-turn memory (docs/10 §9), so a
+    // follow-up ("explain that simpler", "why?") continues the thread instead of restarting.
+    const history = await withOrgScope(this.db, orgId, async (c) => {
+      const { rows } = await c.query<{ role: string; content: string }>(
+        `SELECT role, content FROM ai_messages
+          WHERE conversation_id = $1 AND role IN ('user','assistant')
+          ORDER BY created_at ASC`,
+        [conversationId],
+      );
+      return rows
+        .filter((r) => r.role === "user" || r.role === "assistant")
+        .map((r) => ({ role: r.role as "user" | "assistant", content: r.content }));
+    });
     await withOrgScope(this.db, orgId, (c) =>
       this.insertMessage(c, orgId, conversationId, "user", message, [], null),
     );
@@ -256,6 +269,7 @@ export class AiService {
         orgId,
         message,
         signal,
+        history,
       )) {
         if (ev.type === "token") text += ev.text;
         else if (ev.type === "citation") citations.push(ev.citation);

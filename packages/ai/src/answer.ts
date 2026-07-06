@@ -71,6 +71,31 @@ type Prepared =
       advisory: boolean;
     };
 
+/** Recent conversation, oldest→newest, for cross-turn memory (docs/10 §9). */
+export type History = Array<{ role: "user" | "assistant"; content: string }>;
+
+/** Resolve a follow-up against history: a short/deictic message ("explain that again",
+ *  "why?", "the other one") carries no topic on its own, so we prepend the last user turn
+ *  for PLANNING/RETRIEVAL only - so "explain again simpler" re-fetches the topic just
+ *  discussed instead of misrouting to a generic overview. The narrator gets full history
+ *  separately, so it still answers conversationally. */
+function planningQuestion(question: string, history: History): string {
+  const lastUser = [...history].reverse().find((m) => m.role === "user");
+  if (!lastUser) return question;
+  const followupish =
+    question.trim().length < 60 ||
+    /\b(again|simpler|that|this|it|those|them|more|why|elaborate|expand)\b/i.test(question);
+  return followupish ? `${lastUser.content}\n\n${question}` : question;
+}
+
+/** History as prior LLM turns (content only; capped + truncated to keep tokens sane). */
+function historyMessages(history: History): Array<{ role: "user" | "assistant"; content: string }> {
+  return history.slice(-6).map((m) => ({
+    role: m.role,
+    content: m.content.length > 1200 ? `${m.content.slice(0, 1200)}…` : m.content,
+  }));
+}
+
 async function prepare(
   deps: AnswerDeps,
   orgId: string,
@@ -127,6 +152,7 @@ export async function answerQuestion(
   orgId: string,
   question: string,
   signal?: AbortSignal,
+  history: History = [],
 ): Promise<Answer> {
   if (classifyIntent(question) === "smalltalk") {
     return {
@@ -139,7 +165,7 @@ export async function answerQuestion(
       nodesConsidered: 0,
     };
   }
-  const prep = await prepare(deps, orgId, question, signal);
+  const prep = await prepare(deps, orgId, planningQuestion(question, history), signal);
   if (!prep.grounded) {
     return {
       grounded: false,
@@ -151,7 +177,7 @@ export async function answerQuestion(
       nodesConsidered: 0,
     };
   }
-  const narration = await narrate(deps, prep.built.context, question, prep.system, signal);
+  const narration = await narrate(deps, prep.built.context, question, prep.system, signal, history);
   const citations = bindCitations(narration, prep.built.cites);
   return {
     grounded: true,
@@ -178,6 +204,7 @@ export async function* answerQuestionStream(
   orgId: string,
   question: string,
   signal?: AbortSignal,
+  history: History = [],
 ): AsyncIterable<AnswerEvent> {
   // Pleasantries ("hi", "thanks") get a warm reply, not a graph search / honest-absence.
   if (classifyIntent(question) === "smalltalk") {
@@ -186,11 +213,14 @@ export async function* answerQuestionStream(
     yield { type: "done", grounded: true, citations: 0 };
     return;
   }
-  // Route: agentic path streams its retrieval steps live (show-your-work); fast path is deterministic.
+  // Route: agentic path streams its retrieval steps live (show-your-work); fast path is
+  // deterministic. Retrieval planning uses the history-resolved question so a follow-up
+  // targets the topic under discussion, not a generic overview.
+  const forPlanning = planningQuestion(question, history);
   let prep: Prepared;
-  const agenticIntent = agenticRoute(question, deps.llm);
+  const agenticIntent = agenticRoute(forPlanning, deps.llm);
   if (agenticIntent) {
-    const gen = retrievalLoop({ port: deps.port, llm: deps.llm }, orgId, question, signal);
+    const gen = retrievalLoop({ port: deps.port, llm: deps.llm }, orgId, forPlanning, signal);
     let next = await gen.next();
     while (!next.done) {
       const s = next.value;
@@ -208,7 +238,7 @@ export async function* answerQuestionStream(
         }
       : { grounded: false, intent: agenticIntent, reason: NO_MATCH };
   } else {
-    prep = await prepare(deps, orgId, question, signal);
+    prep = await prepare(deps, orgId, forPlanning, signal);
   }
 
   if (!prep.grounded) {
@@ -223,7 +253,12 @@ export async function* answerQuestionStream(
   const parts: string[] = [];
   for await (const ev of deps.llm.complete({
     system: prep.system,
-    messages: [{ role: "user", content: userMessage(prep.built.context, question) }],
+    // Prior turns give the narrator conversational memory; the final user message still
+    // carries the fresh CONTEXT, and every fact must bind to ITS markers (grounding intact).
+    messages: [
+      ...historyMessages(history),
+      { role: "user", content: userMessage(prep.built.context, question) },
+    ],
     // Narration temperature is deliberately non-zero: the answer is a human explanation of
     // fixed CONTEXT facts, so warmth/variation here can't fabricate (grounding is enforced by
     // the closed context + citation gate, not by temperature). The PLANNER/LOOP stay at 0 -
@@ -254,11 +289,15 @@ async function narrate(
   question: string,
   system: string,
   signal?: AbortSignal,
+  history: History = [],
 ): Promise<string> {
   const parts: string[] = [];
   for await (const ev of deps.llm.complete({
     system,
-    messages: [{ role: "user", content: userMessage(context, question) }],
+    messages: [
+      ...historyMessages(history),
+      { role: "user", content: userMessage(context, question) },
+    ],
     maxTokens: deps.maxTokens ?? 1500,
     temperature: 0.4,
     ...(signal ? { signal } : {}),
