@@ -27,6 +27,8 @@ export interface BitbucketClient {
     revision: string,
     path: string,
   ): Promise<string | null>;
+  /** Raw unified diff of a pull request (text, not JSON). `null` if unavailable. */
+  diff(workspace: string, repoSlug: string, prId: number | string): Promise<string | null>;
 }
 
 export interface FetchBitbucketClientDeps {
@@ -86,6 +88,21 @@ export class FetchBitbucketClient implements BitbucketClient {
         throw new BitbucketHttpError(res.status, path);
       }
       await this.sleep(waitMs);
+    }
+  }
+
+  async diff(workspace: string, repoSlug: string, prId: number | string): Promise<string | null> {
+    // GET /repositories/{ws}/{repo}/pullrequests/{id}/diff → raw unified diff text (follows
+    // Bitbucket's redirect). Best-effort: unavailable/forbidden yields null, never throws.
+    const url = this.resolve(`/repositories/${workspace}/${repoSlug}/pullrequests/${prId}/diff`);
+    try {
+      const res = await fetch(url, {
+        headers: { Authorization: this.authHeader, "User-Agent": "atlas-connector" },
+      });
+      if (!res.ok) return null;
+      return await res.text();
+    } catch {
+      return null;
     }
   }
 

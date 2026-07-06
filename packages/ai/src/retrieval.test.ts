@@ -62,6 +62,12 @@ function port(overrides: Partial<RetrievalPort> = {}): RetrievalPort {
     async timeline() {
       return [];
     },
+    async nodeEvents() {
+      return [];
+    },
+    async prDiff() {
+      return null;
+    },
     async estateOverview() {
       return ESTATE;
     },

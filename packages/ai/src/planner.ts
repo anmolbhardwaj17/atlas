@@ -75,6 +75,11 @@ const INTENT_RULES: Array<{ intent: Intent; re: RegExp }> = [
     re: /\b(which|what) (pr|pull request|change|commit).*(caus|broke|culprit|responsible)/i,
   },
   { intent: "culprit", re: /\b(culprit|who broke|what broke)\b/i },
+  // "why is X unhealthy/broken/failing/down" - the Phase D diagnose path.
+  {
+    intent: "culprit",
+    re: /\bwhy\b.*\b(unhealthy|degraded|broken|failing|down|not (working|running))\b/i,
+  },
   { intent: "deploy_mapping", re: /\b(which|what) repo.*deploy|deploys? to|deployed to\b/i },
   {
     intent: "dependents",

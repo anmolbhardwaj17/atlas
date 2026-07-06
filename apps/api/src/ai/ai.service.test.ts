@@ -38,7 +38,12 @@ suite("G3.5 AiService", () => {
   let connId: string;
 
   const makeAi = (narration: string): AiService => {
-    const port = new GraphRetrievalPort(new GraphService(app), new PostgresSearchProvider(app));
+    const port = new GraphRetrievalPort(
+      new GraphService(app),
+      new PostgresSearchProvider(app),
+      app,
+      new InMemorySecretBroker(),
+    );
     return new AiService(
       app,
       port,

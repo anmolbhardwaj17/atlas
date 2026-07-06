@@ -21,7 +21,25 @@ export interface RetrievedNode {
   status: string;
   confidence: string;
   region: string | null;
+  /** Live runtime health (operational-intelligence Phase B), when the poll has seen it. */
+  health?: { state: string; reason: string | null } | null;
   provenance: { source: string | null; rawSnapshotRef: string | null } | null;
+}
+
+/** A change-timeline entry (Phase C: node_events ∪ derived PR merges). */
+export interface NodeEventFact {
+  id: string;
+  kind: string;
+  occurredAt: string;
+  actor: string | null;
+  title: string;
+  source: string;
+}
+
+/** An on-demand pull-request diff (clamped server-side). */
+export interface PrDiff {
+  text: string;
+  truncated: boolean;
 }
 
 export interface ViaEdge {
@@ -112,6 +130,10 @@ export interface RetrievalPort {
     kinds: string[] | null,
     limit: number,
   ): Promise<TimelineChange[]>;
+  /** Change timeline for one node (Phase C: config changes, deploys, health transitions, PR merges). */
+  nodeEvents(orgId: string, nodeId: string, limit: number): Promise<NodeEventFact[]>;
+  /** On-demand PR diff for a pull-request node (Phase D incident tracing); null if unavailable. */
+  prDiff(orgId: string, prNodeId: string, maxChars: number): Promise<PrDiff | null>;
   /** Whole-org aggregate snapshot for estate/aggregate questions (P0 estate slice). */
   estateOverview(orgId: string): Promise<EstateOverview>;
 }

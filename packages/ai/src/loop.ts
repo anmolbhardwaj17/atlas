@@ -14,6 +14,7 @@ import type {
   RetrievedEdge,
   Traversal,
   TimelineChange,
+  NodeEventFact,
 } from "./retrieval-port";
 import type { EstateOverview } from "./retrieval-port";
 import type { BuiltContext, Cite } from "./context";
@@ -48,6 +49,8 @@ export class ContextAccumulator {
   private readonly traversals: Traversal[] = [];
   private readonly timeline: TimelineChange[] = [];
   private estate: EstateOverview | undefined;
+  private readonly events: Array<{ subject: string; items: NodeEventFact[] }> = [];
+  private readonly diffs: Array<{ prName: string; text: string; truncated: boolean }> = [];
   private readonly notes: string[] = [];
 
   add(o: {
@@ -56,12 +59,16 @@ export class ContextAccumulator {
     traversal?: Traversal;
     timeline?: TimelineChange[];
     estate?: EstateOverview;
+    events?: Array<{ subject: string; items: NodeEventFact[] }>;
+    diff?: { prName: string; text: string; truncated: boolean };
   }): void {
     for (const n of o.nodes ?? []) this.nodes.set(n.id, n);
     for (const e of o.edges ?? []) this.edges.set(e.id, e);
     if (o.traversal) this.traversals.push(o.traversal);
     if (o.timeline?.length) this.timeline.push(...o.timeline);
     if (o.estate) this.estate = o.estate;
+    if (o.events?.length) this.events.push(...o.events);
+    if (o.diff) this.diffs.push(o.diff);
   }
 
   note(n: string): void {
@@ -79,7 +86,9 @@ export class ContextAccumulator {
       this.edges.size === 0 &&
       this.traversals.length === 0 &&
       this.timeline.length === 0 &&
-      this.estate === undefined
+      this.estate === undefined &&
+      this.events.length === 0 &&
+      this.diffs.length === 0
     );
   }
 
@@ -149,18 +158,48 @@ export class ContextAccumulator {
       (c) => `  ${c.at} ${c.changeKind} ${c.changeType}: ${compact(c.entity)}`,
     );
 
-    // Estate (computed aggregate facts → A-markers). Mirrors context.buildContext exactly.
+    // Change-timeline events (from diagnose) → computed A-marker facts, deduped by event id.
+    // The A namespace is shared with estate facts (markers must stay [NEA]\d+ for binding).
+    let aCount = 0;
+    const eventLines: string[] = [];
+    const seenEvents = new Set<string>();
+    for (const group of this.events) {
+      for (const ev of group.items) {
+        if (seenEvents.has(ev.id)) continue;
+        seenEvents.add(ev.id);
+        aCount += 1;
+        const marker = `A${aCount}`;
+        cites.push({ marker, kind: "computed", id: `event:${ev.id}`, confidence: "observed" });
+        eventLines.push(
+          `  ${marker} (cite:event:${ev.id}) ${ev.occurredAt} [${ev.kind}] on ${group.subject}: ${ev.title}${ev.actor ? ` (by ${ev.actor})` : ""}`,
+        );
+      }
+    }
+
+    // Estate (computed aggregate facts → A-markers, continuing the shared counter).
     const estateLines: string[] = [];
-    if (this.estate) estateLines.push(...renderEstate(this.estate, cites));
+    if (this.estate) estateLines.push(...renderEstate(this.estate, cites, aCount));
 
     const sections: string[] = [`[CONTEXT — org:${orgId} — these are the ONLY facts you may use]`];
     if (nodeLines.length) sections.push("NODES:", ...nodeLines);
     if (edgeLines.length) sections.push("EDGES:", ...edgeLines);
     if (timelineLines.length) sections.push("CHANGES:", ...timelineLines);
+    if (eventLines.length)
+      sections.push(
+        "CHANGE TIMELINE (what changed, when, by whom - cite the marker for any claim built on an event):",
+        ...eventLines,
+      );
     if (estateLines.length)
       sections.push(
         "ESTATE OVERVIEW (aggregate facts computed from your synced graph — state these figures directly and cite the marker):",
         ...estateLines,
+      );
+    if (this.diffs.length)
+      sections.push(
+        ...this.diffs.map(
+          (d) =>
+            `PR DIFF - ${d.prName}${d.truncated ? " (truncated)" : ""} (reference code; cite the PR's N marker when describing it):\n${d.text}`,
+        ),
       );
     if (this.notes.length) sections.push("FRESHNESS:", ...this.notes.map((n) => `  ${n}`));
     sections.push("[END CONTEXT]");
@@ -263,9 +302,9 @@ function compact(obj: Record<string, unknown>): string {
     .join(" ");
 }
 
-function renderEstate(e: EstateOverview, cites: Cite[]): string[] {
+function renderEstate(e: EstateOverview, cites: Cite[], startAt = 0): string[] {
   const lines: string[] = [];
-  let a = 0;
+  let a = startAt;
   const acite = (id: string, line: string): void => {
     a += 1;
     const marker = `A${a}`;

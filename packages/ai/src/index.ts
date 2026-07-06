@@ -50,6 +50,8 @@ export type {
   ViaEdge,
   TimelineChange,
   EstateOverview,
+  NodeEventFact,
+  PrDiff,
 } from "./retrieval-port";
 export { classifyIntent, extractTerms, resolveEntity, plan } from "./planner";
 export type { Intent, RetrievalPlan, ResolvedEntity } from "./planner";

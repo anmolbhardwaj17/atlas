@@ -1,6 +1,8 @@
 import { Inject, Injectable } from "@nestjs/common";
 import type {
   EstateOverview,
+  NodeEventFact,
+  PrDiff,
   RetrievalPort,
   RetrievedEdge,
   RetrievedNode,
@@ -9,7 +11,12 @@ import type {
   Traversal,
   TraversalOpts,
 } from "@atlas/ai";
+import { withOrgScope, type Db } from "@atlas/db";
+import { FetchBitbucketClient } from "@atlas/connector-bitbucket";
+import type { SecretBroker } from "@atlas/ingest";
 import { ApiException } from "../common/errors";
+import { PG_POOL } from "../core/tokens";
+import { SECRET_BROKER } from "../connections/tokens";
 import { GraphService } from "../graph/graph.service";
 import { SEARCH_PROVIDER, type SearchProvider } from "../search/search.provider";
 
@@ -24,6 +31,8 @@ export class GraphRetrievalPort implements RetrievalPort {
   constructor(
     private readonly graph: GraphService,
     @Inject(SEARCH_PROVIDER) private readonly search_: SearchProvider,
+    @Inject(PG_POOL) private readonly db: Db,
+    @Inject(SECRET_BROKER) private readonly secrets: SecretBroker,
   ) {}
 
   async search(orgId: string, q: string, limit: number): Promise<SearchHit[]> {
@@ -48,6 +57,7 @@ export class GraphRetrievalPort implements RetrievalPort {
         status: n.status,
         confidence: n.confidence,
         region: n.region,
+        health: healthOf(n.attributes as Record<string, unknown> | undefined),
         provenance: prov
           ? { source: prov.source ?? null, rawSnapshotRef: prov.rawSnapshotRef ?? null }
           : null,
@@ -97,6 +107,62 @@ export class GraphRetrievalPort implements RetrievalPort {
    * dashboard summary aggregation so Ask AI and the dashboard report identical figures — the AI
    * never recomputes counts a different way (single source of truth). Org-scoped by GraphService.
    */
+  /** Change timeline for one node (Phase C; includes derived PR merges for repos). */
+  async nodeEvents(orgId: string, nodeId: string, limit: number): Promise<NodeEventFact[]> {
+    try {
+      const events = await this.graph.nodeEvents(orgId, nodeId, Math.min(Math.max(limit, 1), 50));
+      return events.map((e) => ({
+        id: e.id,
+        kind: e.kind,
+        occurredAt: e.occurredAt,
+        actor: e.actor,
+        title: e.title,
+        source: e.source,
+      }));
+    } catch (err) {
+      if (err instanceof ApiException && err.code === "not_found") return [];
+      throw err;
+    }
+  }
+
+  /**
+   * On-demand PR diff (Phase D incident tracing). Resolves the PR node's workspace/repo/id
+   * from its URN (`bitbucket:<ws>:pullrequest/<repo>/<id>`), authenticates with the org's
+   * OWN Bitbucket connection through the Secrets Broker (org-scoped, R8), and fetches the
+   * raw diff read-only. Anything unresolvable → null - the tool reports it honestly.
+   */
+  async prDiff(orgId: string, prNodeId: string, maxChars: number): Promise<PrDiff | null> {
+    let urn: string;
+    try {
+      urn = (await this.graph.getNode(orgId, prNodeId)).urn;
+    } catch {
+      return null;
+    }
+    const m = /^bitbucket:([^:]+):pullrequest\/([^/]+)\/(\d+)$/.exec(urn);
+    if (!m) return null;
+    const [, workspace, repoSlug, prId] = m as unknown as [string, string, string, string];
+
+    const conn = await withOrgScope(this.db, orgId, async (c) => {
+      const { rows } = await c.query<{ secret_ref: string | null }>(
+        `SELECT secret_ref FROM connections
+          WHERE provider = 'bitbucket' AND deleted_at IS NULL AND secret_ref IS NOT NULL
+          ORDER BY created_at LIMIT 1`,
+      );
+      return rows[0] ?? null;
+    });
+    if (!conn?.secret_ref) return null;
+    const creds = await this.secrets.get(conn.secret_ref);
+    if (!creds.email || !creds.apiToken) return null;
+
+    const client = new FetchBitbucketClient({ email: creds.email, apiToken: creds.apiToken });
+    const text = await client.diff(workspace, repoSlug, prId);
+    if (text == null) return null;
+    const max = Math.min(Math.max(maxChars, 1_000), 20_000);
+    return text.length > max
+      ? { text: text.slice(0, max), truncated: true }
+      : { text, truncated: false };
+  }
+
   async estateOverview(orgId: string): Promise<EstateOverview> {
     const [s, infrastructure] = await Promise.all([
       this.graph.summary(orgId),
@@ -158,4 +224,13 @@ function traversalQuery(opts: TraversalOpts): {
   };
   if (opts.minConfidence) q.minConfidence = opts.minConfidence;
   return q;
+}
+
+/** Extract the Phase-B health annotation for citations (unknown → null, never faked). */
+function healthOf(
+  attributes: Record<string, unknown> | undefined,
+): { state: string; reason: string | null } | null {
+  const h = attributes?.["health"] as { state?: unknown; reason?: unknown } | undefined;
+  if (!h || typeof h.state !== "string") return null;
+  return { state: h.state, reason: typeof h.reason === "string" ? h.reason : null };
 }

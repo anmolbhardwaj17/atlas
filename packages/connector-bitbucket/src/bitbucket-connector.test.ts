@@ -29,6 +29,9 @@ class FakeClient implements BitbucketClient {
     if (this.throwOn[key]) throw new BitbucketHttpError(this.throwOn[key]!, key);
     for (const v of this.pages[key] ?? []) yield v as T;
   }
+  async diff(): Promise<string | null> {
+    return null;
+  }
   async content(
     _workspace: string,
     repoSlug: string,

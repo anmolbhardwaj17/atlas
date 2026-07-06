@@ -11,6 +11,7 @@
  */
 import type {
   EstateOverview,
+  NodeEventFact,
   RetrievalPort,
   RetrievedEdge,
   RetrievedNode,
@@ -34,6 +35,10 @@ export interface ToolOutcome {
   timeline?: TimelineChange[];
   /** Whole-org aggregate snapshot (from estate_overview). */
   estate?: EstateOverview;
+  /** Change-timeline facts per subject node (from diagnose) - each event is citable. */
+  events?: Array<{ subject: string; items: NodeEventFact[] }>;
+  /** An on-demand PR diff (from get_pr_diff) - reference text tied to the PR node. */
+  diff?: { prName: string; text: string; truncated: boolean };
 }
 
 const clampInt = (v: unknown, min: number, max: number, dflt: number): number => {
@@ -177,6 +182,110 @@ const TOOLS: Record<string, Tool> = {
     async run(port, orgId) {
       const e = await port.estateOverview(orgId);
       return { summary: summariseEstate(e), estate: e };
+    },
+  },
+
+  diagnose: {
+    spec: {
+      name: "diagnose",
+      description:
+        "Root-cause helper for a broken/unhealthy resource: returns its live health, its blast radius, WHO DEPLOYS TO IT, and the change timeline (config changes, deploys, health transitions, merged PRs) for it and its deployers in a time window. Use for 'why is X broken / unhealthy / failing' questions, then get_pr_diff on a suspicious merged PR.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          node_id: { type: "string", description: "the id of the broken/suspect node" },
+          hours: { type: "number", description: "lookback window in hours (default 48, max 336)" },
+        },
+        required: ["node_id"],
+      },
+    },
+    async run(port, orgId, input) {
+      const id = asStr(input.node_id);
+      const hours = clampInt(input.hours, 1, 336, 48);
+      const node = await port.getNode(orgId, id);
+      if (!node) return { summary: `no node with id ${id}` };
+
+      const [events, edges, blast] = await Promise.all([
+        port.nodeEvents(orgId, id, 40),
+        port.edges(orgId, id, "both"),
+        port.blastRadius(orgId, id, { depth: 2 }),
+      ]);
+      const cutoff = Date.now() - hours * 3_600_000;
+      const inWindow = (evs: NodeEventFact[]): NodeEventFact[] =>
+        evs.filter((e) => new Date(e.occurredAt).getTime() >= cutoff);
+
+      const own = inWindow(events).slice(0, 15);
+      // Who ships code onto this node - their recent merges/deploys are prime suspects.
+      const deployers = edges.filter((e) => e.type === "DEPLOYS_TO" && e.to.id === id).slice(0, 3);
+      const deployerEvents: Array<{ subject: string; items: NodeEventFact[] }> = [];
+      for (const d of deployers) {
+        const evs = inWindow(await port.nodeEvents(orgId, d.from.id, 30)).slice(0, 10);
+        if (evs.length > 0) deployerEvents.push({ subject: d.from.name ?? d.from.id, items: evs });
+      }
+
+      const fmt = (e: NodeEventFact): string =>
+        `${e.occurredAt} [${e.kind}] ${e.title}${e.actor ? ` (by ${e.actor})` : ""}`;
+      const lines: string[] = [
+        `${node.name ?? node.id} (${node.kind})` +
+          (node.health
+            ? ` - health: ${node.health.state}${node.health.reason ? ` (${node.health.reason})` : ""}`
+            : " - health: unknown (not checked)"),
+        own.length
+          ? `its changes in the last ${hours}h:\n${own.map(fmt).join("\n")}`
+          : `no recorded changes on it in the last ${hours}h`,
+        ...deployerEvents.map(
+          (d) => `changes on deployer ${d.subject}:\n${d.items.map(fmt).join("\n")}`,
+        ),
+        deployers.length === 0 ? "no repository is known to deploy to it (no DEPLOYS_TO edge)" : "",
+        `blast radius: ${blast.impacted.length} resource(s) depend on it`,
+        "Correlate the timeline with the failure: rank hypotheses by how close in time and how directly connected each change is, cite every claim, and inspect a suspicious merged PR with get_pr_diff. If the window shows no changes, say plainly that no likely culprit was found in it - do not invent one.",
+      ].filter(Boolean);
+
+      const eventFacts = [
+        ...(own.length ? [{ subject: node.name ?? node.id, items: own }] : []),
+        ...deployerEvents,
+      ];
+      return {
+        summary: lines.join("\n"),
+        nodes: [node],
+        edges: deployers,
+        traversal: blast,
+        ...(eventFacts.length ? { events: eventFacts } : {}),
+      };
+    },
+  },
+
+  get_pr_diff: {
+    spec: {
+      name: "get_pr_diff",
+      description:
+        "Fetch the actual code diff of a merged/open pull-request NODE (id from diagnose or search). Use it to check whether a suspicious PR plausibly caused a failure. Returns the diff text (truncated).",
+      inputSchema: {
+        type: "object",
+        properties: {
+          node_id: { type: "string", description: "the pull-request node id" },
+        },
+        required: ["node_id"],
+      },
+    },
+    async run(port, orgId, input) {
+      const id = asStr(input.node_id);
+      const node = await port.getNode(orgId, id);
+      if (!node) return { summary: `no node with id ${id}` };
+      const diff = await port.prDiff(orgId, id, 12_000);
+      if (!diff) {
+        return {
+          summary: `no diff available for ${node.name ?? id} (not a pull request, or the source is unreachable)`,
+          nodes: [node],
+        };
+      }
+      return {
+        summary:
+          `diff of ${node.name ?? id}${diff.truncated ? " (truncated)" : ""} - cite this PR's N marker when referencing it:\n` +
+          diff.text,
+        nodes: [node],
+        diff: { prName: node.name ?? id, text: diff.text, truncated: diff.truncated },
+      };
     },
   },
 };

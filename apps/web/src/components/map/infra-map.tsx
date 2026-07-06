@@ -166,6 +166,20 @@ export function InfraMap({ data }: { data: MapData }) {
         </span>
       </div>
 
+      {(() => {
+        const unlinked = data.nodes.filter((n) => !connectedIds.has(n.id)).length;
+        return unlinked > 0 ? (
+          <p className="text-xs text-muted-foreground">
+            {unlinked} resource{unlinked > 1 ? "s" : ""} with no observed connections{" "}
+            {unlinked > 1 ? "are" : "is"} not drawn on the map -{" "}
+            <Link href="/explore" className="underline hover:text-foreground">
+              browse everything in Explore
+            </Link>
+            . Connections appear as syncs and inference discover them.
+          </p>
+        ) : null;
+      })()}
+
       {data.truncated && (
         <p className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
           Showing the most recent {data.nodes.length} resources - the graph is larger. Filter to

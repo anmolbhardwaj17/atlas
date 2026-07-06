@@ -42,6 +42,12 @@ function fakePort(nodes: Array<{ id: string; kind: string; name: string }>): Ret
     async timeline() {
       return [];
     },
+    async nodeEvents() {
+      return [];
+    },
+    async prDiff() {
+      return null;
+    },
     async estateOverview() {
       return {
         inventory: {

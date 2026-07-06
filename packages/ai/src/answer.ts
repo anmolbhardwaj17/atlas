@@ -22,7 +22,8 @@ import { retrievalLoop, collectLoop } from "./loop";
  * plan with tools; canonical intents keep their fast deterministic path (unchanged). The mock
  * provider (dev/CI) always uses the fast path — the loop needs a real tool-calling model.
  */
-const AGENTIC_INTENTS = new Set<Intent>(["lookup", "architecture"]);
+// culprit joins the loop (Phase D): diagnose + get_pr_diff do the multi-hop tracing.
+const AGENTIC_INTENTS = new Set<Intent>(["lookup", "architecture", "culprit"]);
 const NO_MATCH =
   "I searched your graph but couldn't find anything matching that — it may not be connected, or it's named differently.";
 function agenticRoute(question: string, llm: LLMProvider): Intent | null {

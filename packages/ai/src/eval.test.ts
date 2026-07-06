@@ -66,6 +66,12 @@ function port(hasEntity: boolean): RetrievalPort {
     async timeline() {
       return [];
     },
+    async nodeEvents() {
+      return [];
+    },
+    async prDiff() {
+      return null;
+    },
     async estateOverview() {
       return EMPTY_ESTATE;
     },
@@ -177,6 +183,12 @@ const POP_ESTATE = {
 function estatePort(): RetrievalPort {
   return {
     ...port(true),
+    async nodeEvents() {
+      return [];
+    },
+    async prDiff() {
+      return null;
+    },
     async estateOverview() {
       return POP_ESTATE;
     },
@@ -300,6 +312,12 @@ const ADVISORY_ESTATE = {
 function advisoryPort(): RetrievalPort {
   return {
     ...port(true),
+    async nodeEvents() {
+      return [];
+    },
+    async prDiff() {
+      return null;
+    },
     async estateOverview() {
       return ADVISORY_ESTATE;
     },
