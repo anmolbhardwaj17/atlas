@@ -15,6 +15,7 @@ interface RdsInstance {
   Engine?: string;
   EngineVersion?: string;
   Endpoint?: { Address?: string; Port?: number };
+  MultiAZ?: boolean;
   VpcSecurityGroups?: Array<{ VpcSecurityGroupId?: string }>;
   DBSubnetGroup?: { VpcId?: string };
 }
@@ -34,6 +35,7 @@ export const rdsModule: ServiceModule<RdsInstance> = {
         dbInstanceIdentifier: data.DBInstanceIdentifier,
         engine: data.Engine,
         engineVersion: data.EngineVersion,
+        multiAz: data.MultiAZ === true,
         endpointAddress: data.Endpoint?.Address,
         endpointPort: data.Endpoint?.Port,
         vpcId: data.DBSubnetGroup?.VpcId,

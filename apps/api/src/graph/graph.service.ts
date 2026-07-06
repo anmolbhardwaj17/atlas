@@ -356,21 +356,31 @@ export class GraphService {
         return { cats, meta, edgeCount, codeCounts, stale };
       }),
       scope(async (c) => {
-        const [conns, cross, blast, noPipeline, emptyProjects, openSgs, publicElbs, unhealthy] =
-          await Promise.all([
-            c.query<{
-              id: string;
-              provider: string;
-              display_name: string;
-              status: string;
-              last_synced_at: Date | null;
-            }>(
-              `SELECT id, provider, display_name, status, last_synced_at
+        const [
+          conns,
+          cross,
+          blast,
+          noPipeline,
+          emptyProjects,
+          openSgs,
+          publicElbs,
+          wildcardRoles,
+          singleAzDbs,
+          unhealthy,
+        ] = await Promise.all([
+          c.query<{
+            id: string;
+            provider: string;
+            display_name: string;
+            status: string;
+            last_synced_at: Date | null;
+          }>(
+            `SELECT id, provider, display_name, status, last_synced_at
                FROM connections WHERE deleted_at IS NULL ORDER BY created_at`,
-            ),
-            // Cross-boundary edges (cloud→cloud spanning a provider or account boundary).
-            c.query<{ pf: string; af: string | null; pt: string; at2: string | null }>(
-              `SELECT split_part(nf.urn, ':', 1) AS pf, nf.account_ref AS af,
+          ),
+          // Cross-boundary edges (cloud→cloud spanning a provider or account boundary).
+          c.query<{ pf: string; af: string | null; pt: string; at2: string | null }>(
+            `SELECT split_part(nf.urn, ':', 1) AS pf, nf.account_ref AS af,
                     split_part(nt.urn, ':', 1) AS pt, nt.account_ref AS at2
                FROM edges e
                JOIN nodes nf ON nf.id = e.from_node_id
@@ -381,38 +391,38 @@ export class GraphService {
                 AND (split_part(nf.urn, ':', 1) <> split_part(nt.urn, ':', 1)
                      OR (nf.account_ref IS NOT NULL AND nt.account_ref IS NOT NULL
                          AND nf.account_ref <> nt.account_ref))`,
-            ),
-            // Highest in-degree over impact edges - the biggest single point of failure.
-            c.query<{ id: string; name: string | null; kind: string; deg: number }>(
-              `SELECT e.to_node_id AS id, nd.name, nd.kind, count(*)::int AS deg
+          ),
+          // Highest in-degree over impact edges - the biggest single point of failure.
+          c.query<{ id: string; name: string | null; kind: string; deg: number }>(
+            `SELECT e.to_node_id AS id, nd.name, nd.kind, count(*)::int AS deg
                FROM edges e JOIN nodes nd ON nd.id = e.to_node_id
               WHERE e.status = 'active' AND e.type = ANY($1)
               GROUP BY e.to_node_id, nd.name, nd.kind
               ORDER BY deg DESC LIMIT 1`,
-              [impact],
-            ),
-            // Repos with no CI/CD pipeline (no CONTAINS→pipeline) - a hygiene finding.
-            c.query<{ n: number }>(
-              `SELECT count(*)::int AS n FROM nodes r
+            [impact],
+          ),
+          // Repos with no CI/CD pipeline (no CONTAINS→pipeline) - a hygiene finding.
+          c.query<{ n: number }>(
+            `SELECT count(*)::int AS n FROM nodes r
               WHERE r.kind LIKE '%.repository' AND r.status <> 'deleted'
                 AND NOT EXISTS (
                   SELECT 1 FROM edges e JOIN nodes p ON p.id = e.to_node_id
                    WHERE e.from_node_id = r.id AND e.type = 'CONTAINS'
                      AND (p.kind LIKE '%.pipeline' OR p.kind LIKE '%.workflow'))`,
-            ),
-            // Projects that contain no repositories.
-            c.query<{ n: number }>(
-              `SELECT count(*)::int AS n FROM nodes pr
+          ),
+          // Projects that contain no repositories.
+          c.query<{ n: number }>(
+            `SELECT count(*)::int AS n FROM nodes pr
               WHERE pr.kind LIKE '%.project' AND pr.status <> 'deleted'
                 AND NOT EXISTS (
                   SELECT 1 FROM edges e JOIN nodes r ON r.id = e.to_node_id
                    WHERE e.from_node_id = pr.id AND e.type = 'CONTAINS'
                      AND r.kind LIKE '%.repository')`,
-            ),
-            // Security posture (Phase E, first slice): SGs with a world-open ingress rule
-            // (0.0.0.0/0 or ::/0) - computed from the crawl's aws.sg.rules signals.
-            c.query<{ id: string; name: string | null; ports: string | null }>(
-              `SELECT n.id, n.name,
+          ),
+          // Security posture (Phase E, first slice): SGs with a world-open ingress rule
+          // (0.0.0.0/0 or ::/0) - computed from the crawl's aws.sg.rules signals.
+          c.query<{ id: string; name: string | null; ports: string | null }>(
+            `SELECT n.id, n.name,
                     string_agg(DISTINCT coalesce(r->>'toPort', 'all'), ', ') AS ports
                FROM signals s
                JOIN nodes n ON n.urn = s.subject_urn AND n.deleted_at IS NULL
@@ -420,27 +430,56 @@ export class GraphService {
               WHERE s.kind = 'aws.sg.rules'
                 AND (r->'cidrs' ? '0.0.0.0/0' OR r->'cidrs' ? '::/0')
               GROUP BY n.id, n.name`,
-            ),
-            // Internet-facing load balancers (the estate's front door - worth stating, and a
-            // 'private'-named one that is internet-facing is a misconfiguration smell).
-            c.query<{ id: string; name: string | null }>(
-              `SELECT id, name FROM nodes
+          ),
+          // Internet-facing load balancers (the estate's front door - worth stating, and a
+          // 'private'-named one that is internet-facing is a misconfiguration smell).
+          c.query<{ id: string; name: string | null }>(
+            `SELECT id, name FROM nodes
               WHERE kind = 'aws.elb' AND deleted_at IS NULL AND status <> 'deleted'
                 AND attributes->>'scheme' = 'internet-facing'`,
-            ),
-            // Runtime health (operational-intelligence Phase B): nodes the health poll marked
-            // degraded/unhealthy, worst first - the "something is broken right now" finding.
-            c.query<{ id: string; name: string | null; state: string; reason: string | null }>(
-              `SELECT id, name, attributes->'health'->>'state' AS state,
+          ),
+          // Wildcard IAM (Phase E): roles whose policy statements Allow action AND resource
+          // '*' - the classic over-broad grant (aws.iam.policy_statements signals).
+          c.query<{ id: string; name: string | null }>(
+            `SELECT DISTINCT n.id, n.name
+               FROM signals s
+               JOIN nodes n ON n.urn = s.subject_urn AND n.deleted_at IS NULL
+               CROSS JOIN LATERAL jsonb_array_elements(s.data->'statements') AS st
+              WHERE s.kind = 'aws.iam.policy_statements'
+                AND st->>'effect' = 'Allow'
+                AND st->'actions' ? '*'
+                AND st->'resources' ? '*'`,
+          ),
+          // Single-AZ production databases (Phase E): one AZ failure takes them down.
+          c.query<{ id: string; name: string | null }>(
+            `SELECT id, name FROM nodes
+              WHERE kind = 'aws.rds.instance' AND deleted_at IS NULL AND status <> 'deleted'
+                AND attributes->>'multiAz' = 'false'`,
+          ),
+          // Runtime health (operational-intelligence Phase B): nodes the health poll marked
+          // degraded/unhealthy, worst first - the "something is broken right now" finding.
+          c.query<{ id: string; name: string | null; state: string; reason: string | null }>(
+            `SELECT id, name, attributes->'health'->>'state' AS state,
                     attributes->'health'->>'reason' AS reason
                FROM nodes
               WHERE status <> 'deleted' AND deleted_at IS NULL
                 AND attributes->'health'->>'state' IN ('degraded', 'unhealthy')
               ORDER BY CASE attributes->'health'->>'state' WHEN 'unhealthy' THEN 0 ELSE 1 END
               LIMIT 20`,
-            ),
-          ]);
-        return { conns, cross, blast, noPipeline, emptyProjects, openSgs, publicElbs, unhealthy };
+          ),
+        ]);
+        return {
+          conns,
+          cross,
+          blast,
+          noPipeline,
+          emptyProjects,
+          openSgs,
+          publicElbs,
+          wildcardRoles,
+          singleAzDbs,
+          unhealthy,
+        };
       }),
       scope(async (c) => {
         const [contributors, mostActiveRepos, vulnSeverity, topVulnPkg, sprawl] = await Promise.all(
@@ -527,8 +566,18 @@ export class GraphService {
     ]);
 
     const { cats, meta, edgeCount, codeCounts, stale } = grpInventory;
-    const { conns, cross, blast, noPipeline, emptyProjects, openSgs, publicElbs, unhealthy } =
-      grpTopology;
+    const {
+      conns,
+      cross,
+      blast,
+      noPipeline,
+      emptyProjects,
+      openSgs,
+      publicElbs,
+      wildcardRoles,
+      singleAzDbs,
+      unhealthy,
+    } = grpTopology;
     const { contributors, mostActiveRepos, vulnSeverity, topVulnPkg, sprawl } = grpPeopleVulns;
 
     const base = (() => {
@@ -580,6 +629,8 @@ export class GraphService {
         unhealthyNodes: unhealthy.rows,
         openSgs: openSgs.rows,
         publicElbs: publicElbs.rows,
+        wildcardRoles: wildcardRoles.rows,
+        singleAzDbs: singleAzDbs.rows,
         topContributors: contributors.rows.map((r) => ({ name: r.name ?? "unknown", count: r.n })),
         mostActiveRepos: mostActiveRepos.rows.map((r) => ({
           name: r.name ?? "unknown",
@@ -620,6 +671,37 @@ export class GraphService {
         detail: `${misnamed.map((l) => l.name).join(", ")} - the scheme says internet-facing; either the name or the exposure is wrong.`,
         href: first ? `/explore/${first.id}` : "/explore?kind=aws.elb",
         count: misnamed.length,
+      });
+    }
+
+    const wild = base.wildcardRoles ?? [];
+    if (wild.length > 0) {
+      findings.push({
+        id: "iam-wildcard",
+        severity: "high",
+        category: "Security posture",
+        title: `${wild.length} IAM role${wild.length > 1 ? "s have" : " has"} a wildcard Allow (action * on resource *)`,
+        detail: `${wild
+          .slice(0, 5)
+          .map((r) => r.name ?? r.id)
+          .join(
+            ", ",
+          )}${wild.length > 5 ? ` (+${wild.length - 5} more)` : ""} - a compromise of anything assuming these roles is a compromise of the whole account.`,
+        href: "/explore?kind=aws.iam.role",
+        count: wild.length,
+      });
+    }
+    const singleAz = base.singleAzDbs ?? [];
+    if (singleAz.length > 0) {
+      const first = singleAz[0];
+      findings.push({
+        id: "rds-single-az",
+        severity: "medium",
+        category: "Security posture",
+        title: `${singleAz.length} database${singleAz.length > 1 ? "s run" : " runs"} in a single availability zone`,
+        detail: `${singleAz.map((d) => d.name ?? d.id).join(", ")} - one AZ outage takes ${singleAz.length > 1 ? "them" : "it"} down; enable Multi-AZ for production data.`,
+        href: first ? `/explore/${first.id}` : "/explore?kind=aws.rds.instance",
+        count: singleAz.length,
       });
     }
 
