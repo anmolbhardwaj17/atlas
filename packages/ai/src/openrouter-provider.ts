@@ -48,10 +48,7 @@ export class OpenRouterProvider implements LLMProvider {
   async *complete(req: CompleteRequest): AsyncIterable<LLMEvent> {
     const body = {
       model: this.config.model,
-      messages: [
-        { role: "system", content: req.system },
-        ...req.messages.map(toOpenAiMessage),
-      ],
+      messages: [{ role: "system", content: req.system }, ...req.messages.map(toOpenAiMessage)],
       temperature: req.temperature,
       max_tokens: req.maxTokens,
       stream: true,

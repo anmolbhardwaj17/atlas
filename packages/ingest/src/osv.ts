@@ -14,14 +14,7 @@ const DETAIL_CONCURRENCY = 8;
 
 /** OSV ecosystem identifiers (a subset — the ones our manifest parser emits). */
 export type OsvEcosystem =
-  | "npm"
-  | "PyPI"
-  | "Go"
-  | "Maven"
-  | "RubyGems"
-  | "crates.io"
-  | "NuGet"
-  | "Packagist";
+  "npm" | "PyPI" | "Go" | "Maven" | "RubyGems" | "crates.io" | "NuGet" | "Packagist";
 
 export interface OsvQueryPkg {
   name: string;
@@ -190,7 +183,11 @@ function normalizeRecord(r: OsvRecord): OsvVulnerability | null {
 }
 
 /** Run `fn` over items with bounded concurrency. */
-async function mapPool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+async function mapPool<T>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<void>,
+): Promise<void> {
   let i = 0;
   const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
     while (i < items.length) {

@@ -7,9 +7,9 @@ import {
 } from "@nestjs/common";
 import { withOrgScope, type Db } from "@atlas/db";
 import type { Env } from "@atlas/config";
-import { applyHealthObservations, type SecretBroker } from "@atlas/ingest";
+import { applyHealthObservations, applyNodeEvents, type SecretBroker } from "@atlas/ingest";
 import type { Connection } from "@atlas/connector-sdk";
-import type { HealthCollectResult } from "@atlas/connector-aws";
+import type { HealthCollectResult, CloudTrailCollectResult } from "@atlas/connector-aws";
 import { PG_POOL, ENV } from "../core/tokens";
 import { SECRET_BROKER } from "./tokens";
 import { ConnectorRegistry } from "./connector-registry";
@@ -25,6 +25,23 @@ interface HealthCapable {
 function isHealthCapable(c: unknown): c is HealthCapable {
   return typeof (c as HealthCapable | undefined)?.collectHealth === "function";
 }
+
+/** Structural check: a connector that can collect change events (CloudTrail, AWS today). */
+interface ChangeCapable {
+  collectChanges(
+    conn: Connection,
+    secrets: SecretBroker,
+    since: Date,
+    signal?: AbortSignal,
+  ): Promise<CloudTrailCollectResult>;
+}
+function isChangeCapable(c: unknown): c is ChangeCapable {
+  return typeof (c as ChangeCapable | undefined)?.collectChanges === "function";
+}
+
+/** CloudTrail lookback per tick: generous overlap - dedupe keys make re-reads free, and a
+ *  missed window (API down for a tick) still gets swept up next time. */
+const CHANGE_LOOKBACK_MS = 60 * 60_000;
 
 /**
  * Runtime-health poller (operational-intelligence Phase B) — the dev in-process slice,
@@ -117,7 +134,7 @@ export class HealthPollerBootstrap implements OnModuleInit, OnApplicationShutdow
       secretRef: conn.secret_ref,
     };
     const result = await connector.collectHealth(sdkConn, this.secrets);
-    const { applied, unmatched } = await applyHealthObservations(
+    const { applied, unmatched, transitions } = await applyHealthObservations(
       this.db,
       orgId,
       result.observations,
@@ -125,10 +142,40 @@ export class HealthPollerBootstrap implements OnModuleInit, OnApplicationShutdow
     const bad = result.observations.filter((o) => o.state !== "healthy").length;
     this.logger.log(
       `health ${conn.display_name}: ${applied} annotated (${bad} not healthy)` +
+        (transitions > 0 ? `, ${transitions} transition(s)` : "") +
         (unmatched > 0 ? `, ${unmatched} unmatched` : "") +
         (result.skipped.length > 0
           ? `, skipped: ${result.skipped.map((s) => s.iamAction).join(", ")}`
           : ""),
     );
+
+    // Change timeline (Phase C): CloudTrail write events in the lookback window → node_events.
+    if (isChangeCapable(connector)) {
+      const since = new Date(Date.now() - CHANGE_LOOKBACK_MS);
+      const changes = await connector.collectChanges(sdkConn, this.secrets, since);
+      const evts = await applyNodeEvents(
+        this.db,
+        orgId,
+        changes.events.map((e) => ({
+          urn: e.urn,
+          kind: "config_change" as const,
+          occurredAt: e.occurredAt,
+          actor: e.actor,
+          title: `${e.eventName}${e.actor ? ` by ${e.actor}` : ""}`,
+          evidence: { eventName: e.eventName, eventSource: e.eventSource, actor: e.actor },
+          source: "cloudtrail",
+          dedupeKey: e.eventId,
+        })),
+      );
+      if (evts.inserted > 0 || changes.skipped.length > 0) {
+        this.logger.log(
+          `changes ${conn.display_name}: ${evts.inserted} new event(s)` +
+            (evts.unmatched > 0 ? `, ${evts.unmatched} unmatched` : "") +
+            (changes.skipped.length > 0
+              ? `, skipped: ${changes.skipped.map((s) => s.region).join(", ")}`
+              : ""),
+        );
+      }
+    }
   }
 }

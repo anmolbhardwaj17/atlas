@@ -81,7 +81,9 @@ export default async function InsightsPage() {
             <span className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm">
               <span className="font-medium text-foreground">{summary.total} to act on</span>
               <span className="flex items-center gap-2 text-xs text-muted-foreground">
-                {summary.high > 0 ? <SevCount dot="bg-danger" n={summary.high} label="high" /> : null}
+                {summary.high > 0 ? (
+                  <SevCount dot="bg-danger" n={summary.high} label="high" />
+                ) : null}
                 {summary.medium > 0 ? (
                   <SevCount dot="bg-warning" n={summary.medium} label="medium" />
                 ) : null}
@@ -96,9 +98,8 @@ export default async function InsightsPage() {
               href={`/ask?q=${encodeURIComponent("How do I improve my CI/CD pipeline coverage?")}`}
               className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
-              CI/CD coverage{" "}
-              <span className="font-medium text-foreground">{covPct}%</span> · {covGap} repos to
-              cover <ArrowRight className="size-3.5" />
+              CI/CD coverage <span className="font-medium text-foreground">{covPct}%</span> ·{" "}
+              {covGap} repos to cover <ArrowRight className="size-3.5" />
             </Link>
           ) : null}
         </div>
@@ -110,8 +111,8 @@ export default async function InsightsPage() {
           <CardContent className="py-14 text-center">
             <AtlasAiMark size={28} className="mx-auto mb-3 size-7" />
             <p className="text-sm text-muted-foreground">
-              Nothing needs attention right now — the graph doesn&apos;t flag any issues. You&apos;re
-              in good shape.
+              Nothing needs attention right now — the graph doesn&apos;t flag any issues.
+              You&apos;re in good shape.
             </p>
           </CardContent>
         </Card>
@@ -143,7 +144,9 @@ export default async function InsightsPage() {
                       <span className="font-medium text-foreground">How to fix. </span>
                       {it.guidance.fix}
                     </p>
-                    <p className="text-xs text-muted-foreground/70">Guidance: {it.guidance.source}</p>
+                    <p className="text-xs text-muted-foreground/70">
+                      Guidance: {it.guidance.source}
+                    </p>
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">{it.detail}</p>

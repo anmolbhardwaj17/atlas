@@ -92,3 +92,14 @@ export interface EdgeDetail {
   firstSeen: string;
   lastSeen: string;
 }
+
+/** A change-timeline entry for a node (operational-intelligence Phase C). */
+export interface NodeEvent {
+  id: string;
+  kind: "deploy" | "config_change" | "pr_merged" | "alarm_transition" | "health_transition";
+  occurredAt: string;
+  actor: string | null;
+  title: string;
+  source: string;
+  evidence: Record<string, unknown>;
+}

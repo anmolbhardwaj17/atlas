@@ -91,6 +91,7 @@ const EMPTY_ESTATE = {
   topContributors: [],
   mostActiveRepos: [],
   pipelineCoverage: { withPipeline: 0, total: 0 },
+  infrastructure: [],
   findings: [],
   sources: { total: 0, healthy: 0, lastSyncAt: null },
 };
@@ -220,13 +221,19 @@ describe("AI eval — estate/aggregate (P0 golden)", () => {
 describe("AI eval — agentic loop route (P1)", () => {
   // Planner calls (req has tools) gather; the narration call (no tools) writes the cited answer.
   const responder =
-    (toolCall: { id: string; name: string; input: Record<string, unknown> }, text: string): MockResponder =>
+    (
+      toolCall: { id: string; name: string; input: Record<string, unknown> },
+      text: string,
+    ): MockResponder =>
     (req) => {
       if (req.tools && req.tools.length > 0) {
         // one gather hop, then stop
         return req.messages.some((m) => m.role === "tool")
           ? [{ type: "stop", reason: "end_turn" }]
-          : [{ type: "tool_call", ...toolCall }, { type: "stop", reason: "tool_calls" }];
+          : [
+              { type: "tool_call", ...toolCall },
+              { type: "stop", reason: "tool_calls" },
+            ];
       }
       return [
         { type: "token", text },
@@ -239,7 +246,10 @@ describe("AI eval — agentic loop route (P1)", () => {
       {
         port: port(true),
         llm: agentProvider(
-          responder({ id: "c1", name: "get_node", input: { id: "rds1" } }, "prod-orders [N1] is an RDS instance."),
+          responder(
+            { id: "c1", name: "get_node", input: { id: "rds1" } },
+            "prod-orders [N1] is an RDS instance.",
+          ),
         ),
       },
       "o",
@@ -274,8 +284,17 @@ const ADVISORY_ESTATE = {
   ...EMPTY_ESTATE,
   inventory: { ...EMPTY_ESTATE.inventory, repositories: 12 },
   findings: [
-    { title: "4 repositories have no CI/CD pipeline", severity: "medium", category: "Code hygiene", count: 4 },
-    { title: "payments-service is a single point of failure", severity: "medium", category: "Blast radius" },
+    {
+      title: "4 repositories have no CI/CD pipeline",
+      severity: "medium",
+      category: "Code hygiene",
+      count: 4,
+    },
+    {
+      title: "payments-service is a single point of failure",
+      severity: "medium",
+      category: "Blast radius",
+    },
   ],
 };
 function advisoryPort(): RetrievalPort {

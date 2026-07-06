@@ -36,6 +36,12 @@ export { DISCOVERERS, DISCOVERER_BY_SERVICE } from "./discoverers";
 export { probeFromDiscoverer, makeRef } from "./aws/discoverer";
 export type { Discoverer, CrawlScopeInput, DiscoveredResource } from "./aws/discoverer";
 export { collectAwsHealth } from "./health-collect";
+export { collectCloudTrailEvents } from "./cloudtrail-collect";
+export type {
+  ChangeEvent,
+  CloudTrailCollectInput,
+  CloudTrailCollectResult,
+} from "./cloudtrail-collect";
 export type {
   HealthState,
   HealthObservation,

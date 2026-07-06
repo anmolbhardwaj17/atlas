@@ -23,7 +23,10 @@ const ESTATE: EstateOverview = {
   topContributors: [{ name: "Mohit", count: 87 }],
   mostActiveRepos: [{ name: "api-backend", count: 49 }],
   pipelineCoverage: { withPipeline: 8, total: 12 },
-  findings: [{ title: "4 repos have no CI/CD", severity: "medium", category: "Code hygiene", count: 4 }],
+  infrastructure: [],
+  findings: [
+    { title: "4 repos have no CI/CD", severity: "medium", category: "Code hygiene", count: 4 },
+  ],
   sources: { total: 2, healthy: 2, lastSyncAt: "2026-07-04T10:00:00Z" },
 };
 
@@ -45,10 +48,20 @@ function fakePort(overrides: Partial<RetrievalPort> = {}): RetrievalPort {
       };
     },
     async blastRadius() {
-      return { root: { id: "n1", urn: "u", kind: "k", name: "orders-db" }, impacted: [], warnings: [], truncated: false };
+      return {
+        root: { id: "n1", urn: "u", kind: "k", name: "orders-db" },
+        impacted: [],
+        warnings: [],
+        truncated: false,
+      };
     },
     async dependencies() {
-      return { root: { id: "n1", urn: "u", kind: "k", name: "orders-db" }, impacted: [], warnings: [], truncated: false };
+      return {
+        root: { id: "n1", urn: "u", kind: "k", name: "orders-db" },
+        impacted: [],
+        warnings: [],
+        truncated: false,
+      };
     },
     async edges() {
       return [];
@@ -129,7 +142,10 @@ describe("retrievalLoop (agentic tool loop)", () => {
         throw new Error("db down");
       },
     });
-    const llm = scripted([[call("c1", "get_node", { id: "n1" }), stop("tool_calls")], [stop("end")]]);
+    const llm = scripted([
+      [call("c1", "get_node", { id: "n1" }), stop("tool_calls")],
+      [stop("end")],
+    ]);
     const res = await collectLoop({ port, llm }, "o", "x");
     // error surfaced to the model as a step summary; loop still returns (not grounded here).
     expect(res.steps[0]?.summary).toMatch(/error running get_node: db down/);

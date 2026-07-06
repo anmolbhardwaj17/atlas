@@ -2,10 +2,18 @@ import Link from "next/link";
 import { ArrowUpRight, ArrowDownLeft, Zap } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
-import type { NodeDetail, EdgeDto } from "@/lib/graph-types";
+import type { NodeDetail, EdgeDto, NodeEvent } from "@/lib/graph-types";
 
 /** Node detail (docs/09 §5.3): header + attributes + provenance disclosure + connections. */
-export function NodeDetailView({ node, edges }: { node: NodeDetail; edges: EdgeDto[] }) {
+export function NodeDetailView({
+  node,
+  edges,
+  events = [],
+}: {
+  node: NodeDetail;
+  edges: EdgeDto[];
+  events?: NodeEvent[];
+}) {
   const outgoing = edges.filter((e) => e.from.id === node.id);
   const incoming = edges.filter((e) => e.to.id === node.id);
 
@@ -29,6 +37,41 @@ export function NodeDetailView({ node, edges }: { node: NodeDetail; edges: EdgeD
           {node.region ? ` · ${node.region}` : ""} · seen {new Date(node.lastSeen).toLocaleString()}
         </p>
       </div>
+
+      {events.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Timeline</CardTitle>
+          </CardHeader>
+          <CardBody>
+            {/* What changed, when, by whom (Phase C): CloudTrail config changes, health
+                transitions, deploys, merged PRs - newest first, the incident-story view. */}
+            <ol className="space-y-2 text-sm">
+              {events.slice(0, 12).map((e) => (
+                <li key={e.id} className="flex items-start gap-2.5">
+                  <span
+                    className={`mt-1.5 size-1.5 shrink-0 rounded-full ${
+                      e.kind === "health_transition"
+                        ? "bg-danger"
+                        : e.kind === "config_change"
+                          ? "bg-warning"
+                          : "bg-muted-foreground"
+                    }`}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate" title={e.title}>
+                      {e.title}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(e.occurredAt).toLocaleString()} · {e.source}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </CardBody>
+        </Card>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

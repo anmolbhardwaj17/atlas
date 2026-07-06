@@ -54,7 +54,11 @@ export function smalltalkReply(question: string): string {
     return "See you! I'll be right here whenever you want to understand your estate.";
   if (/\bhow (are|'?s)|how'?s it going|what'?s up|whats up|how are you\b/.test(q))
     return "I'm here and ready to help you make sense of your infrastructure and code. What would you like to know?";
-  if (/\b(nice|cool|great|awesome|amazing|perfect|brilliant|good job|well done|ok(ay)?|k|got it|gotcha|understood)\b/.test(q))
+  if (
+    /\b(nice|cool|great|awesome|amazing|perfect|brilliant|good job|well done|ok(ay)?|k|got it|gotcha|understood)\b/.test(
+      q,
+    )
+  )
     return "Glad that helped! Let me know what else you'd like to explore.";
   return 'Hi! I\'m Atlas — your engineering intelligence assistant. Ask me anything about your infrastructure, code, or deploys, like "how many repositories do I have?" or "what needs attention?"';
 }
@@ -88,7 +92,10 @@ const INTENT_RULES: Array<{ intent: Intent; re: RegExp }> = [
     intent: "advisory",
     re: /\b(how (do|can|should) i|how to|help me)\b[^?]*\b(optimi[sz]|improv|secur|harden|reduce|lower|cut|fix|better|cheaper|faster|safer|resilien|tighten|clean up)/i,
   },
-  { intent: "advisory", re: /\b(recommend|recommendation|suggest\w*|advice|advise|best[- ]practice)s?\b/i },
+  {
+    intent: "advisory",
+    re: /\b(recommend|recommendation|suggest\w*|advice|advise|best[- ]practice)s?\b/i,
+  },
   {
     intent: "advisory",
     re: /\bwhat should i (do|fix|improve|prioriti[sz]e?|address|change|tackle|worry about)\b/i,

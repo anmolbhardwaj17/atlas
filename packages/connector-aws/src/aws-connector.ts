@@ -37,6 +37,7 @@ import { SERVICE_MODULES, MODULE_BY_KIND, type ServiceModule } from "./services"
 import type { AwsRawPayload } from "./services/module";
 import { DISCOVERER_BY_SERVICE } from "./discoverers";
 import { collectAwsHealth, type HealthCollectResult } from "./health-collect";
+import { collectCloudTrailEvents, type CloudTrailCollectResult } from "./cloudtrail-collect";
 
 const NOOP_LOGGER: ConnectorLogger = {
   debug: () => undefined,
@@ -160,6 +161,32 @@ export class AwsConnector implements Connector {
       credentials: assumed.credentials,
       accountId: assumed.accountId,
       regions: cfg.regions,
+      ...(signal ? { signal } : {}),
+    });
+  }
+
+  /**
+   * Change-timeline pass (operational-intelligence Phase C): CloudTrail write events in
+   * the lookback window, mapped conservatively onto crawled nodes. Read-only, no setup.
+   */
+  async collectChanges(
+    conn: Connection,
+    secrets: SecretAccessor,
+    since: Date,
+    signal?: AbortSignal,
+  ): Promise<CloudTrailCollectResult> {
+    const cfg = parseAwsConfig(conn.config);
+    const assumed = await this.resolveCredentials(
+      conn,
+      secrets,
+      buildSessionName("atlas-changes", conn.id),
+      signal,
+    );
+    return collectCloudTrailEvents({
+      credentials: assumed.credentials,
+      accountId: assumed.accountId,
+      regions: cfg.regions,
+      since,
       ...(signal ? { signal } : {}),
     });
   }

@@ -251,7 +251,12 @@ export class AiService {
     const citations: AnswerCitation[] = [];
     let confidence: string | null = null;
     try {
-      for await (const ev of answerQuestionStream({ port: this.port, llm }, orgId, message, signal)) {
+      for await (const ev of answerQuestionStream(
+        { port: this.port, llm },
+        orgId,
+        message,
+        signal,
+      )) {
         if (ev.type === "token") text += ev.text;
         else if (ev.type === "citation") citations.push(ev.citation);
         else if (ev.type === "confidence") confidence = ev.overall;

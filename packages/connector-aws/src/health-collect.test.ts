@@ -22,7 +22,7 @@ const rdsMock = mockClient(RDSClient);
 const cwMock = mockClient(CloudWatchClient);
 
 const INPUT = {
-  credentials: { accessKeyId: "AKIA", secretAccessKey: "s" },
+  credentials: { accessKeyId: "AKIA", secretAccessKey: "s", expiration: null },
   accountId: "851725189424",
   regions: ["us-east-1"],
   now: () => new Date("2026-07-06T00:00:00Z"),

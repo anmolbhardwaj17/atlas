@@ -117,6 +117,26 @@ export function buildContext(orgId: string, result: RetrievalResult): BuiltConte
       "estate:inventory",
       `inventory: repositories=${inv.repositories} services=${inv.services} datastores=${inv.datastores} pipelines=${inv.pipelines} openPullRequests=${inv.pullRequests} contributors=${inv.contributors} clouds=${inv.clouds} accounts=${inv.accounts} environments=${inv.environments} totalResources=${inv.resources} totalRelationships=${inv.relationships}`,
     );
+    if (e.infrastructure.length) {
+      acite(
+        "estate:infrastructure",
+        `cloud infrastructure by kind: ${e.infrastructure
+          .map(
+            (i) =>
+              `${i.kind}=${i.count}${i.notHealthy > 0 ? ` (${i.notHealthy} not healthy)` : ""} e.g. ${i.names.slice(0, 3).join(", ")}`,
+          )
+          .join(" · ")}`,
+      );
+      const bad = e.infrastructure.filter((i) => i.notHealthy > 0);
+      if (bad.length) {
+        acite(
+          "estate:live_health",
+          `live health right now: ${bad
+            .map((i) => `${i.notHealthy} ${i.kind} degraded/unhealthy`)
+            .join(", ")}`,
+        );
+      }
+    }
     if (e.topContributors.length) {
       acite(
         "estate:contributors",
@@ -192,7 +212,12 @@ export function buildAdvisoryContext(orgId: string, estate: EstateOverview): Bui
 
   estate.findings.forEach((f, i) => {
     const marker = `A${i + 1}`;
-    cites.push({ marker, kind: "computed", id: `finding:${f.category}:${i}`, confidence: "observed" });
+    cites.push({
+      marker,
+      kind: "computed",
+      id: `finding:${f.category}:${i}`,
+      confidence: "observed",
+    });
     findingLines.push(
       `  ${marker} (cite:finding) [${f.severity}] ${f.title}${f.count !== undefined ? ` (${f.count})` : ""} — category: ${f.category}`,
     );
@@ -210,7 +235,10 @@ export function buildAdvisoryContext(orgId: string, estate: EstateOverview): Bui
 
   const sections: string[] = [`[CONTEXT — org:${orgId} — these are the ONLY facts you may use]`];
   if (findingLines.length) {
-    sections.push("FINDINGS (issues the graph proves — these are FACTS; cite the marker):", ...findingLines);
+    sections.push(
+      "FINDINGS (issues the graph proves — these are FACTS; cite the marker):",
+      ...findingLines,
+    );
   } else {
     sections.push("FINDINGS: none — the graph does not currently flag any issues.");
   }

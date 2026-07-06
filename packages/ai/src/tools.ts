@@ -137,7 +137,10 @@ const TOOLS: Record<string, Tool> = {
         input.mode === "deps"
           ? await port.dependencies(orgId, id, { depth })
           : await port.blastRadius(orgId, id, { depth });
-      return { summary: summariseTraversal(t, input.mode === "deps" ? "depends on" : "impacts"), traversal: t };
+      return {
+        summary: summariseTraversal(t, input.mode === "deps" ? "depends on" : "impacts"),
+        traversal: t,
+      };
     },
   },
 
@@ -157,7 +160,10 @@ const TOOLS: Record<string, Tool> = {
       const sinceDays = clampInt(input.sinceDays, 1, 90, 7);
       const since = new Date(Date.now() - sinceDays * 86_400_000).toISOString();
       const changes = await port.timeline(orgId, since, null, 50);
-      return { summary: `${changes.length} change(s) in the last ${sinceDays}d`, timeline: changes };
+      return {
+        summary: `${changes.length} change(s) in the last ${sinceDays}d`,
+        timeline: changes,
+      };
     },
   },
 
@@ -188,7 +194,8 @@ export async function runTool(
   input: Record<string, unknown>,
 ): Promise<ToolOutcome> {
   const tool = TOOLS[name];
-  if (!tool) return { summary: `error: unknown tool "${name}". Available: ${TOOL_NAMES.join(", ")}` };
+  if (!tool)
+    return { summary: `error: unknown tool "${name}". Available: ${TOOL_NAMES.join(", ")}` };
   try {
     return await tool.run(port, orgId, input ?? {});
   } catch (err) {
@@ -210,7 +217,9 @@ function summariseEdges(edges: RetrievedEdge[]): string {
   if (edges.length === 0) return "no edges";
   return `${edges.length} edge(s): ${edges
     .slice(0, 20)
-    .map((e) => `${e.from.name ?? e.from.id} --${e.type}--> ${e.to.name ?? e.to.id} (${e.confidence})`)
+    .map(
+      (e) => `${e.from.name ?? e.from.id} --${e.type}--> ${e.to.name ?? e.to.id} (${e.confidence})`,
+    )
     .join("; ")}`;
 }
 
@@ -226,11 +235,25 @@ function summariseEstate(e: EstateOverview): string {
   const inv = e.inventory;
   const parts = [
     `inventory: repositories=${inv.repositories} services=${inv.services} datastores=${inv.datastores} pipelines=${inv.pipelines} openPRs=${inv.pullRequests} contributors=${inv.contributors} clouds=${inv.clouds} accounts=${inv.accounts}`,
+    ...(e.infrastructure.length
+      ? [
+          `cloud infrastructure: ${e.infrastructure
+            .map(
+              (i) =>
+                `${i.kind}=${i.count}${i.notHealthy > 0 ? ` (${i.notHealthy} not healthy)` : ""}`,
+            )
+            .join(" · ")}`,
+        ]
+      : []),
   ];
   if (e.topContributors.length)
-    parts.push(`top contributors: ${e.topContributors.map((c) => `${c.name}=${c.count}`).join(", ")}`);
+    parts.push(
+      `top contributors: ${e.topContributors.map((c) => `${c.name}=${c.count}`).join(", ")}`,
+    );
   if (e.mostActiveRepos.length)
-    parts.push(`most active repos: ${e.mostActiveRepos.map((r) => `${r.name}=${r.count}`).join(", ")}`);
+    parts.push(
+      `most active repos: ${e.mostActiveRepos.map((r) => `${r.name}=${r.count}`).join(", ")}`,
+    );
   if (e.pipelineCoverage.total)
     parts.push(`pipeline coverage: ${e.pipelineCoverage.withPipeline}/${e.pipelineCoverage.total}`);
   if (e.findings.length)

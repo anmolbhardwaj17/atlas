@@ -92,6 +92,12 @@ export class GraphController {
     return this.graph.getNode(org(req).id, id);
   }
 
+  @Get("nodes/:id/events")
+  @Roles("Member")
+  async nodeEvents(@Req() req: AuthedRequest, @Param("id") id: string): Promise<unknown> {
+    return this.graph.nodeEvents(org(req).id, id);
+  }
+
   @Get("nodes/:id/edges")
   @Roles("Member")
   async nodeEdges(

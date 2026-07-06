@@ -9,7 +9,14 @@
  * prompt, and the retrieval port. Planner (G3.2), context+grounding (G3.3), the answer
  * pipeline + eval (G3.4), and SSE endpoints (G3.5) build on it.
  */
-export type { LLMProvider, CompleteRequest, LLMEvent, ChatMessage, ToolCall, ToolSpec } from "./llm";
+export type {
+  LLMProvider,
+  CompleteRequest,
+  LLMEvent,
+  ChatMessage,
+  ToolCall,
+  ToolSpec,
+} from "./llm";
 export { MockLLMProvider, streamText } from "./mock-provider";
 export type { MockResponder } from "./mock-provider";
 export { ClaudeProvider } from "./claude-provider";

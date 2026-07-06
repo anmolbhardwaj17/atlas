@@ -62,6 +62,7 @@ function fakePort(nodes: Array<{ id: string; kind: string; name: string }>): Ret
         topContributors: [],
         mostActiveRepos: [],
         pipelineCoverage: { withPipeline: 0, total: 0 },
+        infrastructure: [],
         findings: [],
         sources: { total: 0, healthy: 0, lastSyncAt: null },
       };

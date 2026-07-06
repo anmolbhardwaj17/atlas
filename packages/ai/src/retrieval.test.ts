@@ -91,8 +91,14 @@ const ESTATE = {
   ],
   mostActiveRepos: [{ name: "gpt-idor-service", count: 9 }],
   pipelineCoverage: { withPipeline: 8, total: 12 },
+  infrastructure: [],
   findings: [
-    { title: "4 repositories have no CI/CD pipeline", severity: "medium", category: "Code hygiene", count: 4 },
+    {
+      title: "4 repositories have no CI/CD pipeline",
+      severity: "medium",
+      category: "Code hygiene",
+      count: 4,
+    },
   ],
   sources: { total: 2, healthy: 2, lastSyncAt: "2026-07-04T10:00:00Z" },
 };

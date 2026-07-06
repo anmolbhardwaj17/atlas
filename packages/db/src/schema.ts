@@ -205,3 +205,21 @@ export interface AuditEventRow {
   request_id: string | null;
   created_at: Date;
 }
+
+/** A change-timeline event attached to a node (operational-intelligence Phase C). */
+export type NodeEventKind =
+  "deploy" | "config_change" | "pr_merged" | "alarm_transition" | "health_transition";
+
+export interface NodeEventRow {
+  id: string;
+  org_id: string;
+  node_id: string;
+  kind: NodeEventKind;
+  occurred_at: Date;
+  actor: string | null;
+  title: string;
+  evidence: Record<string, unknown>;
+  source: string;
+  dedupe_key: string;
+  created_at: Date;
+}

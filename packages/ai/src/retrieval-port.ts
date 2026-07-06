@@ -92,6 +92,9 @@ export interface EstateOverview {
   topContributors: Array<{ name: string; count: number }>;
   mostActiveRepos: Array<{ name: string; count: number }>;
   pipelineCoverage: { withPipeline: number; total: number };
+  /** Cloud-infrastructure breakdown by kind (count + example names + live health) — so
+   *  "tell me about my AWS infra" answers from real inventory, not a bare cloud count. */
+  infrastructure: Array<{ kind: string; count: number; names: string[]; notHealthy: number }>;
   /** "Needs attention" facts the graph proves. `category` keys into the advisory knowledge pack. */
   findings: Array<{ title: string; severity: string; category: string; count?: number }>;
   sources: { total: number; healthy: number; lastSyncAt: string | null };

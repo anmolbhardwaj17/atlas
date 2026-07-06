@@ -31,11 +31,7 @@ function agenticRoute(question: string, llm: LLMProvider): Intent | null {
 }
 
 export type OverallConfidence =
-  | "observed"
-  | "inferred-high"
-  | "inferred-low"
-  | "insufficient"
-  | "advisory";
+  "observed" | "inferred-high" | "inferred-low" | "insufficient" | "advisory";
 
 export interface AnswerCitation {
   number: number;
@@ -85,7 +81,13 @@ async function prepare(
   if (agenticIntent) {
     const loop = await collectLoop({ port: deps.port, llm: deps.llm }, orgId, question, signal);
     return loop.grounded
-      ? { grounded: true, intent: agenticIntent, built: loop.built, system: SYSTEM_PROMPT, advisory: false }
+      ? {
+          grounded: true,
+          intent: agenticIntent,
+          built: loop.built,
+          system: SYSTEM_PROMPT,
+          advisory: false,
+        }
       : { grounded: false, intent: agenticIntent, reason: NO_MATCH };
   }
   const p = await plan(deps.port, orgId, question);
@@ -196,7 +198,13 @@ export async function* answerQuestionStream(
     }
     const loop = next.value;
     prep = loop.grounded
-      ? { grounded: true, intent: agenticIntent, built: loop.built, system: SYSTEM_PROMPT, advisory: false }
+      ? {
+          grounded: true,
+          intent: agenticIntent,
+          built: loop.built,
+          system: SYSTEM_PROMPT,
+          advisory: false,
+        }
       : { grounded: false, intent: agenticIntent, reason: NO_MATCH };
   } else {
     prep = await prepare(deps, orgId, question, signal);

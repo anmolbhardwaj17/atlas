@@ -789,6 +789,127 @@ export class GraphService {
    * kind/region/account; environment is inferred in-process (not a column) so it's filtered
    * after. Node-budgeted - `truncated` tells the UI to show a "showing N of many" banner.
    */
+  /**
+   * Cloud-infrastructure breakdown for the AI estate snapshot (per-kind counts, freshest
+   * example names, live not-healthy counts). Without this, "tell me about my AWS infra"
+   * could only cite `clouds=1` - the inventory existed in the graph but never reached the
+   * model. Org-scoped (RLS).
+   */
+  async infrastructureBreakdown(
+    orgId: string,
+  ): Promise<Array<{ kind: string; count: number; names: string[]; notHealthy: number }>> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      const { rows } = await c.query<{
+        kind: string;
+        count: number;
+        names: string[] | null;
+        not_healthy: number;
+      }>(
+        `SELECT kind, count(*)::int AS count,
+                (array_agg(coalesce(name, urn) ORDER BY last_seen DESC))[1:5] AS names,
+                count(*) FILTER (
+                  WHERE attributes->'health'->>'state' IN ('degraded', 'unhealthy')
+                )::int AS not_healthy
+           FROM nodes
+          WHERE status <> 'deleted' AND deleted_at IS NULL
+            AND (kind LIKE 'aws.%' OR kind LIKE 'azure.%' OR kind LIKE 'gcp.%')
+          GROUP BY kind
+          ORDER BY count DESC`,
+      );
+      return rows.map((r) => ({
+        kind: r.kind,
+        count: r.count,
+        names: r.names ?? [],
+        notHealthy: r.not_healthy,
+      }));
+    });
+  }
+
+  /**
+   * Change timeline for one node (operational-intelligence Phase C): persisted
+   * node_events (CloudTrail config changes, health transitions, deploys) UNION derived
+   * pr_merged entries for repositories (merged PRs are already graph nodes - no backfill
+   * table needed for history the graph itself proves). Newest first. 404 via loadNode.
+   */
+  async nodeEvents(
+    orgId: string,
+    id: string,
+    limit = 50,
+  ): Promise<
+    Array<{
+      id: string;
+      kind: string;
+      occurredAt: string;
+      actor: string | null;
+      title: string;
+      source: string;
+      evidence: Record<string, unknown>;
+    }>
+  > {
+    return withOrgScope(this.db, orgId, async (c) => {
+      const node = await this.loadNode(c, id);
+      const { rows } = await c.query<{
+        id: string;
+        kind: string;
+        occurred_at: Date;
+        actor: string | null;
+        title: string;
+        source: string;
+        evidence: Record<string, unknown>;
+      }>(
+        `SELECT id, kind, occurred_at, actor, title, source, evidence
+           FROM node_events WHERE node_id = $1
+          ORDER BY occurred_at DESC LIMIT $2`,
+        [id, limit],
+      );
+      const events = rows.map((r) => ({
+        id: r.id,
+        kind: r.kind,
+        occurredAt: r.occurred_at.toISOString(),
+        actor: r.actor,
+        title: r.title,
+        source: r.source,
+        evidence: r.evidence,
+      }));
+
+      if (node.kind.endsWith(".repository")) {
+        const prs = await c.query<{
+          id: string;
+          name: string | null;
+          author: string | null;
+          merged_on: string | null;
+        }>(
+          `SELECT p.id, p.name,
+                  (SELECT nu.name FROM edges eo
+                     JOIN nodes nu ON nu.id = eo.to_node_id
+                    WHERE eo.from_node_id = p.id AND eo.type = 'OWNED_BY' LIMIT 1) AS author,
+                  p.attributes->>'updatedOn' AS merged_on
+             FROM edges e JOIN nodes p ON p.id = e.to_node_id
+            WHERE e.from_node_id = $1 AND e.type = 'CONTAINS'
+              AND p.kind LIKE '%.pullrequest'
+              AND p.attributes->>'state' = 'MERGED'
+            ORDER BY p.attributes->>'updatedOn' DESC NULLS LAST
+            LIMIT $2`,
+          [id, limit],
+        );
+        for (const pr of prs.rows) {
+          if (!pr.merged_on) continue;
+          events.push({
+            id: pr.id,
+            kind: "pr_merged",
+            occurredAt: pr.merged_on,
+            actor: pr.author,
+            title: `PR merged: ${pr.name ?? pr.id}${pr.author ? ` (by ${pr.author})` : ""}`,
+            source: "graph",
+            evidence: { prNodeId: pr.id },
+          });
+        }
+        events.sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1));
+      }
+      return events.slice(0, limit);
+    });
+  }
+
   async graph(orgId: string, q: GraphQuery): Promise<GraphResult> {
     return withOrgScope(this.db, orgId, async (c) => {
       const where = ["status <> 'deleted'"];

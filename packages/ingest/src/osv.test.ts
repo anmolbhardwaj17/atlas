@@ -8,7 +8,9 @@ const SAFE: OsvQueryPkg = { name: "safe-pkg", version: "1.0.0", ecosystem: "npm"
 function fakeFetch(): typeof fetch {
   return (async (url: string, init?: RequestInit) => {
     if (String(url).includes("/querybatch")) {
-      const body = JSON.parse(String(init?.body)) as { queries: Array<{ package: { name: string } }> };
+      const body = JSON.parse(String(init?.body)) as {
+        queries: Array<{ package: { name: string } }>;
+      };
       const results = body.queries.map((q) =>
         q.package.name === "lodash" ? { vulns: [{ id: "GHSA-jf85-cpcp-j695" }] } : {},
       );

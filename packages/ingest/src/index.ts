@@ -4,6 +4,8 @@ export { runOsvEnrichment } from "./osv-enrichment";
 export type { OsvEnrichmentDeps, OsvEnrichmentResult } from "./osv-enrichment";
 export { OsvClient, pkgKey } from "./osv";
 export { applyHealthObservations } from "./health-apply";
+export { applyNodeEvents } from "./node-events";
+export type { NodeEventInput, NodeEventsApplyResult } from "./node-events";
 export type { HealthObservationInput, HealthApplyResult } from "./health-apply";
 export type {
   OsvEcosystem,

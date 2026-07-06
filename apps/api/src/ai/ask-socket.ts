@@ -144,7 +144,12 @@ export async function registerAskSocket(app: NestFastifyApplication): Promise<vo
           const ac = new AbortController();
           current = ac;
           try {
-            for await (const ev of ai.askStream(orgId, msg.conversationId, msg.message, ac.signal)) {
+            for await (const ev of ai.askStream(
+              orgId,
+              msg.conversationId,
+              msg.message,
+              ac.signal,
+            )) {
               if (ac.signal.aborted) break;
               send(ev);
             }

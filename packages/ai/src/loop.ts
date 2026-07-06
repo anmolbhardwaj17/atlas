@@ -8,7 +8,13 @@
  * clamps. Deterministic under the MockLLMProvider (scripted tool_calls) → fully unit-testable.
  */
 import type { LLMProvider, ChatMessage, ToolCall } from "./llm";
-import type { RetrievalPort, RetrievedNode, RetrievedEdge, Traversal, TimelineChange } from "./retrieval-port";
+import type {
+  RetrievalPort,
+  RetrievedNode,
+  RetrievedEdge,
+  Traversal,
+  TimelineChange,
+} from "./retrieval-port";
 import type { EstateOverview } from "./retrieval-port";
 import type { BuiltContext, Cite } from "./context";
 import { PLANNER_SYSTEM } from "./prompt";
@@ -84,7 +90,12 @@ export class ContextAccumulator {
     const nodeLines: string[] = [];
     const edgeLines: string[] = [];
 
-    const nodeRef = (id: string, kind: string, name: string | null, confidence?: string | null): string => {
+    const nodeRef = (
+      id: string,
+      kind: string,
+      name: string | null,
+      confidence?: string | null,
+    ): string => {
       let marker = nodeMarker.get(id);
       if (!marker) {
         marker = `N${nodeMarker.size + 1}`;
@@ -96,12 +107,20 @@ export class ContextAccumulator {
       }
       return marker;
     };
-    const edgeRef = (id: string, from: string, type: string, to: string, confidence: string): void => {
+    const edgeRef = (
+      id: string,
+      from: string,
+      type: string,
+      to: string,
+      confidence: string,
+    ): void => {
       if (edgeMarker.has(id)) return;
       const marker = `E${edgeMarker.size + 1}`;
       edgeMarker.set(id, marker);
       cites.push({ marker, kind: "edge", id, confidence });
-      edgeLines.push(`  ${marker} (cite:${id}) ${from} --${type}--> ${to} confidence=${confidence}`);
+      edgeLines.push(
+        `  ${marker} (cite:${id}) ${from} --${type}--> ${to} confidence=${confidence}`,
+      );
     };
 
     // Full nodes (from get_node).
@@ -258,6 +277,16 @@ function renderEstate(e: EstateOverview, cites: Cite[]): string[] {
     "estate:inventory",
     `inventory: repositories=${inv.repositories} services=${inv.services} datastores=${inv.datastores} pipelines=${inv.pipelines} openPullRequests=${inv.pullRequests} contributors=${inv.contributors} clouds=${inv.clouds} accounts=${inv.accounts} environments=${inv.environments} totalResources=${inv.resources} totalRelationships=${inv.relationships}`,
   );
+  if (e.infrastructure.length) {
+    acite(
+      "estate:infrastructure",
+      `cloud infrastructure by kind: ${e.infrastructure
+        .map(
+          (i) => `${i.kind}=${i.count}${i.notHealthy > 0 ? ` (${i.notHealthy} not healthy)` : ""}`,
+        )
+        .join(" · ")}`,
+    );
+  }
   if (e.topContributors.length)
     acite(
       "estate:contributors",

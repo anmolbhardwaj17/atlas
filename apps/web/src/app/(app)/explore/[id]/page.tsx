@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
 import { NodeDetailView } from "@/components/explore/node-detail";
-import type { NodeDetail, EdgeDto } from "@/lib/graph-types";
+import type { NodeDetail, EdgeDto, NodeEvent } from "@/lib/graph-types";
 
 export const dynamic = "force-dynamic";
 
@@ -10,12 +10,14 @@ export default async function NodePage({ params }: { params: Promise<{ id: strin
   const shell = await requireShell();
   const { id } = await params;
 
-  const [nodeRes, edgesRes] = await Promise.all([
+  const [nodeRes, edgesRes, eventsRes] = await Promise.all([
     apiGet<ApiOk<NodeDetail>>(`/nodes/${id}`, { token: shell.token, orgId: shell.orgId }),
     apiGet<ApiOk<EdgeDto[]>>(`/nodes/${id}/edges`, { token: shell.token, orgId: shell.orgId }),
+    apiGet<ApiOk<NodeEvent[]>>(`/nodes/${id}/events`, { token: shell.token, orgId: shell.orgId }),
   ]);
   const node = nodeRes.body?.data ?? null;
   const edges = edgesRes.body?.data ?? [];
+  const events = eventsRes.body?.data ?? [];
 
   return (
     <>
@@ -25,7 +27,7 @@ export default async function NodePage({ params }: { params: Promise<{ id: strin
         </Link>
       </div>
       {node ? (
-        <NodeDetailView node={node} edges={edges} />
+        <NodeDetailView node={node} edges={edges} events={events} />
       ) : (
         <div className="rounded-lg border border-border py-12 text-center">
           <p className="text-sm text-foreground">Resource not found</p>

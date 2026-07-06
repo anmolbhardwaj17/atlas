@@ -98,7 +98,10 @@ export class GraphRetrievalPort implements RetrievalPort {
    * never recomputes counts a different way (single source of truth). Org-scoped by GraphService.
    */
   async estateOverview(orgId: string): Promise<EstateOverview> {
-    const s = await this.graph.summary(orgId);
+    const [s, infrastructure] = await Promise.all([
+      this.graph.summary(orgId),
+      this.graph.infrastructureBreakdown(orgId),
+    ]);
     return {
       inventory: {
         resources: s.inventory.resources,
@@ -124,6 +127,7 @@ export class GraphRetrievalPort implements RetrievalPort {
         withPipeline: s.insights.pipelineCoverage.withPipeline,
         total: s.insights.pipelineCoverage.total,
       },
+      infrastructure,
       findings: s.findings.map((f) => ({
         title: f.title,
         severity: f.severity,
