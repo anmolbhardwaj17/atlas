@@ -202,21 +202,21 @@ export function CommandPalette({ orgId }: { orgId: string }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-[15dvh]"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-[15dvh] backdrop-blur-sm"
       onClick={() => setOpen(false)}
       role="dialog"
       aria-modal="true"
       aria-label="Command palette"
     >
       <div
-        className="w-full max-w-xl overflow-hidden rounded-lg border border-border bg-card shadow-xl"
+        className="w-full max-w-xl overflow-hidden rounded-xl border border-border/70 bg-card shadow-2xl ring-1 ring-black/5"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2 border-b border-border px-3">
+        <div className="flex items-center gap-2.5 border-b border-border px-4">
           {searching ? (
-            <Loader2 size={16} className="animate-spin text-muted-foreground" />
+            <Loader2 size={18} className="shrink-0 animate-spin text-muted-foreground" />
           ) : (
-            <Search size={16} className="text-muted-foreground" />
+            <Search size={18} className="shrink-0 text-muted-foreground" />
           )}
           <input
             ref={inputRef}
@@ -235,14 +235,14 @@ export function CommandPalette({ orgId }: { orgId: string }) {
               }
             }}
             placeholder="Search resources, jump to a page, or ask Atlas…"
-            className="w-full bg-transparent py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+            className="w-full bg-transparent py-3.5 text-[15px] text-foreground placeholder:text-muted-foreground focus:outline-none"
           />
-          <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground sm:block">
+          <kbd className="hidden shrink-0 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:block">
             esc
           </kbd>
         </div>
 
-        <ul className="max-h-96 overflow-y-auto py-1">
+        <ul className="max-h-96 overflow-y-auto p-2">
           {/* Resources still loading: a clear "working" row so the list never looks empty. */}
           {searching && !items.some((it) => it.type === "resource") ? (
             <li>
@@ -255,7 +255,7 @@ export function CommandPalette({ orgId }: { orgId: string }) {
             </li>
           ) : null}
           {items.length === 0 && !searching ? (
-            <li className="px-3 py-6 text-center text-sm text-muted-foreground">
+            <li className="px-3 py-10 text-center text-sm text-muted-foreground">
               No matches - try a resource name, or press ↵ to ask Atlas.
             </li>
           ) : (
@@ -265,15 +265,15 @@ export function CommandPalette({ orgId }: { orgId: string }) {
               return (
                 <li key={item.key}>
                   {header ? (
-                    <p className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="px-2 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground first:pt-1">
                       {header}
                     </p>
                   ) : null}
                   <button
                     onMouseEnter={() => setActive(i)}
                     onClick={() => run(item)}
-                    className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm ${
-                      i === active ? "bg-primary/15 text-foreground" : "text-muted-foreground"
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors ${
+                      i === active ? "bg-accent text-accent-foreground" : "text-muted-foreground"
                     }`}
                   >
                     {item.type === "ask" || (item.type === "nav" && item.href === "/ask") ? (
@@ -281,8 +281,8 @@ export function CommandPalette({ orgId }: { orgId: string }) {
                         <AtlasAiMark size={18} />
                       </span>
                     ) : item.type === "nav" ? (
-                      <span className="grid size-6 shrink-0 place-items-center">
-                        <item.icon size={15} className="text-muted-foreground" />
+                      <span className="grid size-6 shrink-0 place-items-center rounded-md border border-border bg-background">
+                        <item.icon size={14} className="text-muted-foreground" />
                       </span>
                     ) : (
                       <ResourceIcon kind={item.kind} />
@@ -300,7 +300,32 @@ export function CommandPalette({ orgId }: { orgId: string }) {
             })
           )}
         </ul>
+
+        {/* Keyboard hint footer - gives the palette a finished, app-like feel. */}
+        <div className="flex items-center justify-between border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <AtlasAiMark size={13} /> Press ↵ to ask Atlas anything
+          </span>
+          <span className="hidden items-center gap-2.5 sm:flex">
+            <span className="flex items-center gap-1">
+              <Kbd>↑</Kbd>
+              <Kbd>↓</Kbd> navigate
+            </span>
+            <span className="flex items-center gap-1">
+              <Kbd>↵</Kbd> select
+            </span>
+          </span>
+        </div>
       </div>
     </div>
+  );
+}
+
+/** Small keyboard-key chip for the palette footer. */
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="rounded border border-border bg-muted px-1 py-0.5 font-mono text-[10px] leading-none text-muted-foreground">
+      {children}
+    </kbd>
   );
 }
