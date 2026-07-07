@@ -8,8 +8,27 @@ import { Pool, type PoolClient } from "pg";
 
 export type Db = Pool;
 
+/**
+ * Build the app's Postgres pool. Crucially it attaches an `error` handler: pg emits an
+ * `error` event on the Pool when an IDLE pooled client dies (a Supabase pooler dropping or
+ * timing out an idle connection - common on the session pooler, especially under the
+ * background pollers). With no listener, Node treats that as an unhandled `error` and
+ * CRASHES the whole process - which is exactly what took the API down. Here we log it and
+ * move on: pg discards the dead client and opens a fresh one on the next query, so a
+ * transient DB blip degrades one in-flight request, never the whole server.
+ */
 export function createPool(connectionString: string): Pool {
-  return new Pool({ connectionString });
+  const pool = new Pool({
+    connectionString,
+    keepAlive: true, // fewer idle drops by the pooler
+    connectionTimeoutMillis: 10_000,
+    idleTimeoutMillis: 30_000,
+  });
+  pool.on("error", (err) => {
+    // eslint-disable-next-line no-console
+    console.error(`[db] idle client error (recovered, not fatal): ${err.message}`);
+  });
+  return pool;
 }
 
 /**
