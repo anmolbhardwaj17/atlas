@@ -31,7 +31,16 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   // server-side auth guards then treat the request as unauthenticated and redirect to /login,
   // instead of the whole app crashing on a transient upstream blip.
   try {
-    await supabase.auth.getUser();
+    const { data } = await supabase.auth.getUser();
+    // Already signed in? Don't let them sit on /login - send them into the app.
+    if (data.user && request.nextUrl.pathname === "/login") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/";
+      url.search = "";
+      const redirect = NextResponse.redirect(url);
+      for (const c of response.cookies.getAll()) redirect.cookies.set(c.name, c.value, c);
+      return redirect;
+    }
   } catch {
     // Swallow - a reachability failure is not an auth decision. Downstream guards handle no-session.
   }

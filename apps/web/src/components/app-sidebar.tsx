@@ -12,6 +12,7 @@ import {
   Settings,
   ChevronsUpDown,
   LogOut,
+  Loader2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { AtlasLogo, AtlasAiMark } from "@/components/brand";
@@ -92,6 +93,10 @@ export function AppSidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  // Dynamic routes wait for a server round-trip before the URL/loading boundary changes, so a
+  // click can feel frozen. Show an instant spinner on the clicked item until the route commits.
+  const [pendingHref, setPendingHref] = React.useState<string | null>(null);
+  React.useEffect(() => setPendingHref(null), [pathname]);
 
   async function signOut() {
     await createClient().auth.signOut();
@@ -127,8 +132,15 @@ export function AppSidebar({
               {NAV.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton asChild isActive={item.match(pathname)} tooltip={item.label}>
-                    <Link href={item.href}>
-                      {item.icon ? (
+                    <Link
+                      href={item.href}
+                      onClick={() => {
+                        if (!item.match(pathname)) setPendingHref(item.href);
+                      }}
+                    >
+                      {pendingHref === item.href ? (
+                        <Loader2 className="size-4 shrink-0 animate-spin" />
+                      ) : item.icon ? (
                         <item.icon />
                       ) : (
                         // The Ask Atlas mark reads a touch bigger than the lucide glyphs (it's a
