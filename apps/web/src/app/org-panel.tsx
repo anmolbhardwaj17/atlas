@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RoleBadge } from "@/components/tags";
 import { StatusBadge } from "@/components/certainty";
+import { UserAvatar } from "@/components/user-avatar";
 import { byRole } from "@/lib/taxonomy";
 
 interface Member {
@@ -108,9 +109,12 @@ export function OrgPanel({
             ) : (
               [...members].sort(byRole).map((m) => (
                 <li key={m.userId} className="flex items-center justify-between px-3 py-2 text-sm">
-                  <span>
-                    <span className="font-medium">{m.name ?? m.email}</span>{" "}
-                    <span className="text-muted-foreground">{m.email}</span>
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <UserAvatar name={m.name} email={m.email} size={28} />
+                    <span className="truncate">
+                      <span className="font-medium">{m.name ?? m.email}</span>{" "}
+                      <span className="text-muted-foreground">{m.email}</span>
+                    </span>
                   </span>
                   <RoleBadge role={m.role} />
                 </li>

@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -16,6 +15,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { AtlasLogo, AtlasAiMark } from "@/components/brand";
+import { UserAvatar } from "@/components/user-avatar";
 import {
   Sidebar,
   SidebarContent,
@@ -99,9 +99,6 @@ export function AppSidebar({
   }
 
   const displayName = name?.trim() || email || "Account";
-  // Photo if we have one, otherwise a deterministic DiceBear "Dylan" avatar seeded by email.
-  const avatar =
-    avatarUrl || `https://api.dicebear.com/10.x/dylan/svg?seed=${encodeURIComponent(email)}`;
 
   return (
     <Sidebar collapsible="icon">
@@ -158,14 +155,7 @@ export function AppSidebar({
                   size="lg"
                   className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                 >
-                  <Image
-                    src={avatar}
-                    alt={displayName}
-                    width={32}
-                    height={32}
-                    unoptimized
-                    className="aspect-square size-8 rounded-lg border border-border bg-muted object-cover"
-                  />
+                  <UserAvatar value={avatarUrl} name={name} email={email} size={32} />
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-medium">{displayName}</span>
                     <span className="truncate text-xs text-muted-foreground">{orgName}</span>

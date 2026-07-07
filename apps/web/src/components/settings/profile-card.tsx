@@ -1,29 +1,24 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
 import { Check, Loader2, Pencil, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/cn";
 import { createClient } from "@/lib/supabase/client";
 import { updateMyProfile } from "@/lib/browser-api";
 
-/** A DiceBear "Dylan" avatar (bold, flat-illustrated faces) for a given seed. SVG, no network build. */
-function dylanAvatar(seed: string): string {
-  return `https://api.dicebear.com/10.x/dylan/svg?seed=${encodeURIComponent(seed)}`;
-}
-
-// Seed suffixes → a spread of distinct Dylan faces to pick from (seeded off your email so
-// they're stable for you).
-const AVATAR_VARIANTS = ["a", "b", "c", "d", "e", "f", "g"];
+// The default avatar is your initials; "avv:shape:<seed>" is a generated geometric shape.
+const DEFAULT_AVATAR = "avv:character";
+const SHAPE_SEEDS = ["a", "b", "c", "d", "e", "f"];
 
 /**
  * Your personal profile - distinct from the organization. Shows your photo + name + email, and
- * lets you rename yourself and pick an avatar (your Google photo or a generated DiceBear one).
- * All of it persists to your user record and survives the next login.
+ * lets you rename yourself and pick an avatar: your Google photo, your initials (the default), or
+ * a generated shape. All of it persists to your user record and survives the next login.
  */
 export function ProfileCard({
   name,
@@ -34,9 +29,8 @@ export function ProfileCard({
   email: string;
   avatarUrl: string | null;
 }) {
-  const fallback = dylanAvatar(email);
   const [currentName, setCurrentName] = React.useState(name);
-  const [currentAvatar, setCurrentAvatar] = React.useState(avatarUrl ?? fallback);
+  const [currentAvatar, setCurrentAvatar] = React.useState(avatarUrl ?? DEFAULT_AVATAR);
   const [editing, setEditing] = React.useState(false);
   const [draftName, setDraftName] = React.useState(name ?? "");
   const [pickedAvatar, setPickedAvatar] = React.useState(currentAvatar);
@@ -59,13 +53,13 @@ export function ProfileCard({
       .catch(() => {});
   }, []);
 
-  // Avatar options: your Google photo (if any) first, then a spread of Dylan faces.
+  // Avatar options: your Google photo (if any), your initials (default), then generated shapes.
   const options = React.useMemo(() => {
-    const list: { url: string; label: string }[] = [];
-    if (googlePhoto) list.push({ url: googlePhoto, label: "Google photo" });
-    list.push({ url: dylanAvatar(email), label: "Avatar 1" });
-    AVATAR_VARIANTS.forEach((v, i) =>
-      list.push({ url: dylanAvatar(`${email}-${v}`), label: `Avatar ${i + 2}` }),
+    const list: { value: string; label: string }[] = [];
+    if (googlePhoto) list.push({ value: googlePhoto, label: "Google photo" });
+    list.push({ value: DEFAULT_AVATAR, label: "Your initials" });
+    SHAPE_SEEDS.forEach((s, i) =>
+      list.push({ value: `avv:shape:${email}-${s}`, label: `Shape ${i + 1}` }),
     );
     return list;
   }, [email, googlePhoto]);
@@ -111,14 +105,7 @@ export function ProfileCard({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center gap-4">
-          <Image
-            src={currentAvatar}
-            alt={currentName ?? email}
-            width={56}
-            height={56}
-            unoptimized
-            className="size-14 shrink-0 rounded-full border border-border bg-muted object-cover"
-          />
+          <UserAvatar value={currentAvatar} name={currentName} email={email} size={56} />
 
           <div className="min-w-0 flex-1">
             {editing ? (
@@ -163,27 +150,20 @@ export function ProfileCard({
             <div className="flex flex-wrap gap-2.5">
               {options.map((opt) => (
                 <button
-                  key={opt.url}
+                  key={opt.value}
                   type="button"
-                  onClick={() => setPickedAvatar(opt.url)}
+                  onClick={() => setPickedAvatar(opt.value)}
                   title={opt.label}
                   aria-label={opt.label}
-                  aria-pressed={pickedAvatar === opt.url}
+                  aria-pressed={pickedAvatar === opt.value}
                   className={cn(
                     "rounded-full ring-2 ring-offset-2 ring-offset-background transition",
-                    pickedAvatar === opt.url
+                    pickedAvatar === opt.value
                       ? "ring-primary"
                       : "ring-transparent hover:ring-border",
                   )}
                 >
-                  <Image
-                    src={opt.url}
-                    alt={opt.label}
-                    width={40}
-                    height={40}
-                    unoptimized
-                    className="size-10 rounded-full border border-border bg-muted object-cover"
-                  />
+                  <UserAvatar value={opt.value} name={currentName} email={email} size={40} />
                 </button>
               ))}
             </div>

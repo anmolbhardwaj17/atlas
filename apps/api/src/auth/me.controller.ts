@@ -11,7 +11,8 @@ import type { MirroredUser } from "./user-mirror.service";
 const UpdateMeSchema = z
   .object({
     name: z.string().trim().min(1).max(80).optional(),
-    avatarUrl: z.string().trim().url().max(500).optional(),
+    // A photo URL OR an avvvatars descriptor ("avv:character" / "avv:shape:<seed>").
+    avatarUrl: z.string().trim().min(1).max(500).optional(),
   })
   .strict()
   .refine((v) => v.name !== undefined || v.avatarUrl !== undefined, {

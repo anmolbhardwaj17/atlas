@@ -138,6 +138,9 @@ importers:
       '@xyflow/react':
         specifier: ^12
         version: 12.11.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      avvvatars-react:
+        specifier: ^0.4.2
+        version: 0.4.2(csstype@3.2.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -2402,6 +2405,12 @@ packages:
   avvio@9.2.0:
     resolution: {integrity: sha512-2t/sy01ArdHHE0vRH5Hsay+RtCZt3dLPji7W7/MMOCEgze5b7SNDC4j5H6FnVgPkI1MTNFGzHdHrVXDDl7QSSQ==}
 
+  avvvatars-react@0.4.2:
+    resolution: {integrity: sha512-D/bnSM+P6pQi71dFeFVqQsqmv+ct5XG7uO2lvJoiksALpXLd6kPgpRR1SUQxFZJkJNrkmg0NPgbhIgJgOsDYRQ==}
+    peerDependencies:
+      react: '>= 16'
+      react-dom: '>= 16'
+
   aws-sdk-client-mock@4.1.0:
     resolution: {integrity: sha512-h/tOYTkXEsAcV3//6C1/7U4ifSpKyJvb6auveAepqqNJl6TdZaPFEtKjBQNf8UxQdDP850knB2i/whq4zlsxJw==}
 
@@ -3092,6 +3101,11 @@ packages:
   globals@14.0.0:
     resolution: {integrity: sha512-oahGvuMGQlPw/ivIYBjVSrWAfWLBeku5tpPE2fOPLi+WHffIWbuh2tCjhyQhTBPMf5E9jDEH4FOmTYgYwbKwtQ==}
     engines: {node: '>=18'}
+
+  goober@2.1.19:
+    resolution: {integrity: sha512-U7veizMqxyKlM58+Z5j2ngJBH/r9siDmxpvNxSw0PylF6WQvrASJEZrxh1hidRBJc2jqoBVSyOban5u8m+6Rxg==}
+    peerDependencies:
+      csstype: ^3.0.10
 
   gopd@1.2.0:
     resolution: {integrity: sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==}
@@ -6706,6 +6720,14 @@ snapshots:
       '@fastify/error': 4.2.0
       fastq: 1.20.1
 
+  avvvatars-react@0.4.2(csstype@3.2.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+    dependencies:
+      goober: 2.1.19(csstype@3.2.3)
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+    transitivePeerDependencies:
+      - csstype
+
   aws-sdk-client-mock@4.1.0:
     dependencies:
       '@types/sinon': 17.0.4
@@ -7470,6 +7492,10 @@ snapshots:
       is-glob: 4.0.3
 
   globals@14.0.0: {}
+
+  goober@2.1.19(csstype@3.2.3):
+    dependencies:
+      csstype: 3.2.3
 
   gopd@1.2.0: {}
 
