@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search,
+  Loader2,
   LayoutDashboard,
   Waypoints,
   Boxes,
@@ -17,6 +18,7 @@ import {
 import { searchNodes, type SearchHit } from "@/lib/browser-api";
 import { kindIcon, kindStyle, kindShort, KIND_LOGO } from "@/lib/kind-visual";
 import { CloudIcon } from "@/components/cloud-icon";
+import { AtlasAiMark } from "@/components/brand";
 import { cn } from "@/lib/cn";
 
 /** Support-data kinds are not navigable estate - they live in Insights/Explore-by-kind, not
@@ -45,11 +47,13 @@ function ResourceIcon({ kind }: { kind: string }) {
  * uses for entity resolution), or hand the query straight to Ask Atlas. ⌘K/Ctrl-K to open,
  * ↑↓ to move, ↵ to run, Esc to close.
  */
+// Ask Atlas leads - the AI is the headline interface (P1). Its icon is the real AI mark,
+// rendered specially (href === "/ask") since it's an image, not a Lucide glyph.
 const NAV: Array<{ label: string; href: string; icon: LucideIcon; keywords: string }> = [
+  { label: "Ask Atlas", href: "/ask", icon: Sparkles, keywords: "ai chat question diagnose" },
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, keywords: "overview home" },
   { label: "Map", href: "/map", icon: Waypoints, keywords: "infrastructure graph flow" },
   { label: "Explore", href: "/explore", icon: Boxes, keywords: "browse resources repos" },
-  { label: "Ask Atlas", href: "/ask", icon: Sparkles, keywords: "ai chat question diagnose" },
   { label: "Insights", href: "/insights", icon: Lightbulb, keywords: "findings recommendations" },
   { label: "Integrations", href: "/integrations", icon: Plug, keywords: "connect aws bitbucket" },
   { label: "Settings", href: "/settings", icon: Settings, keywords: "config alerts llm members" },
@@ -72,6 +76,7 @@ export function CommandPalette({ orgId }: { orgId: string }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
+  const [searching, setSearching] = useState(false);
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -109,13 +114,18 @@ export function CommandPalette({ orgId }: { orgId: string }) {
     const term = q.trim();
     if (term.length < 2) {
       setHits([]);
+      setSearching(false);
       return;
     }
+    setSearching(true); // in-flight from the first keystroke, so the UI never looks "empty"
     const ctrl = new AbortController();
     const t = setTimeout(() => {
       searchNodes(orgId, term, ctrl.signal)
-        .then((r) => setHits(r))
-        .catch(() => undefined);
+        .then((r) => {
+          setHits(r);
+          setSearching(false);
+        })
+        .catch(() => undefined); // aborted → a newer search is already running; keep searching
     }, 150);
     return () => {
       clearTimeout(t);
@@ -203,7 +213,11 @@ export function CommandPalette({ orgId }: { orgId: string }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 border-b border-border px-3">
-          <Search size={16} className="text-muted-foreground" />
+          {searching ? (
+            <Loader2 size={16} className="animate-spin text-muted-foreground" />
+          ) : (
+            <Search size={16} className="text-muted-foreground" />
+          )}
           <input
             ref={inputRef}
             value={q}
@@ -229,7 +243,18 @@ export function CommandPalette({ orgId }: { orgId: string }) {
         </div>
 
         <ul className="max-h-96 overflow-y-auto py-1">
-          {items.length === 0 ? (
+          {/* Resources still loading: a clear "working" row so the list never looks empty. */}
+          {searching && !items.some((it) => it.type === "resource") ? (
+            <li>
+              <p className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Resources
+              </p>
+              <div className="flex items-center gap-2.5 px-3 py-2 text-sm text-muted-foreground">
+                <Loader2 size={15} className="animate-spin" /> Searching your estate…
+              </div>
+            </li>
+          ) : null}
+          {items.length === 0 && !searching ? (
             <li className="px-3 py-6 text-center text-sm text-muted-foreground">
               No matches — try a resource name, or press ↵ to ask Atlas.
             </li>
@@ -251,13 +276,13 @@ export function CommandPalette({ orgId }: { orgId: string }) {
                       i === active ? "bg-primary/15 text-foreground" : "text-muted-foreground"
                     }`}
                   >
-                    {item.type === "nav" ? (
+                    {item.type === "ask" || (item.type === "nav" && item.href === "/ask") ? (
+                      <span className="grid size-6 shrink-0 place-items-center">
+                        <AtlasAiMark size={18} />
+                      </span>
+                    ) : item.type === "nav" ? (
                       <span className="grid size-6 shrink-0 place-items-center">
                         <item.icon size={15} className="text-muted-foreground" />
-                      </span>
-                    ) : item.type === "ask" ? (
-                      <span className="grid size-6 shrink-0 place-items-center rounded-md bg-primary/10">
-                        <Sparkles size={14} className="text-primary" />
                       </span>
                     ) : (
                       <ResourceIcon kind={item.kind} />
