@@ -15,7 +15,7 @@ import {
   type Edge,
   type NodeMouseHandler,
 } from "@xyflow/react";
-import { Shield, X } from "lucide-react";
+import { Shield, Stethoscope, X } from "lucide-react";
 import { buildLayout } from "@/lib/map-layout";
 import { edgeCrossing, CROSS_COLOR, type MapData, type MapNode } from "@/lib/map-types";
 import { ResourceNode, EnvLaneNode } from "@/components/map/resource-node";
@@ -671,7 +671,16 @@ function DetailPanel({
         </div>
       )}
 
-      <div className="mt-4 flex gap-2">
+      {node.health && node.health.state !== "healthy" ? (
+        <Link
+          href={diagnoseHref(node)}
+          className="mt-4 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-danger px-3 text-xs font-medium text-white hover:bg-danger/90"
+        >
+          <Stethoscope className="size-3.5" /> Diagnose with Atlas AI
+        </Link>
+      ) : null}
+
+      <div className="mt-3 flex gap-2">
         <Link
           href={`/explore/${node.id}`}
           className="inline-flex h-8 flex-1 items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90"
@@ -687,6 +696,13 @@ function DetailPanel({
       </div>
     </div>
   );
+}
+
+/** A pre-filled Ask Atlas diagnosis question (routes to the culprit/agentic diagnose tool). */
+export function diagnoseHref(node: { name: string | null; kind: string }): string {
+  const label = node.name ?? node.kind;
+  const q = `Why is ${label} unhealthy right now? Diagnose the likely cause, what changed recently, and what depends on it.`;
+  return `/ask?q=${encodeURIComponent(q)}`;
 }
 
 function Row({ label, value }: { label: string; value: string }) {

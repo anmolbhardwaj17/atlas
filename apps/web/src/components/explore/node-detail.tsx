@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, ArrowDownLeft, Zap } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, Zap, Stethoscope } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
 import type { NodeDetail, EdgeDto, NodeEvent } from "@/lib/graph-types";
@@ -24,9 +24,22 @@ export function NodeDetailView({
           <h1 className="text-xl font-semibold">{node.name ?? "unnamed"}</h1>
           <ConfidenceBadge tier={node.confidence} />
           <FreshnessTag status={node.status} />
+          {(() => {
+            const h = node.attributes?.health as { state?: string } | undefined;
+            if (!h || h.state === "healthy" || !h.state) return null;
+            const q = `Why is ${node.name ?? node.kind} unhealthy right now? Diagnose the likely cause, what changed recently, and what depends on it.`;
+            return (
+              <Link
+                href={`/ask?q=${encodeURIComponent(q)}`}
+                className="ml-auto flex items-center gap-1.5 rounded-md bg-danger px-2.5 py-1 text-xs font-medium text-white hover:bg-danger/90"
+              >
+                <Stethoscope size={13} /> Diagnose with AI
+              </Link>
+            );
+          })()}
           <Link
             href={`/explore/${node.id}/impact`}
-            className="ml-auto flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground"
+            className={`${node.attributes?.health && (node.attributes.health as { state?: string }).state !== "healthy" ? "" : "ml-auto"} flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground`}
           >
             <Zap size={13} /> Impact analysis
           </Link>
