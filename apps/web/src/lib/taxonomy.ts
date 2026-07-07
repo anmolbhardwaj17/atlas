@@ -53,7 +53,7 @@ export const ROLE_META: Record<Role, RoleMeta> = {
     label: "Member",
     rank: 2,
     icon: User,
-    className: "border-transparent bg-slate-500/15 text-slate-600 dark:text-slate-300",
+    className: "border-border bg-transparent text-muted-foreground",
   },
 };
 

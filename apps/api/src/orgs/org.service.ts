@@ -89,11 +89,12 @@ export class OrgService {
         user_id: string;
         email: string;
         name: string | null;
+        avatar_url: string | null;
         role: Role;
         status: string;
         created_at: Date;
       }>(
-        `SELECT m.user_id, u.email, u.name, m.role, m.status, m.created_at
+        `SELECT m.user_id, u.email, u.name, u.avatar_url, m.role, m.status, m.created_at
          FROM memberships m JOIN users u ON u.id = m.user_id
          ORDER BY m.created_at`,
       );
@@ -101,6 +102,7 @@ export class OrgService {
         userId: r.user_id,
         email: r.email,
         name: r.name,
+        avatarUrl: r.avatar_url,
         role: r.role,
         status: r.status,
         joinedAt: r.created_at.toISOString(),
@@ -133,13 +135,14 @@ export class OrgService {
         user_id: string;
         email: string;
         name: string | null;
+        avatar_url: string | null;
         role: Role;
         status: string;
         created_at: Date;
       }>(
         `UPDATE memberships m SET role = $2 FROM users u
          WHERE m.user_id = $1 AND u.id = m.user_id
-         RETURNING m.user_id, u.email, u.name, m.role, m.status, m.created_at`,
+         RETURNING m.user_id, u.email, u.name, u.avatar_url, m.role, m.status, m.created_at`,
         [targetUserId, newRole],
       );
       const r = rows[0];
@@ -147,6 +150,7 @@ export class OrgService {
       return {
         userId: r.user_id,
         email: r.email,
+        avatarUrl: r.avatar_url,
         name: r.name,
         role: r.role,
         status: r.status,

@@ -41,6 +41,7 @@ export interface MemberDto {
   userId: string;
   email: string;
   name: string | null;
+  avatarUrl: string | null;
   role: Role;
   status: string;
   joinedAt: string;

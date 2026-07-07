@@ -1,6 +1,6 @@
 import * as React from "react";
-import { AlertTriangle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { AtlasLogo } from "@/components/brand";
 import { cn } from "@/lib/cn";
 
 /**
@@ -12,6 +12,7 @@ import { cn } from "@/lib/cn";
  */
 export function EmptyState({
   icon: Icon,
+  iconSlot,
   title,
   description,
   actions,
@@ -20,6 +21,8 @@ export function EmptyState({
   bare = false,
 }: {
   icon?: React.ComponentType<{ className?: string }>;
+  /** A custom visual in place of the tinted icon box (e.g. the spinning Atlas logo). */
+  iconSlot?: React.ReactNode;
   title: string;
   description?: React.ReactNode;
   actions?: React.ReactNode;
@@ -31,7 +34,9 @@ export function EmptyState({
   const danger = tone === "danger";
   const body = (
     <div className={cn("flex flex-col items-center px-6 py-12 text-center", className)}>
-      {Icon ? (
+      {iconSlot ? (
+        <div className="mb-3">{iconSlot}</div>
+      ) : Icon ? (
         <div
           className={cn(
             "mb-3 grid size-10 place-items-center rounded-lg",
@@ -66,18 +71,17 @@ export function ErrorState({
   description,
   actions,
   bare = false,
-  icon = AlertTriangle,
 }: {
   title?: string;
   description?: React.ReactNode;
   actions?: React.ReactNode;
   bare?: boolean;
-  icon?: React.ComponentType<{ className?: string }>;
 }) {
   return (
     <EmptyState
       tone="danger"
-      icon={icon}
+      // The Atlas mark, gently spinning - our own "something went wrong" signature.
+      iconSlot={<AtlasLogo size={44} spin className="size-11" />}
       title={title}
       description={description}
       actions={actions}

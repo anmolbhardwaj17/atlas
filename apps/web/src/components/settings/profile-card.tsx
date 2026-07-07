@@ -138,7 +138,11 @@ export function ProfileCard({
                 </button>
               </div>
             )}
-            <p className="mt-0.5 truncate text-sm text-muted-foreground">{email}</p>
+            <p
+              className={cn("truncate text-sm text-muted-foreground", editing ? "mt-2" : "mt-0.5")}
+            >
+              {email}
+            </p>
           </div>
         </div>
 
