@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Plus, PanelLeftClose, PanelLeftOpen, Trash2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { AskChat } from "@/components/ask/ask-chat";
@@ -40,10 +41,18 @@ export function AskWorkspace({
   const chatKey = conversationId ?? `new-${epoch}`;
 
   async function removeConversation(id: string) {
+    const removed = conversations.find((c) => c.id === id);
     setMenu(null);
     setConversations((prev) => prev.filter((c) => c.id !== id));
     if (conversationId === id || highlightId === id) newChat();
-    await deleteConversation(orgId, id);
+    try {
+      await deleteConversation(orgId, id);
+      toast.success("Chat deleted", {
+        description: removed?.title ? `"${removed.title}" was removed.` : undefined,
+      });
+    } catch {
+      toast.error("Couldn't delete the chat", { description: "Please try again." });
+    }
   }
 
   // Conversation row - highlighted in place when it's the one you're viewing (not pinned to top).

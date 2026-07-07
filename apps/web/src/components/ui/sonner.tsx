@@ -4,11 +4,17 @@ import { Toaster as Sonner } from "sonner";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
-/** App-wide toast surface (sonner), themed to our tokens. Light-only, matching the app. */
+/**
+ * App-wide toast surface (sonner), themed to our tokens. Light-only, top-right, with a close
+ * button and richColors so success/error/warning read as our semantic status colors.
+ */
 const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme="light"
+      position="top-right"
+      richColors
+      closeButton
       className="toaster group"
       toastOptions={{
         classNames: {

@@ -246,9 +246,14 @@ function ConnectionRow({
     setNote(null);
     try {
       await triggerSync(orgId, conn.id);
+      toast.success(`Sync started for ${conn.displayName}`, {
+        description: "Atlas is pulling the latest data. This can take a minute.",
+      });
       router.refresh(); // the row's live "Syncing…" state takes over from here
     } catch (e) {
-      setNote(e instanceof Error ? e.message : "Couldn't start a sync.");
+      const message = e instanceof Error ? e.message : "Couldn't start a sync.";
+      setNote(message);
+      toast.error("Couldn't start a sync", { description: message });
     } finally {
       setTriggering(false);
     }
@@ -454,6 +459,11 @@ function ConnectSheet({
       } else {
         await createConnection(orgId, provider.id, name.trim());
       }
+      toast.success(`Connected ${name.trim()}`, {
+        description: needsCreds
+          ? "Credentials verified. Atlas is starting its first sync."
+          : `${provider.name} connection added.`,
+      });
       onClose();
       router.refresh();
     } catch (e) {

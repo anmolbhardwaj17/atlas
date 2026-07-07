@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { toast } from "sonner";
 import { Loader2, ExternalLink } from "lucide-react";
 import { AtlasAiMark } from "@/components/brand";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -138,8 +139,11 @@ export function LlmSettingsCard({
       setCurrent(saved);
       setApiKey("");
       setMsg({ tone: "ok", text: `Tested + saved - Ask AI now uses ${saved.model}.` });
+      toast.success("Model saved", { description: `Ask AI now uses ${saved.model}.` });
     } catch (e) {
-      setMsg({ tone: "warn", text: e instanceof Error ? e.message : "Couldn't save the model." });
+      const text = e instanceof Error ? e.message : "Couldn't save the model.";
+      setMsg({ tone: "warn", text });
+      toast.error("Couldn't save the model", { description: text });
     } finally {
       setBusy(false);
     }
@@ -152,8 +156,11 @@ export function LlmSettingsCard({
       await deleteLlmSettings(orgId);
       setCurrent(null);
       setMsg({ tone: "ok", text: "Removed - Ask AI is back on the platform default." });
+      toast.success("Model removed", { description: "Ask AI is back on the platform default." });
     } catch (e) {
-      setMsg({ tone: "warn", text: e instanceof Error ? e.message : "Couldn't remove the model." });
+      const text = e instanceof Error ? e.message : "Couldn't remove the model.";
+      setMsg({ tone: "warn", text });
+      toast.error("Couldn't remove the model", { description: text });
     } finally {
       setBusy(false);
     }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { apiUrl } from "@/lib/env";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -77,9 +78,14 @@ export function OrgPanel({
     if (res.ok) {
       setEmail("");
       setNote(`Invited ${body.data.email} as ${body.data.role}.`);
+      toast.success(`Invitation sent to ${body.data.email}`, {
+        description: `They'll join as ${body.data.role} once they accept.`,
+      });
       void load();
     } else {
-      setNote(body.error?.message ?? `Failed (${res.status})`);
+      const message = body.error?.message ?? `Failed (${res.status})`;
+      setNote(message);
+      toast.error("Couldn't send the invitation", { description: message });
     }
   }
 
