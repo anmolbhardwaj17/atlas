@@ -546,14 +546,6 @@ export async function getNodeMetrics(
   return body.data;
 }
 
-/** Proactive-notification channel status (webhook is write-only; only a masked hint returns). */
-export interface NotificationStatus {
-  configured: boolean;
-  kind: "slack" | null;
-  enabled: boolean;
-  hint: string | null;
-}
-
 async function notifyReq<T>(orgId: string, path: string, method: string): Promise<T> {
   const token = await getClientToken();
   if (!token) throw new Error("You're not signed in.");
@@ -571,8 +563,9 @@ async function notifyReq<T>(orgId: string, path: string, method: string): Promis
   return body.data;
 }
 
-export async function getNotificationStatus(orgId: string): Promise<NotificationStatus> {
-  return notifyReq<NotificationStatus>(orgId, "", "GET");
+/** Configured outbound alert channels for the org (Slack / Discord / Teams). */
+export async function listChannels(orgId: string): Promise<ChannelSummary[]> {
+  return notifyReq<ChannelSummary[]>(orgId, "", "GET");
 }
 
 /** One row in the in-app notification feed (the bell). */
@@ -601,23 +594,33 @@ export async function markNotificationRead(orgId: string, id: string): Promise<v
   await notifyReq<{ ok: true }>(orgId, `/inbox/${id}/read`, "POST");
 }
 
-export async function setSlackWebhook(
+export type ChannelKind = "slack" | "discord" | "msteams";
+
+/** One configured outbound alert channel (webhook itself never returned). */
+export interface ChannelSummary {
+  kind: ChannelKind;
+  enabled: boolean;
+  hint: string | null;
+}
+
+export async function setChannel(
   orgId: string,
+  kind: ChannelKind,
   webhookUrl: string,
-): Promise<NotificationStatus> {
+): Promise<ChannelSummary[]> {
   const token = await getClientToken();
   if (!token) throw new Error("You're not signed in.");
-  const res = await fetch(`${apiUrl()}/notifications/slack`, {
+  const res = await fetch(`${apiUrl()}/notifications/channels`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
       "X-Atlas-Org": orgId,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ webhookUrl }),
+    body: JSON.stringify({ kind, webhookUrl }),
   });
   const body = (await res.json().catch(() => null)) as {
-    data?: NotificationStatus;
+    data?: ChannelSummary[];
     error?: { message?: string };
   } | null;
   if (!res.ok || !body?.data)
@@ -625,12 +628,17 @@ export async function setSlackWebhook(
   return body.data;
 }
 
-export async function testNotification(
+export async function testChannel(
   orgId: string,
+  kind: ChannelKind,
 ): Promise<{ delivered: boolean; message: string }> {
-  return notifyReq<{ delivered: boolean; message: string }>(orgId, "/test", "POST");
+  return notifyReq<{ delivered: boolean; message: string }>(
+    orgId,
+    `/channels/${kind}/test`,
+    "POST",
+  );
 }
 
-export async function disableNotifications(orgId: string): Promise<NotificationStatus> {
-  return notifyReq<NotificationStatus>(orgId, "", "DELETE");
+export async function removeChannel(orgId: string, kind: ChannelKind): Promise<ChannelSummary[]> {
+  return notifyReq<ChannelSummary[]>(orgId, `/channels/${kind}`, "DELETE");
 }

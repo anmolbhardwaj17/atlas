@@ -1,8 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Check, Loader2 } from "lucide-react";
+import {
+  Bell,
+  Check,
+  CheckCircle2,
+  CircleAlert,
+  Info,
+  Loader2,
+  TriangleAlert,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/cn";
 import {
   getInbox,
@@ -13,12 +22,13 @@ import {
 
 const POLL_MS = 45_000;
 
-const SEVERITY_DOT: Record<NotificationItem["severity"], string> = {
-  success: "bg-success",
-  danger: "bg-danger",
-  warning: "bg-warning",
-  info: "bg-muted-foreground",
-};
+const SEVERITY_ICON: Record<NotificationItem["severity"], { icon: LucideIcon; className: string }> =
+  {
+    success: { icon: CheckCircle2, className: "bg-success/10 text-success" },
+    danger: { icon: TriangleAlert, className: "bg-danger/10 text-danger" },
+    warning: { icon: CircleAlert, className: "bg-warning/10 text-warning" },
+    info: { icon: Info, className: "bg-muted text-muted-foreground" },
+  };
 
 /** Compact relative time: "just now", "5m", "3h", "2d". */
 function ago(iso: string): string {
@@ -36,10 +46,29 @@ function ago(iso: string): string {
  */
 export function NotificationBell({ orgId }: { orgId: string }) {
   const router = useRouter();
+  const wrapRef = useRef<HTMLDivElement>(null);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Close on any click outside the bell + Escape. (A fixed-inset backdrop won't work here: the
+  // header's backdrop-blur is a containing block, so a fixed overlay is clipped to the header.)
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
 
   const refresh = useCallback(async () => {
     try {
@@ -87,7 +116,7 @@ export function NotificationBell({ orgId }: { orgId: string }) {
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={wrapRef}>
       <button
         type="button"
         onClick={() => void toggle()}
@@ -104,9 +133,7 @@ export function NotificationBell({ orgId }: { orgId: string }) {
 
       {open ? (
         <>
-          {/* Backdrop closes on any outside click. */}
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+          <div className="absolute right-0 z-50 mt-2 w-[26rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-border bg-card shadow-lg">
             <div className="flex items-center justify-between border-b border-border px-3 py-2">
               <span className="text-sm font-medium">Notifications</span>
               {unread > 0 ? (
@@ -135,46 +162,52 @@ export function NotificationBell({ orgId }: { orgId: string }) {
                 </div>
               ) : (
                 <ul className="divide-y divide-border">
-                  {items.map((item) => (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        onClick={() => void openItem(item)}
-                        className={cn(
-                          "flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-muted/50",
-                          !item.readAt && "bg-muted/30",
-                        )}
-                      >
-                        <span
+                  {items.map((item) => {
+                    const sev = SEVERITY_ICON[item.severity];
+                    const SevIcon = sev.icon;
+                    return (
+                      <li key={item.id}>
+                        <button
+                          type="button"
+                          onClick={() => void openItem(item)}
                           className={cn(
-                            "mt-1.5 size-2 shrink-0 rounded-full",
-                            SEVERITY_DOT[item.severity],
-                            item.readAt && "opacity-40",
+                            "flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/50",
+                            !item.readAt && "bg-muted/30",
                           )}
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-baseline justify-between gap-2">
-                            <span
-                              className={cn(
-                                "truncate text-sm",
-                                item.readAt ? "font-normal" : "font-medium",
-                              )}
-                            >
-                              {item.title}
-                            </span>
-                            <span className="shrink-0 text-[11px] text-muted-foreground">
-                              {ago(item.createdAt)}
-                            </span>
+                        >
+                          <span
+                            className={cn(
+                              "mt-0.5 grid size-8 shrink-0 place-items-center rounded-full",
+                              sev.className,
+                              item.readAt && "opacity-60",
+                            )}
+                          >
+                            <SevIcon className="size-4" />
                           </span>
-                          {item.body ? (
-                            <span className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">
-                              {item.body}
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-baseline justify-between gap-2">
+                              <span
+                                className={cn(
+                                  "truncate text-sm",
+                                  item.readAt ? "font-normal" : "font-medium",
+                                )}
+                              >
+                                {item.title}
+                              </span>
+                              <span className="shrink-0 text-[11px] text-muted-foreground">
+                                {ago(item.createdAt)}
+                              </span>
                             </span>
-                          ) : null}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
+                            {item.body ? (
+                              <span className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">
+                                {item.body}
+                              </span>
+                            ) : null}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>

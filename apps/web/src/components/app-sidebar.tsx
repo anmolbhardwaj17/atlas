@@ -116,7 +116,14 @@ export function AppSidebar({ orgName, email }: { orgName: string; email: string 
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton asChild isActive={item.match(pathname)} tooltip={item.label}>
                     <Link href={item.href}>
-                      {item.icon ? <item.icon /> : <AtlasAiMark size={16} className="size-4" />}
+                      {item.icon ? (
+                        <item.icon />
+                      ) : (
+                        // The Ask Atlas mark reads a touch bigger than the lucide glyphs (it's a
+                        // filled sphere, not a line icon); the row height is fixed so this adds no
+                        // spacing between items.
+                        <AtlasAiMark size={20} className="size-5 shrink-0" />
+                      )}
                       <span>{item.label}</span>
                     </Link>
                   </SidebarMenuButton>

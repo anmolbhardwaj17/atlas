@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OrgPanel } from "@/app/org-panel";
 import { LlmSettingsCard } from "@/components/settings/llm-settings";
 import { NotificationsSettingsCard } from "@/components/settings/notifications-settings";
-import type { LlmSettings, NotificationStatus } from "@/lib/browser-api";
+import type { LlmSettings, ChannelSummary } from "@/lib/browser-api";
 
 interface MemberDto {
   userId: string;
@@ -46,7 +46,7 @@ export function SettingsView({
   members: MemberDto[];
   invites: InvitationDto[];
   llm: LlmSettings | null;
-  notify: NotificationStatus | null;
+  notify: ChannelSummary[] | null;
   /** Server-rendered audit log, passed as a slot (it's an async server component and can't be
       imported into this client component). */
   securitySlot: ReactNode;

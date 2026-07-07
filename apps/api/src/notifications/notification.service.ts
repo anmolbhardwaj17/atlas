@@ -14,13 +14,33 @@ import { AiService } from "../ai/ai.service";
  * All reads/sends are org-scoped (RLS). The webhook URL is a bearer-capability secret, so
  * it is never returned to the client - GET only reports that a channel is configured.
  */
-export interface ChannelStatus {
-  configured: boolean;
-  kind: "slack" | null;
+export type ChannelKind = "slack" | "discord" | "msteams";
+
+export const CHANNEL_KINDS: ChannelKind[] = ["slack", "discord", "msteams"];
+
+/** One configured outbound channel, as reported to the client (webhook itself never returned). */
+export interface ChannelSummary {
+  kind: ChannelKind;
   enabled: boolean;
   /** Masked hint of the webhook (last segment), never the full URL. */
   hint: string | null;
 }
+
+/** Per-kind webhook validation + labels. All three take a simple incoming-webhook POST. */
+const CHANNEL_META: Record<ChannelKind, { label: string; validate: (url: string) => boolean }> = {
+  slack: {
+    label: "Slack",
+    validate: (u) => /^https:\/\/hooks\.slack\.com\/services\/\S+$/.test(u),
+  },
+  discord: {
+    label: "Discord",
+    validate: (u) => /^https:\/\/(canary\.|ptb\.)?discord(app)?\.com\/api\/webhooks\/\S+$/.test(u),
+  },
+  msteams: {
+    label: "Microsoft Teams",
+    validate: (u) => /^https:\/\/\S+\.webhook\.office\.com\/\S+$/.test(u),
+  },
+};
 
 /** One row in the in-app notification feed (the bell). */
 export interface NotificationItem {
@@ -63,22 +83,22 @@ export class NotificationService {
     private readonly ai: AiService,
   ) {}
 
-  async getStatus(orgId: string): Promise<ChannelStatus> {
+  /** All configured outbound channels for the org (Slack / Discord / Teams). */
+  async listChannels(orgId: string): Promise<ChannelSummary[]> {
     return withOrgScope(this.db, orgId, async (c) => {
       const { rows } = await c.query<ChannelRow>(
-        `SELECT kind, config, enabled, last_alert_at, last_digest_at
-           FROM notification_channels LIMIT 1`,
+        `SELECT kind, config, enabled FROM notification_channels ORDER BY created_at ASC`,
       );
-      const ch = rows[0];
-      if (!ch) return { configured: false, kind: null, enabled: false, hint: null };
-      const url = ch.config.webhookUrl ?? "";
-      const tail = url.split("/").pop() ?? "";
-      return {
-        configured: true,
-        kind: ch.kind as "slack",
-        enabled: ch.enabled,
-        hint: tail ? `…/${tail.slice(0, 6)}…` : null,
-      };
+      return rows
+        .filter((r) => CHANNEL_KINDS.includes(r.kind as ChannelKind))
+        .map((r) => {
+          const tail = (r.config.webhookUrl ?? "").split("/").pop() ?? "";
+          return {
+            kind: r.kind as ChannelKind,
+            enabled: r.enabled,
+            hint: tail ? `…/${tail.slice(0, 6)}…` : null,
+          };
+        });
     });
   }
 
@@ -166,52 +186,68 @@ export class NotificationService {
     );
   }
 
-  /** Set (or replace) the Slack webhook. Validates it looks like a Slack webhook URL. */
-  async setSlack(orgId: string, webhookUrl: string): Promise<ChannelStatus> {
+  /** Set (or replace) a channel's webhook. Validates the URL shape for that channel kind. */
+  async setChannel(
+    orgId: string,
+    kind: ChannelKind,
+    webhookUrl: string,
+  ): Promise<ChannelSummary[]> {
+    const meta = CHANNEL_META[kind];
+    if (!meta) throw new ApiException(422, "validation_failed", "Unknown channel.");
     const url = webhookUrl.trim();
-    if (!/^https:\/\/hooks\.slack\.com\/services\/\S+$/.test(url)) {
+    if (!meta.validate(url)) {
       throw new ApiException(
         422,
         "validation_failed",
-        "That doesn't look like a Slack incoming-webhook URL (https://hooks.slack.com/services/…).",
+        `That doesn't look like a ${meta.label} incoming-webhook URL.`,
       );
     }
     await withOrgScope(this.db, orgId, (c) =>
       c.query(
         `INSERT INTO notification_channels (org_id, kind, config, enabled)
-         VALUES ($1, 'slack', $2::jsonb, true)
+         VALUES ($1, $2, $3::jsonb, true)
          ON CONFLICT (org_id, kind) DO UPDATE
            SET config = EXCLUDED.config, enabled = true, updated_at = now()`,
-        [orgId, JSON.stringify({ webhookUrl: url })],
+        [orgId, kind, JSON.stringify({ webhookUrl: url })],
       ),
     );
-    return this.getStatus(orgId);
+    return this.listChannels(orgId);
   }
 
-  async disable(orgId: string): Promise<ChannelStatus> {
+  async removeChannel(orgId: string, kind: ChannelKind): Promise<ChannelSummary[]> {
     await withOrgScope(this.db, orgId, (c) =>
-      c.query(`DELETE FROM notification_channels WHERE kind = 'slack'`),
+      c.query(`DELETE FROM notification_channels WHERE kind = $1`, [kind]),
     );
-    return this.getStatus(orgId);
+    return this.listChannels(orgId);
   }
 
-  /** Send a sample message so the user sees it land in their channel. */
-  async test(orgId: string): Promise<{ delivered: boolean; message: string }> {
-    const url = await this.webhookFor(orgId);
+  /** Send a sample message so the user sees it land in the chosen channel. */
+  async testChannel(
+    orgId: string,
+    kind: ChannelKind,
+  ): Promise<{ delivered: boolean; message: string }> {
+    const url = await this.webhookFor(orgId, kind);
+    const label = CHANNEL_META[kind]?.label ?? "channel";
     if (!url)
-      throw new ApiException(409, "invalid_state_transition", "No Slack channel configured.");
-    const ok = await postSlack(url, {
-      text: "👋 *Atlas is connected.* You'll get a heads-up here when something in your estate breaks, gets exposed, or needs attention — plus a short daily digest.",
-    });
+      throw new ApiException(409, "invalid_state_transition", `No ${label} channel configured.`);
+    const ok = await postWebhook(
+      kind,
+      url,
+      "👋 *Atlas is connected.* You'll get a heads-up here when something in your estate breaks, gets exposed, or needs attention — plus a short daily digest.",
+    );
     return ok
-      ? { delivered: true, message: "Sent — check your Slack channel." }
-      : { delivered: false, message: "Slack rejected the message. Double-check the webhook URL." };
+      ? { delivered: true, message: `Sent — check your ${label} channel.` }
+      : {
+          delivered: false,
+          message: `${label} rejected the message. Double-check the webhook URL.`,
+        };
   }
 
-  private async webhookFor(orgId: string): Promise<string | null> {
+  private async webhookFor(orgId: string, kind: ChannelKind): Promise<string | null> {
     return withOrgScope(this.db, orgId, async (c) => {
       const { rows } = await c.query<{ config: { webhookUrl?: string } }>(
-        `SELECT config FROM notification_channels WHERE kind = 'slack' AND enabled = true LIMIT 1`,
+        `SELECT config FROM notification_channels WHERE kind = $1 AND enabled = true LIMIT 1`,
+        [kind],
       );
       return rows[0]?.config.webhookUrl ?? null;
     });
@@ -224,17 +260,23 @@ export class NotificationService {
    * broken webhook doesn't wedge the queue.
    */
   async dispatch(orgId: string): Promise<void> {
-    const ch = await withOrgScope(this.db, orgId, async (c) => {
+    const channels = await withOrgScope(this.db, orgId, async (c) => {
       const { rows } = await c.query<ChannelRow>(
         `SELECT kind, config, enabled, last_alert_at, last_digest_at
-           FROM notification_channels WHERE enabled = true LIMIT 1`,
+           FROM notification_channels WHERE enabled = true`,
       );
-      return rows[0] ?? null;
+      return rows.filter(
+        (r) => CHANNEL_KINDS.includes(r.kind as ChannelKind) && r.config.webhookUrl,
+      );
     });
-    const url = ch?.config.webhookUrl;
-    if (!ch || !url) return;
+    if (channels.length === 0) return;
 
-    // ── Real-time alerts: health transitions since the watermark ──
+    // Keep the in-app feed (the bell) fresh for this org too.
+    await this.syncFeed(orgId).catch(() => {});
+
+    // ── Real-time alerts: health transitions since the EARLIEST channel watermark ──
+    // (compute + auto-diagnose once for the org, then fan out to every channel that's behind).
+    const earliest = channels.map((c) => c.last_alert_at).reduce((a, b) => (a < b ? a : b));
     const alerts = await withOrgScope(this.db, orgId, async (c) => {
       const { rows } = await c.query<{
         title: string;
@@ -248,7 +290,7 @@ export class NotificationService {
            FROM node_events e JOIN nodes n ON n.id = e.node_id
           WHERE e.kind = 'health_transition' AND e.occurred_at > $1
           ORDER BY e.occurred_at ASC LIMIT 20`,
-        [ch.last_alert_at],
+        [earliest],
       );
       return rows;
     });
@@ -262,7 +304,7 @@ export class NotificationService {
       // AUTONOMOUS AGENT: for the newly-broken resources (not recoveries), Atlas investigates
       // on its own - runs the agentic diagnose loop and appends its cited hypothesis, so the
       // alert arrives already diagnosed. Capped so a flapping estate can't run away on cost;
-      // best-effort so a slow/absent model never blocks the alert.
+      // best-effort so a slow/absent model never blocks the alert. Computed once per org.
       const broken = alerts.filter((a) => a.to_state !== "healthy").slice(0, 2);
       const diagnoses: string[] = [];
       for (const b of broken) {
@@ -271,29 +313,35 @@ export class NotificationService {
         if (hypothesis) diagnoses.push(`\n🤖 *Atlas looked into ${subject}:*\n${hypothesis}`);
       }
 
-      await postSlack(url, {
-        text:
-          `*Atlas — ${alerts.length} health ${alerts.length === 1 ? "change" : "changes"}*\n` +
-          `${lines.join("\n")}` +
-          `${diagnoses.join("")}` +
-          `\n<${this.webUrl()}/map|Open the map →>`,
-      });
+      const text =
+        `*Atlas — ${alerts.length} health ${alerts.length === 1 ? "change" : "changes"}*\n` +
+        `${lines.join("\n")}` +
+        `${diagnoses.join("")}` +
+        `\n[Open the map →](${this.webUrl()}/map)`;
       const latest = alerts[alerts.length - 1]?.occurred_at ?? new Date();
-      await withOrgScope(this.db, orgId, (c) =>
-        c.query(`UPDATE notification_channels SET last_alert_at = $1 WHERE kind = 'slack'`, [
-          latest,
-        ]),
-      );
+
+      for (const ch of channels) {
+        if (ch.last_alert_at >= latest || !ch.config.webhookUrl) continue; // already caught up
+        await postWebhook(ch.kind as ChannelKind, ch.config.webhookUrl, text);
+        await withOrgScope(this.db, orgId, (c) =>
+          c.query(`UPDATE notification_channels SET last_alert_at = $1 WHERE kind = $2`, [
+            latest,
+            ch.kind,
+          ]),
+        );
+      }
     }
 
-    // ── Daily digest: once per 24h ──
-    const dueForDigest =
-      !ch.last_digest_at || Date.now() - ch.last_digest_at.getTime() > 24 * 3_600_000;
-    if (dueForDigest) {
-      const digest = await this.buildDigest(orgId);
-      if (digest) await postSlack(url, { text: digest });
+    // ── Daily digest: once per 24h, per channel ──
+    const digest = await this.buildDigest(orgId);
+    for (const ch of channels) {
+      const due = !ch.last_digest_at || Date.now() - ch.last_digest_at.getTime() > 24 * 3_600_000;
+      if (!due || !ch.config.webhookUrl) continue;
+      if (digest) await postWebhook(ch.kind as ChannelKind, ch.config.webhookUrl, digest);
       await withOrgScope(this.db, orgId, (c) =>
-        c.query(`UPDATE notification_channels SET last_digest_at = now() WHERE kind = 'slack'`),
+        c.query(`UPDATE notification_channels SET last_digest_at = now() WHERE kind = $1`, [
+          ch.kind,
+        ]),
       );
     }
   }
@@ -337,7 +385,7 @@ export class NotificationService {
         parts.push(
           `🛡️ *${vulnCount}* known ${vulnCount === 1 ? "vulnerability" : "vulnerabilities"} in your dependencies.`,
         );
-      parts.push(`<${this.webUrl()}/dashboard|Open your dashboard →>`);
+      parts.push(`[Open your dashboard →](${this.webUrl()}/dashboard)`);
       return parts.join("\n");
     });
   }
@@ -347,8 +395,15 @@ export class NotificationService {
   }
 }
 
-/** POST a Slack message; true on 2xx. Never throws (best-effort delivery). */
-async function postSlack(webhookUrl: string, body: { text: string }): Promise<boolean> {
+/**
+ * Post a message to a Slack / Discord / Teams incoming webhook. The message is authored once in
+ * a neutral markup (`*bold*`, `[label](url)`) and transcoded to each platform's flavour + payload
+ * shape here. Best-effort: never throws (a broken webhook must not wedge the dispatcher).
+ */
+async function postWebhook(kind: ChannelKind, webhookUrl: string, text: string): Promise<boolean> {
+  const formatted = formatFor(kind, text);
+  // Slack + Teams read `{text}`; Discord reads `{content}` (2000-char cap).
+  const body = kind === "discord" ? { content: formatted.slice(0, 1900) } : { text: formatted };
   try {
     const res = await fetch(webhookUrl, {
       method: "POST",
@@ -359,4 +414,19 @@ async function postSlack(webhookUrl: string, body: { text: string }): Promise<bo
   } catch {
     return false;
   }
+}
+
+/** Transcode the neutral message markup to each platform's flavour. */
+function formatFor(kind: ChannelKind, text: string): string {
+  if (kind === "slack") {
+    // Slack: single-asterisk bold is native; links are <url|label>.
+    return text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "<$2|$1>");
+  }
+  // Discord + Teams use CommonMark: **bold**.
+  const bolded = text.replace(/\*([^*]+)\*/g, "**$1**");
+  if (kind === "discord") {
+    // Discord webhooks don't render [label](url) in content - fall back to "label: url".
+    return bolded.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1: $2");
+  }
+  return bolded; // Teams renders [label](url) fine.
 }

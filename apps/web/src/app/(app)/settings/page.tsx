@@ -2,7 +2,7 @@ import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
 import { SettingsView } from "@/components/settings/settings-view";
 import { AuditLog } from "@/components/settings/audit-log";
-import type { LlmSettings, NotificationStatus } from "@/lib/browser-api";
+import type { LlmSettings, ChannelSummary } from "@/lib/browser-api";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +34,7 @@ export default async function SettingsPage() {
       (r) => r.body?.data ?? [],
     ),
     apiGet<ApiOk<LlmSettings | null>>("/ai/settings", auth).then((r) => r.body?.data ?? null),
-    apiGet<ApiOk<NotificationStatus>>("/notifications", auth).then((r) => r.body?.data ?? null),
+    apiGet<ApiOk<ChannelSummary[]>>("/notifications", auth).then((r) => r.body?.data ?? null),
   ]);
 
   return (

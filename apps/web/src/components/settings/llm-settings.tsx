@@ -180,10 +180,16 @@ export function LlmSettingsCard({
           only narrates. Your key is tested, stored encrypted, and never shown again.
         </p>
 
-        <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+        <div
+          className={cn(
+            "rounded-md border px-3 py-2 text-sm",
+            current ? "border-success/30 bg-success/10 text-success" : "border-border bg-muted/30",
+          )}
+        >
           {current ? (
             <span className="inline-flex items-center gap-1.5">
-              Currently using <span className="font-medium">{current.model}</span> via
+              <span className="size-1.5 rounded-full bg-success" aria-hidden="true" />
+              Active — using <span className="font-medium">{current.model}</span> via
               <ProviderIcon id={current.provider} className="size-3.5" />
               {providerOf(current.provider).label}.
             </span>

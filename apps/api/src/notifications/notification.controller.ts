@@ -9,7 +9,9 @@ import { parseBody } from "../common/validation";
 import type { AuthedRequest } from "../auth/auth.types";
 import {
   NotificationService,
-  type ChannelStatus,
+  CHANNEL_KINDS,
+  type ChannelKind,
+  type ChannelSummary,
   type NotificationItem,
 } from "./notification.service";
 
@@ -18,7 +20,19 @@ function org(req: AuthedRequest): { id: string } {
   return req.org;
 }
 
-const SetSlackSchema = z.object({ webhookUrl: z.string().trim().min(1) }).strict();
+function asChannelKind(kind: string): ChannelKind {
+  if (!(CHANNEL_KINDS as string[]).includes(kind)) {
+    throw new ApiException(422, "validation_failed", `Unknown channel "${kind}".`);
+  }
+  return kind as ChannelKind;
+}
+
+const SetChannelSchema = z
+  .object({
+    kind: z.enum(CHANNEL_KINDS as [ChannelKind, ...ChannelKind[]]),
+    webhookUrl: z.string().trim().min(1),
+  })
+  .strict();
 
 /**
  * Notification settings (proactive push). Admin manages the org's outbound channel; the
@@ -31,17 +45,15 @@ export class NotificationController {
 
   @Get()
   @Roles("Member")
-  async status(@Req() req: AuthedRequest): Promise<ChannelStatus> {
-    return this.notifications.getStatus(org(req).id);
+  async channels(@Req() req: AuthedRequest): Promise<ChannelSummary[]> {
+    return this.notifications.listChannels(org(req).id);
   }
 
   // ── In-app notification feed (the bell). Any member can read + mark their inbox. ──
 
   @Get("inbox")
   @Roles("Member")
-  async inbox(
-    @Req() req: AuthedRequest,
-  ): Promise<{ items: NotificationItem[]; unread: number }> {
+  async inbox(@Req() req: AuthedRequest): Promise<{ items: NotificationItem[]; unread: number }> {
     return this.notifications.listFeed(org(req).id);
   }
 
@@ -59,22 +71,28 @@ export class NotificationController {
     return { ok: true };
   }
 
-  @Post("slack")
+  @Post("channels")
   @Roles("Admin")
-  async setSlack(@Req() req: AuthedRequest, @Body() body: unknown): Promise<ChannelStatus> {
-    const { webhookUrl } = parseBody(SetSlackSchema, body);
-    return this.notifications.setSlack(org(req).id, webhookUrl);
+  async setChannel(@Req() req: AuthedRequest, @Body() body: unknown): Promise<ChannelSummary[]> {
+    const { kind, webhookUrl } = parseBody(SetChannelSchema, body);
+    return this.notifications.setChannel(org(req).id, kind, webhookUrl);
   }
 
-  @Post("test")
+  @Post("channels/:kind/test")
   @Roles("Admin")
-  async test(@Req() req: AuthedRequest): Promise<{ delivered: boolean; message: string }> {
-    return this.notifications.test(org(req).id);
+  async testChannel(
+    @Req() req: AuthedRequest,
+    @Param("kind") kind: string,
+  ): Promise<{ delivered: boolean; message: string }> {
+    return this.notifications.testChannel(org(req).id, asChannelKind(kind));
   }
 
-  @Delete()
+  @Delete("channels/:kind")
   @Roles("Admin")
-  async disable(@Req() req: AuthedRequest): Promise<ChannelStatus> {
-    return this.notifications.disable(org(req).id);
+  async removeChannel(
+    @Req() req: AuthedRequest,
+    @Param("kind") kind: string,
+  ): Promise<ChannelSummary[]> {
+    return this.notifications.removeChannel(org(req).id, asChannelKind(kind));
   }
 }
