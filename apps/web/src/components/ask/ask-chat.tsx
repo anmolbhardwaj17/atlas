@@ -209,11 +209,12 @@ export function AskChat({
     // Fill the workspace column so the input pins to the bottom.
     <div className="flex h-full min-h-[420px] flex-col">
       {loadingConversation ? (
-        <div className="mb-3 shrink-0 border-b border-border pb-2.5">
+        <div className="mb-3 flex h-11 shrink-0 items-center border-b border-border">
           <div className="h-4 w-56 max-w-[60%] animate-pulse rounded bg-muted" />
         </div>
       ) : title ? (
-        <div className="mb-3 shrink-0 border-b border-border pb-2.5">
+        // Fixed h-11 + border-b so the title's separator lines up with the sidebar header's.
+        <div className="mb-3 flex h-11 shrink-0 items-center border-b border-border">
           <h2 className="truncate text-sm font-semibold text-foreground" title={title}>
             {title}
           </h2>

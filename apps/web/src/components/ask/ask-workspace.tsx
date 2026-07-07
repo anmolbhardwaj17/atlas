@@ -115,7 +115,9 @@ export function AskWorkspace({
         </aside>
       ) : (
         <aside className="hidden w-56 shrink-0 flex-col border-r border-border pr-5 md:flex">
-          <div className="mb-2 flex items-center gap-1.5">
+          {/* Header row: fixed height + border-b so its separator aligns with the chat pane's
+              title separator (both are h-11 with a bottom border). */}
+          <div className="mb-3 flex h-11 items-center gap-1.5 border-b border-border">
             <button
               type="button"
               onClick={newChat}
@@ -135,7 +137,7 @@ export function AskWorkspace({
               <PanelLeftClose className="size-4" />
             </button>
           </div>
-          <div className="mb-1 flex items-center border-t border-border px-1 pb-1 pt-2">
+          <div className="mb-1 flex items-center px-1 pb-1">
             <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               Recent
             </span>
