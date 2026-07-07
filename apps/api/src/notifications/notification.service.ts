@@ -50,6 +50,8 @@ export interface NotificationItem {
   title: string;
   body: string | null;
   href: string | null;
+  /** The source node's kind (e.g. "aws.rds.instance") so the UI can show its real logo. */
+  nodeKind: string | null;
   readAt: string | null;
   createdAt: string;
 }
@@ -61,6 +63,7 @@ interface NotificationRow {
   title: string;
   body: string | null;
   href: string | null;
+  node_kind: string | null;
   read_at: Date | null;
   created_at: Date;
 }
@@ -116,7 +119,7 @@ export class NotificationService {
     await this.syncFeed(orgId);
     return withOrgScope(this.db, orgId, async (c) => {
       const { rows } = await c.query<NotificationRow>(
-        `SELECT id, kind, severity, title, body, href, read_at, created_at
+        `SELECT id, kind, severity, title, body, href, node_kind, read_at, created_at
            FROM notifications ORDER BY created_at DESC LIMIT $1`,
         [limit],
       );
@@ -131,6 +134,7 @@ export class NotificationService {
           title: r.title,
           body: r.body,
           href: r.href,
+          nodeKind: r.node_kind,
           readAt: r.read_at ? r.read_at.toISOString() : null,
           createdAt: r.created_at.toISOString(),
         })),
@@ -159,7 +163,8 @@ export class NotificationService {
   private async syncFeed(orgId: string): Promise<void> {
     await withOrgScope(this.db, orgId, (c) =>
       c.query(
-        `INSERT INTO notifications (org_id, kind, severity, title, body, href, dedupe_key, created_at)
+        `INSERT INTO notifications
+                (org_id, kind, severity, title, body, href, node_kind, dedupe_key, created_at)
          SELECT e.org_id,
                 'health',
                 CASE e.evidence->>'to'
@@ -175,6 +180,7 @@ export class NotificationService {
                   END,
                 e.title,
                 '/map',
+                n.kind,
                 'health:' || e.id,
                 e.occurred_at
            FROM node_events e

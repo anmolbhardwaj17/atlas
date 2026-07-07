@@ -13,6 +13,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { CloudIcon } from "@/components/cloud-icon";
+import { kindIcon, KIND_LOGO } from "@/lib/kind-visual";
 import {
   getInbox,
   markAllNotificationsRead,
@@ -165,6 +167,10 @@ export function NotificationBell({ orgId }: { orgId: string }) {
                   {items.map((item) => {
                     const sev = SEVERITY_ICON[item.severity];
                     const SevIcon = sev.icon;
+                    // Prefer the real resource logo (e.g. the AWS RDS mark) on a severity-tinted
+                    // circle; fall back to the severity icon when there's no node/logo.
+                    const logo = item.nodeKind ? KIND_LOGO[item.nodeKind] : undefined;
+                    const KindIcon = item.nodeKind ? kindIcon(item.nodeKind) : null;
                     return (
                       <li key={item.id}>
                         <button
@@ -182,7 +188,13 @@ export function NotificationBell({ orgId }: { orgId: string }) {
                               item.readAt && "opacity-60",
                             )}
                           >
-                            <SevIcon className="size-4" />
+                            {logo ? (
+                              <CloudIcon name={logo} className="size-[18px]" />
+                            ) : KindIcon ? (
+                              <KindIcon className="size-4" />
+                            ) : (
+                              <SevIcon className="size-4" />
+                            )}
                           </span>
                           <span className="min-w-0 flex-1">
                             <span className="flex items-baseline justify-between gap-2">

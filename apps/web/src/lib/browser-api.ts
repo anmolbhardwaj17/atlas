@@ -576,6 +576,8 @@ export interface NotificationItem {
   title: string;
   body: string | null;
   href: string | null;
+  /** Source node's kind (e.g. "aws.rds.instance"), for showing its real resource logo. */
+  nodeKind: string | null;
   readAt: string | null;
   createdAt: string;
 }
