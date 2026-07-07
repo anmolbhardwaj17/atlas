@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
-import { Building2, Users, Bell, Sparkles, ShieldCheck } from "lucide-react";
+import { type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OrgPanel } from "@/app/org-panel";
@@ -24,12 +23,10 @@ interface InvitationDto {
   expiresAt: string;
 }
 
-type Section = "general" | "members" | "notifications" | "ai" | "security";
-
 /**
- * Settings, sectioned. A left sub-nav (top tabs on mobile) splits a growing set of settings
- * into focused panels instead of one long scroll. Admin-only sections (notifications, AI,
- * audit) are hidden from the nav for non-admins - matching what the API enforces.
+ * Settings - a single, constrained column. There isn't enough here to warrant tabs or a
+ * sub-nav; everything is visible at a glance. Admin-only blocks (alerts, AI model, activity
+ * log) simply don't render for non-admins - matching what the API enforces.
  */
 export function SettingsView({
   orgId,
@@ -55,76 +52,37 @@ export function SettingsView({
   securitySlot: ReactNode;
 }) {
   const isAdmin = role === "Owner" || role === "Admin";
-  const [section, setSection] = useState<Section>("general");
-
-  const nav = (
-    [
-      { id: "general", label: "General", icon: Building2, show: true },
-      { id: "members", label: "Members", icon: Users, show: true },
-      { id: "notifications", label: "Notifications", icon: Bell, show: isAdmin },
-      { id: "ai", label: "AI model", icon: Sparkles, show: isAdmin },
-      { id: "security", label: "Security", icon: ShieldCheck, show: isAdmin },
-    ] as const
-  ).filter((n) => n.show);
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-2xl space-y-6">
       <div>
         <h1 className="text-xl font-semibold">Settings</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage your organization, connected sources, and access.
-        </p>
+        <p className="text-sm text-muted-foreground">Manage your organization, team, and access.</p>
       </div>
 
-      <div className="flex flex-col gap-6 md:flex-row md:gap-8">
-        <nav className="flex shrink-0 gap-1 overflow-x-auto pb-1 md:w-48 md:flex-col md:pb-0">
-          {nav.map((n) => (
-            <button
-              key={n.id}
-              type="button"
-              onClick={() => setSection(n.id)}
-              className={cn(
-                "flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
-                section === n.id
-                  ? "bg-muted font-medium text-foreground"
-                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-              )}
-            >
-              <n.icon className="size-4 shrink-0" /> {n.label}
-            </button>
-          ))}
-        </nav>
+      <Card>
+        <CardHeader>
+          <CardTitle>Organization</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <dl className="space-y-2 text-sm">
+            <Row label="Name" value={orgName} />
+            <Row label="Organization ID" value={orgId} mono />
+            <Row label="Signed in as" value={email} />
+            <Row label="Your role" value={role} />
+          </dl>
+        </CardContent>
+      </Card>
 
-        <div className="min-w-0 flex-1 space-y-6">
-          {section === "general" ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Organization</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <dl className="space-y-2 text-sm">
-                  <Row label="Name" value={orgName} />
-                  <Row label="Organization ID" value={orgId} mono />
-                  <Row label="Signed in as" value={email} />
-                  <Row label="Your role" value={role} />
-                </dl>
-              </CardContent>
-            </Card>
-          ) : null}
+      <OrgPanel orgId={orgId} initialMembers={members} initialInvites={invites} />
 
-          {section === "members" ? (
-            <OrgPanel orgId={orgId} initialMembers={members} initialInvites={invites} />
-          ) : null}
-
-          {section === "notifications" && isAdmin ? (
-            <NotificationsSettingsCard orgId={orgId} initial={notify} />
-          ) : null}
-
-          {section === "ai" && isAdmin ? <LlmSettingsCard orgId={orgId} initial={llm} /> : null}
-
-          {section === "security" && isAdmin ? securitySlot : null}
-        </div>
-      </div>
+      {isAdmin ? (
+        <>
+          <NotificationsSettingsCard orgId={orgId} initial={notify} />
+          <LlmSettingsCard orgId={orgId} initial={llm} />
+          {securitySlot}
+        </>
+      ) : null}
     </div>
   );
 }
