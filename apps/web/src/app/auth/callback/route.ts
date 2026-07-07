@@ -13,7 +13,16 @@ export async function GET(request: Request): Promise<NextResponse> {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+      const res = NextResponse.redirect(`${origin}${next}`);
+      // One-shot flag so the app shows the welcome once on entry after sign-in. It's consumed
+      // (deleted) client-side on first render, so a reload or return visit won't re-trigger it.
+      res.cookies.set("atlas_welcome", "1", {
+        path: "/",
+        maxAge: 300,
+        httpOnly: false,
+        sameSite: "lax",
+      });
+      return res;
     }
   }
 

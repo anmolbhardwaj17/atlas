@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { requireShell } from "@/lib/shell";
 import { AppShell } from "@/components/app-shell";
+import { WelcomeGate } from "@/components/welcome-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       avatarUrl={shell.avatarUrl}
     >
       {children}
+      <WelcomeGate name={shell.name} />
     </AppShell>
   );
 }

@@ -15,10 +15,10 @@ export function WelcomeOverlay({
   onDone,
   holdMs = 3500,
 }: {
-  name?: string | null;
-  onDone?: () => void;
+  name?: string | null | undefined;
+  onDone?: (() => void) | undefined;
   /** How long the greeting stays fully visible before it starts revealing the page. */
-  holdMs?: number;
+  holdMs?: number | undefined;
 }) {
   const [blurIn, setBlurIn] = React.useState(false);
   const [contentIn, setContentIn] = React.useState(false);
