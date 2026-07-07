@@ -73,8 +73,9 @@ export function WelcomeOverlay({
         )}
       >
         <div className="absolute inset-0 m-auto size-[700px] motion-safe:animate-[spin_13s_linear_infinite]">
-          <div className="absolute left-1/2 top-1/2 size-[440px] -translate-x-[64%] -translate-y-[58%] rounded-[46%_54%_63%_37%/52%_44%_56%_48%] bg-[#1f6b4a] blur-[80px]" />
-          <div className="absolute left-1/2 top-1/2 size-[440px] -translate-x-[36%] -translate-y-[42%] rounded-[58%_42%_45%_55%/48%_57%_43%_52%] bg-[#17553c] blur-[80px]" />
+          {/* Greens sampled straight from the Atlas AI logo gradient. */}
+          <div className="absolute left-1/2 top-1/2 size-[440px] -translate-x-[64%] -translate-y-[58%] rounded-[46%_54%_63%_37%/52%_44%_56%_48%] bg-[#55b073] blur-[80px]" />
+          <div className="absolute left-1/2 top-1/2 size-[440px] -translate-x-[36%] -translate-y-[42%] rounded-[58%_42%_45%_55%/48%_57%_43%_52%] bg-[#247e54] blur-[80px]" />
         </div>
       </div>
 
