@@ -3,7 +3,14 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Send, Check, Square } from "lucide-react";
+import dynamic from "next/dynamic";
 import { AtlasAiMark } from "@/components/brand";
+
+// LiquidMetal is a WebGL shader — client-only (no SSR), lazy-loaded so it never blocks paint.
+const LiquidMetal = dynamic(
+  () => import("@paper-design/shaders-react").then((m) => m.LiquidMetal),
+  { ssr: false },
+);
 import { createConversation, getConversation, streamAskWS, type AskEvent } from "@/lib/browser-api";
 
 interface Citation {
@@ -544,26 +551,56 @@ function EmptyState({
 }) {
   const questions = suggestions.length > 0 ? suggestions : FALLBACK_EXAMPLES;
   return (
-    <div className="py-8">
-      <div className="mb-3 flex items-center gap-1.5 text-foreground">
-        <AtlasAiMark size={24} className="-ml-1 size-6 shrink-0" />
-        <h2 className="text-lg font-semibold">Ask Atlas</h2>
+    // Centered, vertically-middle welcome: the liquid-metal Atlas mark leads, then the
+    // pitch, then the suggestion prompts.
+    <div className="flex h-full flex-col items-center justify-center gap-6 py-8 text-center">
+      <div className="flex flex-col items-center gap-3">
+        <LiquidMark />
+        <div>
+          <h2 className="text-xl font-semibold text-foreground">Ask Atlas</h2>
+          <p className="mx-auto mt-1.5 max-w-md text-sm text-muted-foreground">
+            Ask about your infrastructure, code, and deploys. Every answer is grounded in your graph
+            — cited, confidence-tiered, and honest when it doesn’t know.
+          </p>
+        </div>
       </div>
-      <p className="max-w-lg text-sm text-muted-foreground">
-        Ask about your infrastructure, code, and deploys. Every answer is grounded in your graph -
-        cited, confidence-tiered, and honest when it doesn’t know.
-      </p>
-      <div className="mt-5 flex flex-col gap-2">
+      <div className="flex max-w-2xl flex-wrap justify-center gap-2 px-6">
         {questions.map((q) => (
           <button
             key={q}
             onClick={() => onPick(q)}
-            className="rounded-md border border-border px-3 py-2 text-left text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground"
+            className="rounded-full border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/40 hover:text-foreground"
           >
             {q}
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** The animated liquid-metal Atlas mark (WebGL). Client-only, and it degrades to the static
+ *  AI mark until the shader lib loads so the hero never flashes empty. */
+function LiquidMark() {
+  return (
+    <div className="grid size-[280px] place-items-center">
+      <LiquidMetal
+        width={280}
+        height={280}
+        image="/atlas-ai.png"
+        colorBack="#ffffff"
+        colorTint="#35ab5e"
+        repetition={2}
+        softness={0.1}
+        shiftRed={0.3}
+        shiftBlue={0.3}
+        distortion={0.07}
+        contour={0.4}
+        angle={70}
+        speed={1}
+        scale={0.6}
+        fit="contain"
+      />
     </div>
   );
 }
