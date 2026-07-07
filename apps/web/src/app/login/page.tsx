@@ -5,7 +5,6 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { AtlasLogo } from "@/components/brand";
 
 // LiquidMetal is a WebGL shader - client-only (no SSR), lazy-loaded so it never blocks paint.
 const LiquidMetal = dynamic(
@@ -18,6 +17,10 @@ const STEPS = [
   { title: "Atlas builds the map", desc: "A live, cited graph of everything you run and ship." },
   { title: "Ask anything", desc: "Answers grounded in your real system, with sources." },
 ];
+
+// Hero background. Green brand gradient saved here for later:
+// const HERO_GREEN = "radial-gradient(120% 110% at 18% 12%, #1f6b4a 0%, #0e3a28 42%, #071f16 100%)";
+const HERO_BG = "radial-gradient(120% 110% at 18% 12%, #3d3d3d 0%, #1a1a1a 45%, #050505 100%)";
 
 /** Sign-in screen (docs/09 login, docs/12 §2.1). Split layout: a branded hero + Google OAuth.
  *  Supabase redirects to /auth/callback to complete the session. Google-only for MVP (docs/12). */
@@ -41,13 +44,10 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-dvh bg-white md:grid md:grid-cols-2">
-      {/* ── Left: branded hero as an inset green card floating on the white page ── */}
+      {/* ── Left: branded hero as an inset dark card floating on the white page ── */}
       <aside
         className="relative m-2.5 hidden flex-col justify-end overflow-hidden rounded-2xl p-8 text-white shadow-sm md:m-3 md:flex"
-        style={{
-          background:
-            "radial-gradient(120% 110% at 18% 12%, #1f6b4a 0%, #0e3a28 42%, #071f16 100%)",
-        }}
+        style={{ background: HERO_BG }}
       >
         {/* The liquid-metal mark, floating in the hero. */}
         <div className="pointer-events-none absolute right-0 top-2 opacity-90 [filter:drop-shadow(0_20px_50px_rgba(0,0,0,0.35))]">
@@ -110,16 +110,39 @@ export default function LoginPage() {
       {/* ── Right: full-height sign-in ── */}
       <section className="relative flex min-h-dvh flex-col items-center justify-center p-8">
         <div className="w-full max-w-sm text-center">
-          <div className="mb-8 flex items-center justify-center gap-2.5">
-            <AtlasLogo size={40} className="size-10" />
-            <span className="text-3xl font-semibold tracking-tight text-neutral-900">Atlas</span>
+          {/* Liquid-metal Atlas mark above the sign-in. Transparent back (page is white already) so
+              it never paints an opaque box over the heading; grey tint reads on white. */}
+          <div className="-mb-2 flex justify-center [filter:drop-shadow(0_14px_34px_rgba(0,0,0,0.12))]">
+            <LiquidMetal
+              width={190}
+              height={190}
+              image="/atlas-logo.png"
+              colorBack="#00000000"
+              colorTint="#999999"
+              repetition={2}
+              softness={0.1}
+              shiftRed={0.3}
+              shiftBlue={0.3}
+              distortion={0.07}
+              contour={0.4}
+              angle={70}
+              speed={1}
+              scale={0.82}
+              fit="contain"
+            />
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Welcome back</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
+            Sign in to Atlas
+          </h1>
           <p className="mt-1.5 text-sm text-neutral-500">
             Use your Google account to continue to your workspace.
           </p>
 
-          <Button onClick={signInWithGoogle} disabled={busy} className="mt-8 h-11 w-full gap-2.5">
+          <Button
+            onClick={signInWithGoogle}
+            disabled={busy}
+            className="mt-8 h-12 w-full gap-2.5 shadow-lg shadow-neutral-900/20 transition-shadow hover:shadow-xl hover:shadow-neutral-900/25"
+          >
             <span className="grid size-6 shrink-0 place-items-center rounded-full bg-white">
               <GoogleIcon className="size-3.5" />
             </span>
