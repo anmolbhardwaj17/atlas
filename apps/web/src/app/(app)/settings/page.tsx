@@ -6,12 +6,6 @@ import type { LlmSettings, NotificationStatus } from "@/lib/browser-api";
 
 export const dynamic = "force-dynamic";
 
-interface ConnectionDto {
-  id: string;
-  provider: string;
-  displayName: string;
-  status: string;
-}
 interface MemberDto {
   userId: string;
   email: string;
@@ -32,8 +26,7 @@ export default async function SettingsPage() {
   const auth = { token: shell.token, orgId: shell.orgId };
   const isAdmin = shell.role === "Owner" || shell.role === "Admin";
   // Server-fetch everything with the reliable server session (no client auth race).
-  const [conns, members, invites, llm, notify] = await Promise.all([
-    apiGet<ApiOk<ConnectionDto[]>>("/connections", auth).then((r) => r.body?.data ?? []),
+  const [members, invites, llm, notify] = await Promise.all([
     apiGet<ApiOk<MemberDto[]>>(`/orgs/${shell.orgId}/members`, auth).then(
       (r) => r.body?.data ?? [],
     ),
@@ -50,7 +43,6 @@ export default async function SettingsPage() {
       orgName={shell.orgName}
       email={shell.email}
       role={shell.role}
-      connections={conns}
       members={members}
       invites={invites}
       llm={llm}

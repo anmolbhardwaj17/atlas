@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Loader2, Trash2, Check, X, RefreshCw } from "lucide-react";
+import { Plus, Loader2, Trash2, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,16 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { StatusBadge } from "@/components/certainty";
 import { CloudIcon } from "@/components/cloud-icon";
 import {
@@ -196,7 +207,7 @@ function ConnectionRow({
   canManage: boolean;
 }) {
   const router = useRouter();
-  const [confirming, setConfirming] = React.useState(false);
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [triggering, setTriggering] = React.useState(false);
   const [note, setNote] = React.useState<string | null>(null);
@@ -216,10 +227,17 @@ function ConnectionRow({
     setBusy(true);
     try {
       await deleteConnection(orgId, conn.id);
+      setConfirmOpen(false);
+      toast.success(`Disconnected ${conn.displayName}`, {
+        description: "The source and its data have been removed from your graph.",
+      });
       router.refresh();
-    } catch {
+    } catch (e) {
+      toast.error("Couldn't disconnect", {
+        description: e instanceof Error ? e.message : "Please try again.",
+      });
+    } finally {
       setBusy(false);
-      setConfirming(false);
     }
   }
 
@@ -247,7 +265,7 @@ function ConnectionRow({
             </span>
           ) : null}
           <StatusBadge status={conn.status} />
-          {canManage && canSync && !confirming ? (
+          {canManage && canSync ? (
             <button
               type="button"
               onClick={() => void sync()}
@@ -259,42 +277,17 @@ function ConnectionRow({
               <RefreshCw className={cn("size-3.5", (triggering || syncing) && "animate-spin")} />
             </button>
           ) : null}
-          {canManage &&
-            (confirming ? (
-              <span className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => void remove()}
-                  disabled={busy}
-                  aria-label="Confirm disconnect"
-                  className="text-danger hover:opacity-80"
-                >
-                  {busy ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <Check className="size-3.5" />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirming(false)}
-                  aria-label="Cancel"
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <X className="size-3.5" />
-                </button>
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setConfirming(true)}
-                aria-label="Disconnect"
-                title="Disconnect (removes this source's data)"
-                className="text-muted-foreground hover:text-danger"
-              >
-                <Trash2 className="size-3.5" />
-              </button>
-            ))}
+          {canManage ? (
+            <button
+              type="button"
+              onClick={() => setConfirmOpen(true)}
+              aria-label="Disconnect"
+              title="Disconnect (removes this source's data)"
+              className="text-muted-foreground hover:text-danger"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          ) : null}
         </span>
       </div>
       {syncing ? (
@@ -327,6 +320,39 @@ function ConnectionRow({
         </span>
       ) : null}
       {note ? <span className="text-xs text-danger">{note}</span> : null}
+
+      <AlertDialog open={confirmOpen} onOpenChange={(open) => !busy && setConfirmOpen(open)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disconnect {conn.displayName}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the connection and{" "}
+              <strong>purges everything Atlas learned from it</strong> - its resources, edges, and
+              signals disappear from your graph, map, and Ask AI answers. Reconnecting later starts
+              a fresh sync. This can&apos;t be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Keep connected</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault(); // keep the dialog open while the request is in flight
+                void remove();
+              }}
+              disabled={busy}
+              className="bg-danger text-white hover:bg-danger/90"
+            >
+              {busy ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" /> Disconnecting…
+                </>
+              ) : (
+                "Disconnect"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </li>
   );
 }

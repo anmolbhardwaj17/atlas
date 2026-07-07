@@ -1,23 +1,14 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import Link from "next/link";
-import { Building2, Users, Plug, Bell, Sparkles, ShieldCheck, ArrowUpRight } from "lucide-react";
+import { Building2, Users, Bell, Sparkles, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatusBadge } from "@/components/certainty";
-import { EmptyState } from "@/components/patterns/empty-state";
 import { OrgPanel } from "@/app/org-panel";
 import { LlmSettingsCard } from "@/components/settings/llm-settings";
 import { NotificationsSettingsCard } from "@/components/settings/notifications-settings";
 import type { LlmSettings, NotificationStatus } from "@/lib/browser-api";
 
-interface ConnectionDto {
-  id: string;
-  provider: string;
-  displayName: string;
-  status: string;
-}
 interface MemberDto {
   userId: string;
   email: string;
@@ -33,7 +24,7 @@ interface InvitationDto {
   expiresAt: string;
 }
 
-type Section = "general" | "members" | "integrations" | "notifications" | "ai" | "security";
+type Section = "general" | "members" | "notifications" | "ai" | "security";
 
 /**
  * Settings, sectioned. A left sub-nav (top tabs on mobile) splits a growing set of settings
@@ -45,7 +36,6 @@ export function SettingsView({
   orgName,
   email,
   role,
-  connections,
   members,
   invites,
   llm,
@@ -56,7 +46,6 @@ export function SettingsView({
   orgName: string;
   email: string;
   role: string;
-  connections: ConnectionDto[];
   members: MemberDto[];
   invites: InvitationDto[];
   llm: LlmSettings | null;
@@ -72,7 +61,6 @@ export function SettingsView({
     [
       { id: "general", label: "General", icon: Building2, show: true },
       { id: "members", label: "Members", icon: Users, show: true },
-      { id: "integrations", label: "Integrations", icon: Plug, show: true },
       { id: "notifications", label: "Notifications", icon: Bell, show: isAdmin },
       { id: "ai", label: "AI model", icon: Sparkles, show: isAdmin },
       { id: "security", label: "Security", icon: ShieldCheck, show: isAdmin },
@@ -126,45 +114,6 @@ export function SettingsView({
 
           {section === "members" ? (
             <OrgPanel orgId={orgId} initialMembers={members} initialInvites={invites} />
-          ) : null}
-
-          {section === "integrations" ? (
-            <Card>
-              <CardHeader className="flex-row items-center justify-between space-y-0">
-                <CardTitle>Connected sources</CardTitle>
-                <Link
-                  href="/integrations"
-                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  Manage <ArrowUpRight className="size-3.5" />
-                </Link>
-              </CardHeader>
-              <CardContent>
-                {connections.length === 0 ? (
-                  <EmptyState
-                    bare
-                    icon={Plug}
-                    title="No sources connected"
-                    description="Connecting AWS or GitHub starts building your graph. From the dashboard you can also load sample data to explore Atlas without credentials."
-                  />
-                ) : (
-                  <ul className="divide-y divide-border rounded-md border">
-                    {connections.map((c) => (
-                      <li
-                        key={c.id}
-                        className="flex items-center justify-between px-3 py-2 text-sm"
-                      >
-                        <span>
-                          <span className="text-muted-foreground">{c.provider}</span> ·{" "}
-                          {c.displayName}
-                        </span>
-                        <StatusBadge status={c.status} />
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
           ) : null}
 
           {section === "notifications" && isAdmin ? (
