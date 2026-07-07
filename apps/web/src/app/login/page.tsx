@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { AtlasLogo } from "@/components/brand";
+import { WelcomeOverlay } from "@/components/welcome-overlay";
 
 // LiquidMetal is a WebGL shader - client-only (no SSR), lazy-loaded so it never blocks paint.
 const LiquidMetal = dynamic(
@@ -28,6 +29,9 @@ const HERO_BG = "radial-gradient(120% 110% at 18% 12%, #3d3d3d 0%, #1a1a1a 45%, 
 export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // PREVIEW ONLY: sample the post-login welcome here so we can tweak it. Auto-plays on load;
+  // "Replay welcome" re-triggers it. (The real one will fire on entering the app after sign-in.)
+  const [showWelcome, setShowWelcome] = useState(true);
 
   async function signInWithGoogle(): Promise<void> {
     setBusy(true);
@@ -129,6 +133,15 @@ export default function LoginPage() {
             {busy ? "Redirecting…" : "Continue with Google"}
           </Button>
           {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
+
+          {/* PREVIEW ONLY - replays the welcome sample. Remove once wired to the real flow. */}
+          <button
+            type="button"
+            onClick={() => setShowWelcome(true)}
+            className="mt-5 text-xs text-neutral-400 underline underline-offset-2 transition-colors hover:text-neutral-600"
+          >
+            Replay welcome (preview)
+          </button>
         </div>
 
         {/* Legal links, anchored to the bottom of the panel. */}
@@ -141,6 +154,8 @@ export default function LoginPage() {
           </Link>
         </div>
       </section>
+
+      {showWelcome ? <WelcomeOverlay onDone={() => setShowWelcome(false)} /> : null}
     </main>
   );
 }
