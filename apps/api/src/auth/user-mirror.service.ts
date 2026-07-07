@@ -31,8 +31,12 @@ export class UserMirrorService {
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (id) DO UPDATE
          SET email = EXCLUDED.email,
-             name = COALESCE(EXCLUDED.name, users.name),
-             avatar_url = COALESCE(EXCLUDED.avatar_url, users.avatar_url)
+             -- Keep the stored name (which the user may have edited); only seed from the
+             -- provider when we don't have one yet. Avatar stays fresh from the provider.
+             -- Keep whatever the user has (name and avatar may both be user-chosen); only seed
+             -- from the provider the first time, so a picked name/avatar survives re-login.
+             name = COALESCE(users.name, EXCLUDED.name),
+             avatar_url = COALESCE(users.avatar_url, EXCLUDED.avatar_url)
        RETURNING id, email, name, avatar_url`,
       [claims.userId, claims.email, claims.name, claims.avatarUrl],
     );
@@ -46,6 +50,29 @@ export class UserMirrorService {
 
     const row = rows[0];
     if (!row) throw new Error("user upsert returned no row");
+    return { id: row.id, email: row.email, name: row.name, avatarUrl: row.avatar_url };
+  }
+
+  /** Update the user's own profile (display name and/or avatar). Only provided fields change. */
+  async updateProfile(
+    userId: string,
+    patch: { name?: string | undefined; avatarUrl?: string | undefined },
+  ): Promise<MirroredUser> {
+    const { rows } = await this.db.query<{
+      id: string;
+      email: string;
+      name: string | null;
+      avatar_url: string | null;
+    }>(
+      `UPDATE users
+          SET name       = COALESCE($2, name),
+              avatar_url = COALESCE($3, avatar_url)
+        WHERE id = $1
+       RETURNING id, email, name, avatar_url`,
+      [userId, patch.name ?? null, patch.avatarUrl ?? null],
+    );
+    const row = rows[0];
+    if (!row) throw new Error("user not found");
     return { id: row.id, email: row.email, name: row.name, avatarUrl: row.avatar_url };
   }
 }

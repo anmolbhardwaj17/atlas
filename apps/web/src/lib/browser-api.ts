@@ -25,6 +25,26 @@ export async function getClientToken(): Promise<string | null> {
   return session.access_token;
 }
 
+/** Update the signed-in user's own profile (name and/or avatar). Returns the new values. */
+export async function updateMyProfile(patch: {
+  name?: string;
+  avatarUrl?: string;
+}): Promise<{ name: string | null; avatarUrl: string | null }> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/me`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  const body = (await res.json().catch(() => null)) as {
+    data?: { name: string | null; avatarUrl: string | null };
+    error?: { message?: string };
+  } | null;
+  if (!res.ok) throw new Error(body?.error?.message ?? `Couldn't save (${res.status}).`);
+  return { name: body?.data?.name ?? null, avatarUrl: body?.data?.avatarUrl ?? null };
+}
+
 export interface SearchHit {
   node: { id: string; kind: string; name: string | null };
   score: number;

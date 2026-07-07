@@ -4,6 +4,7 @@ import { type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OrgPanel } from "@/app/org-panel";
+import { ProfileCard } from "@/components/settings/profile-card";
 import { LlmSettingsCard } from "@/components/settings/llm-settings";
 import { NotificationsSettingsCard } from "@/components/settings/notifications-settings";
 import type { LlmSettings, ChannelSummary } from "@/lib/browser-api";
@@ -33,6 +34,8 @@ export function SettingsView({
   orgName,
   email,
   role,
+  name,
+  avatarUrl,
   members,
   invites,
   llm,
@@ -43,6 +46,8 @@ export function SettingsView({
   orgName: string;
   email: string;
   role: string;
+  name: string | null;
+  avatarUrl: string | null;
   members: MemberDto[];
   invites: InvitationDto[];
   llm: LlmSettings | null;
@@ -60,6 +65,8 @@ export function SettingsView({
         <p className="text-sm text-muted-foreground">Manage your organization, team, and access.</p>
       </div>
 
+      <ProfileCard name={name} email={email} avatarUrl={avatarUrl} />
+
       <Card>
         <CardHeader>
           <CardTitle>Organization</CardTitle>
@@ -68,7 +75,6 @@ export function SettingsView({
           <dl className="space-y-2 text-sm">
             <Row label="Name" value={orgName} />
             <Row label="Organization ID" value={orgId} mono />
-            <Row label="Signed in as" value={email} />
             <Row label="Your role" value={role} />
           </dl>
         </CardContent>

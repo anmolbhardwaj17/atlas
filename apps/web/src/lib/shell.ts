@@ -13,6 +13,8 @@ export interface Shell {
   orgName: string;
   role: string;
   email: string;
+  name: string | null;
+  avatarUrl: string | null;
 }
 
 interface Membership {
@@ -24,6 +26,7 @@ interface Membership {
 interface MeResponse {
   email: string;
   name: string | null;
+  avatarUrl: string | null;
   memberships: Membership[];
   defaultOrgId: string | null;
 }
@@ -46,5 +49,7 @@ export const requireShell = cache(async (): Promise<Shell> => {
     orgName: active.orgName,
     role: active.role,
     email: me.email ?? session.email,
+    name: me.name,
+    avatarUrl: me.avatarUrl,
   };
 });

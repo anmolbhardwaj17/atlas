@@ -24,13 +24,13 @@ import {
 
 const POLL_MS = 45_000;
 
-const SEVERITY_ICON: Record<NotificationItem["severity"], { icon: LucideIcon; className: string }> =
-  {
-    success: { icon: CheckCircle2, className: "bg-success/10 text-success" },
-    danger: { icon: TriangleAlert, className: "bg-danger/10 text-danger" },
-    warning: { icon: CircleAlert, className: "bg-warning/10 text-warning" },
-    info: { icon: Info, className: "bg-muted text-muted-foreground" },
-  };
+// Only the glyph carries the severity color; the circle stays neutral (no tinted background).
+const SEVERITY_ICON: Record<NotificationItem["severity"], { icon: LucideIcon; color: string }> = {
+  success: { icon: CheckCircle2, color: "text-success" },
+  danger: { icon: TriangleAlert, color: "text-danger" },
+  warning: { icon: CircleAlert, color: "text-warning" },
+  info: { icon: Info, color: "text-muted-foreground" },
+};
 
 /** Compact relative time: "just now", "5m", "3h", "2d". */
 function ago(iso: string): string {
@@ -177,23 +177,19 @@ export function NotificationBell({ orgId }: { orgId: string }) {
                           type="button"
                           onClick={() => void openItem(item)}
                           className={cn(
-                            "flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/50",
-                            !item.readAt && "bg-muted/30",
+                            "flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors",
+                            // Read rows sit on a clearly darker grey; unread stay bright on the
+                            // card. That contrast is how read/unread reads at a glance.
+                            item.readAt ? "bg-muted/80 hover:bg-muted" : "hover:bg-muted/30",
                           )}
                         >
-                          <span
-                            className={cn(
-                              "mt-0.5 grid size-8 shrink-0 place-items-center rounded-full",
-                              sev.className,
-                              item.readAt && "opacity-60",
-                            )}
-                          >
+                          <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-muted">
                             {logo ? (
                               <CloudIcon name={logo} className="size-[18px]" />
                             ) : KindIcon ? (
-                              <KindIcon className="size-4" />
+                              <KindIcon className={cn("size-4", sev.color)} />
                             ) : (
-                              <SevIcon className="size-4" />
+                              <SevIcon className={cn("size-4", sev.color)} />
                             )}
                           </span>
                           <span className="min-w-0 flex-1">

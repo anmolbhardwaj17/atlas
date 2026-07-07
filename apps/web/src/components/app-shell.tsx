@@ -16,17 +16,21 @@ export function AppShell({
   email,
   orgId,
   title,
+  name,
+  avatarUrl,
   children,
 }: {
   orgName: string;
   email: string;
   orgId?: string;
   title?: string;
+  name?: string | null;
+  avatarUrl?: string | null;
   children: ReactNode;
 }) {
   return (
     <SidebarProvider>
-      <AppSidebar orgName={orgName} email={email} />
+      <AppSidebar orgName={orgName} email={email} name={name} avatarUrl={avatarUrl} />
       <SidebarInset>
         <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur">
           <SidebarTrigger className="-ml-1" />

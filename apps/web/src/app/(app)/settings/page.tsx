@@ -43,6 +43,8 @@ export default async function SettingsPage() {
       orgName={shell.orgName}
       email={shell.email}
       role={shell.role}
+      name={shell.name}
+      avatarUrl={shell.avatarUrl}
       members={members}
       invites={invites}
       llm={llm}

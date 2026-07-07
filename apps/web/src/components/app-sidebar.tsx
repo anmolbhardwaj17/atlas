@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -78,7 +79,17 @@ const NAV = [
   },
 ];
 
-export function AppSidebar({ orgName, email }: { orgName: string; email: string }) {
+export function AppSidebar({
+  orgName,
+  email,
+  name,
+  avatarUrl,
+}: {
+  orgName: string;
+  email: string;
+  name?: string | null | undefined;
+  avatarUrl?: string | null | undefined;
+}) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -87,7 +98,10 @@ export function AppSidebar({ orgName, email }: { orgName: string; email: string 
     router.refresh();
   }
 
-  const initials = (email || "?").slice(0, 2).toUpperCase();
+  const displayName = name?.trim() || email || "Account";
+  // Photo if we have one, otherwise a deterministic DiceBear avatar seeded by email.
+  const avatar =
+    avatarUrl || `https://api.dicebear.com/9.x/thumbs/svg?seed=${encodeURIComponent(email)}`;
 
   return (
     <Sidebar collapsible="icon">
@@ -143,11 +157,16 @@ export function AppSidebar({ orgName, email }: { orgName: string; email: string 
                   size="lg"
                   className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                 >
-                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-muted text-xs font-semibold text-muted-foreground">
-                    {initials}
-                  </div>
+                  <Image
+                    src={avatar}
+                    alt={displayName}
+                    width={32}
+                    height={32}
+                    unoptimized
+                    className="aspect-square size-8 rounded-lg border border-border bg-muted object-cover"
+                  />
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-medium">{email || "Account"}</span>
+                    <span className="truncate font-medium">{displayName}</span>
                     <span className="truncate text-xs text-muted-foreground">{orgName}</span>
                   </div>
                   <ChevronsUpDown className="ml-auto size-4" />
@@ -161,8 +180,8 @@ export function AppSidebar({ orgName, email }: { orgName: string; email: string 
               >
                 <DropdownMenuLabel className="font-normal">
                   <div className="grid text-sm leading-tight">
-                    <span className="truncate font-medium">{email}</span>
-                    <span className="truncate text-xs text-muted-foreground">{orgName}</span>
+                    <span className="truncate font-medium">{displayName}</span>
+                    <span className="truncate text-xs text-muted-foreground">{email}</span>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />

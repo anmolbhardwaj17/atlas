@@ -1,9 +1,22 @@
-import { Controller, Get, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Patch, Req, UseGuards } from "@nestjs/common";
+import { z } from "zod";
 import type { Role } from "@atlas/db";
 import { AuthGuard } from "./auth.guard";
 import { UserMirrorService } from "./user-mirror.service";
 import { MembershipService } from "./membership.service";
+import { parseBody } from "../common/validation";
 import type { AuthedRequest } from "./auth.types";
+import type { MirroredUser } from "./user-mirror.service";
+
+const UpdateMeSchema = z
+  .object({
+    name: z.string().trim().min(1).max(80).optional(),
+    avatarUrl: z.string().trim().url().max(500).optional(),
+  })
+  .strict()
+  .refine((v) => v.name !== undefined || v.avatarUrl !== undefined, {
+    message: "Nothing to update.",
+  });
 
 interface MeMembership {
   orgId: string;
@@ -40,13 +53,28 @@ export class MeController {
     const claims = req.auth;
     if (!claims) throw new Error("auth context missing (guard should have set it)");
     const user = await this.users.ensureUser(claims);
+    return this.build(user, claims.emailVerified);
+  }
+
+  /** Update the signed-in user's own profile (currently just their display name). */
+  @Patch()
+  async update(@Req() req: AuthedRequest, @Body() body: unknown): Promise<MeResponse> {
+    const claims = req.auth;
+    if (!claims) throw new Error("auth context missing (guard should have set it)");
+    await this.users.ensureUser(claims); // make sure the row exists
+    const patch = parseBody(UpdateMeSchema, body);
+    const user = await this.users.updateProfile(claims.userId, patch);
+    return this.build(user, claims.emailVerified);
+  }
+
+  private async build(user: MirroredUser, emailVerified: boolean): Promise<MeResponse> {
     const orgs = await this.memberships.listForUser(user.id);
     return {
       id: user.id,
       email: user.email,
       name: user.name,
       avatarUrl: user.avatarUrl,
-      emailVerified: claims.emailVerified,
+      emailVerified,
       memberships: orgs.map((o) => ({
         orgId: o.id,
         orgName: o.name,
