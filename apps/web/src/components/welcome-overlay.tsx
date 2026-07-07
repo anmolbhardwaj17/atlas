@@ -86,14 +86,14 @@ export function WelcomeOverlay({
           contentIn ? "translate-y-0 scale-100 opacity-100" : "translate-y-1 scale-95 opacity-0",
         )}
       >
-        <div className="mb-6 grid place-items-center">
+        <div className="mb-3 grid place-items-center">
           <AtlasLogo
             size={96}
             className="size-24 [filter:invert(1)_drop-shadow(0_6px_18px_rgba(0,0,0,0.4))]"
           />
         </div>
         <h2 className="text-2xl font-semibold tracking-tight text-white [text-shadow:0_2px_16px_rgba(0,0,0,0.35)]">
-          {firstName ? `Hey, ${firstName}` : "Welcome to Atlas"}
+          {firstName ? `Hey ${firstName}!` : "Welcome to Atlas"}
         </h2>
         <p className="mt-2 max-w-xs text-sm text-white/80 [text-shadow:0_2px_16px_rgba(0,0,0,0.3)]">
           Your workspace is ready. Taking you in…
