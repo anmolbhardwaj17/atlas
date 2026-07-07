@@ -2,6 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import type { PoolClient } from "pg";
 import { withOrgScope, type Db } from "@atlas/db";
 import {
+  answerQuestion,
   answerQuestionStream,
   OpenRouterProvider,
   ClaudeProvider,
@@ -169,6 +170,32 @@ export class AiService {
       }
     }
     return this.llm;
+  }
+
+  /**
+   * Autonomous diagnosis (the proactive agent). Given a resource that just went unhealthy,
+   * run the SAME agentic diagnose loop a user would trigger - search → diagnose (health +
+   * blast radius + change timeline) → cited hypothesis - with no human in the loop. Returns a
+   * trimmed grounded hypothesis for the notification, or null (mock provider / not grounded /
+   * error) so the caller falls back to the plain alert. Read-only throughout; it investigates
+   * and advises, never acts.
+   */
+  async autoDiagnose(orgId: string, subject: string): Promise<string | null> {
+    const llm = await this.resolveProvider(orgId);
+    if (llm.name === "mock") return null; // the loop needs a real tool-calling model
+    try {
+      const answer = await answerQuestion(
+        { port: this.port, llm },
+        orgId,
+        `Why is ${subject} unhealthy right now? Diagnose the most likely cause, name any recent change or deploy that could be responsible, and say plainly if the timeline shows nothing conclusive. Be brief.`,
+      );
+      if (!answer.grounded || !answer.text.trim()) return null;
+      // Strip citation markers ([N1]/[A2]/…) - Slack has no provenance panel to bind them to.
+      const clean = answer.text.replace(/\s*\[[NEA]\d+\]/g, "").trim();
+      return clean.length > 900 ? `${clean.slice(0, 900)}…` : clean;
+    } catch {
+      return null;
+    }
   }
 
   async createConversation(

@@ -3,6 +3,7 @@ import { withOrgScope, type Db } from "@atlas/db";
 import type { Env } from "@atlas/config";
 import { PG_POOL, ENV } from "../core/tokens";
 import { ApiException } from "../common/errors";
+import { AiService } from "../ai/ai.service";
 
 /**
  * Proactive notifications (pull → push). An org sets an outbound channel (Slack incoming
@@ -36,6 +37,7 @@ export class NotificationService {
   constructor(
     @Inject(PG_POOL) private readonly db: Db,
     @Inject(ENV) private readonly env: Env,
+    private readonly ai: AiService,
   ) {}
 
   async getStatus(orgId: string): Promise<ChannelStatus> {
@@ -150,8 +152,24 @@ export class NotificationService {
         const icon = recovered ? "✅" : a.to_state === "unhealthy" ? "🔴" : "🟠";
         return `${icon} *${a.node_name ?? a.node_id}* — ${a.title}`;
       });
+      // AUTONOMOUS AGENT: for the newly-broken resources (not recoveries), Atlas investigates
+      // on its own - runs the agentic diagnose loop and appends its cited hypothesis, so the
+      // alert arrives already diagnosed. Capped so a flapping estate can't run away on cost;
+      // best-effort so a slow/absent model never blocks the alert.
+      const broken = alerts.filter((a) => a.to_state !== "healthy").slice(0, 2);
+      const diagnoses: string[] = [];
+      for (const b of broken) {
+        const subject = b.node_name ?? b.node_id;
+        const hypothesis = await this.ai.autoDiagnose(orgId, subject).catch(() => null);
+        if (hypothesis) diagnoses.push(`\n🤖 *Atlas looked into ${subject}:*\n${hypothesis}`);
+      }
+
       await postSlack(url, {
-        text: `*Atlas — ${alerts.length} health ${alerts.length === 1 ? "change" : "changes"}*\n${lines.join("\n")}\n<${this.webUrl()}/map|Open the map →>`,
+        text:
+          `*Atlas — ${alerts.length} health ${alerts.length === 1 ? "change" : "changes"}*\n` +
+          `${lines.join("\n")}` +
+          `${diagnoses.join("")}` +
+          `\n<${this.webUrl()}/map|Open the map →>`,
       });
       const latest = alerts[alerts.length - 1]?.occurred_at ?? new Date();
       await withOrgScope(this.db, orgId, (c) =>

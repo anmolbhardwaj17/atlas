@@ -36,5 +36,8 @@ const searchProvider: Provider = {
   imports: [AuthModule, ConnectionsModule],
   controllers: [AiController],
   providers: [GraphService, searchProvider, GraphRetrievalPort, AiService, llmProvider],
+  // The autonomous-diagnosis agent (AiService.autoDiagnose) is used by the notifications
+  // dispatcher to investigate breaks proactively.
+  exports: [AiService],
 })
 export class AiModule {}
