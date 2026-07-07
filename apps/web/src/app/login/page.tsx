@@ -5,6 +5,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { AtlasLogo } from "@/components/brand";
 
 // LiquidMetal is a WebGL shader - client-only (no SSR), lazy-loaded so it never blocks paint.
 const LiquidMetal = dynamic(
@@ -49,26 +50,11 @@ export default function LoginPage() {
         className="relative m-2.5 hidden flex-col justify-end overflow-hidden rounded-2xl p-8 text-white shadow-sm md:m-3 md:flex"
         style={{ background: HERO_BG }}
       >
-        {/* The liquid-metal mark, floating in the hero. */}
-        <div className="pointer-events-none absolute right-0 top-2 opacity-90 [filter:drop-shadow(0_20px_50px_rgba(0,0,0,0.35))]">
-          <LiquidMetal
-            width={300}
-            height={300}
-            image="/atlas-logo.png"
-            colorBack="#00000000"
-            colorTint="#bfeed4"
-            repetition={2}
-            softness={0.1}
-            shiftRed={0.3}
-            shiftBlue={0.3}
-            distortion={0.07}
-            contour={0.4}
-            angle={70}
-            speed={1}
-            scale={0.82}
-            fit="contain"
-          />
-        </div>
+        {/* A big Atlas logo bleeding off the left edge (inverted to read light on the dark hero). */}
+        <AtlasLogo
+          size={420}
+          className="pointer-events-none absolute -left-40 top-1/2 size-[420px] -translate-y-1/2 opacity-90 [filter:invert(1)_drop-shadow(0_18px_40px_rgba(0,0,0,0.4))]"
+        />
 
         <div className="relative">
           <h2 className="max-w-sm text-4xl font-semibold leading-tight tracking-tight">
