@@ -50,10 +50,10 @@ export default function LoginPage() {
         className="relative m-2.5 hidden flex-col justify-end overflow-hidden rounded-2xl p-8 text-white shadow-sm md:m-3 md:flex"
         style={{ background: HERO_BG }}
       >
-        {/* A big Atlas logo bleeding off the left edge (inverted to read light on the dark hero). */}
+        {/* A large Atlas logo bleeding off the top-left corner, faint (inverted to read light). */}
         <AtlasLogo
-          size={420}
-          className="pointer-events-none absolute -left-40 top-1/2 size-[420px] -translate-y-1/2 opacity-90 [filter:invert(1)_drop-shadow(0_18px_40px_rgba(0,0,0,0.4))]"
+          size={560}
+          className="pointer-events-none absolute -left-28 -top-28 size-[560px] opacity-[0.06] [filter:invert(1)]"
         />
 
         <div className="relative">
@@ -98,10 +98,10 @@ export default function LoginPage() {
         <div className="w-full max-w-sm text-center">
           {/* Liquid-metal Atlas mark above the sign-in. Transparent back (page is white already) so
               it never paints an opaque box over the heading; grey tint reads on white. */}
-          <div className="-mb-2 flex justify-center [filter:drop-shadow(0_14px_34px_rgba(0,0,0,0.12))]">
+          <div className="-mb-3 flex justify-center [filter:drop-shadow(0_14px_34px_rgba(0,0,0,0.12))]">
             <LiquidMetal
-              width={190}
-              height={190}
+              width={224}
+              height={224}
               image="/atlas-logo.png"
               colorBack="#00000000"
               colorTint="#999999"
@@ -120,15 +120,9 @@ export default function LoginPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
             Sign in to Atlas
           </h1>
-          <p className="mt-1.5 text-sm text-neutral-500">
-            Use your Google account to continue to your workspace.
-          </p>
+          <p className="mt-1.5 text-sm text-neutral-500">Everything you run, one sign-in away.</p>
 
-          <Button
-            onClick={signInWithGoogle}
-            disabled={busy}
-            className="mt-8 h-12 w-full gap-2.5 shadow-lg shadow-neutral-900/20 transition-shadow hover:shadow-xl hover:shadow-neutral-900/25"
-          >
+          <Button onClick={signInWithGoogle} disabled={busy} className="mt-8 h-12 w-full gap-2.5">
             <span className="grid size-6 shrink-0 place-items-center rounded-full bg-white">
               <GoogleIcon className="size-3.5" />
             </span>
