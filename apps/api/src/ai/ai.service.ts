@@ -215,6 +215,15 @@ export class AiService {
   }
 
   /** Recent conversations for the history sidebar (newest first). */
+  /** Delete a conversation (and its messages, via ON DELETE CASCADE). Org-scoped: a
+   *  cross-tenant id simply deletes nothing (RLS), which reads as an idempotent no-op. */
+  async deleteConversation(orgId: string, id: string): Promise<{ deleted: boolean }> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      const res = await c.query(`DELETE FROM ai_conversations WHERE id = $1`, [id]);
+      return { deleted: (res.rowCount ?? 0) > 0 };
+    });
+  }
+
   async listConversations(
     orgId: string,
   ): Promise<Array<{ id: string; title: string | null; createdAt: string }>> {

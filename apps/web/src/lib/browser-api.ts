@@ -332,6 +332,17 @@ export async function listConversations(orgId: string): Promise<ConversationSumm
   return body?.data ?? [];
 }
 
+/** Delete a conversation and its messages. Returns true on success (best-effort). */
+export async function deleteConversation(orgId: string, id: string): Promise<boolean> {
+  const token = await getClientToken();
+  if (!token) return false;
+  const res = await fetch(`${apiUrl()}/ai/conversations/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  return res.ok;
+}
+
 export interface ConversationMessage {
   role: string;
   content: string;

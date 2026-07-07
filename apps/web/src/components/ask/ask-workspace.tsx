@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Plus, PanelLeftClose, PanelLeftOpen, Trash2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { AskChat } from "@/components/ask/ask-chat";
-import type { ConversationSummary } from "@/lib/browser-api";
+import { deleteConversation, type ConversationSummary } from "@/lib/browser-api";
 
 /**
  * Ask workspace (docs/09 §5.5): a conversation-history sidebar + the chat pane. Past conversations
@@ -34,15 +34,29 @@ export function AskWorkspace({
   const [highlightId, setHighlightId] = useState<string | null>(initialConversationId ?? null);
   const [epoch, setEpoch] = useState(0); // bumps to force a fresh chat on "New chat"
   const [collapsed, setCollapsed] = useState(false);
+  // Right-click context menu for a conversation row (delete).
+  const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
 
   const chatKey = conversationId ?? `new-${epoch}`;
 
+  async function removeConversation(id: string) {
+    setMenu(null);
+    setConversations((prev) => prev.filter((c) => c.id !== id));
+    if (conversationId === id || highlightId === id) newChat();
+    await deleteConversation(orgId, id);
+  }
+
   // Conversation row — highlighted in place when it's the one you're viewing (not pinned to top).
+  // Right-click opens a small menu with Delete.
   const row = (c: ConversationSummary) => (
     <button
       key={c.id}
       type="button"
       onClick={() => openConversation(c.id)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setMenu({ id: c.id, x: e.clientX, y: e.clientY });
+      }}
       title={c.title ?? "Untitled"}
       className={cn(
         "flex w-full items-center rounded-md px-2.5 py-1.5 text-left text-sm transition-colors",
@@ -94,6 +108,29 @@ export function AskWorkspace({
 
   return (
     <div className="flex h-[calc(100dvh-7rem)] min-h-[420px] gap-5">
+      {/* Right-click menu (delete a conversation). Backdrop closes it on any outside click. */}
+      {menu ? (
+        <div
+          className="fixed inset-0 z-50"
+          onClick={() => setMenu(null)}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <div
+            className="absolute min-w-40 overflow-hidden rounded-md border border-border bg-card py-1 shadow-lg"
+            style={{ top: menu.y, left: menu.x }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => void removeConversation(menu.id)}
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-danger hover:bg-danger/10"
+            >
+              <Trash2 className="size-3.5" /> Delete chat
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {collapsed ? (
         <aside className="hidden shrink-0 flex-col items-center gap-2 border-r border-border pr-3 md:flex">
           <button

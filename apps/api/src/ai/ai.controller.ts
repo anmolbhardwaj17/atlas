@@ -90,6 +90,12 @@ export class AiController {
     return this.ai.getConversation(org(req).id, id);
   }
 
+  @Delete("conversations/:id")
+  @Roles("Member")
+  async deleteConversation(@Req() req: AuthedRequest, @Param("id") id: string): Promise<unknown> {
+    return this.ai.deleteConversation(org(req).id, id);
+  }
+
   @Post("conversations/:id/messages")
   @Roles("Member")
   async ask(
