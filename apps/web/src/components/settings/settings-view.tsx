@@ -54,7 +54,7 @@ export function SettingsView({
   const isAdmin = role === "Owner" || role === "Admin";
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-6">
+    <div className="w-full max-w-3xl space-y-6">
       <div>
         <h1 className="text-xl font-semibold">Settings</h1>
         <p className="text-sm text-muted-foreground">Manage your organization, team, and access.</p>
