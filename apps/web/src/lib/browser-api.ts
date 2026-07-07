@@ -575,6 +575,32 @@ export async function getNotificationStatus(orgId: string): Promise<Notification
   return notifyReq<NotificationStatus>(orgId, "", "GET");
 }
 
+/** One row in the in-app notification feed (the bell). */
+export interface NotificationItem {
+  id: string;
+  kind: string;
+  severity: "info" | "success" | "warning" | "danger";
+  title: string;
+  body: string | null;
+  href: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export async function getInbox(
+  orgId: string,
+): Promise<{ items: NotificationItem[]; unread: number }> {
+  return notifyReq<{ items: NotificationItem[]; unread: number }>(orgId, "/inbox", "GET");
+}
+
+export async function markAllNotificationsRead(orgId: string): Promise<void> {
+  await notifyReq<{ ok: true }>(orgId, "/inbox/read-all", "POST");
+}
+
+export async function markNotificationRead(orgId: string, id: string): Promise<void> {
+  await notifyReq<{ ok: true }>(orgId, `/inbox/${id}/read`, "POST");
+}
+
 export async function setSlackWebhook(
   orgId: string,
   webhookUrl: string,

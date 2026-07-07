@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CommandPalette } from "@/components/command-palette";
 import { CommandTrigger } from "@/components/command-trigger";
+import { NotificationBell } from "@/components/notification-bell";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 
@@ -37,7 +38,10 @@ export function AppShell({
               <span className="text-sm font-medium">{title}</span>
             </>
           ) : null}
-          <div className="ml-auto">{orgId && <CommandTrigger />}</div>
+          <div className="ml-auto flex items-center gap-1.5">
+            {orgId && <CommandTrigger />}
+            {orgId && <NotificationBell orgId={orgId} />}
+          </div>
         </header>
         <div className="flex-1 p-4 md:p-6">
           <div className="mx-auto w-full max-w-6xl">{children}</div>

@@ -22,6 +22,29 @@ export interface ChannelStatus {
   hint: string | null;
 }
 
+/** One row in the in-app notification feed (the bell). */
+export interface NotificationItem {
+  id: string;
+  kind: string;
+  severity: "info" | "success" | "warning" | "danger";
+  title: string;
+  body: string | null;
+  href: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+
+interface NotificationRow {
+  id: string;
+  kind: string;
+  severity: NotificationItem["severity"];
+  title: string;
+  body: string | null;
+  href: string | null;
+  read_at: Date | null;
+  created_at: Date;
+}
+
 interface ChannelRow {
   kind: string;
   config: { webhookUrl?: string };
@@ -57,6 +80,90 @@ export class NotificationService {
         hint: tail ? `…/${tail.slice(0, 6)}…` : null,
       };
     });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // In-app notification feed (the bell). Rows are derived idempotently from the
+  // change timeline, so the feed is always fresh when a user opens it - no
+  // cross-org background job needed. Read state is org-level (a shared inbox).
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /** The feed a user sees when they open the bell: recent notifications + the unread count. */
+  async listFeed(
+    orgId: string,
+    limit = 30,
+  ): Promise<{ items: NotificationItem[]; unread: number }> {
+    await this.syncFeed(orgId);
+    return withOrgScope(this.db, orgId, async (c) => {
+      const { rows } = await c.query<NotificationRow>(
+        `SELECT id, kind, severity, title, body, href, read_at, created_at
+           FROM notifications ORDER BY created_at DESC LIMIT $1`,
+        [limit],
+      );
+      const { rows: cnt } = await c.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM notifications WHERE read_at IS NULL`,
+      );
+      return {
+        items: rows.map((r) => ({
+          id: r.id,
+          kind: r.kind,
+          severity: r.severity,
+          title: r.title,
+          body: r.body,
+          href: r.href,
+          readAt: r.read_at ? r.read_at.toISOString() : null,
+          createdAt: r.created_at.toISOString(),
+        })),
+        unread: cnt[0]?.n ?? 0,
+      };
+    });
+  }
+
+  async markRead(orgId: string, id: string): Promise<void> {
+    await withOrgScope(this.db, orgId, (c) =>
+      c.query(`UPDATE notifications SET read_at = now() WHERE id = $1 AND read_at IS NULL`, [id]),
+    );
+  }
+
+  async markAllRead(orgId: string): Promise<void> {
+    await withOrgScope(this.db, orgId, (c) =>
+      c.query(`UPDATE notifications SET read_at = now() WHERE read_at IS NULL`),
+    );
+  }
+
+  /**
+   * Materialise feed rows from the change timeline. Idempotent: `dedupe_key` = `health:<eventId>`
+   * with a unique (org_id, dedupe_key), so re-running only ever inserts genuinely-new events.
+   * Health transitions are the "something happened" signal worth surfacing in the bell.
+   */
+  private async syncFeed(orgId: string): Promise<void> {
+    await withOrgScope(this.db, orgId, (c) =>
+      c.query(
+        `INSERT INTO notifications (org_id, kind, severity, title, body, href, dedupe_key, created_at)
+         SELECT e.org_id,
+                'health',
+                CASE e.evidence->>'to'
+                  WHEN 'healthy'   THEN 'success'
+                  WHEN 'unhealthy' THEN 'danger'
+                  ELSE 'warning'
+                END,
+                COALESCE(n.name, e.node_id::text) ||
+                  CASE e.evidence->>'to'
+                    WHEN 'healthy'   THEN ' recovered'
+                    WHEN 'unhealthy' THEN ' went down'
+                    ELSE ' is degraded'
+                  END,
+                e.title,
+                '/map',
+                'health:' || e.id,
+                e.occurred_at
+           FROM node_events e
+           JOIN nodes n ON n.id = e.node_id
+          WHERE e.kind = 'health_transition'
+            AND e.occurred_at > now() - interval '30 days'
+         ON CONFLICT (org_id, dedupe_key) DO NOTHING`,
+      ),
+    );
   }
 
   /** Set (or replace) the Slack webhook. Validates it looks like a Slack webhook URL. */
