@@ -29,9 +29,9 @@ const HERO_BG = "radial-gradient(120% 110% at 18% 12%, #3d3d3d 0%, #1a1a1a 45%, 
 export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // PREVIEW ONLY: sample the post-login welcome here so we can tweak it. Auto-plays on load;
-  // "Replay welcome" re-triggers it. (The real one will fire on entering the app after sign-in.)
-  const [showWelcome, setShowWelcome] = useState(true);
+  // PREVIEW ONLY: sample the post-login welcome here so we can tweak it. Triggered by the
+  // "Replay welcome" button (not auto-shown). The real one will fire on entering the app.
+  const [showWelcome, setShowWelcome] = useState(false);
 
   async function signInWithGoogle(): Promise<void> {
     setBusy(true);

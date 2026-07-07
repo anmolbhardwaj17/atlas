@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/cn";
-import { AtlasAiMark } from "@/components/brand";
+import { AtlasLogo } from "@/components/brand";
 
 /**
  * A one-shot welcome that greets you on the way into the app, then dismisses itself. It sits on a
@@ -47,19 +47,21 @@ export function WelcomeOverlay({
       )}
       aria-live="polite"
     >
+      {/* Soft faded blob behind the card so a white card still reads on a white page. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-1/2 size-[620px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/[0.06] blur-3xl"
+      />
+
       <div
         className={cn(
-          "flex flex-col items-center rounded-2xl border border-border bg-card px-10 py-9 text-center shadow-2xl transition-all duration-500 ease-out",
+          "relative flex flex-col items-center rounded-2xl border border-border bg-card px-10 py-9 text-center shadow-2xl transition-all duration-500 ease-out",
           active ? "translate-y-0 scale-100 opacity-100" : "translate-y-2 scale-95 opacity-0",
         )}
       >
-        {/* Brand mark with a soft green glow. */}
-        <div className="relative mb-4 grid size-16 place-items-center">
-          <span
-            aria-hidden
-            className="absolute size-16 rounded-full bg-[#70ff7a] opacity-30 blur-2xl"
-          />
-          <AtlasAiMark size={56} className="size-14 drop-shadow" />
+        {/* Atlas app mark. */}
+        <div className="mb-4 grid size-16 place-items-center">
+          <AtlasLogo size={56} className="size-14 drop-shadow" />
         </div>
 
         <h2 className="text-xl font-semibold tracking-tight">
