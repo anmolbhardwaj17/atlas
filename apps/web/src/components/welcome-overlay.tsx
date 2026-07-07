@@ -73,9 +73,9 @@ export function WelcomeOverlay({
         )}
       >
         <div className="absolute inset-0 m-auto size-[700px] motion-safe:animate-[spin_13s_linear_infinite]">
-          {/* Greens sampled straight from the Atlas AI logo gradient. */}
-          <div className="absolute left-1/2 top-1/2 size-[440px] -translate-x-[64%] -translate-y-[58%] rounded-[46%_54%_63%_37%/52%_44%_56%_48%] bg-[#55b073] blur-[80px]" />
-          <div className="absolute left-1/2 top-1/2 size-[440px] -translate-x-[36%] -translate-y-[42%] rounded-[58%_42%_45%_55%/48%_57%_43%_52%] bg-[#247e54] blur-[80px]" />
+          {/* Greens from the Atlas AI logo gradient (its brighter spring-green range). */}
+          <div className="absolute left-1/2 top-1/2 size-[440px] -translate-x-[64%] -translate-y-[58%] rounded-[46%_54%_63%_37%/52%_44%_56%_48%] bg-[#6cc487] blur-[80px]" />
+          <div className="absolute left-1/2 top-1/2 size-[440px] -translate-x-[36%] -translate-y-[42%] rounded-[58%_42%_45%_55%/48%_57%_43%_52%] bg-[#49aa72] blur-[80px]" />
         </div>
       </div>
 
@@ -93,7 +93,7 @@ export function WelcomeOverlay({
           />
         </div>
         <h2 className="text-2xl font-semibold tracking-tight text-white [text-shadow:0_2px_16px_rgba(0,0,0,0.35)]">
-          {firstName ? `Welcome, ${firstName}` : "Welcome to Atlas"}
+          {firstName ? `Hey, ${firstName}` : "Welcome to Atlas"}
         </h2>
         <p className="mt-2 max-w-xs text-sm text-white/80 [text-shadow:0_2px_16px_rgba(0,0,0,0.3)]">
           Your workspace is ready. Taking you in…

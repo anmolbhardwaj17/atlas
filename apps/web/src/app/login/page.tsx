@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { Plug, Waypoints, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { AtlasLogo } from "@/components/brand";
@@ -14,9 +15,21 @@ const LiquidMetal = dynamic(
 );
 
 const STEPS = [
-  { title: "Connect in minutes", desc: "Read-only access to AWS and your repositories." },
-  { title: "Atlas builds the map", desc: "A live, cited graph of everything you run and ship." },
-  { title: "Ask anything", desc: "Answers grounded in your real system, with sources." },
+  {
+    icon: Plug,
+    title: "Connect in minutes",
+    desc: "Read-only access to AWS and your repositories.",
+  },
+  {
+    icon: Waypoints,
+    title: "Atlas builds the map",
+    desc: "A live, cited graph of everything you run and ship.",
+  },
+  {
+    icon: Sparkles,
+    title: "Ask anything",
+    desc: "Answers grounded in your real system, with sources.",
+  },
 ];
 
 // Hero background. Green brand gradient saved here for later:
@@ -77,11 +90,11 @@ export default function LoginPage() {
               >
                 <span
                   className={
-                    "grid size-6 place-items-center rounded-full text-xs font-semibold " +
+                    "grid size-7 place-items-center rounded-full " +
                     (i === 0 ? "bg-neutral-900 text-white" : "bg-white/10 text-white/80")
                   }
                 >
-                  {i + 1}
+                  <s.icon className="size-4" />
                 </span>
                 <p className="mt-3 text-sm font-medium">{s.title}</p>
                 <p className={"mt-0.5 text-xs " + (i === 0 ? "text-neutral-500" : "text-white/50")}>
