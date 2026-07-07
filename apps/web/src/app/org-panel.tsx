@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { Users } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { apiUrl } from "@/lib/env";
@@ -92,7 +93,9 @@ export function OrgPanel({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Members &amp; access</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Users className="size-4" /> Members &amp; access
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         <div>

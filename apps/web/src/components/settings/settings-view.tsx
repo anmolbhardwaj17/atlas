@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode } from "react";
+import { Building2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OrgPanel } from "@/app/org-panel";
@@ -69,7 +70,9 @@ export function SettingsView({
 
       <Card>
         <CardHeader>
-          <CardTitle>Organization</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="size-4" /> Organization
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <dl className="space-y-2 text-sm">

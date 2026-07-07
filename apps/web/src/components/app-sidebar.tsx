@@ -99,9 +99,9 @@ export function AppSidebar({
   }
 
   const displayName = name?.trim() || email || "Account";
-  // Photo if we have one, otherwise a deterministic DiceBear avatar seeded by email.
+  // Photo if we have one, otherwise a deterministic DiceBear "Dylan" avatar seeded by email.
   const avatar =
-    avatarUrl || `https://api.dicebear.com/9.x/thumbs/svg?seed=${encodeURIComponent(email)}`;
+    avatarUrl || `https://api.dicebear.com/10.x/dylan/svg?seed=${encodeURIComponent(email)}`;
 
   return (
     <Sidebar collapsible="icon">
@@ -111,10 +111,11 @@ export function AppSidebar({
             <SidebarMenuButton size="lg" asChild>
               <Link href="/dashboard">
                 <AtlasLogo size={32} spin className="size-8 shrink-0" />
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">Atlas</span>
-                  <span className="truncate text-xs text-muted-foreground">{orgName}</span>
-                </div>
+                {/* Just the product name here - the org is shown by the account menu at the
+                    bottom, so we don't repeat it. */}
+                <span className="flex flex-1 items-center truncate text-lg font-semibold">
+                  Atlas
+                </span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

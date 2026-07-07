@@ -2,21 +2,23 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { Check, Loader2, Pencil, X } from "lucide-react";
+import { Check, Loader2, Pencil, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/cn";
+import { createClient } from "@/lib/supabase/client";
 import { updateMyProfile } from "@/lib/browser-api";
 
-/** Deterministic DiceBear avatar URL (offline-friendly service; SVG). */
-function dicebear(style: string, seed: string): string {
-  return `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}`;
+/** A DiceBear "Dylan" avatar (bold, flat-illustrated faces) for a given seed. SVG, no network build. */
+function dylanAvatar(seed: string): string {
+  return `https://api.dicebear.com/10.x/dylan/svg?seed=${encodeURIComponent(seed)}`;
 }
 
-// A few friendly DiceBear styles to pick from when you'd rather not use a photo.
-const DICEBEAR_STYLES = ["thumbs", "avataaars", "bottts", "fun-emoji", "notionists", "lorelei"];
+// Seed suffixes → a spread of distinct Dylan faces to pick from (seeded off your email so
+// they're stable for you).
+const AVATAR_VARIANTS = ["a", "b", "c", "d", "e", "f", "g"];
 
 /**
  * Your personal profile - distinct from the organization. Shows your photo + name + email, and
@@ -32,21 +34,41 @@ export function ProfileCard({
   email: string;
   avatarUrl: string | null;
 }) {
-  const fallback = dicebear("thumbs", email);
+  const fallback = dylanAvatar(email);
   const [currentName, setCurrentName] = React.useState(name);
   const [currentAvatar, setCurrentAvatar] = React.useState(avatarUrl ?? fallback);
   const [editing, setEditing] = React.useState(false);
   const [draftName, setDraftName] = React.useState(name ?? "");
   const [pickedAvatar, setPickedAvatar] = React.useState(currentAvatar);
   const [busy, setBusy] = React.useState(false);
+  // Your live Google photo, read straight from the session (the stored avatar may have been
+  // changed to a generated one, so we always offer the real photo here).
+  const [googlePhoto, setGooglePhoto] = React.useState<string | null>(null);
 
-  // The avatar options: your real photo (if any) plus a generated set seeded by your email.
+  React.useEffect(() => {
+    createClient()
+      .auth.getUser()
+      .then(({ data }) => {
+        const m = (data.user?.user_metadata ?? {}) as Record<string, unknown>;
+        const url =
+          (typeof m.avatar_url === "string" && m.avatar_url) ||
+          (typeof m.picture === "string" && m.picture) ||
+          null;
+        if (url) setGooglePhoto(url);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Avatar options: your Google photo (if any) first, then a spread of Dylan faces.
   const options = React.useMemo(() => {
     const list: { url: string; label: string }[] = [];
-    if (avatarUrl) list.push({ url: avatarUrl, label: "Your photo" });
-    for (const s of DICEBEAR_STYLES) list.push({ url: dicebear(s, email), label: s });
+    if (googlePhoto) list.push({ url: googlePhoto, label: "Google photo" });
+    list.push({ url: dylanAvatar(email), label: "Avatar 1" });
+    AVATAR_VARIANTS.forEach((v, i) =>
+      list.push({ url: dylanAvatar(`${email}-${v}`), label: `Avatar ${i + 2}` }),
+    );
     return list;
-  }, [avatarUrl, email]);
+  }, [email, googlePhoto]);
 
   function startEdit() {
     setDraftName(currentName ?? "");
@@ -83,7 +105,9 @@ export function ProfileCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Your profile</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <UserRound className="size-4" /> Your profile
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center gap-4">

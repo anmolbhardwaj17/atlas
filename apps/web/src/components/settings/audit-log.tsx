@@ -37,7 +37,9 @@ export async function AuditLog({ orgId, token }: { orgId: string; token: string 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Activity log</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <ScrollText className="size-4" /> Activity log
+        </CardTitle>
       </CardHeader>
       <CardContent>
         {events.length === 0 ? (
