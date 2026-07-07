@@ -43,7 +43,7 @@ export default function LoginPage() {
     <main className="min-h-dvh bg-white md:grid md:grid-cols-2">
       {/* ── Left: branded hero as an inset green card floating on the white page ── */}
       <aside
-        className="relative m-4 hidden flex-col justify-end overflow-hidden rounded-3xl p-8 text-white shadow-sm md:m-6 md:flex"
+        className="relative m-2.5 hidden flex-col justify-end overflow-hidden rounded-2xl p-8 text-white shadow-sm md:m-3 md:flex"
         style={{
           background:
             "radial-gradient(120% 110% at 18% 12%, #1f6b4a 0%, #0e3a28 42%, #071f16 100%)",
@@ -110,10 +110,11 @@ export default function LoginPage() {
       {/* ── Right: full-height sign-in ── */}
       <section className="relative flex min-h-dvh flex-col items-center justify-center p-8">
         <div className="w-full max-w-sm text-center">
-          <AtlasLogo size={52} className="mx-auto mb-5 size-[52px]" />
-          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
-            Sign in to Atlas
-          </h1>
+          <div className="mb-8 flex items-center justify-center gap-2.5">
+            <AtlasLogo size={40} className="size-10" />
+            <span className="text-3xl font-semibold tracking-tight text-neutral-900">Atlas</span>
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Welcome back</h1>
           <p className="mt-1.5 text-sm text-neutral-500">
             Use your Google account to continue to your workspace.
           </p>
