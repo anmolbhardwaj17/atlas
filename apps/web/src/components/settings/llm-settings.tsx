@@ -267,7 +267,7 @@ export function LlmSettingsCard({
         </div>
 
         <div className="flex items-center gap-2">
-          <Button onClick={() => void save()} disabled={busy} size="sm">
+          <Button onClick={() => void save()} disabled={busy || !apiKey.trim()} size="sm">
             {busy ? (
               <>
                 <Loader2 className="size-4 animate-spin" />

@@ -66,22 +66,26 @@ export function SettingsView({
         <p className="text-sm text-muted-foreground">Manage your organization, team, and access.</p>
       </div>
 
-      <ProfileCard name={name} email={email} avatarUrl={avatarUrl} />
+      {/* Profile + Organization sit side by side on wider screens, stretched to equal height
+          (grid's default align-items: stretch) so they stay level even while editing. */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <ProfileCard name={name} email={email} avatarUrl={avatarUrl} />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building2 className="size-4" /> Organization
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="space-y-2 text-sm">
-            <Row label="Name" value={orgName} />
-            <Row label="Organization ID" value={orgId} mono />
-            <Row label="Your role" value={role} />
-          </dl>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="size-4" /> Organization
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="space-y-2 text-sm">
+              <Row label="Name" value={orgName} />
+              <Row label="Organization ID" value={orgId} mono />
+              <Row label="Your role" value={role} />
+            </dl>
+          </CardContent>
+        </Card>
+      </div>
 
       {isAdmin ? <NotificationsSettingsCard orgId={orgId} initial={notify} /> : null}
       {isAdmin ? <LlmSettingsCard orgId={orgId} initial={llm} /> : null}
