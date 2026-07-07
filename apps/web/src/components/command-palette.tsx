@@ -15,6 +15,29 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { searchNodes, type SearchHit } from "@/lib/browser-api";
+import { kindIcon, kindStyle, kindShort, KIND_LOGO } from "@/lib/kind-visual";
+import { CloudIcon } from "@/components/cloud-icon";
+import { cn } from "@/lib/cn";
+
+/** Support-data kinds are not navigable estate - they live in Insights/Explore-by-kind, not
+ *  the command palette (so "map" surfaces the Map page, not an axios CVE). */
+const PALETTE_HIDE = /^(external\.package|security\.vulnerability|aws\.logs\.group)$/;
+
+/** Real per-kind icon in a category-tinted chip - the same visual language as the map/Explore. */
+function ResourceIcon({ kind }: { kind: string }) {
+  const logo = KIND_LOGO[kind];
+  const Icon = kindIcon(kind);
+  return (
+    <span
+      className={cn(
+        "grid size-6 shrink-0 place-items-center rounded-md",
+        logo ? "bg-muted/60" : kindStyle(kind),
+      )}
+    >
+      {logo ? <CloudIcon name={logo} className="size-4" /> : <Icon className="size-3.5" />}
+    </span>
+  );
+}
 
 /**
  * ⌘K command palette (docs/09 §5.5). Not just resource search - a keyboard-first launcher
@@ -34,7 +57,15 @@ const NAV: Array<{ label: string; href: string; icon: LucideIcon; keywords: stri
 
 type Item =
   | { type: "nav"; key: string; label: string; href: string; icon: LucideIcon; group: string }
-  | { type: "resource"; key: string; label: string; sub: string; href: string; group: string }
+  | {
+      type: "resource";
+      key: string;
+      label: string;
+      sub: string;
+      kind: string;
+      href: string;
+      group: string;
+    }
   | { type: "ask"; key: string; label: string; href: string; group: string };
 
 export function CommandPalette({ orgId }: { orgId: string }) {
@@ -92,46 +123,58 @@ export function CommandPalette({ orgId }: { orgId: string }) {
     };
   }, [q, open, orgId]);
 
-  // Compose the unified, grouped item list: Resources → Ask Atlas → Go to.
+  // Compose the unified, grouped item list. Ordering adapts to intent: when the query clearly
+  // names a PAGE (a nav label starts with it, e.g. "map"→Map), "Go to" leads; otherwise
+  // resources lead. Support-data kinds (packages/CVEs/logs) are filtered out so navigation
+  // queries aren't buried under CVE noise.
   const items = useMemo<Item[]>(() => {
     const term = q.trim();
-    const out: Item[] = [];
-    if (term.length >= 2) {
-      for (const h of hits) {
-        out.push({
-          type: "resource",
-          key: `r:${h.node.id}`,
-          label: h.node.name ?? h.node.id.slice(0, 8),
-          sub: h.node.kind,
-          href: `/explore/${h.node.id}`,
-          group: "Resources",
-        });
-      }
-    }
-    if (term.length >= 3) {
-      out.push({
-        type: "ask",
-        key: "ask",
-        label: `Ask Atlas: “${term}”`,
-        href: `/ask?q=${encodeURIComponent(term)}`,
-        group: "Ask Atlas",
-      });
-    }
     const lower = term.toLowerCase();
-    const nav = term
-      ? NAV.filter((n) => `${n.label} ${n.keywords}`.toLowerCase().includes(lower))
-      : NAV;
-    for (const n of nav) {
-      out.push({
-        type: "nav",
-        key: `n:${n.href}`,
-        label: n.label,
-        href: n.href,
-        icon: n.icon,
-        group: "Go to",
-      });
-    }
-    return out;
+
+    const navGroup: Item[] = (
+      term ? NAV.filter((n) => `${n.label} ${n.keywords}`.toLowerCase().includes(lower)) : NAV
+    ).map((n) => ({
+      type: "nav" as const,
+      key: `n:${n.href}`,
+      label: n.label,
+      href: n.href,
+      icon: n.icon,
+      group: "Go to",
+    }));
+
+    const resourceGroup: Item[] =
+      term.length >= 2
+        ? hits
+            .filter((h) => !PALETTE_HIDE.test(h.node.kind))
+            .map((h) => ({
+              type: "resource" as const,
+              key: `r:${h.node.id}`,
+              label: h.node.name ?? h.node.id.slice(0, 8),
+              sub: kindShort(h.node.kind),
+              kind: h.node.kind,
+              href: `/explore/${h.node.id}`,
+              group: "Resources",
+            }))
+        : [];
+
+    const askGroup: Item[] =
+      term.length >= 3
+        ? [
+            {
+              type: "ask" as const,
+              key: "ask",
+              label: `Ask Atlas: “${term}”`,
+              href: `/ask?q=${encodeURIComponent(term)}`,
+              group: "Ask Atlas",
+            },
+          ]
+        : [];
+
+    // Strong page match → navigation leads (typing "map" should default to the Map page).
+    const strongNav = term.length >= 2 && NAV.some((n) => n.label.toLowerCase().startsWith(lower));
+    return strongNav
+      ? [...navGroup, ...resourceGroup, ...askGroup]
+      : [...resourceGroup, ...askGroup, ...navGroup];
   }, [q, hits]);
 
   // Keep the active index in range as the list changes.
@@ -209,11 +252,15 @@ export function CommandPalette({ orgId }: { orgId: string }) {
                     }`}
                   >
                     {item.type === "nav" ? (
-                      <item.icon size={15} className="shrink-0 text-muted-foreground" />
+                      <span className="grid size-6 shrink-0 place-items-center">
+                        <item.icon size={15} className="text-muted-foreground" />
+                      </span>
                     ) : item.type === "ask" ? (
-                      <Sparkles size={15} className="shrink-0 text-primary" />
+                      <span className="grid size-6 shrink-0 place-items-center rounded-md bg-primary/10">
+                        <Sparkles size={14} className="text-primary" />
+                      </span>
                     ) : (
-                      <Boxes size={15} className="shrink-0 text-muted-foreground" />
+                      <ResourceIcon kind={item.kind} />
                     )}
                     <span className="min-w-0 flex-1 truncate text-foreground">{item.label}</span>
                     {item.type === "resource" ? (
