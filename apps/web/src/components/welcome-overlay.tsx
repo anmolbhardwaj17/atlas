@@ -5,69 +5,96 @@ import { cn } from "@/lib/cn";
 import { AtlasLogo } from "@/components/brand";
 
 /**
- * A one-shot welcome that greets you on the way into the app, then dismisses itself. It sits on a
- * blurred backdrop and, on exit, both the blur and the card fade away to smoothly reveal the page
- * behind (e.g. the dashboard). Purely presentational + self-timing; the parent unmounts it via
- * `onDone`.
+ * A one-shot welcome that greets you on the way into the app, then dismisses itself. The
+ * background blur eases in first; the green blob + greeting fade in over it; then everything
+ * (blur, blob, text) fades out together to smoothly reveal the page behind. Self-timing; the
+ * parent unmounts it via `onDone`.
  */
 export function WelcomeOverlay({
   name,
   onDone,
-  holdMs = 2400,
+  holdMs = 3500,
 }: {
   name?: string | null;
   onDone?: () => void;
   /** How long the greeting stays fully visible before it starts revealing the page. */
   holdMs?: number;
 }) {
-  const [entered, setEntered] = React.useState(false);
-  const [leaving, setLeaving] = React.useState(false);
+  const [blurIn, setBlurIn] = React.useState(false);
+  const [contentIn, setContentIn] = React.useState(false);
 
   React.useEffect(() => {
-    const t0 = setTimeout(() => setEntered(true), 20); // trigger the enter transition
-    const t1 = setTimeout(() => setLeaving(true), holdMs); // begin the reveal
-    const t2 = setTimeout(() => onDone?.(), holdMs + 750); // unmount after the reveal finishes
+    const t0 = setTimeout(() => setBlurIn(true), 20); // blur eases in first
+    const t1 = setTimeout(() => setContentIn(true), 450); // then the blob + greeting
+    const t2 = setTimeout(() => {
+      // fade everything out together
+      setContentIn(false);
+      setBlurIn(false);
+    }, holdMs);
+    const t3 = setTimeout(() => onDone?.(), holdMs + 750); // unmount after the reveal
     return () => {
       clearTimeout(t0);
       clearTimeout(t1);
       clearTimeout(t2);
+      clearTimeout(t3);
     };
   }, [holdMs, onDone]);
 
-  const active = entered && !leaving;
   const firstName = name?.trim().split(/\s+/)[0];
+
+  // Blur strongest at the center, fading to none at the edges (Chrome-friendly; -webkit for Safari).
+  const CENTER_FADE = "radial-gradient(circle at center, black 0%, black 46%, transparent 86%)";
 
   return (
     <div
       className={cn(
-        "fixed inset-0 z-[100] flex items-center justify-center transition-all duration-700 ease-out",
-        active
-          ? "bg-background/40 opacity-100 backdrop-blur-xl"
-          : "pointer-events-none bg-background/0 opacity-0 backdrop-blur-0",
+        "fixed inset-0 z-[100] flex items-center justify-center",
+        blurIn ? "" : "pointer-events-none",
       )}
       aria-live="polite"
     >
-      {/* Soft faded blob behind the card so a white card still reads on a white page. */}
-      <span
+      {/* 1) Center-focused gaussian blur - eases in first. */}
+      <div
         aria-hidden
-        className="pointer-events-none absolute left-1/2 top-1/2 size-[620px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/[0.06] blur-3xl"
+        className={cn(
+          "absolute inset-0 backdrop-blur-3xl transition-opacity duration-700 ease-out",
+          blurIn ? "opacity-100" : "opacity-0",
+        )}
+        style={{ WebkitMaskImage: CENTER_FADE, maskImage: CENTER_FADE }}
       />
 
+      {/* 2) Two organic green blobs orbiting the center as the wrapper rotates - fade in after the
+             blur, and heavily blurred so they read as a soft living light. */}
       <div
+        aria-hidden
         className={cn(
-          "relative flex flex-col items-center rounded-2xl border border-border bg-card px-10 py-9 text-center shadow-2xl transition-all duration-500 ease-out",
-          active ? "translate-y-0 scale-100 opacity-100" : "translate-y-2 scale-95 opacity-0",
+          "pointer-events-none absolute inset-0 transition-opacity duration-700 ease-out",
+          contentIn ? "opacity-100" : "opacity-0",
         )}
       >
-        {/* Atlas app mark. */}
-        <div className="mb-4 grid size-16 place-items-center">
-          <AtlasLogo size={56} className="size-14 drop-shadow" />
+        <div className="absolute inset-0 m-auto size-[700px] motion-safe:animate-[spin_13s_linear_infinite]">
+          <div className="absolute left-1/2 top-1/2 size-[440px] -translate-x-[64%] -translate-y-[58%] rounded-[46%_54%_63%_37%/52%_44%_56%_48%] bg-[#1f6b4a] blur-[80px]" />
+          <div className="absolute left-1/2 top-1/2 size-[440px] -translate-x-[36%] -translate-y-[42%] rounded-[58%_42%_45%_55%/48%_57%_43%_52%] bg-[#17553c] blur-[80px]" />
         </div>
+      </div>
 
-        <h2 className="text-xl font-semibold tracking-tight">
+      {/* 3) The greeting - fades in with the blob, out with everything else. */}
+      <div
+        className={cn(
+          "relative flex flex-col items-center text-center transition-all duration-700 ease-out",
+          contentIn ? "translate-y-0 scale-100 opacity-100" : "translate-y-1 scale-95 opacity-0",
+        )}
+      >
+        <div className="mb-6 grid place-items-center">
+          <AtlasLogo
+            size={96}
+            className="size-24 [filter:invert(1)_drop-shadow(0_6px_18px_rgba(0,0,0,0.4))]"
+          />
+        </div>
+        <h2 className="text-2xl font-semibold tracking-tight text-white [text-shadow:0_2px_16px_rgba(0,0,0,0.35)]">
           {firstName ? `Welcome, ${firstName}` : "Welcome to Atlas"}
         </h2>
-        <p className="mt-1.5 max-w-xs text-sm text-muted-foreground">
+        <p className="mt-2 max-w-xs text-sm text-white/80 [text-shadow:0_2px_16px_rgba(0,0,0,0.3)]">
           Your workspace is ready. Taking you in…
         </p>
       </div>
