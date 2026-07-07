@@ -23,7 +23,7 @@ interface ProviderCfg {
 
 // Curated per provider. OpenRouter model ids are VERIFIED against the live catalogue + a real
 // completion (openrouter.ai/models). NOTE: OpenRouter's $0 `:free` models are heavily rate-limited
-// and often return empty/429 — deliberately not offered here; the low-cost ones are pennies + reliable.
+// and often return empty/429 - deliberately not offered here; the low-cost ones are pennies + reliable.
 const PROVIDERS: ProviderCfg[] = [
   {
     id: "openrouter",
@@ -98,8 +98,8 @@ const SELECT_CLASS =
   "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
 /**
- * BYO-LLM: point Ask AI at your own model (docs/10 §3). Pick a provider — OpenRouter (one key,
- * any model incl. free), OpenAI, or Anthropic — paste that provider's key + pick a model. On save
+ * BYO-LLM: point Ask AI at your own model (docs/10 §3). Pick a provider - OpenRouter (one key,
+ * any model incl. free), OpenAI, or Anthropic - paste that provider's key + pick a model. On save
  * we run a live test call and only store on success. The key is encrypted server-side and never
  * shown again. Admin-only. Without this, Ask AI uses the platform default.
  */

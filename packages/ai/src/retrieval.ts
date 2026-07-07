@@ -1,6 +1,6 @@
 /**
  * Retrieval orchestration (docs/10 §4.3). Executes a RetrievalPlan against the (bounded,
- * org-scoped) RetrievalPort — deterministic graph traversals are the primary source
+ * org-scoped) RetrievalPort - deterministic graph traversals are the primary source
  * (AE-4). The result feeds the context builder + grounding gate. Nothing here calls the
  * LLM; retrieval happens BEFORE narration (retrieval-first pipeline).
  */
@@ -64,7 +64,7 @@ export async function orchestrate(
   switch (plan.intent) {
     case "blast_radius":
     case "dependents":
-      // "what breaks if X" / "what depends on X" — inbound impact closure (docs/05 §7.2).
+      // "what breaks if X" / "what depends on X" - inbound impact closure (docs/05 §7.2).
       result.traversal = await port.blastRadius(orgId, top.id, {});
       break;
     case "deploy_mapping":

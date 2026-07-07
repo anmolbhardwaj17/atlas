@@ -1,13 +1,13 @@
 /**
  * Retrieval tool registry (docs/plans/ai-knowledge-engine-p1-design §5, DD-P1-4). The agentic
- * loop lets the LLM gather grounded context by calling these — a SMALL, typed, read-only,
+ * loop lets the LLM gather grounded context by calling these - a SMALL, typed, read-only,
  * org-scoped, BOUNDED surface over the RetrievalPort (never the open world, A41/AE-7). Each tool:
  *   - advertises a JSON-schema `ToolSpec` to the model,
- *   - clamps its inputs server-side (never trusts model numbers — AIR-7),
+ *   - clamps its inputs server-side (never trusts model numbers - AIR-7),
  *   - returns a `ToolOutcome`: a compact `summary` for the model + structured, citable facts for
  *     the ContextAccumulator (so citation binding stays deterministic no matter how many hops).
  *
- * This is also the exact surface we later publish as MCP (docs/10 §12) — one design, two consumers.
+ * This is also the exact surface we later publish as MCP (docs/10 §12) - one design, two consumers.
  */
 import type {
   EstateOverview,

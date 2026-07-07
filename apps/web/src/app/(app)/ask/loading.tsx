@@ -1,7 +1,7 @@
 /**
  * Route-specific loading fallback for Ask Atlas (`/ask` and `/ask/[chatId]`, since this is the
- * shared parent loader). Mirrors the chat workspace — a recent-conversations sidebar plus a message
- * area and pinned input — so navigation shows a matching skeleton, not a blank wait.
+ * shared parent loader). Mirrors the chat workspace - a recent-conversations sidebar plus a message
+ * area and pinned input - so navigation shows a matching skeleton, not a blank wait.
  */
 import { Skeleton } from "@/components/ui/skeleton";
 

@@ -114,8 +114,8 @@ export function buildLayout(mapNodes: MapNode[], mapEdges: MapEdge[]): LayoutRes
     cursorY = shelfY + shelfH;
   };
 
-  addShelf("shelf-code", "Repositories — no infrastructure link found yet", codeShelf);
-  addShelf("shelf-unconnected", "Infrastructure — no observed connections yet", infraShelf);
+  addShelf("shelf-code", "Repositories - no infrastructure link found yet", codeShelf);
+  addShelf("shelf-unconnected", "Infrastructure - no observed connections yet", infraShelf);
 
   // "Flow" edges carry traffic/data → animate them so the map feels alive; structural edges
   // (CONTAINS/OWNED_BY/…) stay static so the motion means something.

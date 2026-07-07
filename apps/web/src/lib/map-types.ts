@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import { ENV_STYLE, PROVIDER_META } from "./taxonomy";
 
 /** Shapes returned by GET /graph (mirrors the API's GraphNodeDto / GraphEdgeLite). */
-/** Point-in-time runtime health (operational-intelligence Phase B). Absent = unknown —
+/** Point-in-time runtime health (operational-intelligence Phase B). Absent = unknown -
  *  a designed state: we say "not checked", we never fake green (docs/09 §7). */
 export interface NodeHealth {
   state: "healthy" | "degraded" | "unhealthy";

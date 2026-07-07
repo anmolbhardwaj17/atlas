@@ -1,5 +1,5 @@
 /**
- * Claude LLM provider (docs/10 §3, A40) — the production narrator. Thin adapter over the
+ * Claude LLM provider (docs/10 §3, A40) - the production narrator. Thin adapter over the
  * Anthropic SDK: maps our provider-agnostic CompleteRequest → a streamed messages call
  * and the SDK's stream events → our LLMEvent union. Not unit-tested (needs a live key);
  * the MockLLMProvider covers the engine logic. Model + key are per-env config.

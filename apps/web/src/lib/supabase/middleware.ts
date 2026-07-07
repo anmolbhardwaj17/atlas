@@ -33,7 +33,7 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   try {
     await supabase.auth.getUser();
   } catch {
-    // Swallow — a reachability failure is not an auth decision. Downstream guards handle no-session.
+    // Swallow - a reachability failure is not an auth decision. Downstream guards handle no-session.
   }
   return response;
 }

@@ -1,10 +1,10 @@
 /**
  * Query planner (docs/10 §4.2, DD-2). Maps a question → a typed retrieval plan biased
- * toward deterministic graph traversals — keeping the expensive/critical retrieval bounded
+ * toward deterministic graph traversals - keeping the expensive/critical retrieval bounded
  * and the canonical questions reliable (they map to fixed plans). Intent classification is
  * rule-based (deterministic, testable); entity mentions are resolved to node ids via the
  * RetrievalPort's search. Ambiguous mentions yield multiple candidates (never silently pick
- * one — P3); the answer pipeline disambiguates or narrates over candidates with citations.
+ * one - P3); the answer pipeline disambiguates or narrates over candidates with citations.
  */
 import type { RetrievalPort, SearchHit } from "./retrieval-port";
 
@@ -39,17 +39,17 @@ export interface RetrievalPlan {
 const OUT_OF_SCOPE =
   /\b(capital of|the weather|meaning of life|who is the|tell me a joke|write me|president|stock price)\b/i;
 
-// Pleasantries / conversational filler — the whole message is a greeting/thanks/etc. (anchored so
+// Pleasantries / conversational filler - the whole message is a greeting/thanks/etc. (anchored so
 // "thanks, who owns X" is still treated as the real question). Answered warmly, no graph search.
 const SMALLTALK =
   /^\s*(hi+|hey+|hello+|hola|yo|sup|howdy|thanks?|thank you|thankyou|thx|ty|cheers|appreciate (it|you|that)|nice|cool|great|awesome|amazing|perfect|brilliant|ok(ay)?|k|got it|gotcha|understood|good (morning|afternoon|evening|night)|how are you|how'?s it going|what'?s up|whats up|good job|well done|bye|goodbye|see (ya|you)|later)\b[\s!.?]*$/i;
 
-/** A warm, non-graph reply for pleasantries (greetings/thanks/etc.) — keeps Atlas friendly instead
+/** A warm, non-graph reply for pleasantries (greetings/thanks/etc.) - keeps Atlas friendly instead
  *  of answering "I don't have that data" to "thank you". */
 export function smalltalkReply(question: string): string {
   const q = question.toLowerCase();
   if (/\b(thank|thanks|thx|ty|cheers|appreciate)\b/.test(q))
-    return 'You\'re welcome! Happy to help. Ask me anything about your infrastructure, code, or deploys — like "who are the top contributors?" or "what should I fix first?"';
+    return 'You\'re welcome! Happy to help. Ask me anything about your infrastructure, code, or deploys - like "who are the top contributors?" or "what should I fix first?"';
   if (/\b(bye|goodbye|see (ya|you)|later)\b/.test(q))
     return "See you! I'll be right here whenever you want to understand your estate.";
   if (/\bhow (are|'?s)|how'?s it going|what'?s up|whats up|how are you\b/.test(q))
@@ -60,10 +60,10 @@ export function smalltalkReply(question: string): string {
     )
   )
     return "Glad that helped! Let me know what else you'd like to explore.";
-  return 'Hi! I\'m Atlas — your engineering intelligence assistant. Ask me anything about your infrastructure, code, or deploys, like "how many repositories do I have?" or "what needs attention?"';
+  return 'Hi! I\'m Atlas - your engineering intelligence assistant. Ask me anything about your infrastructure, code, or deploys, like "how many repositories do I have?" or "what needs attention?"';
 }
 
-/** Ordered rules — first match wins (docs/10 §4.2 intent table). */
+/** Ordered rules - first match wins (docs/10 §4.2 intent table). */
 const INTENT_RULES: Array<{ intent: Intent; re: RegExp }> = [
   {
     intent: "blast_radius",
@@ -290,7 +290,7 @@ export async function plan(
   const intent = classifyIntent(question);
   if (intent === "out_of_scope") return { intent, question };
   if (intent === "timeline") return { intent, question, window: { sinceDays: 7 } };
-  // Estate + advisory answer from the whole-org snapshot/findings — no entity to resolve.
+  // Estate + advisory answer from the whole-org snapshot/findings - no entity to resolve.
   if (intent === "estate" || intent === "advisory") return { intent, question };
 
   const entity = await resolveEntity(port, orgId, question);

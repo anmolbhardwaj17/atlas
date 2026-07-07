@@ -11,7 +11,7 @@ import { deleteConversation, type ConversationSummary } from "@/lib/browser-api"
  * are persisted and reopen with their cited turns; "New chat" starts fresh.
  *
  * Remount discipline: the chat's React `key` changes ONLY when the user explicitly opens a past
- * conversation or starts a new chat — NOT when the current chat creates its conversation mid-stream
+ * conversation or starts a new chat - NOT when the current chat creates its conversation mid-stream
  * (that just updates the sidebar). Otherwise a key change would remount the chat and drop the
  * in-flight answer.
  */
@@ -26,7 +26,7 @@ export function AskWorkspace({
   initialQuestion?: string | undefined;
   suggestions: string[];
   initialConversations: ConversationSummary[];
-  /** From the /ask/:chatId route — open this conversation on load. */
+  /** From the /ask/:chatId route - open this conversation on load. */
   initialConversationId?: string | undefined;
 }) {
   const [conversations, setConversations] = useState(initialConversations);
@@ -46,7 +46,7 @@ export function AskWorkspace({
     await deleteConversation(orgId, id);
   }
 
-  // Conversation row — highlighted in place when it's the one you're viewing (not pinned to top).
+  // Conversation row - highlighted in place when it's the one you're viewing (not pinned to top).
   // Right-click opens a small menu with Delete.
   const row = (c: ConversationSummary) => (
     <button
@@ -59,10 +59,10 @@ export function AskWorkspace({
       }}
       title={c.title ?? "Untitled"}
       className={cn(
-        "flex w-full items-center rounded-md px-2.5 py-1.5 text-left text-sm transition-colors",
+        "flex w-full items-center px-2.5 py-2 text-left text-sm transition-colors",
         highlightId === c.id
-          ? "bg-muted font-medium text-foreground"
-          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+          ? "font-medium text-foreground"
+          : "text-muted-foreground hover:text-foreground",
       )}
     >
       <span className="truncate">{c.title ?? "Untitled"}</span>
@@ -81,8 +81,8 @@ export function AskWorkspace({
     window.history.pushState(null, "", `/ask/${id}`);
   }
   // The current chat created its conversation: reflect it in the sidebar + highlight + URL, but
-  // DON'T touch conversationId/epoch — the chat stays mounted so its streaming answer survives.
-  // (replaceState updates the address bar via the history API only — no React re-render/remount.)
+  // DON'T touch conversationId/epoch - the chat stays mounted so its streaming answer survives.
+  // (replaceState updates the address bar via the history API only - no React re-render/remount.)
   function onCreated(id: string, title: string) {
     setConversations((prev) => [{ id, title, createdAt: "" }, ...prev.filter((c) => c.id !== id)]);
     setHighlightId(id);
@@ -179,7 +179,7 @@ export function AskWorkspace({
               Recent
             </span>
           </div>
-          <div className="flex-1 space-y-0.5 overflow-y-auto">
+          <div className="flex-1 divide-y divide-border/60 overflow-y-auto">
             {conversations.length === 0 ? (
               <p className="px-2 py-4 text-xs text-muted-foreground">No conversations yet.</p>
             ) : (

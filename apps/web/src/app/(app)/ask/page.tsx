@@ -18,7 +18,7 @@ interface SummaryLite {
   insights: { mostActiveRepos: Array<{ name: string }> };
 }
 
-/** Suggested questions grounded in what's actually connected — so the empty state fits a code
+/** Suggested questions grounded in what's actually connected - so the empty state fits a code
  *  estate, an infra estate, or both, instead of showing irrelevant examples. */
 function suggestions(s: SummaryLite | undefined): string[] {
   if (!s) return [];

@@ -1,5 +1,5 @@
 /**
- * The answer pipeline (docs/10 §4.6–§4.7, §5–§7). Orchestrates plan → retrieve → gate →
+ * The answer pipeline (docs/10 §4.6-§4.7, §5-§7). Orchestrates plan → retrieve → gate →
  * narrate (LLM) → deterministic post-process. The generative step is bounded on both
  * sides: the grounding gate (L1) runs BEFORE it, and the citation engine (L4/DD-5) +
  * uncited-claim detector (L5) + confidence scorer (§5) run AFTER it. The model is a
@@ -20,12 +20,12 @@ import { retrievalLoop, collectLoop } from "./loop";
 /**
  * Router (DD-P1-2): open-ended intents go through the agentic tool-loop when the provider can
  * plan with tools; canonical intents keep their fast deterministic path (unchanged). The mock
- * provider (dev/CI) always uses the fast path — the loop needs a real tool-calling model.
+ * provider (dev/CI) always uses the fast path - the loop needs a real tool-calling model.
  */
 // culprit joins the loop (Phase D): diagnose + get_pr_diff do the multi-hop tracing.
 const AGENTIC_INTENTS = new Set<Intent>(["lookup", "architecture", "culprit"]);
 const NO_MATCH =
-  "I searched your graph but couldn't find anything matching that — it may not be connected, or it's named differently.";
+  "I searched your graph but couldn't find anything matching that - it may not be connected, or it's named differently.";
 function agenticRoute(question: string, llm: LLMProvider): Intent | null {
   const intent = classifyIntent(question);
   return AGENTIC_INTENTS.has(intent) && llm.name !== "mock" ? intent : null;
@@ -65,7 +65,7 @@ type Prepared =
       grounded: true;
       intent: Intent;
       built: BuiltContext;
-      /** Narrator system prompt — the closed-context narrator, or the advisory narrator (P2). */
+      /** Narrator system prompt - the closed-context narrator, or the advisory narrator (P2). */
       system: string;
       /** Advisory answers are recommendations → the `advisory` confidence tier, not a fact tier. */
       advisory: boolean;

@@ -3,8 +3,8 @@ import { cn } from "@/lib/cn";
 
 /**
  * Brand marks. Two distinct assets, used deliberately (docs/09):
- * - `AtlasLogo`   — the geometric globe. The product/company mark: sidebar, login, favicon.
- * - `AtlasAiMark` — the green gradient sphere. The AI interface (P1): Ask AI everywhere.
+ * - `AtlasLogo`   - the geometric globe. The product/company mark: sidebar, login, favicon.
+ * - `AtlasAiMark` - the green gradient sphere. The AI interface (P1): Ask AI everywhere.
  * Both are square PNGs in /public; pass a Tailwind size via `className` (e.g. `size-8`).
  */
 export function AtlasLogo({

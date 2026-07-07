@@ -1,6 +1,6 @@
 /**
  * Retrieval contract (docs/10 §4.3). The AI engine reads the graph ONLY through this
- * port — the API implements it over the G2 GraphService + SearchProvider (docs/08 §9,
+ * port - the API implements it over the G2 GraphService + SearchProvider (docs/08 §9,
  * docs/11). Keeping the engine behind a port makes it NestJS-free and unit-testable with
  * a fake port, and keeps retrieval the authoritative, org-scoped, bounded source (AE-4/AE-7).
  * Every operation is org-scoped; the engine never sees another tenant's data (R8).
@@ -85,8 +85,8 @@ export interface TraversalOpts {
 }
 
 /**
- * A whole-org aggregate snapshot (docs/plans/ai-knowledge-engine — P0 estate slice). These are
- * COMPUTED facts (counts/rankings over many nodes), not single graph nodes — the context builder
+ * A whole-org aggregate snapshot (docs/plans/ai-knowledge-engine - P0 estate slice). These are
+ * COMPUTED facts (counts/rankings over many nodes), not single graph nodes - the context builder
  * cites them as computed facts, not to one node id. Reuses the dashboard summary aggregation
  * (GraphService.summary), so Ask AI and the dashboard agree by construction.
  */
@@ -110,7 +110,7 @@ export interface EstateOverview {
   topContributors: Array<{ name: string; count: number }>;
   mostActiveRepos: Array<{ name: string; count: number }>;
   pipelineCoverage: { withPipeline: number; total: number };
-  /** Cloud-infrastructure breakdown by kind (count + example names + live health) — so
+  /** Cloud-infrastructure breakdown by kind (count + example names + live health) - so
    *  "tell me about my AWS infra" answers from real inventory, not a bare cloud count. */
   infrastructure: Array<{ kind: string; count: number; names: string[]; notHealthy: number }>;
   /** "Needs attention" facts the graph proves. `category` keys into the advisory knowledge pack. */

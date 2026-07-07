@@ -6,7 +6,7 @@ import { Send, Check, Square } from "lucide-react";
 import dynamic from "next/dynamic";
 import { AtlasAiMark } from "@/components/brand";
 
-// LiquidMetal is a WebGL shader — client-only (no SSR), lazy-loaded so it never blocks paint.
+// LiquidMetal is a WebGL shader - client-only (no SSR), lazy-loaded so it never blocks paint.
 const LiquidMetal = dynamic(
   () => import("@paper-design/shaders-react").then((m) => m.LiquidMetal),
   { ssr: false },
@@ -94,7 +94,7 @@ export function AskChat({
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   // True while a reopened conversation's turns are being fetched (show a skeleton, not the
-  // empty state) — fixes the "click a chat → blank flash → answer pops in" jank.
+  // empty state) - fixes the "click a chat → blank flash → answer pops in" jank.
   const [loadingConversation, setLoadingConversation] = useState<boolean>(!!conversationId);
   const convoRef = useRef<string | null>(conversationId ?? null);
   const autoAsked = useRef(false);
@@ -369,7 +369,7 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
           </div>
         ) : message.text.length === 0 && !message.streaming ? (
           <p className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
-            The model returned no answer — it may be rate-limited or unavailable. Try a different
+            The model returned no answer - it may be rate-limited or unavailable. Try a different
             model in Settings.
           </p>
         ) : (
@@ -404,7 +404,7 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
 }
 
 /**
- * Render the model's light markdown inline — **bold**, `code`, and citation markers ([A1]/[N2]/…)
+ * Render the model's light markdown inline - **bold**, `code`, and citation markers ([A1]/[N2]/…)
  * as small clickable superscript numbers tied to the exact claim (the "proper" way to cite, à la
  * Perplexity). Incomplete markers mid-stream stay literal; a marker with no resolved citation yet
  * (citations arrive after the tokens) is hidden until it resolves.
@@ -486,7 +486,7 @@ function TypewriterText({
 
 /**
  * Quiet trust line (replaces the loud badge + floating chip row): a small colored dot + label, and
- * a subtle source count. The brand green appears only as the tiny "observed" dot — not a full pill.
+ * a subtle source count. The brand green appears only as the tiny "observed" dot - not a full pill.
  */
 const TRUST_FALLBACK = { dot: "bg-muted-foreground", label: "No grounded data" };
 const TRUST: Record<string, { dot: string; label: string }> = {
@@ -513,7 +513,7 @@ function TrustHint({ tier, sources }: { tier: string; sources: number }) {
   );
 }
 
-/** Placeholder while a reopened conversation's turns are fetched — a question + answer shimmer. */
+/** Placeholder while a reopened conversation's turns are fetched - a question + answer shimmer. */
 function ConversationSkeleton() {
   return (
     <div className="space-y-5" aria-label="Loading conversation" aria-busy="true">
@@ -553,14 +553,14 @@ function EmptyState({
   return (
     // Centered, vertically-middle welcome: the liquid-metal Atlas mark leads, then the
     // pitch, then the suggestion prompts.
-    <div className="flex h-full flex-col items-center justify-center gap-6 py-8 text-center">
-      <div className="flex flex-col items-center gap-3">
+    <div className="flex h-full flex-col items-center justify-center gap-6 pb-28 pt-8 text-center">
+      <div className="flex flex-col items-center gap-1">
         <LiquidMark />
         <div>
-          <h2 className="text-xl font-semibold text-foreground">Ask Atlas</h2>
+          <h2 className="text-3xl font-semibold text-foreground">Ask Atlas</h2>
           <p className="mx-auto mt-1.5 max-w-md text-sm text-muted-foreground">
             Ask about your infrastructure, code, and deploys. Every answer is grounded in your graph
-            — cited, confidence-tiered, and honest when it doesn’t know.
+            - cited, confidence-tiered, and honest when it doesn’t know.
           </p>
         </div>
       </div>
@@ -583,24 +583,31 @@ function EmptyState({
  *  AI mark until the shader lib loads so the hero never flashes empty. */
 function LiquidMark() {
   return (
-    <div className="grid size-[280px] place-items-center">
-      <LiquidMetal
-        width={280}
-        height={280}
-        image="/atlas-ai.png"
-        colorBack="#ffffff"
-        colorTint="#35ab5e"
-        repetition={2}
-        softness={0.1}
-        shiftRed={0.3}
-        shiftBlue={0.3}
-        distortion={0.07}
-        contour={0.4}
-        angle={70}
-        speed={1}
-        scale={0.6}
-        fit="contain"
+    <div className="relative grid size-[280px] place-items-center">
+      {/* Soft green glow behind the mark. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute size-44 rounded-full bg-[#70ff7a] opacity-40 blur-3xl"
       />
+      <div className="[filter:drop-shadow(0_14px_30px_rgba(112,255,122,0.45))]">
+        <LiquidMetal
+          width={280}
+          height={280}
+          image="/atlas-ai.png"
+          colorBack="#00000000"
+          colorTint="#70ff7a"
+          repetition={2}
+          softness={0.1}
+          shiftRed={0.3}
+          shiftBlue={0.3}
+          distortion={0.07}
+          contour={0.4}
+          angle={70}
+          speed={1}
+          scale={0.82}
+          fit="contain"
+        />
+      </div>
     </div>
   );
 }

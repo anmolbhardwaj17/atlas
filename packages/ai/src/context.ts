@@ -179,13 +179,13 @@ export function buildContext(orgId: string, result: RetrievalResult): BuiltConte
     );
   }
 
-  const sections: string[] = [`[CONTEXT — org:${orgId} — these are the ONLY facts you may use]`];
+  const sections: string[] = [`[CONTEXT - org:${orgId} - these are the ONLY facts you may use]`];
   if (nodeLines.length) sections.push("NODES:", ...nodeLines);
   if (edgeLines.length) sections.push("EDGES:", ...edgeLines);
   if (timelineLines.length) sections.push("CHANGES:", ...timelineLines);
   if (estateLines.length)
     sections.push(
-      "ESTATE OVERVIEW (aggregate facts computed from your synced graph — state these figures directly and cite the marker):",
+      "ESTATE OVERVIEW (aggregate facts computed from your synced graph - state these figures directly and cite the marker):",
       ...estateLines,
     );
   if (notes.length) sections.push("FRESHNESS:", ...notes.map((n) => `  ${n}`));
@@ -202,7 +202,7 @@ export function buildContext(orgId: string, result: RetrievalResult): BuiltConte
 /**
  * Advisory context (P2): the graph's FINDINGS as cited facts (computed `A`-markers) + the knowledge
  * pack's GUIDANCE as clearly-separated reference for recommendations. The narrator (ADVISORY_SYSTEM)
- * turns each cited finding into a labelled recommendation — facts stay cited, advice stays advice.
+ * turns each cited finding into a labelled recommendation - facts stay cited, advice stays advice.
  */
 export function buildAdvisoryContext(orgId: string, estate: EstateOverview): BuiltContext {
   const cites: Cite[] = [];
@@ -219,7 +219,7 @@ export function buildAdvisoryContext(orgId: string, estate: EstateOverview): Bui
       confidence: "observed",
     });
     findingLines.push(
-      `  ${marker} (cite:finding) [${f.severity}] ${f.title}${f.count !== undefined ? ` (${f.count})` : ""} — category: ${f.category}`,
+      `  ${marker} (cite:finding) [${f.severity}] ${f.title}${f.count !== undefined ? ` (${f.count})` : ""} - category: ${f.category}`,
     );
     const cat = f.category.toLowerCase();
     if (!seenCats.has(cat)) {
@@ -227,24 +227,24 @@ export function buildAdvisoryContext(orgId: string, estate: EstateOverview): Bui
       const g = guidanceFor(f.category);
       if (g) {
         guidanceLines.push(
-          `  ${f.category} [${g.pillar}] — why: ${g.why} fix: ${g.fix} (source: ${g.source})`,
+          `  ${f.category} [${g.pillar}] - why: ${g.why} fix: ${g.fix} (source: ${g.source})`,
         );
       }
     }
   });
 
-  const sections: string[] = [`[CONTEXT — org:${orgId} — these are the ONLY facts you may use]`];
+  const sections: string[] = [`[CONTEXT - org:${orgId} - these are the ONLY facts you may use]`];
   if (findingLines.length) {
     sections.push(
-      "FINDINGS (issues the graph proves — these are FACTS; cite the marker):",
+      "FINDINGS (issues the graph proves - these are FACTS; cite the marker):",
       ...findingLines,
     );
   } else {
-    sections.push("FINDINGS: none — the graph does not currently flag any issues.");
+    sections.push("FINDINGS: none - the graph does not currently flag any issues.");
   }
   if (guidanceLines.length) {
     sections.push(
-      "GUIDANCE (best-practice reference for your recommendations — NOT customer facts):",
+      "GUIDANCE (best-practice reference for your recommendations - NOT customer facts):",
       ...guidanceLines,
     );
   }

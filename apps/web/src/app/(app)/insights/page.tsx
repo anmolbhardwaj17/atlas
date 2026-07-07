@@ -45,7 +45,7 @@ const SEV_DOT: Record<string, string> = {
 };
 
 /**
- * Insights (Atlas Knowledge Engine) — the ADVISORY / action layer. Distinct from the dashboard
+ * Insights (Atlas Knowledge Engine) - the ADVISORY / action layer. Distinct from the dashboard
  * (status glance): this is where you come to *improve*. Every grounded finding is paired with the
  * knowledge pack's guidance (why it matters / how to fix / source) and opens an Ask Atlas advisory
  * thread. Action‑framed, prioritised by severity.
@@ -69,12 +69,12 @@ export default async function InsightsPage() {
       <header className="space-y-1">
         <h1 className="text-xl font-semibold">Insights</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          What to act on — grounded findings with best‑practice guidance on how to fix and optimise.
+          What to act on - grounded findings with best‑practice guidance on how to fix and optimise.
           Recomputed live from your latest sync. Ask Atlas to go deeper on any of them.
         </p>
       </header>
 
-      {/* Action-framed summary strip (not a status dump — the dashboard covers status). */}
+      {/* Action-framed summary strip (not a status dump - the dashboard covers status). */}
       {summary && (summary.total > 0 || covGap > 0) ? (
         <div className="flex flex-wrap items-center gap-2">
           {summary.total > 0 ? (
@@ -105,13 +105,13 @@ export default async function InsightsPage() {
         </div>
       ) : null}
 
-      {/* The findings — the core of the advisory layer. */}
+      {/* The findings - the core of the advisory layer. */}
       {findings.length === 0 ? (
         <Card>
           <CardContent className="py-14 text-center">
             <AtlasAiMark size={28} className="mx-auto mb-3 size-7" />
             <p className="text-sm text-muted-foreground">
-              Nothing needs attention right now — the graph doesn&apos;t flag any issues.
+              Nothing needs attention right now - the graph doesn&apos;t flag any issues.
               You&apos;re in good shape.
             </p>
           </CardContent>

@@ -87,7 +87,7 @@ export function NotificationsSettingsCard({
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Get a Slack heads-up the moment a resource breaks, recovers, or gets exposed — plus a
+          Get a Slack heads-up the moment a resource breaks, recovers, or gets exposed - plus a
           short daily digest of what changed. Atlas already watches your estate; this is how it
           reaches you.
         </p>

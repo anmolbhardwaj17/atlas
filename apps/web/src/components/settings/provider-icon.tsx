@@ -22,7 +22,7 @@ export function ProviderIcon({ id, className }: { id: string; className?: string
       </svg>
     );
   }
-  // OpenRouter — a simple routing-fork mark (no official mark in our icon set).
+  // OpenRouter - a simple routing-fork mark (no official mark in our icon set).
   return (
     <svg
       viewBox="0 0 24 24"

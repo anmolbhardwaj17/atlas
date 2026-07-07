@@ -12,7 +12,7 @@ export async function getClientToken(): Promise<string | null> {
     data: { session },
   } = await supabase.auth.getSession();
   if (!session) return null;
-  // `getSession()` returns whatever is in storage — which can be an already-expired access token
+  // `getSession()` returns whatever is in storage - which can be an already-expired access token
   // (Supabase tokens live ~1h; a tab left open past that, or a backgrounded tab whose auto-refresh
   // timer didn't fire, holds a stale one). Sending an expired Bearer makes the API 401, which the
   // client surfaces as "Couldn't start a conversation." / empty search. Refresh proactively when
@@ -95,7 +95,7 @@ export interface ConnectionSummary {
   provider: string;
   displayName: string;
   status: string;
-  /** Sample/demo connection — not a real syncable source (skip in Fetch latest). */
+  /** Sample/demo connection - not a real syncable source (skip in Fetch latest). */
   demo?: boolean;
   /** Connector health from verify/sync probes - `missingPermissions` drives the degraded hint. */
   health?: { missingPermissions?: string[] };

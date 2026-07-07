@@ -27,7 +27,7 @@ export class MockLLMProvider implements LLMProvider {
     for (const event of this.responder(req)) yield event;
   }
 
-  /** Deterministic pseudo-embeddings (unit length, hashed) — for search tests only. */
+  /** Deterministic pseudo-embeddings (unit length, hashed) - for search tests only. */
   async embed(texts: string[]): Promise<number[][]> {
     return texts.map((t) => {
       let h = 0;

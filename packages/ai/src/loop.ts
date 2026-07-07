@@ -1,7 +1,7 @@
 /**
  * Agentic retrieval loop (docs/plans/ai-knowledge-engine-p1-design §4/§6, DD-P1-3). The LLM
  * PLANS retrieval by calling read-only tools; we execute them, feed results back, and repeat
- * until it has enough grounded context OR a budget is hit. The loop only GATHERS — the final
+ * until it has enough grounded context OR a budget is hit. The loop only GATHERS - the final
  * answer is narrated separately from the accumulated CONTEXT (closed-context guarantee intact).
  *
  * Bounded by construction (AIR-7/8): MAX_HOPS, MAX_TOOL_CALLS, a node budget, and per-tool input
@@ -135,7 +135,7 @@ export class ContextAccumulator {
     // Full nodes (from get_node).
     for (const n of this.nodes.values()) nodeRef(n.id, n.kind, n.name, n.confidence);
 
-    // Traversals — root + impacted + the why-edge toward the root.
+    // Traversals - root + impacted + the why-edge toward the root.
     for (const t of this.traversals) {
       const rootMarker = nodeRef(t.root.id, t.root.kind, t.root.name);
       for (const imp of t.impacted) {
@@ -147,7 +147,7 @@ export class ContextAccumulator {
       for (const w of t.warnings) this.notes.push(w);
     }
 
-    // Loose edges (from get_neighbors) — register endpoints as nodes, then the edge.
+    // Loose edges (from get_neighbors) - register endpoints as nodes, then the edge.
     for (const e of this.edges.values()) {
       const fromMarker = nodeRef(e.from.id, "", e.from.name);
       const toMarker = nodeRef(e.to.id, "", e.to.name);
@@ -180,7 +180,7 @@ export class ContextAccumulator {
     const estateLines: string[] = [];
     if (this.estate) estateLines.push(...renderEstate(this.estate, cites, aCount));
 
-    const sections: string[] = [`[CONTEXT — org:${orgId} — these are the ONLY facts you may use]`];
+    const sections: string[] = [`[CONTEXT - org:${orgId} - these are the ONLY facts you may use]`];
     if (nodeLines.length) sections.push("NODES:", ...nodeLines);
     if (edgeLines.length) sections.push("EDGES:", ...edgeLines);
     if (timelineLines.length) sections.push("CHANGES:", ...timelineLines);
@@ -191,7 +191,7 @@ export class ContextAccumulator {
       );
     if (estateLines.length)
       sections.push(
-        "ESTATE OVERVIEW (aggregate facts computed from your synced graph — state these figures directly and cite the marker):",
+        "ESTATE OVERVIEW (aggregate facts computed from your synced graph - state these figures directly and cite the marker):",
         ...estateLines,
       );
     if (this.diffs.length)
@@ -243,7 +243,7 @@ export async function* retrievalLoop(
       ...(signal ? { signal } : {}),
     })) {
       if (ev.type === "tool_call") calls.push({ id: ev.id, name: ev.name, input: ev.input });
-      // planner tokens are "thinking about which tool" — not shown to the user.
+      // planner tokens are "thinking about which tool" - not shown to the user.
     }
     if (calls.length === 0) break; // model has enough → stop gathering
 
@@ -259,7 +259,7 @@ export async function* retrievalLoop(
           role: "tool",
           toolCallId: c.id,
           name: c.name,
-          content: "(already retrieved — try a different query or stop)",
+          content: "(already retrieved - try a different query or stop)",
         });
         continue;
       }
@@ -281,7 +281,7 @@ export async function* retrievalLoop(
   return { built: acc.build(orgId), steps, grounded: !acc.isEmpty() };
 }
 
-/** Drain the loop ignoring live steps — for the non-streaming path + unit tests. */
+/** Drain the loop ignoring live steps - for the non-streaming path + unit tests. */
 export async function collectLoop(
   deps: { port: RetrievalPort; llm: LLMProvider },
   orgId: string,

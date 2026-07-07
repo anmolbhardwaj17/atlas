@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 /**
  * Insights loading fallback. Route-specific (mirrors the header + summary strip + finding cards)
  * so clicking "Insights" swaps to *this* screen instantly with a matching skeleton while the
- * server recomputes findings — never a blank wait that reads as a hang (docs/09 §7).
+ * server recomputes findings - never a blank wait that reads as a hang (docs/09 §7).
  */
 export default function InsightsLoading() {
   return (

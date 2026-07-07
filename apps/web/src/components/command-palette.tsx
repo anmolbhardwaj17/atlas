@@ -256,7 +256,7 @@ export function CommandPalette({ orgId }: { orgId: string }) {
           ) : null}
           {items.length === 0 && !searching ? (
             <li className="px-3 py-6 text-center text-sm text-muted-foreground">
-              No matches — try a resource name, or press ↵ to ask Atlas.
+              No matches - try a resource name, or press ↵ to ask Atlas.
             </li>
           ) : (
             items.map((item, i) => {

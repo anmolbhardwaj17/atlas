@@ -22,7 +22,7 @@ const PR: RetrievedNode = {
   id: "pr-9",
   urn: "bitbucket:siemba:pullrequest/chat-api/3022",
   kind: "bitbucket.pullrequest",
-  name: "#3022 — pool tuning",
+  name: "#3022 - pool tuning",
   status: "active",
   confidence: "observed",
   region: null,
@@ -100,7 +100,7 @@ describe("diagnose (Phase D)", () => {
             kind: "pr_merged",
             occurredAt: recent(45),
             actor: "dev-a",
-            title: "PR merged: #3022 — pool tuning",
+            title: "PR merged: #3022 - pool tuning",
             source: "graph",
           },
         ],
@@ -141,7 +141,7 @@ describe("diagnose (Phase D)", () => {
       { node_id: "pr-9" },
     );
     expect(withDiff.summary).toContain("db/pool.ts");
-    expect(withDiff.diff?.prName).toBe("#3022 — pool tuning");
+    expect(withDiff.diff?.prName).toBe("#3022 - pool tuning");
     expect(withDiff.nodes?.[0]?.id).toBe("pr-9");
 
     const without = await runTool(fakePort({}, null), "org-1", "get_pr_diff", {

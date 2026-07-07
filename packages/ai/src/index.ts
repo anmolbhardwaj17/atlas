@@ -1,8 +1,8 @@
 /**
- * @atlas/ai — the AI Engine (docs/10). Turns a natural-language question into a grounded,
+ * @atlas/ai - the AI Engine (docs/10). Turns a natural-language question into a grounded,
  * cited, confidence-scored answer over the knowledge graph. Per P1, the graph is the
  * product and the AI is one interface: retrieval over a correct graph is the engine; the
- * LLM is a constrained narrator/planner (AE-4). NestJS-free — the API wires a RetrievalPort
+ * LLM is a constrained narrator/planner (AE-4). NestJS-free - the API wires a RetrievalPort
  * + an LLMProvider.
  *
  * G3.1 lays the foundation: LLM provider abstraction (+ mock/Claude), the versioned system

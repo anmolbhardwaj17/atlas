@@ -141,7 +141,7 @@ describe("buildContext (DD-3 citation-tagged block)", () => {
   it("tags every node/edge with a stable marker + cite id", async () => {
     const r = await orchestrate(port(), "o", blastPlan);
     const { context, cites, nodesConsidered } = buildContext("o", r);
-    expect(context).toContain("[CONTEXT — org:o");
+    expect(context).toContain("[CONTEXT - org:o");
     expect(context).toContain("ONLY facts");
     expect(context).toMatch(/N1 \(cite:rds1\)/);
     expect(context).toMatch(/--CONNECTS_TO-->/);

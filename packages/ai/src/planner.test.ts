@@ -86,7 +86,7 @@ describe("classifyIntent (canonical questions, docs/10 §4.2)", () => {
     ["Which PR caused the outage?", "culprit"],
     ["Who owns checkout?", "lookup"],
     ["What is the capital of France?", "out_of_scope"],
-    // Aggregate / estate questions (P0 slice) — these used to fall to `lookup` and fail.
+    // Aggregate / estate questions (P0 slice) - these used to fall to `lookup` and fail.
     ["Who are the top contributors on Bitbucket?", "estate"],
     ["Who are the top contributors this month?", "estate"],
     ["How many repositories are there?", "estate"],
@@ -94,7 +94,7 @@ describe("classifyIntent (canonical questions, docs/10 §4.2)", () => {
     ["Which repositories have no CI/CD pipeline?", "estate"],
     ["What needs attention?", "estate"],
     ["Which are my most active repositories?", "estate"],
-    // Advisory / optimisation (P2) — "how to fix/improve", not just "what is".
+    // Advisory / optimisation (P2) - "how to fix/improve", not just "what is".
     ["How do I improve my CI/CD setup?", "advisory"],
     ["How can I make my infrastructure more secure?", "advisory"],
     ["What should I fix first?", "advisory"],
@@ -119,7 +119,7 @@ describe("classifyIntent (canonical questions, docs/10 §4.2)", () => {
   });
 
   it("does not treat a real question prefixed with a pleasantry as smalltalk", () => {
-    // "thanks, who owns X" is still the real question — smalltalk is anchored to the whole message.
+    // "thanks, who owns X" is still the real question - smalltalk is anchored to the whole message.
     expect(classifyIntent("thanks, who are the top contributors?")).toBe("estate");
   });
 });

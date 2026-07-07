@@ -5,11 +5,11 @@ import type { MockResponder } from "./mock-provider";
 import type { RetrievalPort, RetrievedNode, Traversal } from "./retrieval-port";
 
 /**
- * AI eval set (docs/10 §7 L7, docs/14 §11) — canonical + adversarial scenarios run against
+ * AI eval set (docs/10 §7 L7, docs/14 §11) - canonical + adversarial scenarios run against
  * a MockLLMProvider so behavior is deterministic and independent of any model. The bar:
  * canonical questions are answered + cited + tiered; insufficient grounding yields
  * honest-absence (US-11); attempts to tempt fabrication are BLOCKED (by the gate) or
- * CAUGHT (by the uncited-claim detector) — never silently emitted. Escaped-hallucination
+ * CAUGHT (by the uncited-claim detector) - never silently emitted. Escaped-hallucination
  * rate on this set: 0 (< 1% bar, docs/01 §7.3).
  */
 const RDS: RetrievedNode = {
@@ -104,7 +104,7 @@ const EMPTY_ESTATE = {
 
 const provider = (r: MockResponder | string): MockLLMProvider => new MockLLMProvider(r);
 
-describe("AI eval — canonical", () => {
+describe("AI eval - canonical", () => {
   it("blast radius: grounded, cited, confidence-tiered", async () => {
     const narration =
       "Deleting **prod-orders** [N1] would impact the orders-api service [N2]. Atlas infers (high confidence) this via a security-group correlation [E1].";
@@ -121,7 +121,7 @@ describe("AI eval — canonical", () => {
   });
 });
 
-describe("AI eval — honest absence (US-11)", () => {
+describe("AI eval - honest absence (US-11)", () => {
   it("unresolved entity → refuses, does NOT narrate (L1 blocks fabrication)", async () => {
     // The mock WOULD hallucinate, but the grounding gate stops it before narration.
     const ans = await answerQuestion(
@@ -146,7 +146,7 @@ describe("AI eval — honest absence (US-11)", () => {
   });
 });
 
-describe("AI eval — adversarial (tempt hallucination)", () => {
+describe("AI eval - adversarial (tempt hallucination)", () => {
   it("an uncited fabricated sentence is CAUGHT by the detector (L5), not emitted silently", async () => {
     const narration =
       "Deleting prod-orders [N1] impacts orders-api [N2]. It also secretly powers the billing-fraud pipeline in another region.";
@@ -201,7 +201,7 @@ function agentProvider(responder: MockResponder): MockLLMProvider {
   return p;
 }
 
-describe("AI eval — estate/aggregate (P0 golden)", () => {
+describe("AI eval - estate/aggregate (P0 golden)", () => {
   it("answers a count/ranking question from the computed snapshot, cited to the computation", async () => {
     const narration =
       "You have 12 repositories [A1]. Your top contributor is Mohit with 87 PRs [A2].";
@@ -230,7 +230,7 @@ describe("AI eval — estate/aggregate (P0 golden)", () => {
   });
 });
 
-describe("AI eval — agentic loop route (P1)", () => {
+describe("AI eval - agentic loop route (P1)", () => {
   // Planner calls (req has tools) gather; the narration call (no tools) writes the cited answer.
   const responder =
     (
@@ -324,7 +324,7 @@ function advisoryPort(): RetrievalPort {
   };
 }
 
-describe("AI eval — advisory (P2)", () => {
+describe("AI eval - advisory (P2)", () => {
   it("turns grounded findings into cited facts + a labelled recommendation (advisory tier)", async () => {
     const narration =
       "You have 4 repositories with no CI/CD pipeline [A1]. Recommendation: add a pipeline that builds and tests on every PR before merge.";
@@ -339,7 +339,7 @@ describe("AI eval — advisory (P2)", () => {
   });
 
   it("does not invent problems when the graph flags no findings (good outcome)", async () => {
-    const narration = "Good news — the graph doesn't currently flag any issues to act on.";
+    const narration = "Good news - the graph doesn't currently flag any issues to act on.";
     const ans = await answerQuestion(
       { port: estatePort(), llm: provider(narration) },
       "o",

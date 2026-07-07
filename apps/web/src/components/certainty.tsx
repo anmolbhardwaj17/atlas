@@ -20,7 +20,7 @@ const TIER_FALLBACK: TierStyle = {
   className: "text-muted-foreground",
 };
 const TIER: Record<string, TierStyle> = {
-  // observed = a green (matches the Atlas AI mark), lightweight badge — not the heavy solid one.
+  // observed = a green (matches the Atlas AI mark), lightweight badge - not the heavy solid one.
   observed: {
     label: "observed",
     variant: "outline",

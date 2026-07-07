@@ -78,7 +78,7 @@ export class OpenRouterProvider implements LLMProvider {
       throw new Error(`OpenRouter request failed (${res.status}): ${detail.slice(0, 200)}`);
     }
 
-    // Tool-call args stream across deltas — accumulate per index, emit at the end.
+    // Tool-call args stream across deltas - accumulate per index, emit at the end.
     const toolCalls = new Map<number, { id: string; name: string; args: string }>();
     const reader = res.body.getReader();
     const decoder = new TextDecoder();

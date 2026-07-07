@@ -39,7 +39,7 @@ export function ResourceNode({ data, selected }: NodeProps) {
     node: MapNode;
     collapse?: CollapseInfo;
     openPrCount?: number;
-    /** Security groups protecting this node — protection reads as a chip, not canvas rails. */
+    /** Security groups protecting this node - protection reads as a chip, not canvas rails. */
     protectedBy?: string[];
   };
   const node = d.node;
@@ -73,7 +73,7 @@ export function ResourceNode({ data, selected }: NodeProps) {
       )}
       title={
         health && health.state !== "healthy"
-          ? `${node.urn} — ${health.reason ?? health.state}`
+          ? `${node.urn} - ${health.reason ?? health.state}`
           : node.urn
       }
     >
