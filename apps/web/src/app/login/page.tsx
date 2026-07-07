@@ -39,109 +39,105 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="grid min-h-dvh place-items-center bg-white p-4 md:p-6">
-      <div className="grid w-full max-w-6xl overflow-hidden rounded-2xl border border-neutral-200 shadow-sm md:min-h-[38rem] md:grid-cols-2">
-        {/* ── Left: branded hero (dark green gradient + liquid-metal mark + steps), inset ── */}
-        <aside
-          className="relative hidden flex-col justify-end overflow-hidden p-10 text-white md:flex"
-          style={{
-            background:
-              "radial-gradient(120% 110% at 18% 12%, #1f6b4a 0%, #0e3a28 42%, #071f16 100%)",
-          }}
-        >
-          {/* The liquid-metal mark, floating in the hero. */}
-          <div className="pointer-events-none absolute right-0 top-2 opacity-90 [filter:drop-shadow(0_20px_50px_rgba(0,0,0,0.35))]">
-            <LiquidMetal
-              width={300}
-              height={300}
-              image="/atlas-logo.png"
-              colorBack="#00000000"
-              colorTint="#bfeed4"
-              repetition={2}
-              softness={0.1}
-              shiftRed={0.3}
-              shiftBlue={0.3}
-              distortion={0.07}
-              contour={0.4}
-              angle={70}
-              speed={1}
-              scale={0.82}
-              fit="contain"
-            />
-          </div>
+    <main className="min-h-dvh bg-white md:grid md:grid-cols-2">
+      {/* ── Left: full-height branded hero (dark green gradient + liquid-metal mark + steps) ── */}
+      <aside
+        className="relative hidden flex-col justify-end overflow-hidden p-12 text-white md:flex"
+        style={{
+          background:
+            "radial-gradient(120% 110% at 18% 12%, #1f6b4a 0%, #0e3a28 42%, #071f16 100%)",
+        }}
+      >
+        {/* The liquid-metal mark, floating in the hero. */}
+        <div className="pointer-events-none absolute right-0 top-2 opacity-90 [filter:drop-shadow(0_20px_50px_rgba(0,0,0,0.35))]">
+          <LiquidMetal
+            width={300}
+            height={300}
+            image="/atlas-logo.png"
+            colorBack="#00000000"
+            colorTint="#bfeed4"
+            repetition={2}
+            softness={0.1}
+            shiftRed={0.3}
+            shiftBlue={0.3}
+            distortion={0.07}
+            contour={0.4}
+            angle={70}
+            speed={1}
+            scale={0.82}
+            fit="contain"
+          />
+        </div>
 
-          <div className="relative">
-            <h2 className="max-w-sm text-4xl font-semibold leading-tight tracking-tight">
-              See everything you run.
-            </h2>
-            <p className="mt-3 max-w-md text-sm leading-relaxed text-white/70">
-              Atlas turns your cloud and code into one live, cited graph, so your whole system
-              finally makes sense at a glance.
-            </p>
+        <div className="relative">
+          <h2 className="max-w-sm text-4xl font-semibold leading-tight tracking-tight">
+            See everything you run.
+          </h2>
+          <p className="mt-3 max-w-md text-sm leading-relaxed text-white/70">
+            Atlas turns your cloud and code into one live, cited graph, so your whole system finally
+            makes sense at a glance.
+          </p>
 
-            <ol className="mt-8 grid gap-3 sm:grid-cols-3">
-              {STEPS.map((s, i) => (
-                <li
-                  key={s.title}
+          <ol className="mt-8 grid gap-3 sm:grid-cols-3">
+            {STEPS.map((s, i) => (
+              <li
+                key={s.title}
+                className={
+                  i === 0
+                    ? "rounded-xl bg-white p-4 text-neutral-900 shadow-lg"
+                    : "rounded-xl border border-white/10 bg-white/5 p-4 text-white/70 backdrop-blur-sm"
+                }
+              >
+                <span
                   className={
-                    i === 0
-                      ? "rounded-xl bg-white p-4 text-neutral-900 shadow-lg"
-                      : "rounded-xl border border-white/10 bg-white/5 p-4 text-white/70 backdrop-blur-sm"
+                    "grid size-6 place-items-center rounded-full text-xs font-semibold " +
+                    (i === 0 ? "bg-neutral-900 text-white" : "bg-white/10 text-white/80")
                   }
                 >
-                  <span
-                    className={
-                      "grid size-6 place-items-center rounded-full text-xs font-semibold " +
-                      (i === 0 ? "bg-neutral-900 text-white" : "bg-white/10 text-white/80")
-                    }
-                  >
-                    {i + 1}
-                  </span>
-                  <p className="mt-3 text-sm font-medium">{s.title}</p>
-                  <p
-                    className={"mt-0.5 text-xs " + (i === 0 ? "text-neutral-500" : "text-white/50")}
-                  >
-                    {s.desc}
-                  </p>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </aside>
+                  {i + 1}
+                </span>
+                <p className="mt-3 text-sm font-medium">{s.title}</p>
+                <p className={"mt-0.5 text-xs " + (i === 0 ? "text-neutral-500" : "text-white/50")}>
+                  {s.desc}
+                </p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </aside>
 
-        {/* ── Right: sign-in ── */}
-        <section className="relative flex min-h-dvh flex-col items-center justify-center p-8 md:min-h-0">
-          <div className="w-full max-w-sm text-center">
-            <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
-              Sign in to Atlas
-            </h1>
-            <p className="mt-1.5 text-sm text-neutral-500">
-              Use your Google account to continue to your workspace.
-            </p>
+      {/* ── Right: full-height sign-in ── */}
+      <section className="relative flex min-h-dvh flex-col items-center justify-center p-8">
+        <div className="w-full max-w-sm text-center">
+          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
+            Sign in to Atlas
+          </h1>
+          <p className="mt-1.5 text-sm text-neutral-500">
+            Use your Google account to continue to your workspace.
+          </p>
 
-            <Button
-              onClick={signInWithGoogle}
-              disabled={busy}
-              variant="outline"
-              className="mt-8 h-11 w-full gap-2"
-            >
-              <GoogleIcon className="size-4" />
-              {busy ? "Redirecting…" : "Continue with Google"}
-            </Button>
-            {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
-          </div>
+          <Button
+            onClick={signInWithGoogle}
+            disabled={busy}
+            variant="outline"
+            className="mt-8 h-11 w-full gap-2"
+          >
+            <GoogleIcon className="size-4" />
+            {busy ? "Redirecting…" : "Continue with Google"}
+          </Button>
+          {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
+        </div>
 
-          {/* Legal links, anchored to the bottom of the panel. */}
-          <div className="absolute inset-x-0 bottom-6 flex justify-center gap-5 text-xs text-neutral-400">
-            <Link href="/legal/terms" className="transition-colors hover:text-neutral-700">
-              Terms of Service
-            </Link>
-            <Link href="/legal/privacy" className="transition-colors hover:text-neutral-700">
-              Privacy Policy
-            </Link>
-          </div>
-        </section>
-      </div>
+        {/* Legal links, anchored to the bottom of the panel. */}
+        <div className="absolute inset-x-0 bottom-6 flex justify-center gap-5 text-xs text-neutral-400">
+          <Link href="/legal/terms" className="transition-colors hover:text-neutral-700">
+            Terms of Service
+          </Link>
+          <Link href="/legal/privacy" className="transition-colors hover:text-neutral-700">
+            Privacy Policy
+          </Link>
+        </div>
+      </section>
     </main>
   );
 }
