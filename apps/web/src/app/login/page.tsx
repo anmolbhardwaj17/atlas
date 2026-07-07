@@ -5,6 +5,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { AtlasLogo } from "@/components/brand";
 
 // LiquidMetal is a WebGL shader - client-only (no SSR), lazy-loaded so it never blocks paint.
 const LiquidMetal = dynamic(
@@ -40,9 +41,9 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-dvh bg-white md:grid md:grid-cols-2">
-      {/* ── Left: full-height branded hero (dark green gradient + liquid-metal mark + steps) ── */}
+      {/* ── Left: branded hero as an inset green card floating on the white page ── */}
       <aside
-        className="relative hidden flex-col justify-end overflow-hidden p-12 text-white md:flex"
+        className="relative m-4 hidden flex-col justify-end overflow-hidden rounded-3xl p-8 text-white shadow-sm md:m-6 md:flex"
         style={{
           background:
             "radial-gradient(120% 110% at 18% 12%, #1f6b4a 0%, #0e3a28 42%, #071f16 100%)",
@@ -109,6 +110,7 @@ export default function LoginPage() {
       {/* ── Right: full-height sign-in ── */}
       <section className="relative flex min-h-dvh flex-col items-center justify-center p-8">
         <div className="w-full max-w-sm text-center">
+          <AtlasLogo size={52} className="mx-auto mb-5 size-[52px]" />
           <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
             Sign in to Atlas
           </h1>
@@ -116,13 +118,10 @@ export default function LoginPage() {
             Use your Google account to continue to your workspace.
           </p>
 
-          <Button
-            onClick={signInWithGoogle}
-            disabled={busy}
-            variant="outline"
-            className="mt-8 h-11 w-full gap-2"
-          >
-            <GoogleIcon className="size-4" />
+          <Button onClick={signInWithGoogle} disabled={busy} className="mt-8 h-11 w-full gap-2.5">
+            <span className="grid size-6 shrink-0 place-items-center rounded-full bg-white">
+              <GoogleIcon className="size-3.5" />
+            </span>
             {busy ? "Redirecting…" : "Continue with Google"}
           </Button>
           {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
