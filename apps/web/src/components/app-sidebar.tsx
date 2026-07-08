@@ -86,7 +86,7 @@ const NAV = [
  *  logos over a Connect (→ Integrations) / Close pair. Hidden when the sidebar collapses to icons,
  *  and stays dismissed (localStorage) once closed. */
 const CONNECT_CARD_KEY = "atlas.connectAppsDismissed";
-const PROMO_LOGOS = ["github-icon", "slack-icon", "discord-icon", "notion", "figma"];
+const PROMO_LOGOS = ["aws", "microsoft-azure", "github-icon", "bitbucket", "slack-icon"];
 
 function ConnectAppsCard() {
   // Start hidden to avoid a flash before we can read the dismissed flag on the client.
