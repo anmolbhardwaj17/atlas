@@ -2,9 +2,8 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Loader2, Trash2, RefreshCw, ShieldAlert, ChevronRight } from "lucide-react";
+import { Plus, Loader2, Trash2, RefreshCw, ShieldAlert, ChevronRight, Search } from "lucide-react";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -61,8 +60,6 @@ function ProviderSetup({ providerId }: { providerId: string }) {
   }
 }
 
-const CATEGORY_ORDER = ["Cloud", "Code", "CI/CD", "Observability"] as const;
-
 const CREDENTIAL_NOUN: Record<string, string> = {
   aws: "role",
   github: "App",
@@ -87,6 +84,8 @@ export function IntegrationsHub({
   canManage: boolean;
 }) {
   const [connectProvider, setConnectProvider] = React.useState<ProviderMeta | null>(null);
+  const [tab, setTab] = React.useState<(typeof TABS)[number]>("All");
+  const [query, setQuery] = React.useState("");
 
   const byProvider = new Map<string, ConnectionSummary[]>();
   for (const c of connections) {
@@ -95,42 +94,74 @@ export function IntegrationsHub({
     byProvider.set(c.provider, arr);
   }
 
+  const q = query.trim().toLowerCase();
+  const filtered = PROVIDERS.filter(
+    (p) =>
+      (tab === "All" || p.category === tab) &&
+      (q === "" || p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)),
+  );
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold">Integrations</h1>
         <p className="text-sm text-muted-foreground">
-          Connect your cloud, code, and observability accounts. Atlas builds one cited graph across
-          everything you connect.
+          Connect your cloud, code, CI/CD, and observability accounts. Atlas builds one cited graph
+          across everything you connect.
         </p>
       </div>
 
-      {/* Grouped by category, each with a small heading — Cloud · Code · CI/CD · Observability. */}
-      <div className="space-y-8">
-        {CATEGORY_ORDER.map((cat) => {
-          const items = PROVIDERS.filter((p) => p.category === cat);
-          if (items.length === 0) return null;
-          return (
-            <section key={cat} className="space-y-3">
-              <h2 className="border-b border-border pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {cat}
-              </h2>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {items.map((p) => (
-                  <ProviderTile
-                    key={p.id}
-                    provider={p}
-                    connections={byProvider.get(p.id) ?? []}
-                    canManage={canManage}
-                    orgId={orgId}
-                    onConnect={() => setConnectProvider(p)}
-                  />
-                ))}
-              </div>
-            </section>
-          );
-        })}
+      <LogoMarquee />
+
+      {/* Category tabs + search — the row list below filters live. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-1">
+          {TABS.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              className={cn(
+                "rounded-full px-3 py-1 text-sm font-medium transition-colors",
+                tab === t
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+        <div className="relative w-full sm:w-64">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search integrations…"
+            className="h-9 w-full rounded-md border border-border bg-transparent pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground/40"
+          />
+        </div>
       </div>
+
+      {filtered.length === 0 ? (
+        <div className="rounded-lg border border-border py-14 text-center text-sm text-muted-foreground">
+          No integrations match your search.
+        </div>
+      ) : (
+        <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+          {filtered.map((p) => (
+            <ProviderRow
+              key={p.id}
+              provider={p}
+              connections={byProvider.get(p.id) ?? []}
+              canManage={canManage}
+              orgId={orgId}
+              onConnect={() => setConnectProvider(p)}
+            />
+          ))}
+        </div>
+      )}
 
       <ConnectSheet
         provider={connectProvider}
@@ -141,7 +172,31 @@ export function IntegrationsHub({
   );
 }
 
-function ProviderTile({
+const TABS = ["All", "Cloud", "Code", "CI/CD", "Observability"] as const;
+
+/** A decorative strip of every connectable + upcoming logo — "everything you can connect". */
+function LogoMarquee() {
+  return (
+    <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-muted/20 p-3">
+      {PROVIDERS.map((p) => (
+        <div
+          key={p.id}
+          title={p.name}
+          className={cn(
+            "grid size-10 shrink-0 place-items-center rounded-lg border border-border bg-background",
+            p.status === "coming-soon" && "opacity-50",
+          )}
+        >
+          <ProviderLogo provider={p} className="size-6" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** One integration as a list row: logo + name + category + blurb + action. Connected accounts
+ *  appear as compact sub-rows beneath (each opens the detail slide-over). */
+function ProviderRow({
   provider,
   connections,
   canManage,
@@ -156,48 +211,50 @@ function ProviderTile({
 }) {
   const comingSoon = provider.status === "coming-soon";
   return (
-    <Card className={cn(comingSoon && "opacity-70")}>
-      <CardContent className="flex h-full flex-col gap-3 p-5">
-        <div className="flex items-start gap-3">
-          <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-border bg-background">
-            <ProviderLogo provider={provider} className="size-6" />
-          </div>
-          <div className="flex min-w-0 flex-1 items-center gap-2">
+    <div className="bg-card">
+      <div className="flex items-center gap-4 px-4 py-3.5">
+        <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-border bg-background">
+          <ProviderLogo provider={provider} className="size-6" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
             <span className="truncate font-medium">{provider.name}</span>
+            <span className="hidden shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground sm:inline">
+              {provider.category}
+            </span>
             {comingSoon && (
-              <span className="rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+              <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                 Soon
               </span>
             )}
           </div>
+          <p className="truncate text-sm text-muted-foreground">{provider.blurb}</p>
         </div>
-
-        <p className="text-sm text-muted-foreground">{provider.blurb}</p>
-
-        <div className="mt-auto space-y-2">
-          {connections.length > 0 && (
-            <ul className="space-y-1.5 border-t border-border pt-3">
-              {connections.map((c) => (
-                <ConnectionRow key={c.id} conn={c} orgId={orgId} canManage={canManage} />
-              ))}
-            </ul>
-          )}
-
+        <div className="shrink-0">
           {comingSoon ? (
-            <Button variant="outline" size="sm" className="w-full" disabled>
-              Coming soon
-            </Button>
+            <span className="text-xs text-muted-foreground">Coming soon</span>
           ) : canManage ? (
-            <Button size="sm" className="w-full" onClick={onConnect}>
+            <Button
+              size="sm"
+              variant={connections.length > 0 ? "outline" : "default"}
+              onClick={onConnect}
+            >
               <Plus className="size-4" />
-              {connections.length > 0 ? "Add another" : `Connect ${provider.name.split(" ")[0]}`}
+              {connections.length > 0 ? "Add" : "Connect"}
             </Button>
           ) : connections.length === 0 ? (
-            <p className="text-xs text-muted-foreground">Ask an admin to connect this source.</p>
+            <span className="text-xs text-muted-foreground">Ask an admin</span>
           ) : null}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+      {connections.length > 0 && (
+        <ul className="space-y-0.5 border-t border-border bg-muted/20 py-1.5 pl-16 pr-4">
+          {connections.map((c) => (
+            <ConnectionRow key={c.id} conn={c} orgId={orgId} canManage={canManage} />
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
