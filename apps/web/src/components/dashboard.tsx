@@ -45,16 +45,6 @@ const CODE_LOGO: Record<string, string> = {
   bitbucket: "bitbucket",
   gitlab: "gitlab",
 };
-/** Any connectable provider → brand-logo key (for the Sources list). */
-const PROVIDER_LOGO: Record<string, string> = {
-  ...CLOUD_LOGO,
-  ...CODE_LOGO,
-  datadog: "datadog",
-  jenkins: "jenkins",
-  grafana: "grafana",
-  circleci: "circleci",
-  argocd: "argocd",
-};
 interface ConnectionLite {
   provider: string;
   displayName: string;
@@ -169,26 +159,19 @@ export async function Dashboard({
         </div>
       </div>
 
-      {/* Hero grid — one focal point (health, in Atlas green) + posture + sources. */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      {/* Top band — the two KPIs and the AI launcher on the left, with "Needs attention" as a
+          tall rail down the right. The rail column is a touch wider than each KPI (it's the
+          actionable core, so it earns the extra room). */}
+      <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1.4fr] lg:grid-rows-[auto_1fr]">
         <HealthCard health={health} />
         <FindingsDonut findings={s.findings} />
-        <SourcesCard
-          connections={connections}
-          syncedLabel={trust.lastSyncAt ? timeAgo(trust.lastSyncAt) : null}
-        />
-      </div>
-
-      {/* What needs action sits high — right under the pulse — paired with what just changed.
-          gap-4 matches the KPI row above so the columns line up. */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+        <div className="lg:row-span-2 lg:min-h-0">
           <NeedsAttention findings={s.findings} />
         </div>
-        <RecentActivity activity={s.activity} />
+        <div className="lg:col-span-2">
+          <AskLauncher />
+        </div>
       </div>
-
-      <AskLauncher />
 
       {/* Three equal cards: the posture radar, then Infrastructure and Code, each listing their
           counts as rows. Infra/Code only appear when that side is connected. */}
@@ -240,6 +223,8 @@ export async function Dashboard({
       <Insights insights={s.insights} />
 
       <MapPreview inv={inv} cross={s.crossBoundary} />
+
+      <RecentActivity activity={s.activity} />
     </div>
   );
 }
@@ -401,85 +386,9 @@ function HealthGauge({ score, label, tone }: { score: number; label: string; ton
   );
 }
 
-/** Connected sources — a compact list: brand logo, name, and a health dot. */
-function SourcesCard({
-  connections,
-  syncedLabel,
-}: {
-  connections: ConnectionLite[];
-  syncedLabel: string | null;
-}) {
-  const dot = (status: string) =>
-    status === "connected"
-      ? "bg-emerald-500"
-      : status === "degraded"
-        ? "bg-amber-500"
-        : "bg-red-500";
-  const label = (status: string) =>
-    status === "connected" ? "Healthy" : status === "degraded" ? "Degraded" : "Error";
-  // Keep the card compact: show a handful (unhealthy first, so problems surface) and roll the
-  // rest into a "+N more" link — no unbounded growth / scroll.
-  const rank = (s: string) => (s === "connected" ? 2 : s === "degraded" ? 1 : 0);
-  const sorted = [...connections].sort((a, b) => rank(a.status) - rank(b.status));
-  const MAX = 4;
-  const shown = sorted.slice(0, MAX);
-  const more = connections.length - shown.length;
-  return (
-    <Card className="shadow-sm">
-      <CardContent className="flex h-full flex-col p-5">
-        <div className="flex items-baseline justify-between">
-          <p className="text-sm font-medium text-muted-foreground">Sources</p>
-          <Link
-            href="/integrations"
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Manage <ChevronRight className="size-3.5" />
-          </Link>
-        </div>
-        {connections.length === 0 ? (
-          <p className="mt-3 text-sm text-muted-foreground">No sources connected yet.</p>
-        ) : (
-          <ul className="mt-2 divide-y divide-border">
-            {shown.map((c) => {
-              const logo = PROVIDER_LOGO[c.provider];
-              return (
-                <li key={c.displayName} className="flex items-center gap-2.5 py-2.5 text-sm">
-                  {/* White chip keeps dark brand marks (AWS) legible in dark mode. */}
-                  <span className="grid size-6 shrink-0 place-items-center rounded-md bg-white ring-1 ring-black/5">
-                    {logo ? <CloudIcon name={logo} className="size-3.5" /> : null}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate font-medium">{c.displayName}</span>
-                  <span
-                    className={cn("size-2 shrink-0 rounded-full", dot(c.status))}
-                    title={label(c.status)}
-                  />
-                </li>
-              );
-            })}
-            {more > 0 ? (
-              <li className="py-2">
-                <Link
-                  href="/integrations"
-                  className="text-xs text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  +{more} more source{more === 1 ? "" : "s"}
-                </Link>
-              </li>
-            ) : null}
-          </ul>
-        )}
-        {syncedLabel ? (
-          <p className="mt-auto pt-3 text-xs text-muted-foreground">Synced {syncedLabel}</p>
-        ) : null}
-      </CardContent>
-    </Card>
-  );
-}
-
 function NeedsAttention({ findings }: { findings: Finding[] }) {
-  // The dashboard only teases the top findings; the full advisory treatment (why/how‑to‑fix,
-  // Ask Atlas) lives in Insights.
-  const shown = findings.slice(0, 4);
+  // The tall rail lists every open finding, scrolling internally; the full advisory treatment
+  // (why / how-to-fix, Ask Atlas) lives in Insights.
   return (
     <Card className="h-full">
       <CardContent className="flex h-full flex-col p-5">
@@ -508,21 +417,17 @@ function NeedsAttention({ findings }: { findings: Finding[] }) {
             </div>
           </div>
         ) : (
-          <>
-            <ul className="-mx-2 divide-y divide-border">
-              {shown.map((f) => (
-                <FindingRow key={f.id} f={f} />
-              ))}
-            </ul>
-            {findings.length > shown.length ? (
-              <Link
-                href="/insights"
-                className="mt-auto flex items-center justify-center gap-1 rounded-lg pt-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Show more <ChevronRight className="size-3.5" />
-              </Link>
-            ) : null}
-          </>
+          // Absolutely-positioned list so the findings don't drive the rail's height (the KPI +
+          // Ask stack on the left does) — overflow scrolls internally.
+          <div className="relative min-h-0 flex-1">
+            <div className="absolute inset-0 -mx-2 overflow-y-auto">
+              <ul className="divide-y divide-border">
+                {findings.map((f) => (
+                  <FindingRow key={f.id} f={f} />
+                ))}
+              </ul>
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>
@@ -540,13 +445,9 @@ function FindingRow({ f }: { f: Finding }) {
   // Same pillar chip the Insights page renders — driven by the pillar the API tags dynamically.
   const m = pillarMeta(f.pillar ?? undefined);
   const body = (
-    <div className="group flex items-start gap-3 px-2 py-3 transition-colors hover:bg-muted/50">
-      <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium text-foreground group-hover:underline">{f.title}</div>
-        <div className="mt-0.5 line-clamp-1 text-[13px] text-muted-foreground">{f.detail}</div>
-      </div>
-      {/* Two tidy badges on the right: the pillar chip, then a soft severity pill. */}
-      <div className="flex shrink-0 flex-col items-end gap-1.5 text-right">
+    <div className="group px-2 py-3 transition-colors hover:bg-muted/50">
+      {/* Narrow rail: the two badges sit on top, then the title + detail stack below. */}
+      <div className="flex flex-wrap items-center gap-1.5">
         <span
           className={cn(
             "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
@@ -564,36 +465,69 @@ function FindingRow({ f }: { f: Finding }) {
           {f.severity}
         </span>
       </div>
+      <div className="mt-1.5 text-sm font-medium text-foreground group-hover:underline">
+        {f.title}
+      </div>
+      <div className="mt-0.5 line-clamp-2 text-[13px] text-muted-foreground">{f.detail}</div>
     </div>
   );
   return <li>{f.href ? <Link href={f.href}>{body}</Link> : body}</li>;
 }
 
+/** Recent activity — a full-width card at the foot of the page. Low-signal, so it lives at the
+ *  bottom, but keeps the familiar row list; the rows flow into columns to use the full width. */
 function RecentActivity({ activity }: { activity: ActivityItem[] }) {
+  if (activity.length === 0) return null;
   return (
-    <Card className="h-full">
-      <CardContent className="flex h-full flex-col p-5">
+    <Card>
+      <CardContent className="p-5">
         <h2 className="mb-3 flex items-center gap-2 text-base font-semibold">
           <Activity className="size-4 text-muted-foreground" />
           Recent activity
         </h2>
-        {activity.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No recent changes.</p>
-        ) : (
-          // The list is absolutely positioned so it doesn't drive the card's height — Needs
-          // attention sets the row height, and any overflow here scrolls internally instead.
-          <div className="relative min-h-0 flex-1">
-            <div className="absolute inset-0 -mx-2 overflow-y-auto">
-              <ul className="divide-y divide-border">
-                {activity.map((a, i) => (
-                  <ActivityRow key={i} a={a} />
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
+        <ul className="grid gap-x-8 sm:grid-cols-2 lg:grid-cols-3">
+          {activity.map((a, i) => (
+            <ActivityRow key={i} a={a} />
+          ))}
+        </ul>
       </CardContent>
     </Card>
+  );
+}
+
+function ActivityRow({ a }: { a: ActivityItem }) {
+  const { Icon, label } = ACTIVITY_META[a.category];
+  const logo = activityLogo(a.kind);
+  const href = a.id ? `/explore/${a.id}` : null;
+  const inner = (
+    <div className="flex items-start gap-2.5 text-sm">
+      {logo ? (
+        <CloudIcon name={logo} className="mt-0.5 size-4 shrink-0" />
+      ) : (
+        <Icon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="truncate">
+          <span className="text-muted-foreground">{label}: </span>
+          <span className="font-medium">{a.title}</span>
+        </div>
+        {a.subtitle ? (
+          <div className="truncate text-xs text-muted-foreground">{a.subtitle}</div>
+        ) : null}
+      </div>
+      <span className="shrink-0 text-xs text-muted-foreground">{timeAgo(a.at)}</span>
+    </div>
+  );
+  return (
+    <li className="min-w-0 py-2.5">
+      {href ? (
+        <Link href={href} className="block hover:opacity-80">
+          {inner}
+        </Link>
+      ) : (
+        inner
+      )}
+    </li>
   );
 }
 
@@ -612,41 +546,6 @@ function activityLogo(kind: string): string | null {
   if (svc && hasCloudIcon(svc)) return svc;
   const brand = PROVIDER_META[kind.split(".")[0] ?? ""]?.logo;
   return brand && hasCloudIcon(brand) ? brand : null;
-}
-
-function ActivityRow({ a }: { a: ActivityItem }) {
-  const { Icon, label } = ACTIVITY_META[a.category];
-  const logo = activityLogo(a.kind);
-  const href = a.id ? `/explore/${a.id}` : null;
-
-  const inner = (
-    <div className="flex items-start gap-2.5 text-sm">
-      {logo ? (
-        <CloudIcon name={logo} className="mt-0.5 size-4 shrink-0" />
-      ) : (
-        <Icon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-      )}
-      <div className="min-w-0 flex-1">
-        <div>
-          <span className="text-muted-foreground">{label}: </span>
-          <span className="font-medium">{a.title}</span>
-        </div>
-        {a.subtitle ? <div className="text-xs text-muted-foreground">{a.subtitle}</div> : null}
-      </div>
-      <span className="shrink-0 text-xs text-muted-foreground">{timeAgo(a.at)}</span>
-    </div>
-  );
-  return (
-    <li className="px-2 py-3">
-      {href ? (
-        <Link href={href} className="block hover:opacity-80">
-          {inner}
-        </Link>
-      ) : (
-        inner
-      )}
-    </li>
-  );
 }
 
 function MapPreview({

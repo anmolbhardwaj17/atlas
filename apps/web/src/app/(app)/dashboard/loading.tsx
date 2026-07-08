@@ -19,9 +19,10 @@ export default function DashboardLoading() {
         <Skeleton className="h-9 w-28 rounded-md" />
       </div>
 
-      {/* Hero grid: health / findings / sources. */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, i) => (
+      {/* Top band: two KPIs + Ask on the left, Needs attention as a tall rail on the right. */}
+      <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1.4fr] lg:grid-rows-[auto_1fr]">
+        {/* Two KPI cards. */}
+        {Array.from({ length: 2 }).map((_, i) => (
           <Card key={i} className="shadow-sm">
             <CardContent className="p-5">
               <Skeleton className="h-3 w-24" />
@@ -30,62 +31,41 @@ export default function DashboardLoading() {
             </CardContent>
           </Card>
         ))}
-      </div>
 
-      {/* Needs attention (2/3) + Recent activity (1/3) — gap-4 to line up with the KPI row. */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <Card>
+        {/* Needs attention — tall rail spanning both rows. */}
+        <div className="lg:row-span-2">
+          <Card className="h-full">
             <CardContent className="p-5">
               <div className="mb-3 flex items-center justify-between">
                 <Skeleton className="h-5 w-36" />
-                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-4 w-24" />
               </div>
               <ul className="divide-y divide-border">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <li key={i} className="flex items-start gap-3 px-2 py-3">
-                    <div className="min-w-0 flex-1 space-y-2">
-                      <Skeleton className="h-4 w-2/3" />
-                      <Skeleton className="h-3 w-1/2" />
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1.5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <li key={i} className="space-y-2 px-2 py-3">
+                    <div className="flex gap-1.5">
                       <Skeleton className="h-5 w-20 rounded-md" />
-                      <Skeleton className="h-4 w-12 rounded-full" />
+                      <Skeleton className="h-5 w-12 rounded-full" />
                     </div>
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-full" />
                   </li>
                 ))}
               </ul>
             </CardContent>
           </Card>
         </div>
-        <Card>
-          <CardContent className="p-5">
-            <Skeleton className="mb-3 h-5 w-32" />
-            <ul className="space-y-3">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <li key={i} className="flex items-start gap-2.5">
-                  <Skeleton className="mt-0.5 size-4 shrink-0" />
-                  <div className="min-w-0 flex-1 space-y-1.5">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-3 w-1/2" />
-                  </div>
-                  <Skeleton className="h-3 w-10 shrink-0" />
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      </div>
 
-      {/* Ask Atlas (light hero card). */}
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-7">
-        <Skeleton className="mb-2 h-5 w-28" />
-        <Skeleton className="mb-4 h-4 w-full max-w-xl" />
-        <Skeleton className="h-12 w-full rounded-xl" />
-        <div className="mt-3 flex flex-wrap gap-2">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-6 w-52 max-w-full rounded-full" />
-          ))}
+        {/* Ask Atlas (light hero card) spanning the two KPI columns. */}
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-7 lg:col-span-2">
+          <Skeleton className="mb-2 h-5 w-28" />
+          <Skeleton className="mb-4 h-4 w-full max-w-xl" />
+          <Skeleton className="h-12 w-full max-w-3xl rounded-xl" />
+          <div className="mt-3 flex flex-wrap gap-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-6 w-52 max-w-full rounded-full" />
+            ))}
+          </div>
         </div>
       </div>
 
@@ -155,6 +135,25 @@ export default function DashboardLoading() {
             </div>
           </div>
           <Skeleton className="h-9 w-28 rounded-md" />
+        </CardContent>
+      </Card>
+
+      {/* Recent activity — full-width card. */}
+      <Card>
+        <CardContent className="p-5">
+          <Skeleton className="mb-3 h-5 w-32" />
+          <ul className="grid gap-x-8 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <li key={i} className="flex items-start gap-2.5 py-2.5">
+                <Skeleton className="mt-0.5 size-4 shrink-0" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+                <Skeleton className="h-3 w-10 shrink-0" />
+              </li>
+            ))}
+          </ul>
         </CardContent>
       </Card>
     </div>
