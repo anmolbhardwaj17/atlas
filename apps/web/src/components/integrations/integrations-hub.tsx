@@ -2,7 +2,16 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Loader2, Trash2, RefreshCw, ShieldAlert, ChevronRight, Search } from "lucide-react";
+import {
+  Plus,
+  Loader2,
+  Trash2,
+  RefreshCw,
+  ShieldAlert,
+  ChevronRight,
+  Search,
+  Check,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -230,21 +239,27 @@ function ProviderRow({
           </div>
           <p className="truncate text-sm text-muted-foreground">{provider.blurb}</p>
         </div>
-        <div className="shrink-0">
+        <div className="flex shrink-0 items-center gap-2">
           {comingSoon ? (
             <span className="text-xs text-muted-foreground">Coming soon</span>
+          ) : connections.length > 0 ? (
+            <>
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-foreground px-2.5 py-1.5 text-xs font-medium text-background">
+                <Check className="size-3.5" /> Connected
+              </span>
+              {canManage ? (
+                <Button size="sm" variant="outline" onClick={onConnect}>
+                  <Plus className="size-4" /> Add another
+                </Button>
+              ) : null}
+            </>
           ) : canManage ? (
-            <Button
-              size="sm"
-              variant={connections.length > 0 ? "outline" : "default"}
-              onClick={onConnect}
-            >
-              <Plus className="size-4" />
-              {connections.length > 0 ? "Add" : "Connect"}
+            <Button size="sm" onClick={onConnect}>
+              <Plus className="size-4" /> Connect
             </Button>
-          ) : connections.length === 0 ? (
+          ) : (
             <span className="text-xs text-muted-foreground">Ask an admin</span>
-          ) : null}
+          )}
         </div>
       </div>
       {connections.length > 0 && (
