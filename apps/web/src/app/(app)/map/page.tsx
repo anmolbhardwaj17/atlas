@@ -23,7 +23,7 @@ export default async function MapPage() {
         <div className="space-y-1.5">
           <h1 className="text-2xl font-semibold tracking-tight">Infrastructure map</h1>
           <p className="text-sm text-muted-foreground">
-            Your infrastructure and code, wired together — from entry points through compute into
+            Your infrastructure and code, wired together, from entry points through compute into
             your data stores.
           </p>
         </div>

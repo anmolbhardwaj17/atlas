@@ -22,6 +22,7 @@ import {
   ChevronDown,
   Clock,
   ListFilter,
+  Map as MapIcon,
   Search,
   Shield,
   Stethoscope,
@@ -31,11 +32,22 @@ import { buildLayout } from "@/lib/map-layout";
 import { kindShort, kindIcon, KIND_LOGO } from "@/lib/kind-visual";
 import { edgeCrossing, CROSS_COLOR, type MapData, type MapNode } from "@/lib/map-types";
 import { CloudIcon } from "@/components/cloud-icon";
+import { AtlasAiMark } from "@/components/brand";
 import { ResourceNode, EnvLaneNode } from "@/components/map/resource-node";
 import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
 import { cn } from "@/lib/cn";
 
 const nodeTypes = { resource: ResourceNode, envLane: EnvLaneNode };
+
+/** Segmented-control button: one item in the map's grouped toolbar track. Active = a raised segment
+ *  (bg + shadow) inside the muted track; inactive = quiet. */
+const segCls = (active: boolean) =>
+  cn(
+    "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+    active
+      ? "bg-background text-foreground shadow-sm"
+      : "text-muted-foreground hover:text-foreground",
+  );
 
 /**
  * Interactive infrastructure map (docs/09 §5.4). Resources as nodes, connections as edges,
@@ -183,68 +195,55 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
         <div className="space-y-1.5">
           <h1 className="text-2xl font-semibold tracking-tight">Infrastructure map</h1>
           <p className="text-sm text-muted-foreground">
-            Your infrastructure and code, wired together — follow it left to right, from entry
-            points through compute into your data stores.
+            Your infrastructure and code, wired together. Follow it left to right, from entry points
+            through compute into your data stores.
           </p>
         </div>
         <span className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-          <button
-            type="button"
-            onClick={() => setShowSecurity((v) => !v)}
-            aria-pressed={showSecurity}
-            title={
-              showSecurity
-                ? "Hide security groups and protection edges"
-                : "Show security groups and what they protect"
-            }
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-medium transition-colors",
-              showSecurity
-                ? "border-transparent bg-foreground text-background"
-                : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
-            )}
-          >
-            <Shield className="size-3.5" />
-            Security
-          </button>
-          <button
-            type="button"
-            onClick={() => setHealthLens((v) => !v)}
-            aria-pressed={healthLens}
-            title={
-              healthLens
-                ? "Back to the normal map"
-                : "Highlight unhealthy resources — dim everything that's healthy"
-            }
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-medium transition-colors",
-              healthLens
-                ? "border-transparent bg-danger text-white"
-                : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
-            )}
-          >
-            <Stethoscope className="size-3.5" />
-            Health
-          </button>
-          <button
-            type="button"
-            onClick={() => setChangedLens((v) => !v)}
-            aria-pressed={changedLens}
-            title={
-              changedLens
-                ? "Back to the normal map"
-                : "Highlight recently added or drifted resources"
-            }
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-medium transition-colors",
-              changedLens
-                ? "border-transparent bg-foreground text-background"
-                : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
-            )}
-          >
-            <Clock className="size-3.5" />
-            Changed
-          </button>
+          <div className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-muted/50 p-0.5">
+            <button
+              type="button"
+              onClick={() => setShowSecurity((v) => !v)}
+              aria-pressed={showSecurity}
+              title={
+                showSecurity
+                  ? "Hide security groups and protection edges"
+                  : "Show security groups and what they protect"
+              }
+              className={segCls(showSecurity)}
+            >
+              <Shield className={cn("size-3.5", showSecurity && "text-violet-500")} />
+              Security
+            </button>
+            <button
+              type="button"
+              onClick={() => setHealthLens((v) => !v)}
+              aria-pressed={healthLens}
+              title={
+                healthLens
+                  ? "Back to the normal map"
+                  : "Highlight unhealthy resources, dim everything that's healthy"
+              }
+              className={segCls(healthLens)}
+            >
+              <Stethoscope className={cn("size-3.5", healthLens && "text-danger")} />
+              Health
+            </button>
+            <button
+              type="button"
+              onClick={() => setChangedLens((v) => !v)}
+              aria-pressed={changedLens}
+              title={
+                changedLens
+                  ? "Back to the normal map"
+                  : "Highlight recently added or drifted resources"
+              }
+              className={segCls(changedLens)}
+            >
+              <Clock className={cn("size-3.5", changedLens && "text-sky-500")} />
+              Changed
+            </button>
+          </div>
           <span className="relative">
             <button
               type="button"
@@ -252,7 +251,7 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
               aria-pressed={showFilters || kindFilter.size > 0}
               title="Filter the map by resource kind"
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-medium transition-colors",
+                "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
                 showFilters || kindFilter.size > 0
                   ? "border-transparent bg-foreground text-background"
                   : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
@@ -261,7 +260,7 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
               <ListFilter className="size-3.5" />
               Filter
               {kindFilter.size > 0 ? (
-                <span className="rounded-full bg-background/20 px-1 text-[10px] tabular-nums">
+                <span className="rounded-full bg-foreground/10 px-1 text-[10px] tabular-nums">
                   {kindFilter.size}
                 </span>
               ) : null}
@@ -354,7 +353,6 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
         {selected && (
           <DetailPanel
             node={selected}
-            data={data}
             protectedBy={protectedBy.get(selected.id) ?? []}
             onClose={() => setSelectedId(null)}
           />
@@ -423,6 +421,8 @@ function Flow({
 }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const activeId = hoveredId ?? selectedId;
+  // Minimap is collapsed by default (it ate a corner); a small button toggles it.
+  const [showMinimap, setShowMinimap] = useState(false);
   // "Ask the map": a query highlights every matching node (null = no query). While a query is
   // active the shelves auto-expand so matches hiding in them aren't missed.
   const [queryIds, setQueryIds] = useState<Set<string> | null>(null);
@@ -471,12 +471,39 @@ function Flow({
     return counts;
   }, [data]);
 
+  // Which shelves to auto-expand: any shelf holding a node that matches the active query / filter /
+  // lens, so matches hiding in a collapsed shelf still surface. (A blast-radius click doesn't count
+  // — its scope is on-canvas edges.)
+  const shelvesForLayout = useMemo(() => {
+    const active = !!queryIds || kindFilter.size > 0 || healthLens || changedLens;
+    if (!active) return collapsedShelves;
+    const now = Date.now();
+    const WINDOW = 7 * 24 * 60 * 60 * 1000;
+    const matches = (n: MapNode): boolean => {
+      if (queryIds) return queryIds.has(n.id);
+      const passHealth =
+        !healthLens || n.health?.state === "unhealthy" || n.health?.state === "degraded";
+      const passChanged =
+        !changedLens ||
+        (!!n.firstSeen && now - new Date(n.firstSeen).getTime() < WINDOW) ||
+        (!!n.status && n.status !== "active");
+      const passKind = kindFilter.size === 0 || kindFilter.has(n.kind);
+      return passHealth && passChanged && passKind;
+    };
+    const expanded = new Set(collapsedShelves);
+    for (const n of data.nodes) {
+      // Flow nodes and IAM roles are never shelved.
+      if (n.kind === "aws.iam.role" || connectedIds.has(n.id)) continue;
+      if (!matches(n)) continue;
+      expanded.delete(n.kind.endsWith(".repository") ? "shelf-code" : "shelf-unconnected");
+    }
+    return expanded;
+  }, [queryIds, kindFilter, healthLens, changedLens, collapsedShelves, data.nodes, connectedIds]);
+
   const layout = useMemo(() => {
     const visibleNodes = data.nodes.filter((n) => !hiddenSet.has(n.id));
     const ids = new Set(visibleNodes.map((n) => n.id));
     const visibleEdges = canvasEdges.filter((e) => ids.has(e.from) && ids.has(e.to));
-    // A query expands the shelves so matches inside them render and can be highlighted.
-    const shelvesForLayout = queryIds ? new Set<string>() : collapsedShelves;
     const l = buildLayout(visibleNodes, visibleEdges, shelvesForLayout);
     // Attach collapse state (drives the ⊕/⊖ toggle), an open-PR count, and the shield chip
     // (who protects this node) so protection reads on the card, not as canvas rails.
@@ -520,9 +547,8 @@ function Flow({
     connectedIds,
     onToggleCollapse,
     openPrByRepo,
-    collapsedShelves,
+    shelvesForLayout,
     toggleShelf,
-    queryIds,
   ]);
 
   // Undirected adjacency over the drawn edges — powers blast-radius highlighting.
@@ -756,12 +782,25 @@ function Flow({
         <MapSearch nodes={searchNodes} onPick={onPick} onSearch={onSearch} />
       </Panel>
       <Controls showInteractive={false} />
-      <MiniMap
-        pannable
-        zoomable
-        nodeColor="hsl(var(--muted-foreground))"
-        style={{ width: 160, height: 120 }}
-      />
+      {showMinimap ? (
+        <MiniMap
+          pannable
+          zoomable
+          nodeColor="hsl(var(--muted-foreground))"
+          style={{ width: 160, height: 120, bottom: 48 }}
+        />
+      ) : null}
+      <Panel position="bottom-right">
+        <button
+          type="button"
+          onClick={() => setShowMinimap((v) => !v)}
+          title={showMinimap ? "Hide minimap" : "Show minimap"}
+          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background/85 px-2 py-1 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur transition-colors hover:text-foreground"
+        >
+          <MapIcon className="size-3.5" />
+          {showMinimap ? "Hide map" : "Minimap"}
+        </button>
+      </Panel>
     </ReactFlow>
   );
 }
@@ -792,6 +831,16 @@ function MapSearch({
   // Whether the user has arrow-navigated the suggestions — decides what Enter does (jump to the
   // navigated result vs. highlight ALL matches).
   const moved = useRef(false);
+  // Animated placeholder: crossfade the leading glyph + hint between "search" and "ask" while the
+  // box is empty AND unfocused, so it advertises both jobs without fighting you once you're in it.
+  const [phase, setPhase] = useState(0);
+  const [focused, setFocused] = useState(false);
+  const animating = !q && !focused;
+  useEffect(() => {
+    if (!animating) return;
+    const id = setInterval(() => setPhase((p) => (p + 1) % 2), 3200);
+    return () => clearInterval(id);
+  }, [animating]);
   const matches = useMemo(() => {
     const t = q.trim().toLowerCase();
     if (!t) return [];
@@ -837,21 +886,80 @@ function MapSearch({
   return (
     <div className="w-60">
       <div className="flex items-center gap-2 rounded-lg border border-border bg-background/85 px-2.5 py-1.5 shadow-sm backdrop-blur">
-        <Search className="size-3.5 shrink-0 text-muted-foreground" />
-        <input
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value);
-            setActive(0);
-            moved.current = false;
-            setOpen(true);
-          }}
-          onKeyDown={onKeyDown}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 120)}
-          placeholder="Search or ask the map…"
-          className="w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
-        />
+        {/* Crossfading glyph: magnifier ⇄ Atlas AI mark (only while idle & empty). */}
+        <span className="relative size-3.5 shrink-0 text-muted-foreground">
+          <Search
+            className={cn(
+              "absolute inset-0 size-3.5 transition-opacity duration-700",
+              !animating || phase === 0 ? "opacity-100" : "opacity-0",
+            )}
+          />
+          {animating ? (
+            <AtlasAiMark
+              size={14}
+              className={cn(
+                "absolute inset-0 transition-opacity duration-700",
+                phase === 1 ? "opacity-100" : "opacity-0",
+              )}
+            />
+          ) : null}
+        </span>
+        <div className="relative min-w-0 flex-1">
+          <input
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setActive(0);
+              moved.current = false;
+              setOpen(true);
+            }}
+            onKeyDown={onKeyDown}
+            onFocus={() => {
+              setFocused(true);
+              setOpen(true);
+            }}
+            onBlur={() => {
+              setFocused(false);
+              setTimeout(() => setOpen(false), 120);
+            }}
+            placeholder=""
+            className="w-full bg-transparent text-xs outline-none"
+          />
+          {/* Placeholder. Idle+empty → crossfade the two hints; focused+empty → a plain static hint
+              so it doesn't fight your typing. */}
+          {!q ? (
+            animating ? (
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-0 flex items-center overflow-hidden text-xs text-muted-foreground"
+              >
+                <span
+                  className={cn(
+                    "absolute transition-all duration-500",
+                    phase === 0 ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0",
+                  )}
+                >
+                  Search the map…
+                </span>
+                <span
+                  className={cn(
+                    "absolute transition-all duration-500",
+                    phase === 1 ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0",
+                  )}
+                >
+                  Ask the map anything…
+                </span>
+              </span>
+            ) : (
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-0 flex items-center text-xs text-muted-foreground"
+              >
+                Search or ask the map…
+              </span>
+            )
+          ) : null}
+        </div>
         {q ? (
           <button
             type="button"
@@ -959,17 +1067,6 @@ function Legend() {
       </div>
     </div>
   );
-}
-
-/** Humanize an edge type from the selected node's perspective (outgoing = it's the source). */
-function relVerb(type: string, fromKind: string, outgoing: boolean): string {
-  if (type === "OWNED_BY") {
-    if (outgoing) return fromKind === "bitbucket.pullrequest" ? "Raised by" : "Owned by";
-    return "Owns";
-  }
-  if (type === "CONTAINS") return outgoing ? "Contains" : "In";
-  const pretty = type.toLowerCase().replace(/_/g, " ");
-  return outgoing ? pretty.charAt(0).toUpperCase() + pretty.slice(1) : `${pretty} ←`;
 }
 
 function shortName(n: MapNode): string {
@@ -1112,37 +1209,18 @@ function MonitoringRow({ node }: { node: MapNode }) {
 
 function DetailPanel({
   node,
-  data,
   protectedBy,
   onClose,
 }: {
   node: MapNode;
-  data: MapData;
   protectedBy: string[];
   onClose: () => void;
 }) {
   const kindShort = node.kind.replace(/^aws\.|^github\.|^external\.|^atlas\.|^bitbucket\./, "");
   const facts = keyFacts(node);
 
-  const rels = useMemo(() => {
-    const byId = new Map(data.nodes.map((n) => [n.id, n]));
-    const out: { verb: string; name: string }[] = [];
-    for (const e of data.edges) {
-      if (e.from === node.id) {
-        const nb = byId.get(e.to);
-        if (nb) out.push({ verb: relVerb(e.type, node.kind, true), name: shortName(nb) });
-      } else if (e.to === node.id) {
-        const nb = byId.get(e.from);
-        if (nb) out.push({ verb: relVerb(e.type, nb.kind, false), name: shortName(nb) });
-      }
-    }
-    // Put ownership/authorship first - it's usually what you're looking for.
-    out.sort((a, b) => (a.verb.includes("by") ? -1 : 0) - (b.verb.includes("by") ? -1 : 0));
-    return out;
-  }, [data, node]);
-
   return (
-    <div className="absolute right-3 top-3 z-10 w-72 rounded-lg border border-border bg-card p-4 shadow-lg">
+    <div className="absolute right-3 top-3 z-10 w-80 rounded-lg border border-border bg-card p-4 shadow-lg">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold">{node.name ?? kindShort}</div>
@@ -1160,11 +1238,11 @@ function DetailPanel({
 
       <dl className="mt-3 space-y-1.5 text-xs">
         {node.health ? (
-          <div className="flex justify-between gap-3">
-            <dt className="text-muted-foreground">Health</dt>
+          <div className="flex justify-between gap-4">
+            <dt className="shrink-0 text-muted-foreground">Health</dt>
             <dd
               className={cn(
-                "truncate font-medium",
+                "min-w-0 break-words text-right font-medium",
                 node.health.state === "unhealthy"
                   ? "text-danger"
                   : node.health.state === "degraded"
@@ -1198,48 +1276,21 @@ function DetailPanel({
 
       <MonitoringRow node={node} />
 
-      {rels.length > 0 && (
-        <div className="mt-3 border-t border-border pt-3">
-          <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            Connections
-          </p>
-          <ul className="space-y-1 text-xs">
-            {rels.slice(0, 6).map((r, i) => (
-              <li key={i} className="flex justify-between gap-3">
-                <span className="shrink-0 text-muted-foreground">{r.verb}</span>
-                <span className="min-w-0 truncate font-medium">{r.name}</span>
-              </li>
-            ))}
-          </ul>
-          {rels.length > 6 && (
-            <p className="mt-1 text-[10px] text-muted-foreground">+{rels.length - 6} more</p>
-          )}
-        </div>
-      )}
-
       {node.health && node.health.state !== "healthy" ? (
         <Link
           href={diagnoseHref(node)}
-          className="mt-4 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-danger px-3 text-xs font-medium text-white hover:bg-danger/90"
+          className="mt-4 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-foreground px-3 text-xs font-medium text-background transition-opacity hover:opacity-90"
         >
-          <Stethoscope className="size-3.5" /> Diagnose with Atlas AI
+          <AtlasAiMark size={14} className="shrink-0" /> Diagnose with Atlas AI
         </Link>
       ) : null}
 
-      <div className="mt-3 flex gap-2">
-        <Link
-          href={`/explore/${node.id}`}
-          className="inline-flex h-8 flex-1 items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          Details
-        </Link>
-        <Link
-          href={`/explore/${node.id}/impact`}
-          className="inline-flex h-8 flex-1 items-center justify-center rounded-md border border-border px-3 text-xs font-medium hover:border-foreground/40"
-        >
-          Impact
-        </Link>
-      </div>
+      <Link
+        href={`/explore/${node.id}`}
+        className="mt-2 inline-flex h-8 w-full items-center justify-center rounded-md border border-border px-3 text-xs font-medium transition-colors hover:border-foreground/40"
+      >
+        View details
+      </Link>
     </div>
   );
 }
@@ -1253,9 +1304,9 @@ export function diagnoseHref(node: { name: string | null; kind: string }): strin
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between gap-3">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="truncate font-medium">{value}</dd>
+    <div className="flex justify-between gap-4">
+      <dt className="shrink-0 text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 break-words text-right font-medium">{value}</dd>
     </div>
   );
 }
