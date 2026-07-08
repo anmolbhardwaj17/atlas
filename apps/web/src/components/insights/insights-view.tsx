@@ -2,9 +2,11 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Activity,
   ArrowRight,
+  ChevronRight,
   Cog,
   DollarSign,
   Gauge,
@@ -14,7 +16,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { SeverityBadge } from "@/components/tags";
 import { AtlasAiMark } from "@/components/brand";
 import { cn } from "@/lib/cn";
 
@@ -36,7 +37,7 @@ export interface InsightsSummary {
   pipelineCoverage: { withPipeline: number; total: number };
 }
 
-const PILLAR_META: Record<string, { label: string; icon: LucideIcon }> = {
+export const PILLAR_META: Record<string, { label: string; icon: LucideIcon }> = {
   security: { label: "Security", icon: ShieldCheck },
   reliability: { label: "Reliability", icon: Activity },
   cost: { label: "Cost", icon: DollarSign },
@@ -44,15 +45,10 @@ const PILLAR_META: Record<string, { label: string; icon: LucideIcon }> = {
   hygiene: { label: "Hygiene", icon: Sparkles },
   operations: { label: "Operations", icon: Cog },
 };
-const pillarMeta = (p?: string) =>
+export const pillarMeta = (p?: string) =>
   (p && PILLAR_META[p]) || { label: p ?? "General", icon: TriangleAlert };
 
 const SEV_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
-const SEV_ACCENT: Record<string, string> = {
-  high: "border-l-danger",
-  medium: "border-l-warning",
-  low: "border-l-inferred-low",
-};
 const SEV_TEXT: Record<string, string> = {
   high: "text-danger",
   medium: "text-warning",
@@ -65,10 +61,9 @@ const SEV_DOT: Record<string, string> = {
 };
 
 /**
- * Insights (Atlas Knowledge Engine) - the ADVISORY layer. A scannable posture summary up top,
- * then prioritised findings, each with why-it-matters / how-to-fix and a one-click Ask Atlas
- * thread. Filter by pillar to focus. Distinct from the dashboard's status glance: you come here
- * to *improve*.
+ * Insights (Atlas Knowledge Engine) - the ADVISORY layer. A scannable posture summary + a dense,
+ * filterable findings table; each row opens a detail page with the full guidance, evidence, and
+ * lifecycle actions. Findings are derived live from the graph, so a real fix auto-resolves them.
  */
 export function InsightsView({
   summary,
@@ -77,12 +72,12 @@ export function InsightsView({
   summary: InsightsSummary | null;
   findings: Finding[];
 }) {
+  const router = useRouter();
   const sorted = React.useMemo(
     () => [...findings].sort((a, b) => (SEV_ORDER[a.severity] ?? 3) - (SEV_ORDER[b.severity] ?? 3)),
     [findings],
   );
 
-  // Pillars present, with counts, for the filter chips.
   const pillars = React.useMemo(() => {
     const counts = new Map<string, number>();
     for (const f of sorted) {
@@ -105,8 +100,8 @@ export function InsightsView({
       <header className="space-y-1">
         <h1 className="text-xl font-semibold">Insights</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          What to act on - grounded findings with best-practice guidance on how to fix and optimise.
-          Recomputed live from your latest sync.
+          What to act on - grounded findings with best-practice guidance. Open any one for the full
+          fix, evidence, and to track it. Recomputed live from your latest sync.
         </p>
       </header>
 
@@ -139,17 +134,11 @@ export function InsightsView({
                     style={{ width: `${covPct}%` }}
                   />
                 </div>
-                {covGap > 0 ? (
-                  <Link
-                    href={`/ask?q=${encodeURIComponent("How do I improve my CI/CD pipeline coverage?")}`}
-                    className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    {covGap} repo{covGap === 1 ? "" : "s"} to cover{" "}
-                    <ArrowRight className="size-3" />
-                  </Link>
-                ) : (
-                  <p className="mt-2 text-xs text-success">Every repo has a pipeline.</p>
-                )}
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {covGap > 0
+                    ? `${covGap} repo${covGap === 1 ? "" : "s"} without a pipeline`
+                    : "Every repo has a pipeline."}
+                </p>
               </>
             ) : (
               <p className="mt-1 text-sm text-muted-foreground">No repositories yet.</p>
@@ -176,7 +165,7 @@ export function InsightsView({
         </div>
       ) : null}
 
-      {/* Findings. */}
+      {/* Findings table - dense + scannable; a row opens its detail page. */}
       {shown.length === 0 ? (
         <Card>
           <CardContent className="py-14 text-center">
@@ -189,77 +178,74 @@ export function InsightsView({
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {shown.map((it) => {
-            const m = pillarMeta(it.guidance?.pillar);
-            return (
-              <Card key={it.id} className={cn("border-l-4", SEV_ACCENT[it.severity])}>
-                <CardContent className="flex gap-4 p-5">
-                  <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
-                    <m.icon className="size-[18px]" />
-                  </span>
-
-                  <div className="min-w-0 flex-1 space-y-3">
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <SeverityBadge severity={it.severity} />
-                        <span className="text-xs text-muted-foreground">{m.label}</span>
-                        {it.count && it.count > 1 ? (
-                          <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                            {it.count}×
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <th className="w-24 px-4 py-2.5 font-medium">Severity</th>
+                  <th className="px-4 py-2.5 font-medium">Finding</th>
+                  <th className="hidden px-4 py-2.5 font-medium sm:table-cell">Category</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Affected</th>
+                  <th className="w-8 px-2 py-2.5" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {shown.map((it) => {
+                  const m = pillarMeta(it.guidance?.pillar);
+                  return (
+                    <tr
+                      key={it.id}
+                      onClick={() => router.push(`/insights/${it.id}`)}
+                      className="cursor-pointer transition-colors hover:bg-muted/40"
+                    >
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className={cn("size-2 rounded-full", SEV_DOT[it.severity])} />
+                          <span
+                            className={cn("text-xs font-medium capitalize", SEV_TEXT[it.severity])}
+                          >
+                            {it.severity}
                           </span>
-                        ) : null}
-                      </div>
-                      <h3 className="text-sm font-semibold text-foreground">{it.title}</h3>
-                    </div>
-
-                    {it.guidance ? (
-                      <div className="grid gap-3 rounded-lg bg-muted/40 p-3 text-sm text-muted-foreground sm:grid-cols-2">
-                        <p>
-                          <span className="mb-0.5 block text-xs font-semibold uppercase tracking-wide text-foreground/70">
-                            Why it matters
-                          </span>
-                          {it.guidance.why}
-                        </p>
-                        <p>
-                          <span className="mb-0.5 block text-xs font-semibold uppercase tracking-wide text-foreground/70">
-                            How to fix
-                          </span>
-                          {it.guidance.fix}
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">{it.detail}</p>
-                    )}
-
-                    <div className="flex flex-wrap items-center gap-3 pt-0.5">
-                      <Link
-                        href={`/ask?q=${encodeURIComponent(`How do I fix: ${it.title}?`)}`}
-                        className="inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background transition-opacity hover:opacity-90"
-                      >
-                        <AtlasAiMark size={14} className="size-3.5" /> Ask Atlas
-                      </Link>
-                      {it.href ? (
-                        <Link
-                          href={it.href}
-                          className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                        >
-                          View evidence <ArrowRight className="size-3" />
-                        </Link>
-                      ) : null}
-                      {it.guidance?.source ? (
-                        <span className="ml-auto text-[11px] text-muted-foreground/70">
-                          {it.guidance.source}
                         </span>
-                      ) : null}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link
+                          href={`/insights/${it.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="font-medium text-foreground hover:underline"
+                        >
+                          {it.title}
+                        </Link>
+                      </td>
+                      <td className="hidden px-4 py-3 sm:table-cell">
+                        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <m.icon className="size-3.5" /> {m.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                        {it.count && it.count > 1 ? it.count : "-"}
+                      </td>
+                      <td className="px-2 py-3">
+                        <ChevronRight className="size-4 text-muted-foreground" />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
+
+      {covGap > 0 ? (
+        <Link
+          href={`/ask?q=${encodeURIComponent("How do I improve my CI/CD pipeline coverage?")}`}
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          Improve CI/CD coverage with Atlas <ArrowRight className="size-3.5" />
+        </Link>
+      ) : null}
     </div>
   );
 }
