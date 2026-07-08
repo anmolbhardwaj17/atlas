@@ -11,6 +11,7 @@ import { createAwsConnector } from "@atlas/connector-aws";
 import { createGithubConnector } from "@atlas/connector-github";
 import { createBitbucketConnector } from "@atlas/connector-bitbucket";
 import { AuthModule } from "../auth/auth.module";
+import { GraphModule } from "../graph/graph.module";
 import { ENV, PG_POOL } from "../core/tokens";
 import { ConnectionService } from "./connection.service";
 import { NodeMetricsController } from "./node-metrics.controller";
@@ -63,7 +64,7 @@ const connectorRegistryProvider: Provider = {
 };
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, GraphModule],
   controllers: [ConnectionController, NodeMetricsController],
   providers: [
     ConnectionService,

@@ -24,6 +24,9 @@ export function syncJobId(data: SyncJobData): string {
 export interface SyncWorkerDeps extends RunnerDeps {
   resolveConnector: (provider: string) => Connector | undefined;
   loadConnection: (orgId: string, connectionId: string) => Promise<Connection | null>;
+  /** Ran after a non-failed sync's enrich + infer stages, once the graph is fully persisted.
+   *  Used to reconcile the derived-finding lifecycle (open/resolved/regressed). Best-effort. */
+  onSyncComplete?: (orgId: string, connectionId: string) => Promise<void>;
 }
 
 /** Build the handler that runs one sync job: load connection → resolve connector →
@@ -62,6 +65,16 @@ export function createSyncHandler(deps: SyncWorkerDeps): (job: Job<SyncJobData>)
         await runInference({ db: deps.db }, orgId, ALL_RULES);
       } catch (err) {
         logger.error(`inference after sync ${runId} failed: ${(err as Error).message}`);
+      }
+    }
+
+    // Lifecycle stage: reconcile the persisted finding history now the graph is fully built, so a
+    // fixed finding is recorded as resolved (and a returning one as regressed). Best-effort (P7).
+    if (result.status !== "failed" && deps.onSyncComplete) {
+      try {
+        await deps.onSyncComplete(orgId, connectionId);
+      } catch (err) {
+        logger.error(`finding reconcile after sync ${runId} failed: ${(err as Error).message}`);
       }
     }
   };

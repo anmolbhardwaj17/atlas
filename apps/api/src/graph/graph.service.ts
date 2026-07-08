@@ -79,6 +79,19 @@ export interface Finding {
   count?: number;
 }
 
+/** Persisted lifecycle of a finding (docs/09): open/resolved + when first/last seen + regression. */
+export interface FindingState {
+  findingId: string;
+  status: "open" | "resolved";
+  severity: string;
+  title: string;
+  category: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  resolvedAt: string | null;
+  regressedAt: string | null;
+}
+
 /** Consumer-facing dashboard summary (docs/09 §5.2): inventory, trust, findings, activity. */
 export interface DashboardSummary {
   inventory: {
@@ -276,6 +289,76 @@ export class GraphService {
     await withOrgScope(this.db, orgId, (c) =>
       c.query(`DELETE FROM muted_findings WHERE finding_id = $1`, [findingId]),
     );
+  }
+
+  /**
+   * Reconcile the persisted finding lifecycle against the live graph. Called by the sync worker
+   * after each completed sync (docs/09): findings are derived, so this is the only place the
+   * "what's open / what got fixed / what regressed" history is recorded — tied to a real data
+   * change, not a page view. Reuses the dashboard's own finding computation, so the persisted
+   * lifecycle can never drift from what the UI shows.
+   */
+  async reconcileFindings(orgId: string): Promise<{ active: number; resolved: number }> {
+    const { findings } = await this.summary(orgId);
+    const activeIds = findings.map((f) => f.id);
+    return withOrgScope(this.db, orgId, async (c) => {
+      for (const f of findings) {
+        await c.query(
+          `INSERT INTO finding_state (org_id, finding_id, status, severity, title, category)
+           VALUES ($1, $2, 'open', $3, $4, $5)
+           ON CONFLICT (org_id, finding_id) DO UPDATE SET
+             last_seen_at = now(),
+             status       = 'open',
+             severity     = EXCLUDED.severity,
+             title        = EXCLUDED.title,
+             category     = EXCLUDED.category,
+             -- resolved → seen again = a regression; stamp it (kept as history).
+             regressed_at = CASE WHEN finding_state.status = 'resolved' THEN now()
+                                 ELSE finding_state.regressed_at END,
+             resolved_at  = NULL`,
+          [orgId, f.id, f.severity, f.title, f.category],
+        );
+      }
+      // Anything still open but no longer produced by the live graph is now fixed.
+      const resolved = await c.query(
+        `UPDATE finding_state SET status = 'resolved', resolved_at = now()
+         WHERE status = 'open' AND finding_id <> ALL($1::text[])`,
+        [activeIds],
+      );
+      return { active: activeIds.length, resolved: resolved.rowCount ?? 0 };
+    });
+  }
+
+  /** The persisted lifecycle rows (open + resolved), for merging aging/fixed history into Insights. */
+  async listFindingStates(orgId: string): Promise<FindingState[]> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      const { rows } = await c.query<{
+        finding_id: string;
+        status: "open" | "resolved";
+        severity: string;
+        title: string;
+        category: string;
+        first_seen_at: Date;
+        last_seen_at: Date;
+        resolved_at: Date | null;
+        regressed_at: Date | null;
+      }>(
+        `SELECT finding_id, status, severity, title, category,
+                first_seen_at, last_seen_at, resolved_at, regressed_at
+           FROM finding_state`,
+      );
+      return rows.map((r) => ({
+        findingId: r.finding_id,
+        status: r.status,
+        severity: r.severity,
+        title: r.title,
+        category: r.category,
+        firstSeenAt: r.first_seen_at.toISOString(),
+        lastSeenAt: r.last_seen_at.toISOString(),
+        resolvedAt: r.resolved_at?.toISOString() ?? null,
+        regressedAt: r.regressed_at?.toISOString() ?? null,
+      }));
+    });
   }
 
   /** Org overview for the dashboard (docs/09 §5.2): counts + tiers + freshness. */

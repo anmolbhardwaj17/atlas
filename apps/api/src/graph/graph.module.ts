@@ -8,5 +8,7 @@ import { GraphService } from "./graph.service";
   imports: [AuthModule],
   controllers: [GraphController],
   providers: [GraphService],
+  // Exported so the sync worker can reconcile the finding lifecycle after each sync.
+  exports: [GraphService],
 })
 export class GraphModule {}

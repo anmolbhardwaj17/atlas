@@ -8,6 +8,7 @@ import {
 } from "@atlas/ingest";
 import type { Connection, ConnectorLogger } from "@atlas/connector-sdk";
 import { PG_POOL } from "../core/tokens";
+import { GraphService } from "../graph/graph.service";
 import { SECRET_BROKER, JOB_QUEUE } from "./tokens";
 import { ConnectorRegistry } from "./connector-registry";
 
@@ -28,6 +29,7 @@ export class SyncWorkerBootstrap implements OnModuleInit {
     @Inject(JOB_QUEUE) private readonly queue: JobQueue,
     @Inject(SECRET_BROKER) private readonly secrets: SecretBroker,
     private readonly registry: ConnectorRegistry,
+    private readonly graph: GraphService,
   ) {}
 
   onModuleInit(): void {
@@ -44,6 +46,10 @@ export class SyncWorkerBootstrap implements OnModuleInit {
       logger: log,
       resolveConnector: (provider) => this.registry.get(provider),
       loadConnection: (orgId, connectionId) => this.loadConnection(orgId, connectionId),
+      onSyncComplete: async (orgId) => {
+        const { active, resolved } = await this.graph.reconcileFindings(orgId);
+        this.logger.log(`finding lifecycle reconciled: ${active} open, ${resolved} newly resolved`);
+      },
     });
     this.logger.log("In-process sync worker registered (dev).");
   }
