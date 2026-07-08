@@ -295,25 +295,24 @@ function ProviderRow({
           </div>
           {connected ? (
             <p className="truncate text-sm">
-              <span className={freshTone}>{freshLabel}</span>
               {resourcesLabel ? (
                 <>
-                  <span className="text-muted-foreground"> · </span>
                   <span className="text-foreground">{resourcesLabel}</span>
-                </>
-              ) : null}
-              {needsAttention > 0 ? (
-                <>
                   <span className="text-muted-foreground"> · </span>
-                  <span className="text-warning">{attentionLabel}</span>
                 </>
               ) : null}
+              <span className={cn("text-xs", freshTone)}>{freshLabel}</span>
             </p>
           ) : (
             <p className="truncate text-sm text-muted-foreground">{provider.blurb}</p>
           )}
         </button>
         <div className="flex shrink-0 items-center gap-2">
+          {connected && needsAttention > 0 ? (
+            <span className="mr-1 hidden text-sm font-medium text-warning sm:inline">
+              {attentionLabel}
+            </span>
+          ) : null}
           {comingSoon ? (
             <span className="text-xs text-muted-foreground">Coming soon</span>
           ) : connected ? (
