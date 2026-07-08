@@ -248,6 +248,50 @@ function LogoShowcase() {
   );
 }
 
+/** The shared integration list-row shell: logo · name + category · a one-line state, with an action
+ *  on the right. Both connectable providers (which sync a graph) and alert channels (webhooks) use
+ *  it — they differ only in the `secondary` line and the `action`, so the row itself stays one thing. */
+function IntegrationRow({
+  provider,
+  onOpen,
+  openEnabled,
+  secondary,
+  action,
+}: {
+  provider: ProviderMeta;
+  onOpen?: () => void;
+  openEnabled: boolean;
+  secondary: React.ReactNode;
+  action: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-3 bg-card px-4 py-3">
+      <div className="grid size-8 shrink-0 place-items-center">
+        <ProviderLogo provider={provider} className="size-6" />
+      </div>
+      <button
+        type="button"
+        onClick={onOpen}
+        disabled={!openEnabled}
+        className={cn("min-w-0 flex-1 text-left", openEnabled ? "group" : "cursor-default")}
+      >
+        <div className="flex items-center gap-2">
+          <span
+            className={cn("truncate text-sm font-medium", openEnabled && "group-hover:underline")}
+          >
+            {provider.name}
+          </span>
+          <span className="hidden shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground sm:inline">
+            {provider.category}
+          </span>
+        </div>
+        <div className="mt-0.5 truncate text-xs">{secondary}</div>
+      </button>
+      <div className="flex shrink-0 items-center gap-2">{action}</div>
+    </div>
+  );
+}
+
 /** An outbound alert channel (Slack/Discord/Teams) as a list row. These don't sync a graph —
  *  they're an incoming webhook — so the row mirrors that state and opens a slide-over to
  *  connect, send a test, or disconnect, right here (no jump to Settings). */
@@ -268,50 +312,35 @@ function AlertProviderRow({
 
   return (
     <>
-      <div className="flex items-center gap-4 bg-card px-4 py-5">
-        <div className="grid size-10 shrink-0 place-items-center">
-          <ProviderLogo provider={provider} className="size-7" />
-        </div>
-        <button
-          type="button"
-          onClick={open}
-          disabled={!canManage}
-          className={cn("min-w-0 flex-1 text-left", canManage ? "group" : "cursor-default")}
-        >
-          <div className="flex items-center gap-2">
-            <span className={cn("truncate font-medium", canManage && "group-hover:underline")}>
-              {provider.name}
-            </span>
-            <span className="hidden shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground sm:inline">
-              {provider.category}
-            </span>
-          </div>
-          {connected && channel ? (
-            <p className="truncate text-sm">
-              <span className="text-xs text-success">Added {timeAgo(channel.createdAt)}</span>
-            </p>
+      <IntegrationRow
+        provider={provider}
+        openEnabled={canManage}
+        onOpen={open}
+        secondary={
+          connected && channel ? (
+            <span className="text-success">Added {timeAgo(channel.createdAt)}</span>
           ) : (
-            <p className="truncate text-sm text-muted-foreground">{provider.blurb}</p>
-          )}
-        </button>
-        <div className="flex shrink-0 items-center gap-2">
-          {connected ? (
+            <span className="text-muted-foreground">{provider.blurb}</span>
+          )
+        }
+        action={
+          connected ? (
             <button
               type="button"
               onClick={open}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-foreground px-3 text-sm font-medium text-background transition-opacity hover:opacity-90 dark:bg-secondary dark:text-foreground"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-foreground px-3 text-xs font-medium text-background transition-opacity hover:opacity-90 dark:bg-secondary dark:text-foreground"
             >
               <Check className="size-4 text-emerald-400" /> Connected
             </button>
           ) : canManage ? (
-            <Button variant="outline" className="h-9" onClick={open}>
+            <Button variant="outline" className="h-8 text-xs" onClick={open}>
               Connect
             </Button>
           ) : (
             <span className="text-xs text-muted-foreground">Ask an admin</span>
-          )}
-        </div>
-      </div>
+          )
+        }
+      />
       <AlertManageSheet
         open={manageOpen}
         onOpenChange={setManageOpen}
@@ -563,78 +592,67 @@ function ProviderRow({
 
   return (
     <>
-      <div className="flex items-center gap-4 bg-card px-4 py-5">
-        <div className="grid size-10 shrink-0 place-items-center">
-          <ProviderLogo provider={provider} className="size-7" />
-        </div>
-        <button
-          type="button"
-          onClick={openManage}
-          disabled={!connected}
-          className={cn("min-w-0 flex-1 text-left", connected ? "group" : "cursor-default")}
-        >
-          <div className="flex items-center gap-2">
-            <span className={cn("truncate font-medium", connected && "group-hover:underline")}>
-              {provider.name}
-            </span>
-            <span className="hidden shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground sm:inline">
-              {provider.category}
-            </span>
-          </div>
-          {connected ? (
-            <p className="truncate text-sm">
+      <IntegrationRow
+        provider={provider}
+        openEnabled={connected}
+        onOpen={openManage}
+        secondary={
+          connected ? (
+            <>
               {resourcesLabel ? (
                 <>
                   <span className="text-foreground">{resourcesLabel}</span>
                   <span className="text-muted-foreground"> · </span>
                 </>
               ) : null}
-              <span className={cn("text-xs", freshTone)}>{freshLabel}</span>
-            </p>
-          ) : (
-            <p className="truncate text-sm text-muted-foreground">{provider.blurb}</p>
-          )}
-        </button>
-        <div className="flex shrink-0 items-center gap-2">
-          {connected && needsAttention > 0 ? (
-            <span className="mr-1 hidden text-sm font-medium text-warning sm:inline">
-              {attentionLabel}
-            </span>
-          ) : null}
-          {comingSoon ? (
-            <span className="text-xs text-muted-foreground">Coming soon</span>
-          ) : connected ? (
-            <>
-              {canManage ? (
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="size-9"
-                  onClick={onConnect}
-                  aria-label={`Add another ${provider.name} connection`}
-                  title="Add another connection"
-                >
-                  <Plus className="size-4" />
-                </Button>
-              ) : null}
-              <button
-                type="button"
-                onClick={openManage}
-                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-foreground px-3 text-sm font-medium text-background transition-opacity hover:opacity-90 dark:bg-secondary dark:text-foreground"
-              >
-                <Check className="size-4 text-emerald-400" />
-                {connections.length > 1 ? `${connections.length} connected` : "Connected"}
-              </button>
+              <span className={cn(freshTone)}>{freshLabel}</span>
             </>
-          ) : canManage ? (
-            <Button variant="outline" className="h-9" onClick={onConnect}>
-              Connect
-            </Button>
           ) : (
-            <span className="text-xs text-muted-foreground">Ask an admin</span>
-          )}
-        </div>
-      </div>
+            <span className="text-muted-foreground">{provider.blurb}</span>
+          )
+        }
+        action={
+          <>
+            {connected && needsAttention > 0 ? (
+              <span className="mr-1 hidden text-xs font-medium text-warning sm:inline">
+                {attentionLabel}
+              </span>
+            ) : null}
+            {comingSoon ? (
+              <span className="text-xs text-muted-foreground">Coming soon</span>
+            ) : connected ? (
+              <>
+                {canManage ? (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="size-8"
+                    onClick={onConnect}
+                    aria-label={`Add another ${provider.name} connection`}
+                    title="Add another connection"
+                  >
+                    <Plus className="size-4" />
+                  </Button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={openManage}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md bg-foreground px-3 text-xs font-medium text-background transition-opacity hover:opacity-90 dark:bg-secondary dark:text-foreground"
+                >
+                  <Check className="size-4 text-emerald-400" />
+                  {connections.length > 1 ? `${connections.length} connected` : "Connected"}
+                </button>
+              </>
+            ) : canManage ? (
+              <Button variant="outline" className="h-8 text-xs" onClick={onConnect}>
+                Connect
+              </Button>
+            ) : (
+              <span className="text-xs text-muted-foreground">Ask an admin</span>
+            )}
+          </>
+        }
+      />
       <ManageSheet
         open={manageOpen}
         onOpenChange={setManageOpen}
