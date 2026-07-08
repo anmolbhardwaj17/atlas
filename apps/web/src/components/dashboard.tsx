@@ -25,6 +25,7 @@ import { cn } from "@/lib/cn";
 import { Onboarding } from "@/components/onboarding";
 import { AskLauncher } from "@/components/dashboard/ask-launcher";
 import { RefreshLatest } from "@/components/dashboard/refresh-latest";
+import { ContributorsDonut } from "@/components/dashboard/contributors-donut";
 import { SeverityBadge } from "@/components/tags";
 import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
 import { KIND_LOGO } from "@/lib/kind-visual";
@@ -751,7 +752,7 @@ function Insights({ insights }: { insights: Summary["insights"] }) {
         </p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <ContributorsCard items={topContributors} subtitle="PRs raised · 30d" href={userHref} />
+        <ContributorsDonut items={topContributors} subtitle="PRs raised · 30d" href={userHref} />
         <Leaderboard
           title="Most active repos"
           subtitle="PRs · 30d"
@@ -799,98 +800,6 @@ function TickMeter({ pct, ticks = 30 }: { pct: number; ticks?: number }) {
         <span key={i} className={cn("flex-1 rounded-full", i < filled ? fill : "bg-muted")} />
       ))}
     </div>
-  );
-}
-
-/** Palette for the contributor donut — a spread of blues (a la shadcn's pie-chart demo). */
-const DONUT_COLORS = ["#2684ff", "#4c9aff", "#0052cc", "#79b8ff", "#1d4ed8", "#93c5fd"];
-
-/** Top contributors as a donut (shadcn "donut with text"): a segment per person sized by their
- *  PR count, with the total PRs in the centre and a compact legend beside it. */
-function ContributorsCard({
-  items,
-  subtitle,
-  href,
-}: {
-  items: Array<{ name: string; count: number }>;
-  subtitle: string;
-  href: string;
-}) {
-  const total = items.reduce((sum, it) => sum + it.count, 0);
-  const r = 44;
-  const sw = 12;
-  const circ = 2 * Math.PI * r;
-  const gap = items.length > 1 ? 4 : 0;
-  let acc = 0;
-  const segs = items.map((it, i) => {
-    const len = total > 0 ? (it.count / total) * circ : 0;
-    const seg = {
-      dash: Math.max(0, len - gap),
-      offset: -acc,
-      color: DONUT_COLORS[i % DONUT_COLORS.length] ?? "#2684ff",
-    };
-    acc += len;
-    return seg;
-  });
-  return (
-    <Card>
-      <CardContent className="p-5">
-        <div className="mb-3 flex items-baseline justify-between">
-          <div className="text-sm font-medium">Top contributors</div>
-          <Link href={href} className="text-xs text-muted-foreground hover:text-foreground">
-            {subtitle}
-          </Link>
-        </div>
-        {items.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No PRs in the last 30 days yet.</p>
-        ) : (
-          <div className="flex items-center gap-5">
-            <div className="relative grid size-[124px] shrink-0 place-items-center">
-              <svg viewBox="0 0 112 112" className="size-[124px] -rotate-90">
-                <circle
-                  cx="56"
-                  cy="56"
-                  r={r}
-                  fill="none"
-                  className="stroke-muted"
-                  strokeWidth={sw}
-                />
-                {segs.map((sgm, i) => (
-                  <circle
-                    key={items[i]?.name ?? i}
-                    cx="56"
-                    cy="56"
-                    r={r}
-                    fill="none"
-                    stroke={sgm.color}
-                    strokeWidth={sw}
-                    strokeLinecap="butt"
-                    strokeDasharray={`${sgm.dash.toFixed(1)} ${(circ - sgm.dash).toFixed(1)}`}
-                    strokeDashoffset={sgm.offset.toFixed(1)}
-                  />
-                ))}
-              </svg>
-              <div className="absolute text-center leading-none">
-                <div className="text-2xl font-semibold tabular-nums">{total}</div>
-                <div className="mt-1 text-[10px] text-muted-foreground">PRs</div>
-              </div>
-            </div>
-            <ul className="min-w-0 flex-1 space-y-2">
-              {items.map((it, i) => (
-                <li key={it.name} className="flex items-center gap-2 text-sm">
-                  <span
-                    className="size-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: DONUT_COLORS[i % DONUT_COLORS.length] }}
-                  />
-                  <span className="min-w-0 flex-1 truncate">{it.name}</span>
-                  <span className="shrink-0 font-semibold tabular-nums">{it.count}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </CardContent>
-    </Card>
   );
 }
 
