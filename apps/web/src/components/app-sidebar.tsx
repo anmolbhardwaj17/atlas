@@ -103,7 +103,18 @@ function ConnectAppsCard() {
 
   return (
     <div className="mb-1 overflow-hidden rounded-xl border border-sidebar-border bg-background group-data-[collapsible=icon]:hidden">
-      <div className="flex items-center justify-center gap-1.5 bg-gradient-to-br from-violet-300 via-sky-200 to-emerald-200 px-3 py-8 dark:from-violet-500/50 dark:via-sky-500/40 dark:to-emerald-500/40">
+      <div
+        className="flex items-center justify-center gap-1.5 px-3 py-8"
+        style={{
+          backgroundImage: [
+            "radial-gradient(120% 120% at 12% 12%, rgba(196,181,253,0.9), transparent 52%)",
+            "radial-gradient(120% 120% at 88% 22%, rgba(253,186,208,0.85), transparent 55%)",
+            "radial-gradient(120% 120% at 72% 92%, rgba(191,219,254,0.9), transparent 55%)",
+            "radial-gradient(120% 120% at 96% 82%, rgba(254,205,170,0.75), transparent 55%)",
+            "linear-gradient(135deg, #ede9fe, #e0f2fe)",
+          ].join(", "),
+        }}
+      >
         {PROMO_LOGOS.map((l) => (
           <div key={l} className="grid size-8 place-items-center rounded-lg bg-white shadow-sm">
             <CloudIcon name={l} className="size-5" />
