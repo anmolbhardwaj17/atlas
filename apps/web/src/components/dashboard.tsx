@@ -65,6 +65,7 @@ interface Summary {
     topContributors: Array<{ name: string; count: number }>;
     mostActiveRepos: Array<{ name: string; count: number }>;
     pipelineCoverage: { withPipeline: number; total: number };
+    codeProvider: string | null;
   };
 }
 
@@ -121,11 +122,10 @@ export async function Dashboard({
           that side of the estate is connected, so a code-only or infra-only org isn't all zeros. */}
       {inv.services + inv.datastores + inv.clouds > 0 && (
         <StatGroup label="Infrastructure">
-          <Stat icon={Boxes} tone={STAT_TONE.violet} label="Services" value={inv.services} />
-          <Stat icon={Database} tone={STAT_TONE.sky} label="Datastores" value={inv.datastores} />
+          <Stat icon={Boxes} label="Services" value={inv.services} />
+          <Stat icon={Database} label="Datastores" value={inv.datastores} />
           <Stat
             icon={Cloud}
-            tone={STAT_TONE.amber}
             label="Clouds"
             value={inv.clouds}
             sub={
@@ -136,16 +136,10 @@ export async function Dashboard({
       )}
       {inv.repositories > 0 && (
         <StatGroup label="Code">
-          <Stat
-            icon={GitBranch}
-            tone={STAT_TONE.indigo}
-            label="Repositories"
-            value={inv.repositories}
-          />
-          <Stat icon={FolderGit2} tone={STAT_TONE.teal} label="Projects" value={inv.projects} />
+          <Stat icon={GitBranch} label="Repositories" value={inv.repositories} />
+          <Stat icon={FolderGit2} label="Projects" value={inv.projects} />
           <Stat
             icon={Play}
-            tone={STAT_TONE.cyan}
             label="Pipelines"
             value={inv.pipelines}
             sub={
@@ -154,7 +148,7 @@ export async function Dashboard({
                 : undefined
             }
           />
-          <Stat icon={Users} tone={STAT_TONE.rose} label="Contributors" value={inv.contributors} />
+          <Stat icon={Users} label="Contributors" value={inv.contributors} />
         </StatGroup>
       )}
 
@@ -213,7 +207,7 @@ function TrustPulse({ trust, inv }: { trust: Summary["trust"]; inv: Summary["inv
       <span aria-hidden>·</span>
       <span className="inline-flex items-center gap-1.5">
         <span
-          className={`size-1.5 rounded-full ${allHealthy ? "bg-success" : "bg-warning"}`}
+          className={`size-1.5 rounded-full ${allHealthy ? "bg-emerald-500" : "bg-amber-500"}`}
           aria-hidden
         />
         {trust.healthySources}/{trust.sources} sources healthy
@@ -297,9 +291,9 @@ function FindingsCard({ findings }: { findings: Finding[] }) {
   }
   const total = findings.length;
   const seg = [
-    { n: sev.high, color: "bg-danger", label: "High" },
-    { n: sev.medium, color: "bg-warning", label: "Medium" },
-    { n: sev.low, color: "bg-inferred-low", label: "Low" },
+    { n: sev.high, color: "bg-red-500", label: "High" },
+    { n: sev.medium, color: "bg-amber-500", label: "Medium" },
+    { n: sev.low, color: "bg-blue-500", label: "Low" },
   ];
   return (
     <Card className="shadow-sm">
@@ -351,8 +345,9 @@ function FindingsCard({ findings }: { findings: Finding[] }) {
 
 /** Sources health pulse — how trustworthy the picture is, at a glance. */
 function SourcesCard({ trust, inv }: { trust: Summary["trust"]; inv: Summary["inventory"] }) {
-  const allHealthy = trust.sources > 0 && trust.healthySources === trust.sources;
-  const pct = trust.sources > 0 ? Math.round((trust.healthySources / trust.sources) * 100) : 0;
+  const ratio = trust.sources > 0 ? trust.healthySources / trust.sources : 0;
+  const pct = Math.round(ratio * 100);
+  const barColor = ratio >= 1 ? "bg-emerald-500" : ratio > 0 ? "bg-amber-500" : "bg-red-500";
   return (
     <Card className="shadow-sm">
       <CardContent className="flex h-full flex-col p-5">
@@ -373,10 +368,7 @@ function SourcesCard({ trust, inv }: { trust: Summary["trust"]; inv: Summary["in
         </p>
         <p className="text-xs text-muted-foreground">healthy connections</p>
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
-          <div
-            className={cn("h-full rounded-full", allHealthy ? "bg-success" : "bg-warning")}
-            style={{ width: `${pct}%` }}
-          />
+          <div className={cn("h-full rounded-full", barColor)} style={{ width: `${pct}%` }} />
         </div>
         <p className="mt-auto pt-3 text-xs text-muted-foreground">
           {inv.clouds > 0 ? `${inv.clouds} cloud${inv.clouds === 1 ? "" : "s"}` : "Code sources"}
@@ -569,12 +561,19 @@ function MapPreview({
 }
 
 function Insights({ insights }: { insights: Summary["insights"] }) {
-  const { topContributors, mostActiveRepos, pipelineCoverage } = insights;
+  const { topContributors, mostActiveRepos, pipelineCoverage, codeProvider } = insights;
   if (pipelineCoverage.total === 0) return null;
   const pct =
     pipelineCoverage.total > 0
       ? Math.round((pipelineCoverage.withPipeline / pipelineCoverage.total) * 100)
       : 0;
+
+  // Brand the PR leaderboards by the connected code host (Bitbucket today, GitHub/GitLab later) -
+  // the data literally comes from there, so the icon comes with it dynamically.
+  const brandLogo = codeProvider ? PROVIDER_META[codeProvider]?.logo : undefined;
+  const logo = brandLogo && hasCloudIcon(brandLogo) ? brandLogo : null;
+  const userHref = codeProvider ? `/explore?kind=${codeProvider}.user` : "/explore";
+  const repoHref = codeProvider ? `/explore?kind=${codeProvider}.repository` : "/explore";
 
   return (
     <div>
@@ -587,14 +586,16 @@ function Insights({ insights }: { insights: Summary["insights"] }) {
           title="Top contributors"
           subtitle="PRs raised · 30d"
           items={topContributors}
-          href="/explore?kind=bitbucket.user"
-          emptyLabel="No PRs in the last 30 days - reconnect Bitbucket to sync recent activity."
+          href={userHref}
+          logo={logo}
+          emptyLabel="No PRs in the last 30 days yet."
         />
         <Leaderboard
           title="Most active repos"
           subtitle="PRs · 30d"
           items={mostActiveRepos}
-          href="/explore?kind=bitbucket.repository"
+          href={repoHref}
+          logo={logo}
           emptyLabel="No PRs in the last 30 days yet."
         />
         <Card>
@@ -622,12 +623,14 @@ function Leaderboard({
   subtitle,
   items,
   href,
+  logo = null,
   emptyLabel = "None yet.",
 }: {
   title: string;
   subtitle: string;
   items: Array<{ name: string; count: number }>;
   href: string;
+  logo?: string | null;
   emptyLabel?: string;
 }) {
   const max = items[0]?.count ?? 1;
@@ -635,7 +638,8 @@ function Leaderboard({
     <Card>
       <CardContent className="p-5">
         <div className="mb-3 flex items-baseline justify-between">
-          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {logo ? <CloudIcon name={logo} className="size-3.5" /> : null}
             {title}
           </div>
           <Link href={href} className="text-xs text-muted-foreground hover:text-foreground">
@@ -673,48 +677,30 @@ function StatGroup({ label, children }: { label: string; children: React.ReactNo
       <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{children}</div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{children}</div>
     </div>
   );
 }
 
-// Tasteful icon-chip tints for the inventory stats (one hue each), matching the Insights
-// category enums so color means the same thing across the app.
-const STAT_TONE = {
-  violet: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
-  sky: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
-  amber: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  indigo: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
-  teal: "bg-teal-500/10 text-teal-600 dark:text-teal-400",
-  cyan: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
-  rose: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
-} as const;
-
 function Stat({
   icon: Icon,
-  tone,
   label,
   value,
   sub,
 }: {
   icon: LucideIcon;
-  tone: string;
   label: string;
   value: number | string;
   sub?: string | undefined;
 }) {
   return (
     <Card className="shadow-sm transition-colors hover:border-foreground/20">
-      <CardContent className="p-5">
-        <div className="flex items-center gap-2.5">
-          <span className={cn("grid size-8 place-items-center rounded-lg", tone)}>
-            <Icon className="size-4" />
-          </span>
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {label}
-          </span>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Icon className="size-3.5" />
+          <span className="text-[11px] font-medium uppercase tracking-wide">{label}</span>
         </div>
-        <div className="mt-3 text-3xl font-semibold tabular-nums">
+        <div className="mt-1.5 text-2xl font-semibold tabular-nums">
           {typeof value === "number" ? value.toLocaleString() : value}
         </div>
         {sub ? <div className="text-xs text-muted-foreground">{sub}</div> : null}

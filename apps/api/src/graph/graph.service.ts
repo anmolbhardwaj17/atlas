@@ -123,6 +123,7 @@ export interface DashboardSummary {
     topContributors: Array<{ name: string; count: number }>;
     mostActiveRepos: Array<{ name: string; count: number }>;
     pipelineCoverage: { withPipeline: number; total: number };
+    codeProvider: string | null;
   };
 }
 
@@ -1038,6 +1039,11 @@ export class GraphService {
           withPipeline: Math.max(0, base.repositories - base.noPipeline),
           total: base.repositories,
         },
+        // Which code host the PR/repo leaderboards come from, so the UI can brand them
+        // dynamically (Bitbucket today, GitHub/GitLab when connected) instead of hardcoding.
+        codeProvider:
+          base.conns.find((c) => ["github", "bitbucket", "gitlab"].includes(c.provider))
+            ?.provider ?? null,
       },
       findings,
       activity,
