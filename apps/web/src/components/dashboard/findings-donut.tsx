@@ -69,7 +69,7 @@ export function FindingsDonut({ findings }: { findings: Array<{ severity: string
                 outerRadius={72}
                 paddingAngle={2}
                 stroke="none"
-                isAnimationActive={false}
+                animationDuration={700}
               >
                 <Label
                   content={({ viewBox }) => {
@@ -84,16 +84,9 @@ export function FindingsDonut({ findings }: { findings: Array<{ severity: string
                           <tspan
                             x={viewBox.cx}
                             y={viewBox.cy}
-                            className="fill-foreground text-2xl font-semibold"
+                            className="fill-foreground text-3xl font-semibold"
                           >
                             {total}
-                          </tspan>
-                          <tspan
-                            x={viewBox.cx}
-                            y={(viewBox.cy || 0) + 20}
-                            className="fill-muted-foreground text-xs"
-                          >
-                            open
                           </tspan>
                         </text>
                       );

@@ -63,7 +63,7 @@ export function ContributorsDonut({
                 outerRadius={72}
                 paddingAngle={2}
                 stroke="none"
-                isAnimationActive={false}
+                animationDuration={700}
               >
                 <Label
                   content={({ viewBox }) => {

@@ -412,6 +412,13 @@ function SourcesCard({
         : "bg-red-500";
   const label = (status: string) =>
     status === "connected" ? "Healthy" : status === "degraded" ? "Degraded" : "Error";
+  // Keep the card compact: show a handful (unhealthy first, so problems surface) and roll the
+  // rest into a "+N more" link — no unbounded growth / scroll.
+  const rank = (s: string) => (s === "connected" ? 2 : s === "degraded" ? 1 : 0);
+  const sorted = [...connections].sort((a, b) => rank(a.status) - rank(b.status));
+  const MAX = 4;
+  const shown = sorted.slice(0, MAX);
+  const more = connections.length - shown.length;
   return (
     <Card className="shadow-sm">
       <CardContent className="flex h-full flex-col p-5">
@@ -427,11 +434,11 @@ function SourcesCard({
         {connections.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">No sources connected yet.</p>
         ) : (
-          <ul className="mt-3 space-y-2.5">
-            {connections.map((c) => {
+          <ul className="mt-2 divide-y divide-border">
+            {shown.map((c) => {
               const logo = PROVIDER_LOGO[c.provider];
               return (
-                <li key={c.displayName} className="flex items-center gap-2.5 text-sm">
+                <li key={c.displayName} className="flex items-center gap-2.5 py-2.5 text-sm">
                   {/* White chip keeps dark brand marks (AWS) legible in dark mode. */}
                   <span className="grid size-6 shrink-0 place-items-center rounded-md bg-white ring-1 ring-black/5">
                     {logo ? <CloudIcon name={logo} className="size-3.5" /> : null}
@@ -444,6 +451,16 @@ function SourcesCard({
                 </li>
               );
             })}
+            {more > 0 ? (
+              <li className="py-2">
+                <Link
+                  href="/integrations"
+                  className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  +{more} more source{more === 1 ? "" : "s"}
+                </Link>
+              </li>
+            ) : null}
           </ul>
         )}
         {syncedLabel ? (
