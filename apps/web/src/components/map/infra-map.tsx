@@ -10,13 +10,14 @@ import {
   BackgroundVariant,
   Controls,
   MiniMap,
+  Panel,
   useNodesState,
   useEdgesState,
   useReactFlow,
   type Edge,
   type NodeMouseHandler,
 } from "@xyflow/react";
-import { Shield, Stethoscope, X } from "lucide-react";
+import { Search, Shield, Stethoscope, X } from "lucide-react";
 import { buildLayout } from "@/lib/map-layout";
 import { edgeCrossing, CROSS_COLOR, type MapData, type MapNode } from "@/lib/map-types";
 import { ResourceNode, EnvLaneNode } from "@/components/map/resource-node";
@@ -489,6 +490,28 @@ function Flow({
   };
   const onNodeMouseLeave: NodeMouseHandler = () => setHoveredId(null);
 
+  // Searchable list of on-canvas resources (name + kind), and jump-to: select it (which lights its
+  // blast radius) and pan/zoom the viewport to centre it.
+  const searchNodes = useMemo(
+    () =>
+      layout.nodes
+        .filter((n) => n.type === "resource")
+        .map((n) => {
+          const nd = (n.data as { node: MapNode }).node;
+          return { id: n.id, name: nd.name ?? nd.kind, kind: nd.kind };
+        }),
+    [layout.nodes],
+  );
+  const onPick = useCallback(
+    (id: string) => {
+      onSelect(id);
+      requestAnimationFrame(
+        () => void fitView({ nodes: [{ id }], duration: 500, maxZoom: 1.3, padding: 0.5 }),
+      );
+    },
+    [onSelect, fitView],
+  );
+
   return (
     <ReactFlow
       nodes={nodes}
@@ -515,6 +538,9 @@ function Flow({
         size={1.6}
         color="hsl(var(--muted-foreground) / 0.25)"
       />
+      <Panel position="top-left">
+        <MapSearch nodes={searchNodes} onPick={onPick} />
+      </Panel>
       <Controls showInteractive={false} />
       <MiniMap
         pannable
@@ -523,6 +549,81 @@ function Flow({
         style={{ width: 160, height: 120 }}
       />
     </ReactFlow>
+  );
+}
+
+/** Find-a-resource search — floats top-left of the canvas. Matches on name/kind; picking a result
+ *  selects it (lighting its blast radius) and centres the viewport on it. */
+function MapSearch({
+  nodes,
+  onPick,
+}: {
+  nodes: { id: string; name: string; kind: string }[];
+  onPick: (id: string) => void;
+}) {
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+  const matches = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    if (!t) return [];
+    return nodes
+      .filter((n) => n.name.toLowerCase().includes(t) || n.kind.toLowerCase().includes(t))
+      .slice(0, 8);
+  }, [q, nodes]);
+
+  return (
+    <div className="w-60">
+      <div className="flex items-center gap-2 rounded-lg border border-border bg-background/85 px-2.5 py-1.5 shadow-sm backdrop-blur">
+        <Search className="size-3.5 shrink-0 text-muted-foreground" />
+        <input
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 120)}
+          placeholder="Find a resource…"
+          className="w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+        />
+        {q ? (
+          <button
+            type="button"
+            onClick={() => {
+              setQ("");
+              setOpen(false);
+            }}
+            className="shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label="Clear search"
+          >
+            <X className="size-3.5" />
+          </button>
+        ) : null}
+      </div>
+      {open && matches.length > 0 ? (
+        <ul className="mt-1 max-h-64 overflow-auto rounded-lg border border-border bg-background/95 py-1 text-xs shadow-md backdrop-blur">
+          {matches.map((m) => (
+            <li key={m.id}>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onPick(m.id);
+                  setQ(m.name);
+                  setOpen(false);
+                }}
+                className="flex w-full flex-col items-start px-2.5 py-1.5 text-left hover:bg-muted"
+              >
+                <span className="max-w-full truncate font-medium">{m.name}</span>
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {m.kind}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 
