@@ -11,6 +11,7 @@ import {
   DollarSign,
   Gauge,
   History,
+  RotateCcw,
   Search,
   ShieldCheck,
   Sparkles,
@@ -30,6 +31,10 @@ export interface Finding {
   href: string | null;
   count?: number;
   guidance: { why: string; fix: string; pillar: string; source: string } | null;
+  // Lifecycle overlay (persisted, reconciled each sync).
+  firstSeenAt?: string | null;
+  regressedAt?: string | null;
+  resolvedAt?: string | null;
 }
 export interface InsightsSummary {
   total: number;
@@ -124,6 +129,15 @@ function timeAgo(iso: string): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+/** How long a finding has been open ("open 5d"), or null if under a day (not worth the noise). */
+function ageLabel(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return null;
+  const days = Math.floor((Date.now() - then) / 86_400_000);
+  return days >= 1 ? `open ${days}d` : null;
+}
+
 /**
  * Insights (Atlas Knowledge Engine) - the ADVISORY layer. A scannable posture summary + a dense,
  * filterable findings table; each row opens a detail page with the full guidance, evidence, and
@@ -132,11 +146,13 @@ function timeAgo(iso: string): string {
 export function InsightsView({
   summary,
   findings,
+  resolved = [],
   mutes = [],
   lastSyncedAt = null,
 }: {
   summary: InsightsSummary | null;
   findings: Finding[];
+  resolved?: Finding[];
   mutes?: Mute[];
   lastSyncedAt?: string | null;
 }) {
@@ -151,6 +167,11 @@ export function InsightsView({
   // of the active list (their own tab) so the counts reflect what actually needs action.
   const active = React.useMemo(() => sorted.filter((f) => !mutedSet.has(f.id)), [sorted, mutedSet]);
   const muted = React.useMemo(() => sorted.filter((f) => mutedSet.has(f.id)), [sorted, mutedSet]);
+  // Fixed history, most-recently-resolved first.
+  const resolvedSorted = React.useMemo(
+    () => [...resolved].sort((a, b) => (b.resolvedAt ?? "").localeCompare(a.resolvedAt ?? "")),
+    [resolved],
+  );
 
   const sevCounts = React.useMemo(() => {
     const c = { high: 0, medium: 0, low: 0 };
@@ -158,8 +179,8 @@ export function InsightsView({
     return c;
   }, [active]);
 
-  const [tab, setTab] = React.useState<"active" | "muted">("active");
-  const base = tab === "muted" ? muted : active;
+  const [tab, setTab] = React.useState<"active" | "muted" | "fixed">("active");
+  const base = tab === "muted" ? muted : tab === "fixed" ? resolvedSorted : active;
 
   const pillars = React.useMemo(() => {
     const counts = new Map<string, number>();
@@ -246,15 +267,22 @@ export function InsightsView({
         </Card>
       </div>
 
-      {/* Active vs muted (accepted-risk). */}
-      {muted.length > 0 ? (
+      {/* Active / Muted (accepted-risk) / Fixed (resolved history). */}
+      {muted.length > 0 || resolvedSorted.length > 0 ? (
         <div className="flex items-center gap-1 border-b border-border">
           <TabButton active={tab === "active"} onClick={() => setTab("active")}>
             Active <span className="text-muted-foreground">{active.length}</span>
           </TabButton>
-          <TabButton active={tab === "muted"} onClick={() => setTab("muted")}>
-            Muted <span className="text-muted-foreground">{muted.length}</span>
-          </TabButton>
+          {muted.length > 0 ? (
+            <TabButton active={tab === "muted"} onClick={() => setTab("muted")}>
+              Muted <span className="text-muted-foreground">{muted.length}</span>
+            </TabButton>
+          ) : null}
+          {resolvedSorted.length > 0 ? (
+            <TabButton active={tab === "fixed"} onClick={() => setTab("fixed")}>
+              Fixed <span className="text-muted-foreground">{resolvedSorted.length}</span>
+            </TabButton>
+          ) : null}
         </div>
       ) : null}
 
@@ -318,11 +346,13 @@ export function InsightsView({
             <p className="text-sm text-muted-foreground">
               {tab === "muted"
                 ? "Nothing muted. Accepted-risk or dismissed findings will collect here."
-                : filtering
-                  ? "No findings match your search or filters."
-                  : active.length === 0
-                    ? "Nothing needs attention right now - the graph doesn't flag any issues. You're in good shape."
-                    : "No findings here."}
+                : tab === "fixed"
+                  ? "No fixed findings yet. Once a finding clears on a sync, it lands here with when it was resolved."
+                  : filtering
+                    ? "No findings match your search or filters."
+                    : active.length === 0
+                      ? "Nothing needs attention right now - the graph doesn't flag any issues. You're in good shape."
+                      : "No findings here."}
             </p>
             {filtering ? (
               <button
@@ -341,40 +371,72 @@ export function InsightsView({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-                  <th className="w-24 px-4 py-2.5 font-medium">Severity</th>
+                  <th className="w-24 px-4 py-2.5 font-medium">
+                    {tab === "fixed" ? "Status" : "Severity"}
+                  </th>
                   <th className="px-4 py-2.5 font-medium">Finding</th>
                   <th className="hidden px-4 py-2.5 font-medium sm:table-cell">Category</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Affected</th>
+                  <th className="px-4 py-2.5 text-right font-medium">
+                    {tab === "fixed" ? "Fixed" : "Affected"}
+                  </th>
                   <th className="w-8 px-2 py-2.5" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {shown.map((it) => {
                   const m = pillarMeta(it.guidance?.pillar);
+                  const isFixed = tab === "fixed";
+                  const age = ageLabel(it.firstSeenAt);
                   return (
                     <tr
                       key={it.id}
-                      onClick={() => router.push(`/insights/${it.id}`)}
-                      className="cursor-pointer transition-colors hover:bg-muted/40"
+                      onClick={isFixed ? undefined : () => router.push(`/insights/${it.id}`)}
+                      className={cn(
+                        "align-top transition-colors",
+                        isFixed ? "" : "cursor-pointer hover:bg-muted/40",
+                      )}
                     >
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1.5">
-                          <span className={cn("size-2 rounded-full", SEV_DOT[it.severity])} />
                           <span
-                            className={cn("text-xs font-medium capitalize", SEV_TEXT[it.severity])}
+                            className={cn(
+                              "size-2 rounded-full",
+                              isFixed ? "bg-success" : SEV_DOT[it.severity],
+                            )}
+                          />
+                          <span
+                            className={cn(
+                              "text-xs font-medium capitalize",
+                              isFixed ? "text-success" : SEV_TEXT[it.severity],
+                            )}
                           >
-                            {it.severity}
+                            {isFixed ? "Fixed" : it.severity}
                           </span>
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <Link
-                          href={`/insights/${it.id}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="font-medium text-foreground hover:underline"
-                        >
-                          {it.title}
-                        </Link>
+                        {isFixed ? (
+                          <span className="font-medium text-muted-foreground line-through decoration-muted-foreground/40">
+                            {it.title}
+                          </span>
+                        ) : (
+                          <div className="flex flex-col gap-0.5">
+                            <Link
+                              href={`/insights/${it.id}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="font-medium text-foreground hover:underline"
+                            >
+                              {it.title}
+                            </Link>
+                            {it.regressedAt ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-warning">
+                                <RotateCcw className="size-3" /> Regressed — was fixed, came back
+                              </span>
+                            ) : age ? (
+                              <span className="text-[11px] text-muted-foreground">{age}</span>
+                            ) : null}
+                          </div>
+                        )}
                       </td>
                       <td className="hidden px-4 py-3 sm:table-cell">
                         <span
@@ -387,10 +449,16 @@ export function InsightsView({
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
-                        {it.count && it.count > 1 ? it.count : "-"}
+                        {isFixed
+                          ? it.resolvedAt
+                            ? timeAgo(it.resolvedAt)
+                            : "-"
+                          : it.count && it.count > 1
+                            ? it.count
+                            : "-"}
                       </td>
                       <td className="px-2 py-3">
-                        <ChevronRight className="size-4 text-muted-foreground" />
+                        {isFixed ? null : <ChevronRight className="size-4 text-muted-foreground" />}
                       </td>
                     </tr>
                   );

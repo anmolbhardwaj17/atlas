@@ -56,9 +56,17 @@ export class GraphController {
   @Roles("Member")
   async insights(@Req() req: AuthedRequest): Promise<unknown> {
     const orgId = org(req).id;
-    const [s, mutes] = await Promise.all([this.graph.summary(orgId), this.graph.listMutes(orgId)]);
+    const [s, mutes, states] = await Promise.all([
+      this.graph.summary(orgId),
+      this.graph.listMutes(orgId),
+      this.graph.listFindingStates(orgId),
+    ]);
     const bySeverity = { high: 0, medium: 0, low: 0 };
     for (const f of s.findings) bySeverity[f.severity] += 1;
+    // Lifecycle overlay: attach when-first-seen / regression to live findings, and surface the
+    // resolved ones (gone from the live graph) as a "Fixed" history from the persisted snapshot.
+    const stateById = new Map(states.map((st) => [st.findingId, st]));
+    const activeIds = new Set(s.findings.map((f) => f.id));
     return {
       summary: {
         total: s.findings.length,
@@ -68,16 +76,35 @@ export class GraphController {
       // Data freshness for the honest "findings reflect your sync from X ago" line - findings are
       // derived live, so this (not a per-finding timestamp) is the real recency signal (P4/P7).
       lastSyncedAt: s.trust.lastSyncAt,
-      findings: s.findings.map((f) => ({
-        id: f.id,
-        severity: f.severity,
-        category: f.category,
-        title: f.title,
-        detail: f.detail,
-        href: f.href,
-        ...(f.count !== undefined ? { count: f.count } : {}),
-        guidance: guidanceFor(f.category),
-      })),
+      findings: s.findings.map((f) => {
+        const st = stateById.get(f.id);
+        return {
+          id: f.id,
+          severity: f.severity,
+          category: f.category,
+          title: f.title,
+          detail: f.detail,
+          href: f.href,
+          ...(f.count !== undefined ? { count: f.count } : {}),
+          guidance: guidanceFor(f.category),
+          firstSeenAt: st?.firstSeenAt ?? null,
+          regressedAt: st?.regressedAt ?? null,
+        };
+      }),
+      // Resolved = recorded but no longer produced by the live graph (and not currently back).
+      resolved: states
+        .filter((st) => st.status === "resolved" && !activeIds.has(st.findingId))
+        .map((st) => ({
+          id: st.findingId,
+          severity: st.severity as "high" | "medium" | "low",
+          category: st.category,
+          title: st.title,
+          detail: "",
+          href: null,
+          guidance: guidanceFor(st.category),
+          firstSeenAt: st.firstSeenAt,
+          resolvedAt: st.resolvedAt,
+        })),
       mutes,
     };
   }

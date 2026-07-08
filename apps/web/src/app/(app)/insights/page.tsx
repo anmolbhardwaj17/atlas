@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 interface InsightsData {
   summary: InsightsSummary;
   findings: Finding[];
+  resolved: Finding[];
   mutes: Mute[];
   lastSyncedAt: string | null;
 }
@@ -31,6 +32,7 @@ export default async function InsightsPage() {
     <InsightsView
       summary={data?.summary ?? null}
       findings={data?.findings ?? []}
+      resolved={data?.resolved ?? []}
       mutes={data?.mutes ?? []}
       lastSyncedAt={data?.lastSyncedAt ?? null}
     />
