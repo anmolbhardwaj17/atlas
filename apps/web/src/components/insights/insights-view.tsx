@@ -111,9 +111,9 @@ const SEV_TEXT: Record<string, string> = {
   low: "text-inferred-low",
 };
 const SEV_DOT: Record<string, string> = {
-  high: "bg-danger",
-  medium: "bg-warning",
-  low: "bg-inferred-low",
+  high: "bg-sev-high",
+  medium: "bg-sev-medium",
+  low: "bg-sev-low",
 };
 
 /** Compact relative time for the data-freshness line ("just now", "5m ago", "3h ago", "2d ago"). */

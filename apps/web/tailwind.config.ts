@@ -74,6 +74,10 @@ export default {
           DEFAULT: "hsl(var(--brand))",
           foreground: "hsl(var(--brand-foreground))",
         },
+        // Muted data-viz severity fills (bars/dots) — enterprise-toned, not candy-bright.
+        "sev-high": "hsl(var(--sev-high))",
+        "sev-medium": "hsl(var(--sev-medium))",
+        "sev-low": "hsl(var(--sev-low))",
       },
       borderRadius: {
         lg: "var(--radius)",
