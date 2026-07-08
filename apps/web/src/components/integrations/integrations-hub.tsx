@@ -2,16 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import {
-  Plus,
-  Loader2,
-  Trash2,
-  RefreshCw,
-  ShieldAlert,
-  ChevronRight,
-  Search,
-  Check,
-} from "lucide-react";
+import { Plus, Loader2, Trash2, RefreshCw, ShieldAlert, Search, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -174,7 +165,7 @@ export function IntegrationsHub({
         </div>
       )}
 
-      <SoonGrid />
+      <LogoShowcase />
 
       <ConnectSheet
         provider={connectProvider}
@@ -187,48 +178,47 @@ export function IntegrationsHub({
 
 const TABS = ["All", "Cloud", "Code", "CI/CD", "Observability"] as const;
 
-// The "more coming soon" wall (docs/18 roadmap + aspirational). Real upcoming connectors first,
-// then a broad set so the hub reads as a growing platform. Decorative — logos only.
-const SOON_LOGOS = [
-  "kubernetes",
-  "terraform-icon",
-  "docker-icon",
-  "prometheus",
-  "grafana",
-  "pagerduty",
-  "sentry-icon",
-  "pulumi",
-  "slack-icon",
-  "discord-icon",
-  "jira",
-  "linear-icon",
-  "notion",
-  "figma",
-  "trello",
-  "asana-icon",
-  "zendesk-icon",
-  "dropbox",
-  "google-drive",
-  "google-gmail",
-  "microsoft-onedrive",
-  "mailchimp",
-  "todoist-icon",
-];
+// A stylish decorative wall of the tools Atlas connects across — the real provider logos first,
+// then a broad set so the footer reads rich. Logos only (no labels, no status).
+const SHOWCASE_LOGOS = Array.from(
+  new Set([
+    ...PROVIDERS.map((p) => p.logo),
+    "kubernetes",
+    "terraform-icon",
+    "docker-icon",
+    "prometheus",
+    "pagerduty",
+    "sentry-icon",
+    "pulumi",
+    "slack-icon",
+    "discord-icon",
+    "jira",
+    "linear-icon",
+    "notion",
+    "figma",
+    "trello",
+    "asana-icon",
+    "zendesk-icon",
+    "dropbox",
+    "google-drive",
+    "google-gmail",
+    "microsoft-onedrive",
+    "mailchimp",
+    "todoist-icon",
+  ]),
+);
 
-/** The "more coming soon" logo wall at the bottom — a growing-platform signal, uncategorized. */
-function SoonGrid() {
-  const logos = SOON_LOGOS.filter((l) => hasCloudIcon(l));
+/** The stylish logo wall at the bottom — everything Atlas plugs into. Borderless, with the row
+ *  edges faded into the page so it reads as a decorative footer, not a boxed card. */
+function LogoShowcase() {
+  const logos = SHOWCASE_LOGOS.filter((l) => hasCloudIcon(l));
   return (
-    <div className="pt-2">
-      <h2 className="text-sm font-semibold">More coming soon</h2>
-      <p className="mb-3 mt-0.5 text-xs text-muted-foreground">
-        We&apos;re expanding the graph across more of the tools teams run.
-      </p>
-      <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-muted/20 p-4">
+    <div className="[mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
+      <div className="flex flex-wrap justify-center gap-3 py-2">
         {logos.map((logo) => (
           <div
             key={logo}
-            className="grid size-10 shrink-0 place-items-center rounded-lg border border-border bg-background opacity-80 transition-opacity hover:opacity-100"
+            className="grid size-11 shrink-0 place-items-center rounded-xl bg-background shadow-sm ring-1 ring-black/5 transition-transform hover:-translate-y-0.5 dark:ring-white/10"
           >
             <CloudIcon name={logo} className="size-6" />
           </div>
@@ -238,8 +228,9 @@ function SoonGrid() {
   );
 }
 
-/** One integration as a list row: logo + name + category + blurb + action. Connected accounts
- *  appear as compact sub-rows beneath (each opens the detail slide-over). */
+/** One integration as a list row: logo + name + category + a one-line state, and an action on the
+ *  right. When connected the whole row (and the "Connected" pill) opens a Manage slide-over that
+ *  lists the account(s) as readable blocks — so the list itself stays clean and aligned. */
 function ProviderRow({
   provider,
   connections,
@@ -254,25 +245,61 @@ function ProviderRow({
   onConnect: () => void;
 }) {
   const comingSoon = provider.status === "coming-soon";
+  const connected = connections.length > 0;
+  const [manageOpen, setManageOpen] = React.useState(false);
+  const needsAttention = connections.filter(
+    (c) => c.status === "degraded" || c.status === "error",
+  ).length;
+  const anySyncing = connections.some((c) => c.syncing === true);
+  const openManage = () => {
+    if (connected) setManageOpen(true);
+  };
+
+  // Once connected, the blurb gives way to a one-line summary of the real state at a glance.
+  let summary = provider.blurb;
+  if (connected) {
+    const only = connections.length === 1 ? connections[0] : undefined;
+    if (anySyncing) summary = "Syncing — pulling the latest data…";
+    else if (needsAttention > 0)
+      summary = `${needsAttention} need${needsAttention === 1 ? "s" : ""} attention`;
+    else if (only?.lastSync)
+      summary = `Synced ${timeAgo(only.lastSync.finishedAt)} · ${only.lastSync.resources} resources`;
+    else summary = `${connections.length} connections · all healthy`;
+  }
+
   return (
-    <div className="bg-card">
-      <div className="flex items-center gap-4 px-4 py-3.5">
-        <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-border bg-background">
-          <ProviderLogo provider={provider} className="size-6" />
+    <>
+      <div className="flex items-center gap-4 bg-card px-4 py-3.5">
+        <div className="grid size-10 shrink-0 place-items-center">
+          <ProviderLogo provider={provider} className="size-7" />
         </div>
-        <div className="min-w-0 flex-1">
+        <button
+          type="button"
+          onClick={openManage}
+          disabled={!connected}
+          className={cn("min-w-0 flex-1 text-left", connected ? "group" : "cursor-default")}
+        >
           <div className="flex items-center gap-2">
-            <span className="truncate font-medium">{provider.name}</span>
+            <span className={cn("truncate font-medium", connected && "group-hover:underline")}>
+              {provider.name}
+            </span>
             <span className="hidden shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground sm:inline">
               {provider.category}
             </span>
           </div>
-          <p className="truncate text-sm text-muted-foreground">{provider.blurb}</p>
-        </div>
+          <p
+            className={cn(
+              "truncate text-sm",
+              needsAttention > 0 ? "text-warning" : "text-muted-foreground",
+            )}
+          >
+            {summary}
+          </p>
+        </button>
         <div className="flex shrink-0 items-center gap-2">
           {comingSoon ? (
             <span className="text-xs text-muted-foreground">Coming soon</span>
-          ) : connections.length > 0 ? (
+          ) : connected ? (
             <>
               {canManage ? (
                 <Button
@@ -286,9 +313,14 @@ function ProviderRow({
                   <Plus className="size-4" />
                 </Button>
               ) : null}
-              <span className="inline-flex h-9 items-center gap-1.5 rounded-md bg-foreground px-3 text-sm font-medium text-background">
-                <Check className="size-4" /> Connected
-              </span>
+              <button
+                type="button"
+                onClick={openManage}
+                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-foreground px-3 text-sm font-medium text-background transition-opacity hover:opacity-90"
+              >
+                <Check className="size-4" />
+                {connections.length > 1 ? `${connections.length} connected` : "Connected"}
+              </button>
             </>
           ) : canManage ? (
             <Button variant="outline" className="h-9" onClick={onConnect}>
@@ -299,14 +331,16 @@ function ProviderRow({
           )}
         </div>
       </div>
-      {connections.length > 0 && (
-        <ul className="space-y-0.5 border-t border-border bg-muted/20 py-1.5 pl-16 pr-4">
-          {connections.map((c) => (
-            <ConnectionRow key={c.id} conn={c} orgId={orgId} canManage={canManage} />
-          ))}
-        </ul>
-      )}
-    </div>
+      <ManageSheet
+        open={manageOpen}
+        onOpenChange={setManageOpen}
+        provider={provider}
+        connections={connections}
+        orgId={orgId}
+        canManage={canManage}
+        onConnect={onConnect}
+      />
+    </>
   );
 }
 
@@ -319,7 +353,63 @@ function timeAgo(iso: string): string {
   return `${Math.floor(s / 86400)}d ago`;
 }
 
-function ConnectionRow({
+/** The "Manage <provider>" slide-over — lists a provider's connection(s) as full, readable
+ *  blocks (status, sync, permission gaps, actions) plus an "add another" affordance. Opened by
+ *  clicking a connected provider row, so the list itself stays clean and aligned. */
+function ManageSheet({
+  open,
+  onOpenChange,
+  provider,
+  connections,
+  orgId,
+  canManage,
+  onConnect,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  provider: ProviderMeta;
+  connections: ConnectionSummary[];
+  orgId: string;
+  canManage: boolean;
+  onConnect: () => void;
+}) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2.5">
+            <span className="grid size-8 shrink-0 place-items-center">
+              <ProviderLogo provider={provider} className="size-6" />
+            </span>
+            {provider.name}
+          </SheetTitle>
+          <SheetDescription>
+            {connections.length} connection{connections.length === 1 ? "" : "s"} · read-only
+          </SheetDescription>
+        </SheetHeader>
+        <div className="mt-6 space-y-3">
+          {connections.map((c) => (
+            <ConnectionBlock key={c.id} conn={c} orgId={orgId} canManage={canManage} />
+          ))}
+          {canManage ? (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                onOpenChange(false);
+                onConnect();
+              }}
+            >
+              <Plus className="size-4" /> Add another connection
+            </Button>
+          ) : null}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function ConnectionBlock({
   conn,
   orgId,
   canManage,
@@ -330,7 +420,6 @@ function ConnectionRow({
 }) {
   const router = useRouter();
   const [confirmOpen, setConfirmOpen] = React.useState(false);
-  const [detailsOpen, setDetailsOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [triggering, setTriggering] = React.useState(false);
   const [note, setNote] = React.useState<string | null>(null);
@@ -383,15 +472,10 @@ function ConnectionRow({
   }
 
   return (
-    <li className="text-sm">
-      {/* Compact row — click to open the detail slide-over. Keeps the tile short regardless of
-          how much a degraded connection has to say. */}
-      <button
-        type="button"
-        onClick={() => setDetailsOpen(true)}
-        className="flex w-full items-center justify-between gap-2 rounded-md py-1 text-left transition-colors hover:bg-muted/50"
-      >
-        <span className="min-w-0 truncate">{conn.displayName}</span>
+    <div className="rounded-lg border border-border p-3.5 text-sm">
+      {/* Header — name + live status. */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="min-w-0 truncate font-medium">{conn.displayName}</span>
         <span className="flex shrink-0 items-center gap-2">
           {conn.demo ? (
             <span className="rounded-full border border-transparent bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -399,127 +483,105 @@ function ConnectionRow({
             </span>
           ) : null}
           <StatusBadge status={conn.status} />
-          {syncing ? <Loader2 className="size-3.5 animate-spin text-muted-foreground" /> : null}
-          <ChevronRight className="size-4 text-muted-foreground" />
         </span>
-      </button>
+      </div>
 
-      <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
-          <SheetHeader>
-            <SheetTitle className="flex flex-wrap items-center gap-2">
-              {conn.displayName} <StatusBadge status={conn.status} />
-            </SheetTitle>
-            <SheetDescription>
-              {conn.demo ? "Sample connection." : "Read-only connection details and sync status."}
-            </SheetDescription>
-          </SheetHeader>
-
-          <div className="mt-6 space-y-5 text-sm">
-            {/* Sync status. */}
-            <div className="space-y-1.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Sync
-              </p>
-              {syncing ? (
-                <p className="flex items-center gap-1.5 text-muted-foreground">
-                  <Loader2 className="size-3.5 animate-spin" /> Syncing — pulling the latest data…
-                </p>
-              ) : conn.lastSync ? (
-                <p
-                  className={cn(
-                    conn.lastSync.status === "failed" ? "text-danger" : "text-muted-foreground",
-                  )}
-                >
-                  {conn.lastSync.status === "failed"
-                    ? `Last sync failed ${timeAgo(conn.lastSync.finishedAt)}`
-                    : `Last synced ${timeAgo(conn.lastSync.finishedAt)} · ${conn.lastSync.resources} resources`}
-                  {conn.lastSync.status === "partial" && conn.lastSync.scopesFailed > 0 ? (
-                    <span className="text-warning">
-                      {" "}
-                      · {conn.lastSync.scopesFailed} scope
-                      {conn.lastSync.scopesFailed === 1 ? "" : "s"} skipped
-                    </span>
-                  ) : null}
-                </p>
-              ) : (
-                <p className="text-muted-foreground">Not synced yet.</p>
-              )}
-            </div>
-
-            {/* What was skipped this sync (when we have no explicit permission list to show). */}
-            {missingPerms.length === 0 &&
-            conn.lastSync?.status === "partial" &&
-            (conn.lastSync.skippedScopes?.length ?? 0) > 0 ? (
-              <div className="rounded-md border border-warning/30 bg-warning/5 p-3">
-                <p className="text-xs font-medium text-warning">
-                  Skipped this sync — usually a missing read permission on the token:
-                </p>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {(conn.lastSync.skippedScopes ?? []).map((s) => (
-                    <code
-                      key={s}
-                      className="rounded border border-warning/30 bg-warning/10 px-1.5 py-0.5 font-mono text-[11px] text-warning"
-                    >
-                      {s}
-                    </code>
-                  ))}
-                </div>
-              </div>
+      {/* Sync status. */}
+      <p className="mt-2">
+        {syncing ? (
+          <span className="flex items-center gap-1.5 text-muted-foreground">
+            <Loader2 className="size-3.5 animate-spin" /> Syncing — pulling the latest data…
+          </span>
+        ) : conn.lastSync ? (
+          <span
+            className={cn(
+              conn.lastSync.status === "failed" ? "text-danger" : "text-muted-foreground",
+            )}
+          >
+            {conn.lastSync.status === "failed"
+              ? `Last sync failed ${timeAgo(conn.lastSync.finishedAt)}`
+              : `Last synced ${timeAgo(conn.lastSync.finishedAt)} · ${conn.lastSync.resources} resources`}
+            {conn.lastSync.status === "partial" && conn.lastSync.scopesFailed > 0 ? (
+              <span className="text-warning">
+                {" "}
+                · {conn.lastSync.scopesFailed} scope
+                {conn.lastSync.scopesFailed === 1 ? "" : "s"} skipped
+              </span>
             ) : null}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">Not synced yet.</span>
+        )}
+      </p>
 
-            {/* Missing permissions — the detail, now with room to breathe. */}
-            {conn.status === "degraded" && missingPerms.length > 0 ? (
-              <div className="rounded-md border border-warning/30 bg-warning/5 p-3">
-                <p className="flex items-center gap-1.5 text-xs font-medium text-warning">
-                  <ShieldAlert className="size-3.5 shrink-0" />
-                  {missingPerms.length} permission{missingPerms.length === 1 ? "" : "s"} missing —
-                  grant these for full coverage
-                </p>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {missingPerms.map((p) => (
-                    <code
-                      key={p}
-                      className="rounded border border-warning/30 bg-warning/10 px-1.5 py-0.5 font-mono text-[11px] text-warning"
-                    >
-                      {p}
-                    </code>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {note ? <p className="text-xs text-danger">{note}</p> : null}
-
-            {/* Actions. */}
-            {canManage ? (
-              <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
-                {canSync ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void sync()}
-                    disabled={triggering || syncing}
-                  >
-                    <RefreshCw
-                      className={cn("size-3.5", (triggering || syncing) && "animate-spin")}
-                    />
-                    {syncing ? "Syncing…" : "Sync now"}
-                  </Button>
-                ) : null}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setConfirmOpen(true)}
-                  className="ml-auto text-muted-foreground hover:bg-danger/10 hover:text-danger"
-                >
-                  <Trash2 className="size-3.5" /> Disconnect
-                </Button>
-              </div>
-            ) : null}
+      {/* What was skipped this sync (when we have no explicit permission list to show). */}
+      {missingPerms.length === 0 &&
+      conn.lastSync?.status === "partial" &&
+      (conn.lastSync.skippedScopes?.length ?? 0) > 0 ? (
+        <div className="mt-3 rounded-md border border-warning/30 bg-warning/5 p-3">
+          <p className="text-xs font-medium text-warning">
+            Skipped this sync — usually a missing read permission on the token:
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1">
+            {(conn.lastSync.skippedScopes ?? []).map((s) => (
+              <code
+                key={s}
+                className="rounded border border-warning/30 bg-warning/10 px-1.5 py-0.5 font-mono text-[11px] text-warning"
+              >
+                {s}
+              </code>
+            ))}
           </div>
-        </SheetContent>
-      </Sheet>
+        </div>
+      ) : null}
+
+      {/* Missing permissions — the detail, with room to breathe. */}
+      {conn.status === "degraded" && missingPerms.length > 0 ? (
+        <div className="mt-3 rounded-md border border-warning/30 bg-warning/5 p-3">
+          <p className="flex items-center gap-1.5 text-xs font-medium text-warning">
+            <ShieldAlert className="size-3.5 shrink-0" />
+            {missingPerms.length} permission{missingPerms.length === 1 ? "" : "s"} missing — grant
+            these for full coverage
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1">
+            {missingPerms.map((p) => (
+              <code
+                key={p}
+                className="rounded border border-warning/30 bg-warning/10 px-1.5 py-0.5 font-mono text-[11px] text-warning"
+              >
+                {p}
+              </code>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {note ? <p className="mt-2 text-xs text-danger">{note}</p> : null}
+
+      {/* Actions. */}
+      {canManage ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+          {canSync ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void sync()}
+              disabled={triggering || syncing}
+            >
+              <RefreshCw className={cn("size-3.5", (triggering || syncing) && "animate-spin")} />
+              {syncing ? "Syncing…" : "Sync now"}
+            </Button>
+          ) : null}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setConfirmOpen(true)}
+            className="ml-auto text-muted-foreground hover:bg-danger/10 hover:text-danger"
+          >
+            <Trash2 className="size-3.5" /> Disconnect
+          </Button>
+        </div>
+      ) : null}
 
       <AlertDialog open={confirmOpen} onOpenChange={(open) => !busy && setConfirmOpen(open)}>
         <AlertDialogContent>
@@ -553,7 +615,7 @@ function ConnectionRow({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </li>
+    </div>
   );
 }
 

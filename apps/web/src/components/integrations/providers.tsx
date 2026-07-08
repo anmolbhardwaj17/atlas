@@ -121,4 +121,12 @@ export const PROVIDERS: ProviderMeta[] = [
     blurb: "Monitors, dashboards, and the service map - richer runtime signal.",
     logo: "datadog",
   },
+  {
+    id: "grafana",
+    name: "Grafana",
+    category: "Observability",
+    status: "coming-soon",
+    blurb: "Dashboards, alerts, and metrics - health signal on the graph.",
+    logo: "grafana",
+  },
 ];
