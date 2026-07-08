@@ -65,7 +65,9 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <SeverityBadge severity={finding.severity} />
-              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${m.badge}`}
+              >
                 <m.icon className="size-3.5" /> {m.label}
               </span>
               {finding.count && finding.count > 1 ? (

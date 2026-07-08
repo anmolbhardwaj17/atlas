@@ -10,6 +10,7 @@ import {
   Cog,
   DollarSign,
   Gauge,
+  Search,
   ShieldCheck,
   Sparkles,
   TriangleAlert,
@@ -42,16 +43,60 @@ export interface Mute {
   mutedAt: string;
 }
 
-export const PILLAR_META: Record<string, { label: string; icon: LucideIcon }> = {
-  security: { label: "Security", icon: ShieldCheck },
-  reliability: { label: "Reliability", icon: Activity },
-  cost: { label: "Cost", icon: DollarSign },
-  performance: { label: "Performance", icon: Gauge },
-  hygiene: { label: "Hygiene", icon: Sparkles },
-  operations: { label: "Operations", icon: Cog },
+export interface PillarMeta {
+  label: string;
+  icon: LucideIcon;
+  tone: string; // icon/text accent (used on chips + severity-agnostic accents)
+  badge: string; // full pill classes for the Category column (tinted bg + inset ring + text)
+}
+const GENERAL_PILLAR: PillarMeta = {
+  label: "General",
+  icon: TriangleAlert,
+  tone: "text-muted-foreground",
+  badge: "bg-muted text-muted-foreground ring-border",
 };
-export const pillarMeta = (p?: string) =>
-  (p && PILLAR_META[p]) || { label: p ?? "General", icon: TriangleAlert };
+// One color enum per category so the Category column reads at a glance. Kept as tasteful tints
+// (10% bg + inset ring), not neon, so they sit inside Atlas's mostly-mono surface.
+export const PILLAR_META: Record<string, PillarMeta> = {
+  security: {
+    label: "Security",
+    icon: ShieldCheck,
+    tone: "text-violet-600 dark:text-violet-400",
+    badge: "bg-violet-500/10 text-violet-700 ring-violet-500/20 dark:text-violet-300",
+  },
+  reliability: {
+    label: "Reliability",
+    icon: Activity,
+    tone: "text-sky-600 dark:text-sky-400",
+    badge: "bg-sky-500/10 text-sky-700 ring-sky-500/20 dark:text-sky-300",
+  },
+  cost: {
+    label: "Cost",
+    icon: DollarSign,
+    tone: "text-amber-600 dark:text-amber-400",
+    badge: "bg-amber-500/10 text-amber-700 ring-amber-500/20 dark:text-amber-300",
+  },
+  performance: {
+    label: "Performance",
+    icon: Gauge,
+    tone: "text-cyan-600 dark:text-cyan-400",
+    badge: "bg-cyan-500/10 text-cyan-700 ring-cyan-500/20 dark:text-cyan-300",
+  },
+  hygiene: {
+    label: "Hygiene",
+    icon: Sparkles,
+    tone: "text-teal-600 dark:text-teal-400",
+    badge: "bg-teal-500/10 text-teal-700 ring-teal-500/20 dark:text-teal-300",
+  },
+  operations: {
+    label: "Operations",
+    icon: Cog,
+    tone: "text-indigo-600 dark:text-indigo-400",
+    badge: "bg-indigo-500/10 text-indigo-700 ring-indigo-500/20 dark:text-indigo-300",
+  },
+  general: GENERAL_PILLAR,
+};
+export const pillarMeta = (p?: string): PillarMeta => (p && PILLAR_META[p]) || GENERAL_PILLAR;
 
 const SEV_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
 const SEV_TEXT: Record<string, string> = {
@@ -110,8 +155,25 @@ export function InsightsView({
   }, [base]);
 
   const [pillar, setPillar] = React.useState<string>("all");
-  const shown =
-    pillar === "all" ? base : base.filter((f) => (f.guidance?.pillar ?? "general") === pillar);
+  const [query, setQuery] = React.useState("");
+  const [sev, setSev] = React.useState<"all" | "high" | "medium" | "low">("all");
+
+  const q = query.trim().toLowerCase();
+  const shown = base.filter(
+    (f) =>
+      (pillar === "all" || (f.guidance?.pillar ?? "general") === pillar) &&
+      (sev === "all" || f.severity === sev) &&
+      (q === "" ||
+        f.title.toLowerCase().includes(q) ||
+        f.detail.toLowerCase().includes(q) ||
+        f.category.toLowerCase().includes(q)),
+  );
+  const filtering = pillar !== "all" || sev !== "all" || q !== "";
+  const clearFilters = () => {
+    setQuery("");
+    setSev("all");
+    setPillar("all");
+  };
 
   const cov = summary?.pipelineCoverage;
   const covPct = cov && cov.total > 0 ? Math.round((cov.withPipeline / cov.total) * 100) : null;
@@ -181,13 +243,47 @@ export function InsightsView({
             const m = pillarMeta(p);
             return (
               <Chip key={p} active={pillar === p} onClick={() => setPillar(p)}>
-                <m.icon className="size-3.5" /> {m.label}{" "}
+                <m.icon className={cn("size-3.5", pillar === p ? "" : m.tone)} /> {m.label}{" "}
                 <span className="text-muted-foreground">{n}</span>
               </Chip>
             );
           })}
         </div>
       ) : null}
+
+      {/* Search + severity filter. */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative w-full sm:max-w-xs">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search findings…"
+            className="h-9 w-full rounded-md border border-border bg-transparent pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground/40"
+          />
+        </div>
+        <div className="flex items-center gap-0.5 rounded-md border border-border p-0.5">
+          {(["all", "high", "medium", "low"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setSev(s)}
+              className={cn(
+                "rounded px-2.5 py-1 text-xs font-medium capitalize transition-colors",
+                sev === s
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {s === "all" ? "All" : s}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs tabular-nums text-muted-foreground sm:ml-auto">
+          {shown.length} of {base.length}
+        </p>
+      </div>
 
       {/* Findings table - dense + scannable; a row opens its detail page. */}
       {shown.length === 0 ? (
@@ -197,10 +293,21 @@ export function InsightsView({
             <p className="text-sm text-muted-foreground">
               {tab === "muted"
                 ? "Nothing muted. Accepted-risk or dismissed findings will collect here."
-                : active.length === 0
-                  ? "Nothing needs attention right now - the graph doesn't flag any issues. You're in good shape."
-                  : "No findings in this category."}
+                : filtering
+                  ? "No findings match your search or filters."
+                  : active.length === 0
+                    ? "Nothing needs attention right now - the graph doesn't flag any issues. You're in good shape."
+                    : "No findings here."}
             </p>
+            {filtering ? (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="mt-3 text-xs font-medium text-foreground underline-offset-2 hover:underline"
+              >
+                Clear filters
+              </button>
+            ) : null}
           </CardContent>
         </Card>
       ) : (
@@ -245,7 +352,12 @@ export function InsightsView({
                         </Link>
                       </td>
                       <td className="hidden px-4 py-3 sm:table-cell">
-                        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
+                            m.badge,
+                          )}
+                        >
                           <m.icon className="size-3.5" /> {m.label}
                         </span>
                       </td>
