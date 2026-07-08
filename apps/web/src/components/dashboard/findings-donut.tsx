@@ -1,14 +1,14 @@
 "use client";
 
-import Link from "next/link";
-import { CheckCircle2, ChevronRight } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { Label, Pie, PieChart, Tooltip } from "recharts";
 import { Card, CardContent } from "@/components/ui/card";
 
+// Warm "heat ramp" — hotter = worse — so severity reads at a glance (red → orange → yellow).
 const SEVERITIES = [
   { key: "high", label: "High", color: "#ef4444" },
-  { key: "medium", label: "Medium", color: "#f59e0b" },
-  { key: "low", label: "Low", color: "#3b82f6" },
+  { key: "medium", label: "Medium", color: "#f97316" },
+  { key: "low", label: "Low", color: "#eab308" },
 ] as const;
 
 /** Open findings as a donut by severity (High/Medium/Low), total in the centre; hover a wedge to
@@ -32,12 +32,6 @@ export function FindingsDonut({ findings }: { findings: Array<{ severity: string
       <CardContent className="flex h-full flex-col p-5">
         <div className="flex items-baseline justify-between">
           <p className="text-sm font-medium text-muted-foreground">Open findings</p>
-          <Link
-            href="/insights"
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Insights <ChevronRight className="size-3.5" />
-          </Link>
         </div>
         {total === 0 ? (
           <p className="mt-3 flex flex-1 items-center gap-1.5 text-sm text-muted-foreground">

@@ -147,7 +147,9 @@ export async function Dashboard({
             {greeting()}
             {firstName ? `, ${firstName}` : ""}
           </h1>
-          <TrustPulse trust={trust} inv={inv} />
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Here&apos;s what needs your attention across the estate.
+          </p>
         </div>
         <div className="flex items-center gap-2.5">
           {trust.lastSyncAt ? (
@@ -259,26 +261,6 @@ function estateHealth(s: Summary): { score: number; label: string } {
   return { score, label };
 }
 
-function TrustPulse({ trust, inv }: { trust: Summary["trust"]; inv: Summary["inventory"] }) {
-  const allHealthy = trust.sources > 0 && trust.healthySources === trust.sources;
-  return (
-    <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-      <span>
-        {inv.resources.toLocaleString()} resources · {inv.relationships.toLocaleString()}{" "}
-        relationships
-      </span>
-      <span aria-hidden>·</span>
-      <span className="inline-flex items-center gap-1.5">
-        <span
-          className={`size-1.5 rounded-full ${allHealthy ? "bg-emerald-500" : "bg-amber-500"}`}
-          aria-hidden
-        />
-        {trust.healthySources}/{trust.sources} sources healthy
-      </span>
-    </p>
-  );
-}
-
 /** Posture by area — a compact square radar widget (where the estate is weak, by pillar). */
 function PostureCard({ posture }: { posture: Posture }) {
   return (
@@ -288,6 +270,9 @@ function PostureCard({ posture }: { posture: Posture }) {
         <div className="flex flex-1 items-center justify-center py-1">
           <PostureRadar posture={posture} />
         </div>
+        <p className="text-center text-xs text-muted-foreground/80">
+          The fuller the shape, the healthier the area.
+        </p>
       </CardContent>
     </Card>
   );
@@ -368,7 +353,7 @@ function HealthGauge({ score, label, tone }: { score: number; label: string; ton
         y="82"
         textAnchor="middle"
         className="fill-foreground font-semibold tabular-nums"
-        style={{ fontSize: 34 }}
+        style={{ fontSize: 28 }}
       >
         {score}
       </text>
@@ -393,8 +378,8 @@ function NeedsAttention({ findings }: { findings: Finding[] }) {
     <Card className="h-full">
       <CardContent className="flex h-full flex-col p-5">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-base font-semibold">
-            <TriangleAlert className="size-4 text-muted-foreground" />
+          <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+            <TriangleAlert className="size-3.5 text-muted-foreground" />
             Needs attention
           </h2>
           {findings.length > 0 ? (
