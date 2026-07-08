@@ -160,40 +160,41 @@ export function AskWorkspace({
           </button>
         </aside>
       ) : (
-        <aside className="hidden w-56 shrink-0 flex-col border-r border-border pr-5 md:flex">
-          {/* Header row: fixed height + border-b so its separator aligns with the chat pane's
-              title separator (both are h-11 with a bottom border). */}
-          <div className="mb-3 flex h-11 items-center gap-1.5 border-b border-border">
-            <button
-              type="button"
-              onClick={newChat}
-              className={cn(
-                "flex flex-1 items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/50",
-                highlightId === null && "bg-muted/50",
+        // Floating, self-enclosed chat-history panel (a card) — no bare divider lines.
+        <aside className="hidden w-60 shrink-0 md:flex">
+          <div className="flex h-full w-full flex-col rounded-xl border border-border bg-card p-2">
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={newChat}
+                className={cn(
+                  "flex flex-1 items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/50",
+                  highlightId === null && "bg-muted/50",
+                )}
+              >
+                <Plus className="size-4" /> New chat
+              </button>
+              <button
+                type="button"
+                onClick={() => setCollapsed(true)}
+                aria-label="Collapse chat history"
+                className="rounded-md border border-border p-2 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+              >
+                <PanelLeftClose className="size-4" />
+              </button>
+            </div>
+            <div className="px-2 pb-1 pt-3">
+              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Recent
+              </span>
+            </div>
+            <div className="-mr-1 flex-1 space-y-0.5 overflow-y-auto pr-1">
+              {conversations.length === 0 ? (
+                <p className="px-2 py-4 text-xs text-muted-foreground">No conversations yet.</p>
+              ) : (
+                conversations.map((c) => row(c))
               )}
-            >
-              <Plus className="size-4" /> New chat
-            </button>
-            <button
-              type="button"
-              onClick={() => setCollapsed(true)}
-              aria-label="Collapse chat history"
-              className="rounded-md border border-border p-2 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-            >
-              <PanelLeftClose className="size-4" />
-            </button>
-          </div>
-          <div className="mb-1 flex items-center px-1 pb-1">
-            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              Recent
-            </span>
-          </div>
-          <div className="flex-1 divide-y divide-border/60 overflow-y-auto">
-            {conversations.length === 0 ? (
-              <p className="px-2 py-4 text-xs text-muted-foreground">No conversations yet.</p>
-            ) : (
-              conversations.map((c) => row(c))
-            )}
+            </div>
           </div>
         </aside>
       )}

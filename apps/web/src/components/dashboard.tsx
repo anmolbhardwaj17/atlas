@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PostureRadar, type Posture } from "@/components/dashboard/posture-radar";
-import { UserAvatar } from "@/components/user-avatar";
+import { initials } from "@/components/user-avatar";
 import { cn } from "@/lib/cn";
 import { Onboarding } from "@/components/onboarding";
 import { AskLauncher } from "@/components/dashboard/ask-launcher";
@@ -28,6 +28,25 @@ import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
 import { KIND_LOGO } from "@/lib/kind-visual";
 import { severityMeta, PROVIDER_META } from "@/lib/taxonomy";
 import { apiGet, type ApiOk } from "@/lib/api";
+
+/** Vibrant, deterministic avatar colours for the contributor list (the default generated avatars
+ *  all read the same washed-out lilac). */
+const AVATAR_COLORS = [
+  "bg-rose-500",
+  "bg-orange-500",
+  "bg-amber-500",
+  "bg-emerald-500",
+  "bg-teal-500",
+  "bg-sky-500",
+  "bg-indigo-500",
+  "bg-violet-500",
+  "bg-fuchsia-500",
+];
+function avatarColor(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length] ?? "bg-slate-500";
+}
 
 interface Finding {
   id: string;
@@ -99,6 +118,9 @@ export async function Dashboard({
   const canManage = role === "Owner" || role === "Admin";
   const health = estateHealth(s);
   const firstName = name?.trim().split(/\s+/)[0] ?? null;
+  const hasInfra = inv.services + inv.datastores + inv.clouds > 0;
+  const hasCode = inv.repositories > 0;
+  const inventoryCols = 1 + (hasInfra ? 1 : 0) + (hasCode ? 1 : 0);
 
   return (
     <div className="space-y-6">
@@ -130,45 +152,47 @@ export async function Dashboard({
 
       <AskLauncher />
 
-      {/* Risk posture (radar) + inventory side by side — the radar is square, so the inventory
-          fills its spare horizontal room. Infrastructure/Code each show only when connected. */}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,340px)_1fr]">
+      {/* Three equal cards: the posture radar, then Infrastructure and Code, each listing their
+          counts as rows. Infra/Code only appear when that side is connected. */}
+      <div className={cn("grid gap-4", inventoryCols >= 3 ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
         <PostureCard posture={s.insights.posture} />
-        <div className="flex h-full flex-col gap-4">
-          {inv.services + inv.datastores + inv.clouds > 0 && (
-            <StatGroup label="Infrastructure">
-              <Stat icon={Boxes} label="Services" value={inv.services} />
-              <Stat icon={Database} label="Datastores" value={inv.datastores} />
-              <Stat
-                icon={Cloud}
-                label="Clouds"
-                value={inv.clouds}
-                sub={
+        {hasInfra ? (
+          <InventoryCard
+            title="Infrastructure"
+            rows={[
+              { icon: Boxes, label: "Services", value: inv.services },
+              { icon: Database, label: "Datastores", value: inv.datastores },
+              {
+                icon: Cloud,
+                label: "Clouds",
+                value: inv.clouds,
+                sub:
                   inv.accounts > 0
                     ? `${inv.accounts} account${inv.accounts > 1 ? "s" : ""}`
-                    : undefined
-                }
-              />
-            </StatGroup>
-          )}
-          {inv.repositories > 0 && (
-            <StatGroup label="Code">
-              <Stat icon={GitBranch} label="Repositories" value={inv.repositories} />
-              <Stat icon={FolderGit2} label="Projects" value={inv.projects} />
-              <Stat
-                icon={Play}
-                label="Pipelines"
-                value={inv.pipelines}
-                sub={
+                    : undefined,
+              },
+            ]}
+          />
+        ) : null}
+        {hasCode ? (
+          <InventoryCard
+            title="Code"
+            rows={[
+              { icon: GitBranch, label: "Repositories", value: inv.repositories },
+              { icon: FolderGit2, label: "Projects", value: inv.projects },
+              {
+                icon: Play,
+                label: "Pipelines",
+                value: inv.pipelines,
+                sub:
                   inv.pullRequests > 0
                     ? `${inv.pullRequests} open PR${inv.pullRequests > 1 ? "s" : ""}`
-                    : undefined
-                }
-              />
-              <Stat icon={Users} label="Contributors" value={inv.contributors} />
-            </StatGroup>
-          )}
-        </div>
+                    : undefined,
+              },
+              { icon: Users, label: "Contributors", value: inv.contributors },
+            ]}
+          />
+        ) : null}
       </div>
 
       <Insights insights={s.insights} />
@@ -712,7 +736,14 @@ function Leaderboard({
             {items.map((it) => (
               <li key={it.name} className="flex items-center gap-2.5 text-sm">
                 {avatars ? (
-                  <UserAvatar name={it.name} email={it.name} size={22} className="shrink-0" />
+                  <span
+                    className={cn(
+                      "grid size-[22px] shrink-0 place-items-center rounded-full text-[9px] font-semibold text-white",
+                      avatarColor(it.name),
+                    )}
+                  >
+                    {initials(it.name, it.name)}
+                  </span>
                 ) : null}
                 <span className="w-24 shrink-0 truncate">{it.name}</span>
                 <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
@@ -733,45 +764,35 @@ function Leaderboard({
   );
 }
 
-function StatGroup({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-1 flex-col">
-      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
-      {/* flex-1 so the card row grows to fill the column height (matching the radar on the left);
-          flex-wrap keeps 3 infra / 4 code cards on one row that stretches evenly. */}
-      <div className="flex flex-1 flex-wrap gap-3">{children}</div>
-    </div>
-  );
-}
-
-function Stat({
-  icon: Icon,
-  label,
-  value,
-  sub,
-}: {
+interface InventoryRow {
   icon: LucideIcon;
   label: string;
-  value: number | string;
+  value: number;
   sub?: string | undefined;
-}) {
+}
+
+/** One inventory card (Infrastructure / Code): a titled card whose counts are listed as rows that
+ *  stretch to fill the card, so it stands level with the posture radar beside it. */
+function InventoryCard({ title, rows }: { title: string; rows: InventoryRow[] }) {
   return (
-    <Card className="flex min-w-[150px] flex-1 flex-col shadow-sm transition-colors hover:border-foreground/20">
-      <CardContent className="flex flex-1 items-center justify-between gap-3 px-3.5 py-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <Icon className="size-3.5 shrink-0" />
-            <span className="truncate text-[11px] font-medium uppercase tracking-wide">
-              {label}
-            </span>
-          </div>
-          {/* Always reserve the sub line (nbsp when empty) so every card is the same height. */}
-          <div className="mt-0.5 text-[11px] text-muted-foreground">{sub ?? " "}</div>
-        </div>
-        <div className="shrink-0 text-xl font-semibold tabular-nums">
-          {typeof value === "number" ? value.toLocaleString() : value}
+    <Card className="flex h-full flex-col shadow-sm">
+      <CardContent className="flex h-full flex-col p-5">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
+        <div className="mt-1 flex flex-1 flex-col divide-y divide-border">
+          {rows.map((r) => (
+            <div key={r.label} className="flex flex-1 items-center justify-between gap-3 py-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <r.icon className="size-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">{r.label}</div>
+                  {r.sub ? <div className="text-xs text-muted-foreground">{r.sub}</div> : null}
+                </div>
+              </div>
+              <div className="shrink-0 text-2xl font-semibold tabular-nums">
+                {r.value.toLocaleString()}
+              </div>
+            </div>
+          ))}
         </div>
       </CardContent>
     </Card>
