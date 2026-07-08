@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
 import {
   Sheet,
   SheetContent,
@@ -104,11 +105,14 @@ export function IntegrationsHub({
   }
 
   const q = query.trim().toLowerCase();
-  const filtered = PROVIDERS.filter(
+  const hasConn = (id: string) => (byProvider.get(id)?.length ?? 0) > 0;
+  // Every provider is a row (available + coming-soon). Connected ones float to the top so a
+  // consumer sees "what's already set up" first.
+  const rows = PROVIDERS.filter(
     (p) =>
       (tab === "All" || p.category === tab) &&
       (q === "" || p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)),
-  );
+  ).sort((a, b) => Number(hasConn(b.id)) - Number(hasConn(a.id)));
 
   return (
     <div className="space-y-6">
@@ -119,8 +123,6 @@ export function IntegrationsHub({
           across everything you connect.
         </p>
       </div>
-
-      <LogoMarquee />
 
       {/* Category tabs + search — the row list below filters live. */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -153,13 +155,13 @@ export function IntegrationsHub({
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {rows.length === 0 ? (
         <div className="rounded-lg border border-border py-14 text-center text-sm text-muted-foreground">
           No integrations match your search.
         </div>
       ) : (
         <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
-          {filtered.map((p) => (
+          {rows.map((p) => (
             <ProviderRow
               key={p.id}
               provider={p}
@@ -172,6 +174,8 @@ export function IntegrationsHub({
         </div>
       )}
 
+      <SoonGrid />
+
       <ConnectSheet
         provider={connectProvider}
         orgId={orgId}
@@ -183,22 +187,53 @@ export function IntegrationsHub({
 
 const TABS = ["All", "Cloud", "Code", "CI/CD", "Observability"] as const;
 
-/** A decorative strip of every connectable + upcoming logo — "everything you can connect". */
-function LogoMarquee() {
+// The "more coming soon" wall (docs/18 roadmap + aspirational). Real upcoming connectors first,
+// then a broad set so the hub reads as a growing platform. Decorative — logos only.
+const SOON_LOGOS = [
+  "kubernetes",
+  "terraform-icon",
+  "docker-icon",
+  "prometheus",
+  "grafana",
+  "pagerduty",
+  "sentry-icon",
+  "pulumi",
+  "slack-icon",
+  "discord-icon",
+  "jira",
+  "linear-icon",
+  "notion",
+  "figma",
+  "trello",
+  "asana-icon",
+  "zendesk-icon",
+  "dropbox",
+  "google-drive",
+  "google-gmail",
+  "microsoft-onedrive",
+  "mailchimp",
+  "todoist-icon",
+];
+
+/** The "more coming soon" logo wall at the bottom — a growing-platform signal, uncategorized. */
+function SoonGrid() {
+  const logos = SOON_LOGOS.filter((l) => hasCloudIcon(l));
   return (
-    <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-muted/20 p-3">
-      {PROVIDERS.map((p) => (
-        <div
-          key={p.id}
-          title={p.name}
-          className={cn(
-            "grid size-10 shrink-0 place-items-center rounded-lg border border-border bg-background",
-            p.status === "coming-soon" && "opacity-50",
-          )}
-        >
-          <ProviderLogo provider={p} className="size-6" />
-        </div>
-      ))}
+    <div className="pt-2">
+      <h2 className="text-sm font-semibold">More coming soon</h2>
+      <p className="mb-3 mt-0.5 text-xs text-muted-foreground">
+        We&apos;re expanding the graph across more of the tools teams run.
+      </p>
+      <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-muted/20 p-4">
+        {logos.map((logo) => (
+          <div
+            key={logo}
+            className="grid size-10 shrink-0 place-items-center rounded-lg border border-border bg-background opacity-80 transition-opacity hover:opacity-100"
+          >
+            <CloudIcon name={logo} className="size-6" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -231,11 +266,6 @@ function ProviderRow({
             <span className="hidden shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground sm:inline">
               {provider.category}
             </span>
-            {comingSoon && (
-              <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                Soon
-              </span>
-            )}
           </div>
           <p className="truncate text-sm text-muted-foreground">{provider.blurb}</p>
         </div>
@@ -244,17 +274,24 @@ function ProviderRow({
             <span className="text-xs text-muted-foreground">Coming soon</span>
           ) : connections.length > 0 ? (
             <>
-              <span className="inline-flex items-center gap-1.5 rounded-md bg-foreground px-2.5 py-1.5 text-xs font-medium text-background">
-                <Check className="size-3.5" /> Connected
-              </span>
               {canManage ? (
-                <Button size="sm" variant="outline" onClick={onConnect}>
-                  <Plus className="size-4" /> Add another
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="size-9"
+                  onClick={onConnect}
+                  aria-label={`Add another ${provider.name} connection`}
+                  title="Add another connection"
+                >
+                  <Plus className="size-4" />
                 </Button>
               ) : null}
+              <span className="inline-flex h-9 items-center gap-1.5 rounded-md bg-foreground px-3 text-sm font-medium text-background">
+                <Check className="size-4" /> Connected
+              </span>
             </>
           ) : canManage ? (
-            <Button size="sm" onClick={onConnect}>
+            <Button variant="outline" className="h-9" onClick={onConnect}>
               <Plus className="size-4" /> Connect
             </Button>
           ) : (
