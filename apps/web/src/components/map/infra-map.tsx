@@ -26,6 +26,7 @@ import {
   type NodeMouseHandler,
 } from "@xyflow/react";
 import {
+  ArrowUp,
   Check,
   ChevronDown,
   Clock,
@@ -86,7 +87,6 @@ export function InfraMap({ data: rawData, orgId }: { data: MapData; orgId: strin
   }, [rawData]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const selected = selectedId ? (data.nodes.find((n) => n.id === selectedId) ?? null) : null;
   // Security overlay: OFF = the clean traffic flow (protection as shield chips only);
   // ON = security groups return to the canvas with their PROTECTS edges drawn, for the
   // boundary-audit view. Default off - flow first, boundaries on demand.
@@ -361,14 +361,6 @@ export function InfraMap({ data: rawData, orgId }: { data: MapData; orgId: strin
             kindFilter={kindFilter}
           />
         </ReactFlowProvider>
-        {!selected && <Legend />}
-        {selected && (
-          <DetailPanel
-            node={selected}
-            protectedBy={protectedBy.get(selected.id) ?? []}
-            onClose={() => setSelectedId(null)}
-          />
-        )}
       </div>
     </div>
   );
@@ -437,15 +429,18 @@ function Flow({
   const activeId = hoveredId ?? selectedId;
   // Minimap is collapsed by default (it ate a corner); a small button toggles it.
   const [showMinimap, setShowMinimap] = useState(false);
-  // "Ask the map": the set of nodes the AI cited (or a jump target) lights up; everything else
-  // recedes (null = nothing highlighted). While a set is active the shelves auto-expand so matches
-  // hiding in them aren't missed.
+  // "Ask the map": the set of nodes the latest AI answer cited lights up; everything else recedes
+  // (null = nothing highlighted). While a set is active the shelves auto-expand so matches hiding in
+  // them aren't missed. A deliberate node selection (blast radius) out-ranks this — see `litSet`.
   const [queryIds, setQueryIds] = useState<Set<string> | null>(null);
-  // The streaming AI answer (null = the box is idle). Its node citations feed `queryIds` live, so
-  // the graph lights up as Atlas cites its evidence — the P4 money shot on the canvas.
-  const [ask, setAsk] = useState<AskState | null>(null);
+  // The docked chat conversation (empty = closed). Follow-ups reuse the same backend conversation
+  // (convoRef), so Atlas keeps context turn to turn. The latest assistant turn's cited nodes feed
+  // `queryIds`, so the graph lights up as Atlas cites its evidence — the P4 money shot on the canvas.
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [chatOpen, setChatOpen] = useState(false);
   const convoRef = useRef<string | null>(null);
   const askAbortRef = useRef<AbortController | null>(null);
+  const streaming = messages.some((m) => m.role === "assistant" && STREAMING_PHASES.has(m.phase));
   // Fitting the viewport to the cited nodes is a discrete event (once, when the answer lands) — a
   // nonce triggers it, decoupled from the per-citation `queryIds` churn so the view doesn't jump
   // on every token. `queryIdsRef` lets that effect read the freshest set without depending on it.
@@ -647,12 +642,14 @@ function Flow({
     return s;
   }, [layout.nodes]);
 
-  // One "lit" set unifies every focus mode. An ask-query and a blast-radius click win outright;
-  // otherwise each active control NARROWS (AND): a node stays lit only if it passes Health AND
-  // Changed AND the kind filter. null = nothing is filtering (everything lit).
+  // One "lit" set unifies every focus mode. A deliberate blast-radius click wins outright (the
+  // foreground act); the chat's cited nodes are the ambient glow beneath it; otherwise each active
+  // lens/filter NARROWS (AND): a node stays lit only if it passes Health AND Changed AND the kind
+  // filter. null = nothing is filtering (everything lit). Selection > chat citations > lenses means
+  // you can jump to a resource mid-conversation and it takes over, then deselect to get the glow back.
   const litSet = useMemo(() => {
-    if (queryIds) return queryIds;
     if (focusSet) return focusSet;
+    if (queryIds) return queryIds;
     if (!healthLens && !changedLens && kindFilter.size === 0) return null;
     const s = new Set<string>();
     for (const n of layout.nodes) {
@@ -753,62 +750,60 @@ function Flow({
     [onSelect, fitView],
   );
 
-  // Typeahead pick: a plain resource jump — clears any AI highlight/answer and centres the node.
-  const onPick = useCallback(
-    (id: string) => {
-      setQueryIds(null);
-      setAsk(null);
-      jumpTo(id);
-    },
-    [jumpTo],
-  );
+  // Typeahead pick: a plain resource jump — centres + selects the node. We DON'T clear the chat;
+  // a selection out-ranks the chat glow in `litSet`, so it takes over and returns on deselect.
+  const onPick = jumpTo;
 
-  // Clear the AI answer: abort any in-flight stream and drop the highlight.
-  const closeAsk = useCallback(() => {
+  // Close the chat: abort any in-flight stream, drop the conversation + highlight, refit the base
+  // view (the canvas widens back to full width).
+  const closeChat = useCallback(() => {
     askAbortRef.current?.abort();
     askAbortRef.current = null;
-    setAsk(null);
+    convoRef.current = null;
+    setMessages([]);
+    setChatOpen(false);
     setQueryIds(null);
   }, []);
 
-  // Stop generating but keep whatever streamed so far on screen.
+  // Stop generating but keep whatever streamed so far.
   const stopAsk = useCallback(() => {
     askAbortRef.current?.abort();
     askAbortRef.current = null;
-    setAsk((a) => (a ? { ...a, phase: "done" } : a));
+    setMessages((ms) =>
+      ms.map((m, i) =>
+        i === ms.length - 1 && m.role === "assistant" ? { ...m, phase: "done" } : m,
+      ),
+    );
   }, []);
 
-  // Ask the map a real question. Routes through the same retrieval-first, cited answer engine as
-  // Ask Atlas (WS with an SSE fallback). Node citations light up on the canvas as they stream in;
-  // when the answer lands we frame them. Everything is grounded — P1/P4.
+  // Ask the map a real question (from the left command bar OR the chat's follow-up input). Routes
+  // through the same retrieval-first, cited answer engine as Ask Atlas (WS + SSE fallback); reuses
+  // one backend conversation so follow-ups keep context. Cited nodes (and cited-edge endpoints)
+  // light up on the canvas as they stream; when the answer lands we frame them. Grounded — P1/P4.
   const runAsk = useCallback(
     async (question: string) => {
       const q = question.trim();
-      if (!q) return;
+      if (!q || streaming) return;
       askAbortRef.current?.abort();
       const ac = new AbortController();
       askAbortRef.current = ac;
       onSelect(null);
       setQueryIds(null);
-      setAsk({
-        question: q,
-        phase: "searching",
-        steps: [],
-        text: "",
-        citations: [],
-        nodeIds: [],
-        confidence: null,
-        caveats: [],
-        error: null,
-      });
+      setChatOpen(true);
+      setMessages((ms) => [
+        ...ms,
+        { ...EMPTY_MSG, role: "user", text: q, phase: "done" },
+        { ...EMPTY_MSG, role: "assistant", phase: "searching" },
+      ]);
+      // Patch the trailing assistant turn as events stream in.
+      const patch = (fn: (m: ChatMsg) => ChatMsg) =>
+        setMessages((ms) => ms.map((m, i) => (i === ms.length - 1 ? fn(m) : m)));
       const cited = new Set<string>();
       try {
         if (!convoRef.current) convoRef.current = await createConversation(orgId, `Map · ${q}`);
         const convId = convoRef.current;
         if (!convId) {
-          setAsk((a) =>
-            a ? { ...a, phase: "error", error: "Couldn’t start a conversation." } : a,
-          );
+          patch((m) => ({ ...m, phase: "error", error: "Couldn’t start a conversation." }));
           return;
         }
         for await (const ev of streamAskWS(orgId, convId, q, ac.signal)) {
@@ -816,27 +811,23 @@ function Flow({
           switch (ev.type) {
             case "retrieval_step": {
               const label = toolLabel(ev.tool);
-              setAsk((a) =>
-                a
-                  ? {
-                      ...a,
-                      phase: "searching",
-                      steps: a.steps[a.steps.length - 1] === label ? a.steps : [...a.steps, label],
-                    }
-                  : a,
-              );
+              patch((m) => ({
+                ...m,
+                phase: "searching",
+                steps: m.steps[m.steps.length - 1] === label ? m.steps : [...m.steps, label],
+              }));
               break;
             }
             case "retrieval":
-              setAsk((a) => (a ? { ...a, phase: "thinking" } : a));
+              patch((m) => ({ ...m, phase: "thinking" }));
               break;
             case "token":
-              setAsk((a) => (a ? { ...a, phase: "answering", text: a.text + ev.text } : a));
+              patch((m) => ({ ...m, phase: "answering", text: m.text + ev.text }));
               break;
             case "citation": {
               const c = ev.citation;
               // A node citation lights that node; an edge citation lights both endpoints (only ids
-              // that are actually on the map). Keep insertion order for the Source chips.
+              // actually on the map). Keep insertion order for the Source chips.
               const before = cited.size;
               if (c.kind === "node") {
                 if (nodeById.has(c.id)) cited.add(c.id);
@@ -848,52 +839,48 @@ function Flow({
                 }
               }
               const grew = cited.size > before;
-              setAsk((a) =>
-                a
-                  ? {
-                      ...a,
-                      citations: [
-                        ...a.citations,
-                        {
-                          number: c.number,
-                          marker: c.marker,
-                          kind: c.kind,
-                          id: c.id,
-                          confidence: c.confidence,
-                        },
-                      ],
-                      ...(grew ? { nodeIds: [...cited] } : {}),
-                    }
-                  : a,
-              );
+              patch((m) => ({
+                ...m,
+                citations: [
+                  ...m.citations,
+                  {
+                    number: c.number,
+                    marker: c.marker,
+                    kind: c.kind,
+                    id: c.id,
+                    confidence: c.confidence,
+                  },
+                ],
+                ...(grew ? { nodeIds: [...cited] } : {}),
+              }));
               if (grew) setQueryIds(new Set(cited));
               break;
             }
             case "confidence":
-              setAsk((a) => (a ? { ...a, confidence: ev.overall, caveats: ev.caveats } : a));
+              patch((m) => ({ ...m, confidence: ev.overall, caveats: ev.caveats }));
               break;
             case "error":
-              setAsk((a) => (a ? { ...a, phase: "error", error: ev.message } : a));
+              patch((m) => ({ ...m, phase: "error", error: ev.message }));
               break;
             case "done":
               break;
           }
         }
-        setAsk((a) => (a ? { ...a, phase: a.phase === "error" ? "error" : "done" } : a));
+        patch((m) => ({ ...m, phase: m.phase === "error" ? "error" : "done" }));
         if (cited.size > 0) setFitNonce((n) => n + 1);
       } catch {
         if (!ac.signal.aborted) {
-          setAsk((a) => (a ? { ...a, phase: "error", error: "The stream was interrupted." } : a));
+          patch((m) => ({ ...m, phase: "error", error: "The stream was interrupted." }));
         }
       } finally {
         if (askAbortRef.current === ac) askAbortRef.current = null;
       }
     },
-    [orgId, onSelect, nodeById, edgeById],
+    [orgId, onSelect, nodeById, edgeById, streaming],
   );
 
   // Frame the cited nodes — once, when the answer lands (bumped nonce), after the expanded-shelf
-  // nodes have painted.
+  // nodes have painted (and after the dock has taken its width, so we fit inside the visible canvas).
   useEffect(() => {
     if (fitNonce === 0) return;
     const ids = queryIdsRef.current;
@@ -911,70 +898,112 @@ function Flow({
     };
   }, [fitNonce, fitView]);
 
+  // When the dock opens/closes the canvas width changes — gently reframe (to the cited set if one is
+  // lit, else the base flow) so nothing ends up half-hidden behind the dock.
+  const prevChatOpen = useRef(chatOpen);
+  useEffect(() => {
+    if (prevChatOpen.current === chatOpen) return;
+    prevChatOpen.current = chatOpen;
+    const raf = requestAnimationFrame(() => {
+      const ids = queryIdsRef.current;
+      if (ids && ids.size > 0) {
+        void fitView({
+          nodes: [...ids].map((id) => ({ id })),
+          duration: 300,
+          maxZoom: 1.1,
+          padding: 0.4,
+        });
+      } else {
+        void fitView({ ...fitOpts, duration: 300 });
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [chatOpen, fitView, fitOpts]);
+
   // Abort a running stream if the map unmounts.
   useEffect(() => () => askAbortRef.current?.abort(), []);
 
+  const selected = selectedId ? (data.nodes.find((n) => n.id === selectedId) ?? null) : null;
+
   return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      onNodeMouseEnter={onNodeMouseEnter}
-      onNodeMouseLeave={onNodeMouseLeave}
-      nodeTypes={nodeTypes}
-      onNodeClick={onNodeClick}
-      onPaneClick={() => onSelect(null)}
-      onInit={(inst) => void inst.fitView(fitOpts)}
-      nodesDraggable={false}
-      nodesConnectable={false}
-      elementsSelectable
-      fitView
-      fitViewOptions={fitOpts}
-      minZoom={0.1}
-      proOptions={{ hideAttribution: true }}
-    >
-      <Background
-        variant={BackgroundVariant.Dots}
-        gap={22}
-        size={1.6}
-        color="hsl(var(--muted-foreground) / 0.25)"
-      />
-      <Panel position="top-left">
-        <div className="flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2">
-          <MapSearch nodes={searchNodes} onPick={onPick} onAsk={runAsk} onClear={closeAsk} />
-          {ask ? (
-            <MapAnswer
-              ask={ask}
-              resolve={(id) => nodeById.get(id) ?? null}
-              onJump={jumpTo}
-              onStop={stopAsk}
-              onClose={closeAsk}
+    <div className="flex h-full w-full">
+      {/* Canvas column — shrinks when the chat docks so nothing hides behind it. */}
+      <div className="relative min-w-0 flex-1">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeMouseEnter={onNodeMouseEnter}
+          onNodeMouseLeave={onNodeMouseLeave}
+          nodeTypes={nodeTypes}
+          onNodeClick={onNodeClick}
+          onPaneClick={() => onSelect(null)}
+          onInit={(inst) => void inst.fitView(fitOpts)}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          elementsSelectable
+          fitView
+          fitViewOptions={fitOpts}
+          minZoom={0.1}
+          proOptions={{ hideAttribution: true }}
+        >
+          <Background
+            variant={BackgroundVariant.Dots}
+            gap={22}
+            size={1.6}
+            color="hsl(var(--muted-foreground) / 0.25)"
+          />
+          <Panel position="top-left">
+            <div className="w-72 max-w-[calc(100vw-2rem)]">
+              <MapSearch nodes={searchNodes} onPick={onPick} onAsk={runAsk} />
+            </div>
+          </Panel>
+          <Controls showInteractive={false} />
+          {showMinimap ? (
+            <MiniMap
+              pannable
+              zoomable
+              nodeColor="hsl(var(--muted-foreground))"
+              style={{ width: 160, height: 120, bottom: 48 }}
             />
           ) : null}
-        </div>
-      </Panel>
-      <Controls showInteractive={false} />
-      {showMinimap ? (
-        <MiniMap
-          pannable
-          zoomable
-          nodeColor="hsl(var(--muted-foreground))"
-          style={{ width: 160, height: 120, bottom: 48 }}
-        />
+          <Panel position="bottom-right">
+            <button
+              type="button"
+              onClick={() => setShowMinimap((v) => !v)}
+              title={showMinimap ? "Hide minimap" : "Show minimap"}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background/85 px-2 py-1 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur transition-colors hover:text-foreground"
+            >
+              <MapIcon className="size-3.5" />
+              {showMinimap ? "Hide map" : "Minimap"}
+            </button>
+          </Panel>
+        </ReactFlow>
+        {!selected && <Legend />}
+        {selected && (
+          <DetailPanel
+            node={selected}
+            protectedBy={protectedBy.get(selected.id) ?? []}
+            onClose={() => onSelect(null)}
+          />
+        )}
+      </div>
+      {/* Docked chat — the map's conversational sidekick (P4: citations light the canvas). */}
+      {chatOpen ? (
+        <aside className="flex w-[340px] max-w-[42%] shrink-0 flex-col border-l border-border bg-card">
+          <MapChat
+            messages={messages}
+            streaming={streaming}
+            resolve={(id) => nodeById.get(id) ?? null}
+            onJump={jumpTo}
+            onAsk={runAsk}
+            onStop={stopAsk}
+            onClose={closeChat}
+          />
+        </aside>
       ) : null}
-      <Panel position="bottom-right">
-        <button
-          type="button"
-          onClick={() => setShowMinimap((v) => !v)}
-          title={showMinimap ? "Hide minimap" : "Show minimap"}
-          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background/85 px-2 py-1 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur transition-colors hover:text-foreground"
-        >
-          <MapIcon className="size-3.5" />
-          {showMinimap ? "Hide map" : "Minimap"}
-        </button>
-      </Panel>
-    </ReactFlow>
+    </div>
   );
 }
 
@@ -995,12 +1024,14 @@ interface AskCitation {
   id: string;
   confidence: string | null;
 }
-interface AskState {
-  question: string;
+/** One turn in the map chat. User turns use only role+text; assistant turns carry the streamed
+ *  answer, its cited nodes, and a confidence tier. */
+interface ChatMsg {
+  role: "user" | "assistant";
+  text: string;
   /** searching/thinking = pre-token wait; answering = streaming; done/error = settled. */
   phase: "searching" | "thinking" | "answering" | "done" | "error";
   steps: string[];
-  text: string;
   citations: AskCitation[];
   /** The on-map nodes the answer grounds in (node citations + endpoints of cited edges), in the
    *  order first cited — these light up on the canvas and appear as clickable Source chips. */
@@ -1009,6 +1040,19 @@ interface AskState {
   caveats: string[];
   error: string | null;
 }
+
+const EMPTY_MSG: ChatMsg = {
+  role: "assistant",
+  text: "",
+  phase: "done",
+  steps: [],
+  citations: [],
+  nodeIds: [],
+  confidence: null,
+  caveats: [],
+  error: null,
+};
+const STREAMING_PHASES = new Set(["searching", "thinking", "answering"]);
 
 /** Friendly label for a retrieval tool (the agentic loop's "show your work" trace). Mirrors the
  *  Ask Atlas page so the map speaks the same language. */
@@ -1111,79 +1155,161 @@ function renderMapRich(
 }
 
 /**
- * The streamed AI answer to a map question — floats under the command bar. Shows the retrieval
- * "show your work" trace while it thinks, then the cited answer, then a Sources row of the cited
- * nodes (click to jump on the canvas) and a confidence tier. Every claim is grounded (P4); an
- * insufficient-grounding answer reads as an honest "I don't know" (US-11), never a fabrication.
+ * The docked map chat — the conversational sidekick beside the graph. A scrollable transcript of
+ * turns + a follow-up input pinned to the bottom. Same retrieval-first, cited engine as Ask Atlas;
+ * the latest answer's cited nodes light up on the canvas (P4), and every source jumps you to it.
+ * An insufficient-grounding answer reads as an honest "I don't know" (US-11), never a fabrication.
  */
-function MapAnswer({
-  ask,
+function MapChat({
+  messages,
+  streaming,
   resolve,
   onJump,
+  onAsk,
   onStop,
   onClose,
 }: {
-  ask: AskState;
+  messages: ChatMsg[];
+  streaming: boolean;
   resolve: (id: string) => MapNode | null;
   onJump: (id: string) => void;
+  onAsk: (q: string) => void;
   onStop: () => void;
   onClose: () => void;
 }) {
-  const streaming =
-    ask.phase === "searching" || ask.phase === "thinking" || ask.phase === "answering";
-  const thinking = streaming && ask.text.length === 0;
-  const honest = ask.confidence === "insufficient";
-  const citeByMarker = useMemo(
-    () => new Map(ask.citations.map((c) => [c.marker, c])),
-    [ask.citations],
-  );
-  // Sources = the on-map nodes the answer grounds in (node citations + cited-edge endpoints).
-  const sources = ask.nodeIds;
-  const trust = ask.confidence ? (TRUST[ask.confidence] ?? TRUST_FALLBACK) : null;
+  const [input, setInput] = useState("");
+  const endRef = useRef<HTMLDivElement>(null);
+  // Keep the newest turn in view as it streams.
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: "end" });
+  }, [messages]);
+
+  const submit = () => {
+    const q = input.trim();
+    if (!q || streaming) return;
+    onAsk(q);
+    setInput("");
+  };
 
   return (
-    <div className="flex max-h-[62vh] w-full flex-col overflow-hidden rounded-lg border border-border bg-background/95 shadow-lg backdrop-blur">
-      <div className="flex items-start gap-2 border-b border-border px-3 py-2">
-        <AtlasAiMark size={16} className={cn("mt-0.5 shrink-0", thinking && "animate-ai-pulse")} />
-        <p className="min-w-0 flex-1 text-xs font-medium leading-snug text-foreground">
-          {ask.question}
-        </p>
+    <div className="flex h-full flex-col">
+      <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2.5">
+        <AtlasAiMark size={16} className="shrink-0" />
+        <span className="flex-1 text-sm font-semibold text-foreground">Ask Atlas</span>
+        <button
+          type="button"
+          onClick={onClose}
+          title="Close chat"
+          aria-label="Close chat"
+          className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <X className="size-4" />
+        </button>
+      </header>
+
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-3">
+        {messages.map((m, i) =>
+          m.role === "user" ? (
+            <UserBubble key={i} text={m.text} />
+          ) : (
+            <AssistantTurn key={i} msg={m} resolve={resolve} onJump={onJump} />
+          ),
+        )}
+        <div ref={endRef} />
+      </div>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+        className="flex shrink-0 items-center gap-2 border-t border-border p-2.5"
+      >
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Ask a follow-up…"
+          aria-label="Ask a follow-up"
+          className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground/40"
+        />
         {streaming ? (
           <button
             type="button"
             onClick={onStop}
             title="Stop generating"
             aria-label="Stop generating"
-            className="shrink-0 text-muted-foreground hover:text-foreground"
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:text-foreground"
           >
             <Square className="size-3 fill-current" />
           </button>
-        ) : null}
-        <button
-          type="button"
-          onClick={onClose}
-          title="Close"
-          aria-label="Close answer"
-          className="shrink-0 text-muted-foreground hover:text-foreground"
-        >
-          <X className="size-3.5" />
-        </button>
-      </div>
+        ) : (
+          <button
+            type="submit"
+            disabled={!input.trim()}
+            title="Ask"
+            aria-label="Ask"
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-foreground text-background transition-opacity hover:opacity-90 disabled:opacity-40"
+          >
+            <ArrowUp className="size-4" />
+          </button>
+        )}
+      </form>
+    </div>
+  );
+}
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2.5 text-xs leading-relaxed">
-        {ask.error ? (
+/** A question the user asked — right-aligned bubble. */
+function UserBubble({ text }: { text: string }) {
+  return (
+    <div className="flex justify-end">
+      <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-foreground px-3 py-1.5 text-xs leading-relaxed text-background">
+        {text}
+      </div>
+    </div>
+  );
+}
+
+/** One assistant answer: the retrieval trace while it thinks, then the cited answer, its caveats,
+ *  the grounded on-map sources (click to jump), and a confidence tier. */
+function AssistantTurn({
+  msg,
+  resolve,
+  onJump,
+}: {
+  msg: ChatMsg;
+  resolve: (id: string) => MapNode | null;
+  onJump: (id: string) => void;
+}) {
+  const streaming = STREAMING_PHASES.has(msg.phase);
+  const thinking = streaming && msg.text.length === 0;
+  const honest = msg.confidence === "insufficient";
+  const citeByMarker = useMemo(
+    () => new Map(msg.citations.map((c) => [c.marker, c])),
+    [msg.citations],
+  );
+  const sources = msg.nodeIds;
+  const trust = msg.confidence ? (TRUST[msg.confidence] ?? TRUST_FALLBACK) : null;
+
+  return (
+    <div className="flex gap-2.5">
+      <AtlasAiMark
+        size={18}
+        className={cn("mt-0.5 size-[18px] shrink-0", thinking && "animate-ai-pulse")}
+      />
+      <div className="min-w-0 flex-1 space-y-2 text-xs leading-relaxed">
+        {msg.error ? (
           <p className="rounded-md border border-danger/30 bg-danger/10 px-2 py-1.5 text-danger">
-            {ask.error}
+            {msg.error}
           </p>
         ) : thinking ? (
           <div className="space-y-1.5">
             <span className="flex items-center gap-2 text-muted-foreground">
               <TypingDots />
-              {ask.phase === "thinking" ? "Thinking…" : "Searching your graph…"}
+              {msg.phase === "thinking" ? "Thinking…" : "Searching your graph…"}
             </span>
-            {ask.steps.length > 0 ? (
+            {msg.steps.length > 0 ? (
               <ul className="space-y-0.5 pl-0.5">
-                {ask.steps.map((s, i) => (
+                {msg.steps.map((s, i) => (
                   <li
                     key={i}
                     className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
@@ -1195,7 +1321,7 @@ function MapAnswer({
               </ul>
             ) : null}
           </div>
-        ) : ask.text.length === 0 ? (
+        ) : msg.text.length === 0 ? (
           <p className="rounded-md border border-warning/30 bg-warning/10 px-2 py-1.5 text-warning">
             No answer came back — the model may be rate-limited. Try again, or pick a model in
             Settings.
@@ -1207,64 +1333,61 @@ function MapAnswer({
               honest ? "text-muted-foreground" : "text-foreground",
             )}
           >
-            {renderMapRich(ask.text, citeByMarker, onJump)}
+            {renderMapRich(msg.text, citeByMarker, onJump)}
             {streaming ? <span className="ml-0.5 animate-pulse">▌</span> : null}
           </p>
         )}
 
-        {ask.caveats.length > 0 ? (
-          <ul className="mt-2 space-y-0.5">
-            {ask.caveats.map((c) => (
+        {msg.caveats.length > 0 ? (
+          <ul className="space-y-0.5">
+            {msg.caveats.map((c) => (
               <li key={c} className="text-[11px] text-inferred-low">
                 ⚠ {c}
               </li>
             ))}
           </ul>
         ) : null}
-      </div>
 
-      {!thinking && (sources.length > 0 || trust) ? (
-        <div className="space-y-2 border-t border-border px-3 py-2">
-          {sources.length > 0 ? (
-            <div className="space-y-1">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60">
-                On the map
-              </span>
-              <div className="flex flex-wrap gap-1">
-                {sources.map((id) => {
-                  const n = resolve(id);
-                  if (!n) return null;
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => onJump(id)}
-                      title="Jump to it on the map"
-                      className="inline-flex max-w-[10rem] items-center gap-1 rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
-                    >
-                      <KindGlyph kind={n.kind} className="size-3 shrink-0" />
-                      <span className="truncate">{n.name ?? n.kind}</span>
-                    </button>
-                  );
-                })}
-              </div>
+        {!thinking && sources.length > 0 ? (
+          <div className="space-y-1 pt-0.5">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60">
+              On the map
+            </span>
+            <div className="flex flex-wrap gap-1">
+              {sources.map((id) => {
+                const n = resolve(id);
+                if (!n) return null;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => onJump(id)}
+                    title="Jump to it on the map"
+                    className="inline-flex max-w-[11rem] items-center gap-1 rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+                  >
+                    <KindGlyph kind={n.kind} className="size-3 shrink-0" />
+                    <span className="truncate">{n.name ?? n.kind}</span>
+                  </button>
+                );
+              })}
             </div>
-          ) : null}
-          {trust && !streaming ? (
-            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5">
-                <span className={cn("size-1.5 rounded-full", trust.dot)} />
-                {trust.label}
+          </div>
+        ) : null}
+
+        {trust && !streaming ? (
+          <div className="flex items-center gap-2 pt-0.5 text-[11px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <span className={cn("size-1.5 rounded-full", trust.dot)} />
+              {trust.label}
+            </span>
+            {msg.citations.length > 0 ? (
+              <span className="text-muted-foreground/70">
+                · {msg.citations.length} source{msg.citations.length > 1 ? "s" : ""}
               </span>
-              {ask.citations.length > 0 ? (
-                <span className="text-muted-foreground/70">
-                  · {ask.citations.length} source{ask.citations.length > 1 ? "s" : ""}
-                </span>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
+            ) : null}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -1277,12 +1400,10 @@ function MapSearch({
   nodes,
   onPick,
   onAsk,
-  onClear,
 }: {
   nodes: { id: string; name: string; kind: string }[];
   onPick: (id: string) => void;
   onAsk: (q: string) => void;
-  onClear: () => void;
 }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
@@ -1322,7 +1443,6 @@ function MapSearch({
     setQ("");
     setOpen(false);
     setActive(0);
-    onClear();
   };
 
   const onKeyDown = (e: KeyboardEvent) => {
