@@ -31,7 +31,11 @@ interface DeploySignalData {
   ecrImages?: EcrImageRef[];
 }
 
-const DEPLOY_SIGNAL_KINDS = ["github.workflow.deploy", "bitbucket.pipeline.deploy"] as const;
+const DEPLOY_SIGNAL_KINDS = [
+  "github.workflow.deploy",
+  "bitbucket.pipeline.deploy",
+  "jenkins.deploy",
+] as const;
 
 export const repoDeploysToRuntimeRule: Rule = {
   key: "repo_deploys_to_runtime",

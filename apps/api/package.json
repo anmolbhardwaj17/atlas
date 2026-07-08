@@ -16,6 +16,7 @@
     "@atlas/connector-aws": "workspace:*",
     "@atlas/connector-bitbucket": "workspace:*",
     "@atlas/connector-github": "workspace:*",
+    "@atlas/connector-jenkins": "workspace:*",
     "@atlas/connector-sdk": "workspace:*",
     "@atlas/db": "workspace:*",
     "@atlas/ingest": "workspace:*",

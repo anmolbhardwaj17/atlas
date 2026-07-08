@@ -47,6 +47,9 @@ importers:
       '@atlas/connector-github':
         specifier: workspace:*
         version: link:../../packages/connector-github
+      '@atlas/connector-jenkins':
+        specifier: workspace:*
+        version: link:../../packages/connector-jenkins
       '@atlas/connector-sdk':
         specifier: workspace:*
         version: link:../../packages/connector-sdk
@@ -302,6 +305,19 @@ importers:
       yaml:
         specifier: ^2.6.1
         version: 2.9.0
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.0)
+
+  packages/connector-jenkins:
+    dependencies:
+      '@atlas/connector-sdk':
+        specifier: workspace:*
+        version: link:../connector-sdk
     devDependencies:
       typescript:
         specifier: ^5.7.2

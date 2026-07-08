@@ -79,6 +79,7 @@ const ICON: Record<string, LucideIcon> = {
   "bitbucket.project": FolderGit2,
   "bitbucket.repository": GitBranch,
   "bitbucket.pipeline": Play,
+  "jenkins.job": Play,
   "bitbucket.pullrequest": GitPullRequest,
   "bitbucket.user": User,
 };
@@ -134,6 +135,7 @@ const CATEGORY: Record<string, string> = {
   "bitbucket.project": "container",
   "bitbucket.repository": "repo",
   "bitbucket.pipeline": "pipeline",
+  "jenkins.job": "pipeline",
   "bitbucket.pullrequest": "change",
   "bitbucket.user": "people",
 };
@@ -195,5 +197,8 @@ export function kindStyle(kind: string): string {
 
 /** Short, human kind label - strips the provider prefix (aws./bitbucket./…). */
 export function kindShort(kind: string): string {
-  return kind.replace(/^aws\.|^github\.|^external\.|^atlas\.|^azure\.|^gcp\.|^bitbucket\./, "");
+  return kind.replace(
+    /^aws\.|^github\.|^external\.|^atlas\.|^azure\.|^gcp\.|^bitbucket\.|^jenkins\./,
+    "",
+  );
 }
