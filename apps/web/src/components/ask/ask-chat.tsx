@@ -248,7 +248,7 @@ export function AskChat({
           e.preventDefault();
           void ask(input);
         }}
-        className="mt-4 flex shrink-0 items-center gap-2 border-t border-border bg-background pt-4"
+        className="mt-4 flex shrink-0 items-center gap-2 bg-background pt-4"
       >
         <input
           value={input}

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PostureRadar, type Posture } from "@/components/dashboard/posture-radar";
+import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/cn";
 import { Onboarding } from "@/components/onboarding";
 import { AskLauncher } from "@/components/dashboard/ask-launcher";
@@ -27,36 +28,6 @@ import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
 import { KIND_LOGO } from "@/lib/kind-visual";
 import { severityMeta, PROVIDER_META } from "@/lib/taxonomy";
 import { apiGet, type ApiOk } from "@/lib/api";
-
-/** Vibrant, deterministic avatar colours for the contributor list (the default generated avatars
- *  all read the same washed-out lilac). */
-const AVATAR_COLORS = [
-  "bg-rose-500",
-  "bg-orange-500",
-  "bg-amber-500",
-  "bg-emerald-500",
-  "bg-teal-500",
-  "bg-sky-500",
-  "bg-indigo-500",
-  "bg-violet-500",
-  "bg-fuchsia-500",
-];
-function avatarColor(seed: string): string {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  return AVATAR_COLORS[h % AVATAR_COLORS.length] ?? "bg-slate-500";
-}
-
-/** First + last initial (pure, server-safe — the shared one lives in a client module). */
-function contribInitials(name: string): string {
-  const parts = name
-    .trim()
-    .split(/[\s@._-]+/)
-    .filter(Boolean);
-  const a = parts[0]?.[0] ?? "";
-  const b = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
-  return (a + b).toUpperCase() || "?";
-}
 
 interface Finding {
   id: string;
@@ -746,14 +717,7 @@ function Leaderboard({
             {items.map((it) => (
               <li key={it.name} className="flex items-center gap-2.5 text-sm">
                 {avatars ? (
-                  <span
-                    className={cn(
-                      "grid size-[22px] shrink-0 place-items-center rounded-full text-[9px] font-semibold text-white",
-                      avatarColor(it.name),
-                    )}
-                  >
-                    {contribInitials(it.name)}
-                  </span>
+                  <UserAvatar name={it.name} email={it.name} size={22} className="shrink-0" />
                 ) : null}
                 <span className="w-24 shrink-0 truncate">{it.name}</span>
                 <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
