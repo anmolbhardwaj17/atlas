@@ -294,52 +294,63 @@ function HealthCard({ health }: { health: { score: number; label: string } }) {
           : "text-red-500";
   return (
     <Card className="shadow-sm">
-      <CardContent className="flex items-center gap-5 p-5">
-        <HealthRing score={health.score} className={tone} />
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Estate health
-          </p>
-          <p className={cn("mt-1 text-2xl font-semibold leading-none", tone)}>{health.label}</p>
-          <p className="mt-2 max-w-[16rem] text-xs text-muted-foreground">
-            A roll-up of open findings (by severity) and source health. Open Insights to act.
-          </p>
+      <CardContent className="flex h-full flex-col p-5">
+        <p className="text-sm font-medium text-muted-foreground">Estate health</p>
+        <div className="flex flex-1 items-center justify-center">
+          <HealthGauge score={health.score} label={health.label} tone={tone} />
         </div>
       </CardContent>
     </Card>
   );
 }
 
-/** SVG progress ring for the health score. `className` sets the ring color (currentColor). */
-function HealthRing({ score, className }: { score: number; className?: string }) {
-  const r = 30;
-  const circ = 2 * Math.PI * r;
-  const dash = (score / 100) * circ;
+/** Radial gauge for the health score — a half-donut filled to the score, with the number and its
+ *  tier label ("At risk" / "Fair" / …) in the opening. Tone (currentColor) sets the arc + label. */
+function HealthGauge({ score, label, tone }: { score: number; label: string; tone: string }) {
+  const cx = 100;
+  const cy = 100;
+  const r = 80;
+  const pt = (frac: number) => {
+    const a = Math.PI * (1 - Math.max(0, Math.min(1, frac)));
+    return { x: cx + r * Math.cos(a), y: cy - r * Math.sin(a) };
+  };
+  const end = pt(score / 100);
   return (
-    <div className={cn("relative grid size-[84px] shrink-0 place-items-center", className)}>
-      <svg viewBox="0 0 84 84" className="size-[84px] -rotate-90">
-        <circle
-          cx="42"
-          cy="42"
-          r={r}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="7"
-          opacity="0.2"
-        />
-        <circle
-          cx="42"
-          cy="42"
-          r={r}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="7"
-          strokeLinecap="round"
-          strokeDasharray={`${dash} ${circ}`}
-        />
-      </svg>
-      <span className="absolute text-xl font-semibold tabular-nums text-foreground">{score}</span>
-    </div>
+    <svg viewBox="0 0 200 124" className={cn("w-full max-w-[240px]", tone)} role="img">
+      <path
+        d="M 20 100 A 80 80 0 0 1 180 100"
+        fill="none"
+        className="stroke-muted"
+        strokeWidth={16}
+        strokeLinecap="round"
+      />
+      <path
+        d={`M 20 100 A 80 80 0 0 1 ${end.x.toFixed(1)} ${end.y.toFixed(1)}`}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={16}
+        strokeLinecap="round"
+      />
+      <text
+        x="100"
+        y="90"
+        textAnchor="middle"
+        className="fill-foreground font-semibold tabular-nums"
+        style={{ fontSize: 38 }}
+      >
+        {score}
+      </text>
+      <text
+        x="100"
+        y="115"
+        textAnchor="middle"
+        fill="currentColor"
+        className="font-medium"
+        style={{ fontSize: 15 }}
+      >
+        {label}
+      </text>
+    </svg>
   );
 }
 
@@ -800,7 +811,13 @@ function InventoryCard({
           {icons.length ? (
             <div className="flex items-center gap-1.5">
               {icons.map((l) => (
-                <CloudIcon key={l} name={l} className="size-5" />
+                // White chip so brand marks (e.g. AWS's dark wordmark) stay legible in dark mode.
+                <span
+                  key={l}
+                  className="grid size-6 place-items-center rounded-md bg-white ring-1 ring-black/5"
+                >
+                  <CloudIcon name={l} className="size-4" />
+                </span>
               ))}
             </div>
           ) : null}
