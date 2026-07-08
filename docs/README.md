@@ -48,6 +48,7 @@
 | 06 | [aws-crawler](06-aws-crawler.md) | AWS read-only crawler, Connector SDK contract, service catalog, partial-sync safety |
 | 07 | [github-crawler](07-github-crawler.md) | GitHub App crawler, webhooks, deploy inference, CODEOWNERS, dependencies |
 | 07b | [bitbucket-crawler](07b-bitbucket-crawler.md) | **Phase-2 contingency** — Bitbucket as a delta-spec proving the connector abstraction |
+| 07c | [cicd-deployment-linking](07c-cicd-deployment-linking.md) | **Phase-2 keystone** — Jenkins/CI/CD as observed deploy edges linking code↔infra (RCA-to-the-PR) |
 
 ### 🖥️ Interfaces — making it usable
 | # | Doc | One-liner |
@@ -86,6 +87,7 @@ flowchart TB
     02 --> 03 --> 04 --> 05
     05 --> 06 & 07
     07 --> 07b
+    07 --> 07c
     04 & 05 --> 08
     08 --> 09 & 10 & 11
     02 --> 12 --> 13
