@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Loader2, Trash2, RefreshCw, ShieldAlert, Search, Check } from "lucide-react";
+import { Plus, Loader2, Trash2, RefreshCw, ShieldAlert, Search, Check, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,21 +33,36 @@ import {
   BitbucketSetup,
   JenkinsSetup,
 } from "@/components/integrations/provider-setup";
-import Link from "next/link";
 import { PROVIDERS, ProviderLogo, type ProviderMeta } from "@/components/integrations/providers";
 import {
   createConnection,
   verifyConnection,
   deleteConnection,
   triggerSync,
+  setChannel,
+  testChannel,
+  removeChannel,
   type ConnectionSummary,
   type ChannelSummary,
+  type ChannelKind,
 } from "@/lib/browser-api";
 import { cn } from "@/lib/cn";
 
-/** Alert-channel setup + management lives in Settings → Notifications (webhook + test); the hub
- *  deep-links there so there's one source of truth for the steps. */
-const ALERTS_SETTINGS_HREF = "/settings#notifications";
+/** Per-channel webhook setup copy (mirrors Settings → Notifications). */
+const ALERT_META: Record<string, { placeholder: string; help: string }> = {
+  slack: {
+    placeholder: "https://hooks.slack.com/services/…",
+    help: "Slack → Apps → Incoming Webhooks → pick a channel → copy the URL.",
+  },
+  discord: {
+    placeholder: "https://discord.com/api/webhooks/…",
+    help: "Server Settings → Integrations → Webhooks → New Webhook → copy the URL.",
+  },
+  msteams: {
+    placeholder: "https://….webhook.office.com/…",
+    help: "Channel → ⋯ → Connectors → Incoming Webhook → create → copy the URL.",
+  },
+};
 
 /** The right setup steps for each connectable provider. */
 function ProviderSetup({ providerId }: { providerId: string }) {
@@ -172,6 +187,7 @@ export function IntegrationsHub({
                 key={p.id}
                 provider={p}
                 channel={channelByKind.get(p.id)}
+                orgId={orgId}
                 canManage={canManage}
               />
             ) : (
@@ -234,53 +250,240 @@ function LogoShowcase() {
 }
 
 /** An outbound alert channel (Slack/Discord/Teams) as a list row. These don't sync a graph —
- *  they're an incoming webhook set up in Settings → Notifications — so the row mirrors that
- *  state (Connected + hint) and deep-links there to connect/manage/test. */
+ *  they're an incoming webhook — so the row mirrors that state and opens a slide-over to
+ *  connect, send a test, or disconnect, right here (no jump to Settings). */
 function AlertProviderRow({
   provider,
   channel,
+  orgId,
   canManage,
 }: {
   provider: ProviderMeta;
   channel: ChannelSummary | undefined;
+  orgId: string;
   canManage: boolean;
 }) {
   const connected = channel?.enabled === true;
+  const [manageOpen, setManageOpen] = React.useState(false);
+  const open = () => canManage && setManageOpen(true);
+
   return (
-    <div className="flex items-center gap-4 bg-card px-4 py-5">
-      <div className="grid size-10 shrink-0 place-items-center">
-        <ProviderLogo provider={provider} className="size-7" />
-      </div>
-      <Link href={ALERTS_SETTINGS_HREF} className="group min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate font-medium group-hover:underline">{provider.name}</span>
-          <span className="hidden shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground sm:inline">
-            {provider.category}
-          </span>
+    <>
+      <div className="flex items-center gap-4 bg-card px-4 py-5">
+        <div className="grid size-10 shrink-0 place-items-center">
+          <ProviderLogo provider={provider} className="size-7" />
         </div>
-        <p className="truncate text-sm text-muted-foreground">
-          {connected ? `Connected${channel?.hint ? ` · ${channel.hint}` : ""}` : provider.blurb}
-        </p>
-      </Link>
-      <div className="flex shrink-0 items-center gap-2">
-        {connected ? (
-          <Link
-            href={ALERTS_SETTINGS_HREF}
-            className="inline-flex h-9 items-center gap-1.5 rounded-md bg-foreground px-3 text-sm font-medium text-background transition-opacity hover:opacity-90"
-          >
-            <Check className="size-4 text-emerald-400" /> Connected
-          </Link>
-        ) : canManage ? (
-          <Link href={ALERTS_SETTINGS_HREF}>
-            <Button variant="outline" className="h-9">
+        <button
+          type="button"
+          onClick={open}
+          disabled={!canManage}
+          className={cn("min-w-0 flex-1 text-left", canManage ? "group" : "cursor-default")}
+        >
+          <div className="flex items-center gap-2">
+            <span className={cn("truncate font-medium", canManage && "group-hover:underline")}>
+              {provider.name}
+            </span>
+            <span className="hidden shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground sm:inline">
+              {provider.category}
+            </span>
+          </div>
+          <p className="truncate text-sm text-muted-foreground">
+            {connected ? "Connected · sending alerts" : provider.blurb}
+          </p>
+        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          {connected ? (
+            <button
+              type="button"
+              onClick={open}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-foreground px-3 text-sm font-medium text-background transition-opacity hover:opacity-90"
+            >
+              <Check className="size-4 text-emerald-400" /> Connected
+            </button>
+          ) : canManage ? (
+            <Button variant="outline" className="h-9" onClick={open}>
               Connect
             </Button>
-          </Link>
-        ) : (
-          <span className="text-xs text-muted-foreground">Ask an admin</span>
-        )}
+          ) : (
+            <span className="text-xs text-muted-foreground">Ask an admin</span>
+          )}
+        </div>
       </div>
-    </div>
+      <AlertManageSheet
+        open={manageOpen}
+        onOpenChange={setManageOpen}
+        provider={provider}
+        channel={channel}
+        orgId={orgId}
+      />
+    </>
+  );
+}
+
+/** The Slack/Discord/Teams slide-over: paste an incoming webhook to connect, send a test, or
+ *  disconnect. Webhooks are write-only — the server only ever returns a masked hint. */
+function AlertManageSheet({
+  open,
+  onOpenChange,
+  provider,
+  channel,
+  orgId,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  provider: ProviderMeta;
+  channel: ChannelSummary | undefined;
+  orgId: string;
+}) {
+  const router = useRouter();
+  const kind = provider.id as ChannelKind;
+  const meta = ALERT_META[kind] ?? {
+    placeholder: "https://…",
+    help: "Paste the channel's incoming webhook URL.",
+  };
+  const connected = channel?.enabled === true;
+  const [url, setUrl] = React.useState("");
+  const [busy, setBusy] = React.useState<"save" | "test" | "remove" | null>(null);
+
+  async function save() {
+    setBusy("save");
+    try {
+      await setChannel(orgId, kind, url.trim());
+      setUrl("");
+      toast.success(`${provider.name} connected`, { description: "Send a test to see it land." });
+      router.refresh();
+    } catch (e) {
+      toast.error(`Couldn't connect ${provider.name}`, {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function test() {
+    setBusy("test");
+    try {
+      const r = await testChannel(orgId, kind);
+      if (r.delivered) toast.success(`Test sent to ${provider.name}`, { description: r.message });
+      else toast.error(`${provider.name} didn't accept it`, { description: r.message });
+    } catch (e) {
+      toast.error("Test failed", { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function remove() {
+    setBusy("remove");
+    try {
+      await removeChannel(orgId, kind);
+      toast.success(`${provider.name} disconnected`);
+      router.refresh();
+    } catch (e) {
+      toast.error("Couldn't disconnect", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2.5">
+            <span className="grid size-8 shrink-0 place-items-center">
+              <ProviderLogo provider={provider} className="size-6" />
+            </span>
+            {provider.name}
+          </SheetTitle>
+          <SheetDescription>
+            Outbound alert channel · incoming webhook (read-only push)
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="mt-6 space-y-5 text-sm">
+          {connected ? (
+            <>
+              <div className="rounded-lg border border-border p-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">Connected</span>
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success">
+                    <Check className="size-3.5" /> Sending alerts
+                  </span>
+                </div>
+                {channel?.hint ? (
+                  <p className="mt-1.5 truncate font-mono text-xs text-muted-foreground">
+                    {channel.hint}
+                  </p>
+                ) : null}
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Atlas pushes a heads-up here when a resource breaks, recovers, or gets exposed —
+                  plus a short daily digest.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void test()}
+                  disabled={busy !== null}
+                >
+                  {busy === "test" ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Send className="size-3.5" />
+                  )}
+                  Send test
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => void remove()}
+                  disabled={busy !== null}
+                  className="ml-auto text-muted-foreground hover:bg-danger/10 hover:text-danger"
+                >
+                  {busy === "remove" ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="size-3.5" />
+                  )}
+                  Disconnect
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="space-y-2">
+              <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Webhook URL
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder={meta.placeholder}
+                  autoComplete="off"
+                  spellCheck={false}
+                  aria-label={`${provider.name} webhook URL`}
+                />
+                <Button
+                  onClick={() => void save()}
+                  disabled={busy !== null || url.trim().length === 0}
+                >
+                  {busy === "save" ? <Loader2 className="size-4 animate-spin" /> : null}
+                  Connect
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {meta.help} It never leaves Atlas and is never shown again.
+              </p>
+            </div>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
