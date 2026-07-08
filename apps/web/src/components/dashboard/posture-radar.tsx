@@ -73,16 +73,18 @@ export function PostureRadar({ posture }: { posture: Posture }) {
           />
         );
       })}
-      {/* Data polygon — a lighter green than the brand mark so the area reads soft. */}
-      <polygon
-        points={dataPolygon}
-        className="fill-emerald-400/20 stroke-emerald-500"
-        strokeWidth={2}
-        strokeLinejoin="round"
-      />
-      {dataPoints.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r={2.5} className="fill-emerald-500" />
-      ))}
+      {/* Data polygon — a lighter green than the brand mark so the area reads soft; grows in on load. */}
+      <g className="chart-grow">
+        <polygon
+          points={dataPolygon}
+          className="fill-emerald-400/20 stroke-emerald-500"
+          strokeWidth={2}
+          strokeLinejoin="round"
+        />
+        {dataPoints.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r={2.5} className="fill-emerald-500" />
+        ))}
+      </g>
       {/* Axis labels — name over score, stacked so long names never clip. */}
       {AXES.map((ax, i) => {
         const p = coord(i, 1.12);

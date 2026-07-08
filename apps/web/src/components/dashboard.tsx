@@ -27,6 +27,7 @@ import { AskLauncher } from "@/components/dashboard/ask-launcher";
 import { RefreshLatest } from "@/components/dashboard/refresh-latest";
 import { ContributorsDonut } from "@/components/dashboard/contributors-donut";
 import { FindingsDonut } from "@/components/dashboard/findings-donut";
+import { CountUp } from "@/components/dashboard/count-up";
 import { SeverityBadge } from "@/components/tags";
 import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
 import { KIND_LOGO } from "@/lib/kind-visual";
@@ -369,7 +370,8 @@ function HealthGauge({ score, label, tone }: { score: number; label: string; ton
             y2={t.y2}
             strokeWidth={4}
             strokeLinecap="round"
-            className={cls}
+            className={cn(cls, "chart-tick")}
+            style={{ animationDelay: `${i * 18}ms` }}
           />
         );
       })}
@@ -731,7 +733,11 @@ function TickMeter({ pct, ticks = 30 }: { pct: number; ticks?: number }) {
   return (
     <div className="flex h-7 items-stretch gap-[2px]" aria-hidden>
       {Array.from({ length: ticks }).map((_, i) => (
-        <span key={i} className={cn("flex-1 rounded-full", i < filled ? fill : "bg-muted")} />
+        <span
+          key={i}
+          className={cn("chart-tick flex-1 rounded-full", i < filled ? fill : "bg-muted")}
+          style={{ animationDelay: `${i * 16}ms` }}
+        />
       ))}
     </div>
   );
@@ -850,7 +856,7 @@ function InventoryCard({
                   </div>
                 </div>
                 <div className="shrink-0 text-2xl font-semibold tabular-nums">
-                  {r.value.toLocaleString()}
+                  <CountUp value={r.value} />
                 </div>
               </div>
             ) : (
@@ -865,7 +871,7 @@ function InventoryCard({
                 </div>
                 <div>
                   <div className="text-2xl font-semibold tabular-nums">
-                    {r.value.toLocaleString()}
+                    <CountUp value={r.value} />
                   </div>
                   {r.sub ? <div className="text-[11px] text-muted-foreground">{r.sub}</div> : null}
                 </div>
