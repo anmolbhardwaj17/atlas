@@ -8,7 +8,7 @@ export interface ProviderMeta {
   /** For available providers this is the connection `provider` value (aws/github). */
   id: string;
   name: string;
-  category: "Cloud" | "Code" | "CI/CD" | "Observability";
+  category: "Cloud" | "Code" | "CI/CD" | "Observability" | "Alerts";
   status: ProviderStatus;
   blurb: string;
   /** Real brand logo key in CLOUD_ICONS (cloud-icons-data), or a key we fall back to a glyph for. */
@@ -128,5 +128,30 @@ export const PROVIDERS: ProviderMeta[] = [
     status: "coming-soon",
     blurb: "Dashboards, alerts, and metrics - health signal on the graph.",
     logo: "grafana",
+  },
+  // ── Alerts (outbound channels — where Atlas sends findings/incidents) ──
+  {
+    id: "slack",
+    name: "Slack",
+    category: "Alerts",
+    status: "coming-soon",
+    blurb: "Send findings and incident alerts to a channel.",
+    logo: "slack-icon",
+  },
+  {
+    id: "discord",
+    name: "Discord",
+    category: "Alerts",
+    status: "coming-soon",
+    blurb: "Post findings and incident alerts to a server.",
+    logo: "discord-icon",
+  },
+  {
+    id: "msteams",
+    name: "Microsoft Teams",
+    category: "Alerts",
+    status: "coming-soon",
+    blurb: "Route findings and incident alerts to a Teams channel.",
+    logo: "microsoft-teams",
   },
 ];

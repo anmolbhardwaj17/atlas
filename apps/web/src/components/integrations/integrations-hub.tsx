@@ -97,36 +97,37 @@ export function IntegrationsHub({
 
   const q = query.trim().toLowerCase();
   const hasConn = (id: string) => (byProvider.get(id)?.length ?? 0) > 0;
-  // Every provider is a row (available + coming-soon). Connected ones float to the top so a
-  // consumer sees "what's already set up" first.
+  // Row order (stable within each tier, so category grouping from PROVIDERS survives): connected
+  // first (what's already set up), then available-to-connect, then everything "coming soon" last.
+  const rank = (p: ProviderMeta) => (hasConn(p.id) ? 0 : p.status === "coming-soon" ? 2 : 1);
   const rows = PROVIDERS.filter(
     (p) =>
       (tab === "All" || p.category === tab) &&
       (q === "" || p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)),
-  ).sort((a, b) => Number(hasConn(b.id)) - Number(hasConn(a.id)));
+  ).sort((a, b) => rank(a) - rank(b));
 
   return (
-    <div className="space-y-6">
+    <div className="flex min-h-[calc(100vh-7rem)] flex-col gap-6">
       <div>
-        <h1 className="text-xl font-semibold">Integrations</h1>
+        <h1 className="text-xl font-semibold">Integrations and connected apps</h1>
         <p className="text-sm text-muted-foreground">
           Connect your cloud, code, CI/CD, and observability accounts. Atlas builds one cited graph
           across everything you connect.
         </p>
       </div>
 
-      {/* Category tabs + search — the row list below filters live. */}
+      {/* Category tabs (segmented control) + search — the row list below filters live. */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-1">
+        <div className="inline-flex flex-wrap gap-1 rounded-lg border border-border bg-muted/50 p-1">
           {TABS.map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
               className={cn(
-                "rounded-full px-3 py-1 text-sm font-medium transition-colors",
+                "rounded-md px-3 py-1 text-sm font-medium transition-colors",
                 tab === t
-                  ? "bg-foreground text-background"
+                  ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
@@ -165,8 +166,9 @@ export function IntegrationsHub({
         </div>
       )}
 
-      {/* A decorative footer, set well apart from the table so it reads as page-bottom flourish. */}
-      <div className="pt-16">
+      {/* Decorative footer, pushed to the bottom of the screen (mt-auto) with a little breathing
+          room below so it reads as a page-bottom flourish. */}
+      <div className="mt-auto pb-2 pt-16">
         <p className="mb-4 text-center text-xs text-muted-foreground">
           One graph across your whole stack
         </p>
@@ -182,7 +184,7 @@ export function IntegrationsHub({
   );
 }
 
-const TABS = ["All", "Cloud", "Code", "CI/CD", "Observability"] as const;
+const TABS = ["All", "Cloud", "Code", "CI/CD", "Observability", "Alerts"] as const;
 
 // A decorative wall of exactly the integrations in the catalog above — nothing we don't actually
 // offer. Logos only (no labels, no status).
@@ -193,15 +195,16 @@ const SHOWCASE_LOGOS = Array.from(new Set(PROVIDERS.map((p) => p.logo)));
 function LogoShowcase() {
   const logos = SHOWCASE_LOGOS.filter((l) => hasCloudIcon(l));
   return (
-    <div className="[mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
-      <div className="flex flex-wrap justify-center gap-3 py-2">
+    // Full-width, tile-less row so the outermost logos sit in the fade zone and blend into the
+    // page on the left and right. No card/border — the icons float on the background.
+    <div className="overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_12%,black_88%,transparent)]">
+      <div className="flex items-center justify-between gap-3 px-2">
         {logos.map((logo) => (
-          <div
+          <CloudIcon
             key={logo}
-            className="grid size-11 shrink-0 place-items-center rounded-xl bg-background shadow-sm ring-1 ring-black/5 transition-transform hover:-translate-y-0.5 dark:ring-white/10"
-          >
-            <CloudIcon name={logo} className="size-6" />
-          </div>
+            name={logo}
+            className="size-9 shrink-0 opacity-90 transition-opacity hover:opacity-100 sm:size-11"
+          />
         ))}
       </div>
     </div>
@@ -227,49 +230,52 @@ function ProviderRow({
   const comingSoon = provider.status === "coming-soon";
   const connected = connections.length > 0;
   const [manageOpen, setManageOpen] = React.useState(false);
+  // A connection needs attention if it's degraded/errored OR its last sync skipped scopes —
+  // a partial sync is a real gap even when the status stays "connected" (matches the AWS case).
   const needsAttention = connections.filter(
-    (c) => c.status === "degraded" || c.status === "error",
+    (c) =>
+      c.status === "degraded" ||
+      c.status === "error" ||
+      (c.lastSync?.status === "partial" && c.lastSync.scopesFailed > 0),
   ).length;
   const anySyncing = connections.some((c) => c.syncing === true);
   const openManage = () => {
     if (connected) setManageOpen(true);
   };
 
-  // Once connected, the blurb gives way to a one-line summary of the real state at a glance —
-  // always the sync/resources fact, with an attention note appended if a connection is degraded
-  // (so a degraded source still shows what it managed to pull, not just the warning).
-  let summary = provider.blurb;
+  // The one-line sync summary that replaces the blurb once connected, coloured per segment:
+  // the "Synced Xago" fact is tinted by freshness (green <1wk, orange 1–2wk, red >2wk / failed),
+  // the resource count stays plain black, and "needs attention" (degraded / skipped scopes) is
+  // its own warning-coloured note.
+  let freshLabel = "";
+  let freshTone = "text-muted-foreground";
+  let resourcesLabel = "";
   if (connected) {
     const only = connections.length === 1 ? connections[0] : undefined;
     if (anySyncing) {
-      summary = "Syncing — pulling the latest data…";
+      freshLabel = "Syncing — pulling the latest data…";
+    } else if (only?.lastSync && only.lastSync.status === "failed") {
+      freshLabel = `Last sync failed ${timeAgo(only.lastSync.finishedAt)}`;
+      freshTone = "text-danger";
+    } else if (only?.lastSync) {
+      const days = (Date.now() - new Date(only.lastSync.finishedAt).getTime()) / 86_400_000;
+      freshLabel = `Synced ${timeAgo(only.lastSync.finishedAt)}`;
+      freshTone = days > 14 ? "text-danger" : days > 7 ? "text-warning" : "text-success";
+      resourcesLabel = `${only.lastSync.resources} resources`;
+    } else if (only) {
+      freshLabel = "Connected · not synced yet";
     } else {
-      const parts: string[] = [];
-      if (only?.lastSync && only.lastSync.status === "failed") {
-        parts.push(`Last sync failed ${timeAgo(only.lastSync.finishedAt)}`);
-      } else if (only?.lastSync) {
-        parts.push(
-          `Synced ${timeAgo(only.lastSync.finishedAt)} · ${only.lastSync.resources} resources`,
-        );
-      } else if (only) {
-        parts.push("Connected · not synced yet");
-      } else {
-        parts.push(`${connections.length} connections`);
-      }
-      if (needsAttention > 0) {
-        parts.push(
-          connections.length === 1
-            ? "needs attention"
-            : `${needsAttention} need${needsAttention === 1 ? "s" : ""} attention`,
-        );
-      }
-      summary = parts.join(" · ");
+      freshLabel = `${connections.length} connections`;
     }
   }
+  const attentionLabel =
+    connections.length === 1
+      ? "Needs attention"
+      : `${needsAttention} need${needsAttention === 1 ? "s" : ""} attention`;
 
   return (
     <>
-      <div className="flex items-center gap-4 bg-card px-4 py-3.5">
+      <div className="flex items-center gap-4 bg-card px-4 py-5">
         <div className="grid size-10 shrink-0 place-items-center">
           <ProviderLogo provider={provider} className="size-7" />
         </div>
@@ -287,14 +293,25 @@ function ProviderRow({
               {provider.category}
             </span>
           </div>
-          <p
-            className={cn(
-              "truncate text-sm",
-              needsAttention > 0 ? "text-warning" : "text-muted-foreground",
-            )}
-          >
-            {summary}
-          </p>
+          {connected ? (
+            <p className="truncate text-sm">
+              <span className={freshTone}>{freshLabel}</span>
+              {resourcesLabel ? (
+                <>
+                  <span className="text-muted-foreground"> · </span>
+                  <span className="text-foreground">{resourcesLabel}</span>
+                </>
+              ) : null}
+              {needsAttention > 0 ? (
+                <>
+                  <span className="text-muted-foreground"> · </span>
+                  <span className="text-warning">{attentionLabel}</span>
+                </>
+              ) : null}
+            </p>
+          ) : (
+            <p className="truncate text-sm text-muted-foreground">{provider.blurb}</p>
+          )}
         </button>
         <div className="flex shrink-0 items-center gap-2">
           {comingSoon ? (
@@ -318,13 +335,13 @@ function ProviderRow({
                 onClick={openManage}
                 className="inline-flex h-9 items-center gap-1.5 rounded-md bg-foreground px-3 text-sm font-medium text-background transition-opacity hover:opacity-90"
               >
-                <Check className="size-4" />
+                <Check className="size-4 text-emerald-400" />
                 {connections.length > 1 ? `${connections.length} connected` : "Connected"}
               </button>
             </>
           ) : canManage ? (
             <Button variant="outline" className="h-9" onClick={onConnect}>
-              <Plus className="size-4" /> Connect
+              Connect
             </Button>
           ) : (
             <span className="text-xs text-muted-foreground">Ask an admin</span>
