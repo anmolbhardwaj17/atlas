@@ -52,6 +52,11 @@
     --warning: 35 92% 33%;
     --danger: 0 72% 45%;
 
+    /* Atlas brand accent — the green sampled from the Atlas AI mark. The one identity hue;
+       used sparingly (health hero, brand moments), not as a general-purpose color. */
+    --brand: 142 42% 45%;
+    --brand-foreground: 0 0% 100%;
+
     /* Sidebar. */
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 0 0% 25%;
@@ -100,6 +105,9 @@
     --success: 142 60% 55%;
     --warning: 40 90% 60%;
     --danger: 0 72% 62%;
+
+    --brand: 142 46% 52%;
+    --brand-foreground: 0 0% 100%;
 
     --sidebar-background: 0 0% 6%;
     --sidebar-foreground: 0 0% 85%;

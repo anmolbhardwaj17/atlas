@@ -12,8 +12,10 @@ import {
   Play,
   Users,
   Map as MapIcon,
+  type LucideIcon,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/cn";
 import { Onboarding } from "@/components/onboarding";
 import { AskLauncher } from "@/components/dashboard/ask-launcher";
 import { RefreshLatest } from "@/components/dashboard/refresh-latest";
@@ -72,10 +74,12 @@ export async function Dashboard({
   orgId,
   token,
   role,
+  name,
 }: {
   orgId: string;
   token: string;
   role: string;
+  name?: string | null;
 }) {
   const res = await apiGet<ApiOk<Summary>>("/summary", { token, orgId });
   const s = res.body?.data;
@@ -86,17 +90,29 @@ export async function Dashboard({
   }
 
   const { inventory: inv, trust } = s;
-
   const canManage = role === "Owner" || role === "Admin";
+  const health = estateHealth(s);
+  const firstName = name?.trim().split(/\s+/)[0] ?? null;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      {/* Hero band — a greeting with personality + the estate pulse, the way in. */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold">Overview</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {greeting()}
+            {firstName ? `, ${firstName}` : ""}
+          </h1>
           <TrustPulse trust={trust} inv={inv} />
         </div>
         {canManage ? <RefreshLatest orgId={orgId} /> : null}
+      </div>
+
+      {/* Hero grid — one focal point (health, in Atlas green) + posture + sources. */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <HealthCard health={health} />
+        <FindingsCard findings={s.findings} />
+        <SourcesCard trust={trust} inv={inv} />
       </div>
 
       <AskLauncher />
@@ -105,10 +121,11 @@ export async function Dashboard({
           that side of the estate is connected, so a code-only or infra-only org isn't all zeros. */}
       {inv.services + inv.datastores + inv.clouds > 0 && (
         <StatGroup label="Infrastructure">
-          <Stat icon={<Boxes className="size-4" />} label="Services" value={inv.services} />
-          <Stat icon={<Database className="size-4" />} label="Datastores" value={inv.datastores} />
+          <Stat icon={Boxes} tone={STAT_TONE.violet} label="Services" value={inv.services} />
+          <Stat icon={Database} tone={STAT_TONE.sky} label="Datastores" value={inv.datastores} />
           <Stat
-            icon={<Cloud className="size-4" />}
+            icon={Cloud}
+            tone={STAT_TONE.amber}
             label="Clouds"
             value={inv.clouds}
             sub={
@@ -120,13 +137,15 @@ export async function Dashboard({
       {inv.repositories > 0 && (
         <StatGroup label="Code">
           <Stat
-            icon={<GitBranch className="size-4" />}
+            icon={GitBranch}
+            tone={STAT_TONE.indigo}
             label="Repositories"
             value={inv.repositories}
           />
-          <Stat icon={<FolderGit2 className="size-4" />} label="Projects" value={inv.projects} />
+          <Stat icon={FolderGit2} tone={STAT_TONE.teal} label="Projects" value={inv.projects} />
           <Stat
-            icon={<Play className="size-4" />}
+            icon={Play}
+            tone={STAT_TONE.cyan}
             label="Pipelines"
             value={inv.pipelines}
             sub={
@@ -135,7 +154,7 @@ export async function Dashboard({
                 : undefined
             }
           />
-          <Stat icon={<Users className="size-4" />} label="Contributors" value={inv.contributors} />
+          <Stat icon={Users} tone={STAT_TONE.rose} label="Contributors" value={inv.contributors} />
         </StatGroup>
       )}
 
@@ -153,12 +172,43 @@ export async function Dashboard({
   );
 }
 
+/** Time-of-day greeting (server-rendered). Kept simple; personality without gimmicks. */
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+/**
+ * Estate health — a single 0-100 posture summary derived from REAL signals (open findings,
+ * weighted by severity, + source health). It's a heuristic roll-up, not a fabricated metric:
+ * the number always traces back to findings you can open and sources you can see.
+ */
+function estateHealth(s: Summary): { score: number; label: string } {
+  const sev = { high: 0, medium: 0, low: 0 };
+  for (const f of s.findings) {
+    if (f.severity === "high" || f.severity === "medium" || f.severity === "low") {
+      sev[f.severity] += 1;
+    }
+  }
+  let score = 100 - (sev.high * 9 + sev.medium * 4 + sev.low * 1);
+  if (s.trust.sources > 0) {
+    score -= Math.round((1 - s.trust.healthySources / s.trust.sources) * 20);
+  }
+  score = Math.max(0, Math.min(100, score));
+  const label =
+    score >= 85 ? "Strong" : score >= 65 ? "Fair" : score >= 40 ? "Needs work" : "At risk";
+  return { score, label };
+}
+
 function TrustPulse({ trust, inv }: { trust: Summary["trust"]; inv: Summary["inventory"] }) {
   const allHealthy = trust.sources > 0 && trust.healthySources === trust.sources;
   return (
-    <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+    <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
       <span>
-        {inv.resources} resources · {inv.relationships} relationships
+        {inv.resources.toLocaleString()} resources · {inv.relationships.toLocaleString()}{" "}
+        relationships
       </span>
       <span aria-hidden>·</span>
       <span className="inline-flex items-center gap-1.5">
@@ -175,6 +225,165 @@ function TrustPulse({ trust, inv }: { trust: Summary["trust"]; inv: Summary["inv
         </>
       ) : null}
     </p>
+  );
+}
+
+/** The focal hero card — estate health in Atlas green, with an SVG ring. The one bold moment. */
+function HealthCard({ health }: { health: { score: number; label: string } }) {
+  return (
+    <Card className="relative overflow-hidden border-transparent bg-brand text-brand-foreground shadow-sm">
+      {/* Soft light bloom for depth. */}
+      <div
+        className="pointer-events-none absolute -right-16 -top-16 size-56 rounded-full opacity-25 blur-2xl"
+        style={{ background: "radial-gradient(circle, white 0%, transparent 70%)" }}
+        aria-hidden
+      />
+      <CardContent className="relative flex items-center gap-5 p-5">
+        <HealthRing score={health.score} />
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-brand-foreground/80">
+            Estate health
+          </p>
+          <p className="mt-1 text-2xl font-semibold leading-none">{health.label}</p>
+          <p className="mt-2 max-w-[16rem] text-xs text-brand-foreground/80">
+            A roll-up of open findings (by severity) and source health. Open Insights to act.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** SVG progress ring for the health score. Pure, deterministic — no client JS needed. */
+function HealthRing({ score }: { score: number }) {
+  const r = 30;
+  const circ = 2 * Math.PI * r;
+  const dash = (score / 100) * circ;
+  return (
+    <div className="relative grid size-[84px] shrink-0 place-items-center">
+      <svg viewBox="0 0 84 84" className="size-[84px] -rotate-90">
+        <circle
+          cx="42"
+          cy="42"
+          r={r}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="7"
+          opacity="0.25"
+        />
+        <circle
+          cx="42"
+          cy="42"
+          r={r}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="7"
+          strokeLinecap="round"
+          strokeDasharray={`${dash} ${circ}`}
+        />
+      </svg>
+      <span className="absolute text-xl font-semibold tabular-nums">{score}</span>
+    </div>
+  );
+}
+
+/** Open findings, as a scannable severity bar + counts. The bridge into Insights. */
+function FindingsCard({ findings }: { findings: Finding[] }) {
+  const sev = { high: 0, medium: 0, low: 0 };
+  for (const f of findings) {
+    if (f.severity === "high" || f.severity === "medium" || f.severity === "low") {
+      sev[f.severity] += 1;
+    }
+  }
+  const total = findings.length;
+  const seg = [
+    { n: sev.high, color: "bg-danger", label: "High" },
+    { n: sev.medium, color: "bg-warning", label: "Medium" },
+    { n: sev.low, color: "bg-inferred-low", label: "Low" },
+  ];
+  return (
+    <Card className="shadow-sm">
+      <CardContent className="flex h-full flex-col p-5">
+        <div className="flex items-baseline justify-between">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Open findings
+          </p>
+          <Link
+            href="/insights"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Insights <ChevronRight className="size-3.5" />
+          </Link>
+        </div>
+        <p className="mt-1 text-3xl font-semibold tabular-nums">{total}</p>
+        {total > 0 ? (
+          <>
+            <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-muted">
+              {seg.map((x) =>
+                x.n > 0 ? (
+                  <div
+                    key={x.label}
+                    className={x.color}
+                    style={{ width: `${(x.n / total) * 100}%` }}
+                  />
+                ) : null,
+              )}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+              {seg.map((x) => (
+                <span key={x.label} className="inline-flex items-center gap-1.5">
+                  <span className={cn("size-2 rounded-full", x.color)} />
+                  <span className="tabular-nums">{x.n}</span>
+                  <span className="text-muted-foreground">{x.label}</span>
+                </span>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="mt-2 flex items-center gap-1.5 text-sm text-muted-foreground">
+            <CheckCircle2 className="size-4 text-success" /> Nothing needs attention.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Sources health pulse — how trustworthy the picture is, at a glance. */
+function SourcesCard({ trust, inv }: { trust: Summary["trust"]; inv: Summary["inventory"] }) {
+  const allHealthy = trust.sources > 0 && trust.healthySources === trust.sources;
+  const pct = trust.sources > 0 ? Math.round((trust.healthySources / trust.sources) * 100) : 0;
+  return (
+    <Card className="shadow-sm">
+      <CardContent className="flex h-full flex-col p-5">
+        <div className="flex items-baseline justify-between">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Sources
+          </p>
+          <Link
+            href="/integrations"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Manage <ChevronRight className="size-3.5" />
+          </Link>
+        </div>
+        <p className="mt-1 text-3xl font-semibold tabular-nums">
+          {trust.healthySources}
+          <span className="text-lg text-muted-foreground">/{trust.sources}</span>
+        </p>
+        <p className="text-xs text-muted-foreground">healthy connections</p>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+          <div
+            className={cn("h-full rounded-full", allHealthy ? "bg-success" : "bg-warning")}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <p className="mt-auto pt-3 text-xs text-muted-foreground">
+          {inv.clouds > 0 ? `${inv.clouds} cloud${inv.clouds === 1 ? "" : "s"}` : "Code sources"}
+          {trust.lastSyncAt ? ` · synced ${timeAgo(trust.lastSyncAt)}` : ""}
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -469,25 +678,45 @@ function StatGroup({ label, children }: { label: string; children: React.ReactNo
   );
 }
 
+// Tasteful icon-chip tints for the inventory stats (one hue each), matching the Insights
+// category enums so color means the same thing across the app.
+const STAT_TONE = {
+  violet: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+  sky: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+  amber: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  indigo: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
+  teal: "bg-teal-500/10 text-teal-600 dark:text-teal-400",
+  cyan: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
+  rose: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+} as const;
+
 function Stat({
-  icon,
+  icon: Icon,
+  tone,
   label,
   value,
   sub,
 }: {
-  icon: React.ReactNode;
+  icon: LucideIcon;
+  tone: string;
   label: string;
   value: number | string;
   sub?: string | undefined;
 }) {
   return (
-    <Card>
+    <Card className="shadow-sm transition-colors hover:border-foreground/20">
       <CardContent className="p-5">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          {icon}
-          <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
+        <div className="flex items-center gap-2.5">
+          <span className={cn("grid size-8 place-items-center rounded-lg", tone)}>
+            <Icon className="size-4" />
+          </span>
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {label}
+          </span>
         </div>
-        <div className="mt-2 text-2xl font-semibold tabular-nums">{value}</div>
+        <div className="mt-3 text-3xl font-semibold tabular-nums">
+          {typeof value === "number" ? value.toLocaleString() : value}
+        </div>
         {sub ? <div className="text-xs text-muted-foreground">{sub}</div> : null}
       </CardContent>
     </Card>
