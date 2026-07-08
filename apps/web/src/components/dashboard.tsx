@@ -304,49 +304,57 @@ function HealthCard({ health }: { health: { score: number; label: string } }) {
   );
 }
 
-/** Radial gauge for the health score — a half-donut filled to the score, with the number and its
- *  tier label ("At risk" / "Fair" / …) in the opening. Tone (currentColor) sets the arc + label. */
+/** Radial tick gauge for the health score — a semicircle of dashes filled to the score (tone),
+ *  with the number and its tier label ("At risk" / "Fair" / …) centred inside the arc. */
 function HealthGauge({ score, label, tone }: { score: number; label: string; tone: string }) {
   const cx = 100;
   const cy = 100;
-  const r = 80;
-  const pt = (frac: number) => {
-    const a = Math.PI * (1 - Math.max(0, Math.min(1, frac)));
-    return { x: cx + r * Math.cos(a), y: cy - r * Math.sin(a) };
-  };
-  const end = pt(score / 100);
+  const rIn = 62;
+  const rOut = 82;
+  const N = 36;
+  const filled = Math.round((Math.max(0, Math.min(100, score)) / 100) * N);
+  const ticks = Array.from({ length: N }, (_, i) => {
+    const a = Math.PI * (1 - i / (N - 1));
+    const cos = Math.cos(a);
+    const sin = Math.sin(a);
+    return {
+      x1: (cx + rIn * cos).toFixed(1),
+      y1: (cy - rIn * sin).toFixed(1),
+      x2: (cx + rOut * cos).toFixed(1),
+      y2: (cy - rOut * sin).toFixed(1),
+      on: i < filled,
+    };
+  });
   return (
-    <svg viewBox="0 0 200 124" className={cn("w-full max-w-[240px]", tone)} role="img">
-      <path
-        d="M 20 100 A 80 80 0 0 1 180 100"
-        fill="none"
-        className="stroke-muted"
-        strokeWidth={16}
-        strokeLinecap="round"
-      />
-      <path
-        d={`M 20 100 A 80 80 0 0 1 ${end.x.toFixed(1)} ${end.y.toFixed(1)}`}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={16}
-        strokeLinecap="round"
-      />
+    <svg viewBox="0 0 200 112" className={cn("w-full max-w-[240px]", tone)} role="img">
+      {ticks.map((t, i) => (
+        <line
+          key={i}
+          x1={t.x1}
+          y1={t.y1}
+          x2={t.x2}
+          y2={t.y2}
+          strokeWidth={4}
+          strokeLinecap="round"
+          className={t.on ? "stroke-current" : "stroke-muted"}
+        />
+      ))}
       <text
         x="100"
-        y="90"
+        y="82"
         textAnchor="middle"
         className="fill-foreground font-semibold tabular-nums"
-        style={{ fontSize: 38 }}
+        style={{ fontSize: 34 }}
       >
         {score}
       </text>
       <text
         x="100"
-        y="115"
+        y="102"
         textAnchor="middle"
         fill="currentColor"
         className="font-medium"
-        style={{ fontSize: 15 }}
+        style={{ fontSize: 12 }}
       >
         {label}
       </text>
@@ -372,9 +380,7 @@ function FindingsCard({ findings }: { findings: Finding[] }) {
     <Card className="shadow-sm">
       <CardContent className="flex h-full flex-col p-5">
         <div className="flex items-baseline justify-between">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Open findings
-          </p>
+          <p className="text-sm font-medium text-muted-foreground">Open findings</p>
           <Link
             href="/insights"
             className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
@@ -425,9 +431,7 @@ function SourcesCard({ trust, inv }: { trust: Summary["trust"]; inv: Summary["in
     <Card className="shadow-sm">
       <CardContent className="flex h-full flex-col p-5">
         <div className="flex items-baseline justify-between">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Sources
-          </p>
+          <p className="text-sm font-medium text-muted-foreground">Sources</p>
           <Link
             href="/integrations"
             className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
