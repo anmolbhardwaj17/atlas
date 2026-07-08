@@ -637,6 +637,8 @@ export interface ChannelSummary {
   kind: ChannelKind;
   enabled: boolean;
   hint: string | null;
+  /** When the channel was first connected (ISO) — for "added 3d ago". */
+  createdAt: string;
 }
 
 export async function setChannel(

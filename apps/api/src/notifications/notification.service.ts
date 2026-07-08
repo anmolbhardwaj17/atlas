@@ -24,6 +24,8 @@ export interface ChannelSummary {
   enabled: boolean;
   /** Masked hint of the webhook (last segment), never the full URL. */
   hint: string | null;
+  /** When the channel was first connected (ISO) - lets the UI say "added 3d ago". */
+  createdAt: string;
 }
 
 /** Per-kind webhook validation + labels. All three take a simple incoming-webhook POST. */
@@ -72,6 +74,7 @@ interface ChannelRow {
   kind: string;
   config: { webhookUrl?: string };
   enabled: boolean;
+  created_at: Date;
   last_alert_at: Date;
   last_digest_at: Date | null;
 }
@@ -90,7 +93,7 @@ export class NotificationService {
   async listChannels(orgId: string): Promise<ChannelSummary[]> {
     return withOrgScope(this.db, orgId, async (c) => {
       const { rows } = await c.query<ChannelRow>(
-        `SELECT kind, config, enabled FROM notification_channels ORDER BY created_at ASC`,
+        `SELECT kind, config, enabled, created_at FROM notification_channels ORDER BY created_at ASC`,
       );
       return rows
         .filter((r) => CHANNEL_KINDS.includes(r.kind as ChannelKind))
@@ -100,6 +103,7 @@ export class NotificationService {
             kind: r.kind as ChannelKind,
             enabled: r.enabled,
             hint: tail ? `…/${tail.slice(0, 6)}…` : null,
+            createdAt: new Date(r.created_at).toISOString(),
           };
         });
     });

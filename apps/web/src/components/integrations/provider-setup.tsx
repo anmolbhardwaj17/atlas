@@ -179,6 +179,72 @@ export function JenkinsSetup() {
   );
 }
 
+export function SlackSetup() {
+  return (
+    <div className="space-y-5">
+      <Steps>
+        <Step title="Create an Incoming Webhook">
+          In Slack, open <strong>Apps</strong> and add <InlineCode>Incoming Webhooks</InlineCode>.
+          Pick the channel Atlas should post to (e.g. <InlineCode>#alerts</InlineCode>) and copy the
+          generated webhook URL.
+        </Step>
+        <Step title="Paste the webhook into Atlas">
+          Atlas only ever <strong>posts</strong> messages to that URL - it&apos;s write-only and
+          never reads your workspace. The URL is stored encrypted and never shown again.
+        </Step>
+        <Step title="What Atlas sends">
+          A heads-up the moment a resource breaks, recovers, or gets exposed - plus a short daily
+          digest of what changed. Send a test after connecting to see it land.
+        </Step>
+      </Steps>
+    </div>
+  );
+}
+
+export function DiscordSetup() {
+  return (
+    <div className="space-y-5">
+      <Steps>
+        <Step title="Create a webhook">
+          In your Discord server, go to <strong>Server Settings → Integrations → Webhooks</strong>,
+          choose <InlineCode>New Webhook</InlineCode>, select the channel, and{" "}
+          <InlineCode>Copy Webhook URL</InlineCode>.
+        </Step>
+        <Step title="Paste the webhook into Atlas">
+          Atlas only <strong>posts</strong> to that URL - write-only, stored encrypted, and never
+          shown again.
+        </Step>
+        <Step title="What Atlas sends">
+          A heads-up when a resource breaks, recovers, or gets exposed - plus a short daily digest.
+          Send a test after connecting to confirm it works.
+        </Step>
+      </Steps>
+    </div>
+  );
+}
+
+export function TeamsSetup() {
+  return (
+    <div className="space-y-5">
+      <Steps>
+        <Step title="Add an Incoming Webhook connector">
+          In the target channel, open <strong>⋯ → Connectors</strong> (or <strong>Workflows</strong>
+          ), pick <InlineCode>Incoming Webhook</InlineCode>, name it &quot;Atlas&quot;, create it,
+          and copy the URL.
+        </Step>
+        <Step title="Paste the webhook into Atlas">
+          Atlas only <strong>posts</strong> to that URL - write-only, stored encrypted, and never
+          shown again.
+        </Step>
+        <Step title="What Atlas sends">
+          A heads-up when a resource breaks, recovers, or gets exposed - plus a short daily digest.
+          Send a test after connecting to confirm it works.
+        </Step>
+      </Steps>
+    </div>
+  );
+}
+
 export function BitbucketSetup() {
   return (
     <div className="space-y-5">

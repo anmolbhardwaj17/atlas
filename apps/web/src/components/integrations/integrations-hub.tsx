@@ -32,6 +32,9 @@ import {
   GcpSetup,
   BitbucketSetup,
   JenkinsSetup,
+  SlackSetup,
+  DiscordSetup,
+  TeamsSetup,
 } from "@/components/integrations/provider-setup";
 import { PROVIDERS, ProviderLogo, type ProviderMeta } from "@/components/integrations/providers";
 import {
@@ -135,13 +138,19 @@ export function IntegrationsHub({
   ).sort((a, b) => rank(a) - rank(b));
 
   return (
-    <div className="flex min-h-[calc(100vh-7rem)] flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold">Integrations and connected apps</h1>
-        <p className="text-sm text-muted-foreground">
-          Connect your cloud, code, CI/CD, and observability accounts. Atlas builds one cited graph
-          across everything you connect.
-        </p>
+    <div className="flex flex-col gap-6">
+      {/* Header: title on the left, a decorative wall of everything we connect on the right. */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold">Integrations and connected apps</h1>
+          <p className="text-sm text-muted-foreground">
+            Connect your cloud, code, CI/CD, and observability accounts. Atlas builds one cited
+            graph across everything you connect.
+          </p>
+        </div>
+        <div className="hidden shrink-0 sm:block sm:max-w-[44%]">
+          <LogoShowcase />
+        </div>
       </div>
 
       {/* Category tabs (segmented control) + search — the row list below filters live. */}
@@ -204,15 +213,6 @@ export function IntegrationsHub({
         </div>
       )}
 
-      {/* Decorative footer, pushed to the bottom of the screen (mt-auto) with a little breathing
-          room below so it reads as a page-bottom flourish. */}
-      <div className="mt-auto pb-2 pt-16">
-        <p className="mb-4 text-center text-xs text-muted-foreground">
-          One graph across your whole stack
-        </p>
-        <LogoShowcase />
-      </div>
-
       <ConnectSheet
         provider={connectProvider}
         orgId={orgId}
@@ -228,20 +228,18 @@ const TABS = ["All", "Cloud", "Code", "CI/CD", "Observability", "Alerts"] as con
 // offer. Logos only (no labels, no status).
 const SHOWCASE_LOGOS = Array.from(new Set(PROVIDERS.map((p) => p.logo)));
 
-/** The stylish logo wall at the bottom — everything Atlas plugs into. Borderless, with the row
- *  edges faded into the page so it reads as a decorative footer, not a boxed card. */
+/** A compact, decorative wall of everything Atlas connects — sits in the top-right of the header.
+ *  Tile-less; the left edge fades into the page so it blends toward the title on its left. */
 function LogoShowcase() {
   const logos = SHOWCASE_LOGOS.filter((l) => hasCloudIcon(l));
   return (
-    // Full-width, tile-less row so the outermost logos sit in the fade zone and blend into the
-    // page on the left and right. No card/border — the icons float on the background.
-    <div className="overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_12%,black_88%,transparent)]">
-      <div className="flex items-center justify-between gap-3 px-2">
+    <div className="[mask-image:linear-gradient(to_right,transparent,black_22%,black_100%)]">
+      <div className="flex flex-wrap items-center justify-end gap-2.5">
         {logos.map((logo) => (
           <CloudIcon
             key={logo}
             name={logo}
-            className="size-9 shrink-0 opacity-90 transition-opacity hover:opacity-100 sm:size-11"
+            className="size-7 shrink-0 opacity-90 transition-opacity hover:opacity-100"
           />
         ))}
       </div>
@@ -288,7 +286,7 @@ function AlertProviderRow({
             </span>
           </div>
           <p className="truncate text-sm text-muted-foreground">
-            {connected ? "Connected · sending alerts" : provider.blurb}
+            {connected && channel ? `Added ${timeAgo(channel.createdAt)}` : provider.blurb}
           </p>
         </button>
         <div className="flex shrink-0 items-center gap-2">
@@ -455,30 +453,39 @@ function AlertManageSheet({
               </div>
             </>
           ) : (
-            <div className="space-y-2">
-              <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Webhook URL
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder={meta.placeholder}
-                  autoComplete="off"
-                  spellCheck={false}
-                  aria-label={`${provider.name} webhook URL`}
-                />
-                <Button
-                  onClick={() => void save()}
-                  disabled={busy !== null || url.trim().length === 0}
-                >
-                  {busy === "save" ? <Loader2 className="size-4 animate-spin" /> : null}
-                  Connect
-                </Button>
+            <div className="space-y-5">
+              {kind === "discord" ? (
+                <DiscordSetup />
+              ) : kind === "msteams" ? (
+                <TeamsSetup />
+              ) : (
+                <SlackSetup />
+              )}
+              <div className="space-y-2 border-t border-border pt-4">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Webhook URL
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder={meta.placeholder}
+                    autoComplete="off"
+                    spellCheck={false}
+                    aria-label={`${provider.name} webhook URL`}
+                  />
+                  <Button
+                    onClick={() => void save()}
+                    disabled={busy !== null || url.trim().length === 0}
+                  >
+                    {busy === "save" ? <Loader2 className="size-4 animate-spin" /> : null}
+                    Connect
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {meta.help} It never leaves Atlas and is never shown again.
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {meta.help} It never leaves Atlas and is never shown again.
-              </p>
             </div>
           )}
         </div>
