@@ -2,55 +2,77 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 
 /**
- * Route-specific loading fallback for the Dashboard. Next.js App Router renders this
- * instantly while `page.tsx` (which fetches `/summary` on the server) resolves, so
- * navigating to the dashboard shows a skeleton that mirrors the real layout - header +
- * trust pulse, Ask Atlas hero, stat groups, insights, needs-attention / recent-activity,
- * and the map preview - instead of a blank wait.
+ * Route-specific loading fallback for the Dashboard. Rendered instantly while `page.tsx` (which
+ * fetches `/summary` on the server) resolves, so it mirrors the real layout: hero band, the
+ * health/findings/sources hero grid, the dark Ask Atlas card, the posture radar + inventory row,
+ * insights, needs-attention / recent-activity, and the map preview.
  */
 export default function DashboardLoading() {
   return (
     <div className="space-y-6">
-      {/* Header: title + trust pulse line, with the refresh control on the right. */}
-      <div className="flex items-start justify-between gap-4">
+      {/* Hero band: greeting + estate pulse + refresh. */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-2">
-          <Skeleton className="h-6 w-32" />
-          <Skeleton className="h-4 w-80 max-w-full" />
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-4 w-96 max-w-full" />
         </div>
         <Skeleton className="h-9 w-28 rounded-md" />
       </div>
 
-      {/* Ask Atlas hero. */}
-      <div className="rounded-2xl border border-border bg-card p-6 sm:p-7">
-        <Skeleton className="mb-2 h-5 w-28" />
-        <Skeleton className="mb-4 h-4 w-full max-w-xl" />
-        <Skeleton className="h-12 w-full rounded-xl" />
+      {/* Hero grid: health / findings / sources. */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Card key={i} className="shadow-sm">
+            <CardContent className="p-5">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="mt-3 h-8 w-20" />
+              <Skeleton className="mt-3 h-2 w-full rounded-full" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Ask Atlas (dark hero). */}
+      <div className="rounded-2xl border border-transparent bg-neutral-900 p-6 sm:p-7">
+        <Skeleton className="mb-2 h-5 w-28 bg-white/10" />
+        <Skeleton className="mb-4 h-4 w-full max-w-xl bg-white/10" />
+        <Skeleton className="h-12 w-full rounded-xl bg-white/10" />
         <div className="mt-3 flex flex-wrap gap-2">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-6 w-52 max-w-full rounded-full" />
+            <Skeleton key={i} className="h-6 w-52 max-w-full rounded-full bg-white/10" />
           ))}
         </div>
       </div>
 
-      {/* Stat groups (Infrastructure + Code), each a label over a 4-up grid of stat cards. */}
-      {Array.from({ length: 2 }).map((_, g) => (
-        <div key={g}>
-          <Skeleton className="mb-2 h-3 w-24" />
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i}>
-                <CardContent className="p-5">
-                  <div className="flex items-center gap-2">
-                    <Skeleton className="size-4" />
-                    <Skeleton className="h-3 w-20" />
-                  </div>
-                  <Skeleton className="mt-3 h-7 w-16" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+      {/* Posture radar (left) + inventory (right). */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,340px)_1fr]">
+        <Card className="shadow-sm">
+          <CardContent className="flex flex-col items-center gap-5 p-5">
+            <Skeleton className="h-3 w-28 self-start" />
+            <Skeleton className="size-52 rounded-full" />
+          </CardContent>
+        </Card>
+        <div className="flex flex-col justify-center gap-5">
+          {[3, 4].map((count, g) => (
+            <div key={g}>
+              <Skeleton className="mb-2 h-3 w-24" />
+              <div className="flex flex-wrap gap-3">
+                {Array.from({ length: count }).map((_, i) => (
+                  <Card key={i} className="min-w-[150px] flex-1 shadow-sm">
+                    <CardContent className="flex items-center justify-between gap-3 px-3.5 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <Skeleton className="size-3.5" />
+                        <Skeleton className="h-3 w-16" />
+                      </div>
+                      <Skeleton className="h-6 w-8" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
+      </div>
 
       {/* Insights: heading + subtitle over a 3-up grid of cards. */}
       <div>
