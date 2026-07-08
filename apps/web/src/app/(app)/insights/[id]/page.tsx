@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Boxes, Clock, RotateCcw, ShieldAlert, Wrench } from "lucide-react";
 import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,10 +18,23 @@ interface InsightsData {
   mutes: Mute[];
 }
 
+/** Compact relative time ("just now", "5m ago", "3h ago", "2d ago"). Server-safe (pure). */
+function timeAgo(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "unknown";
+  const s = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
 /**
  * Finding detail (the row → detail drill-in). Findings are derived live, so we resolve the id
  * against the current list; if it's gone, it resolved on its own since you last looked. Home for
- * the full guidance, evidence, Ask Atlas, and (next) the lifecycle actions.
+ * the full guidance, the affected-resource evidence, lifecycle actions, and Ask Atlas.
  */
 export default async function FindingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -34,8 +47,21 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
   const mute = res.body?.data?.mutes.find((mm) => mm.findingId === id) ?? null;
   const m = pillarMeta(finding?.guidance?.pillar);
 
+  // Lifecycle metadata (persisted, reconciled each sync) + affected-resource evidence parsed from
+  // the finding's detail (a "; "-joined list when the finding names specific resources).
+  const firstSeen = finding?.firstSeenAt ?? null;
+  const ageDays = firstSeen
+    ? Math.floor((Date.now() - new Date(firstSeen).getTime()) / 86_400_000)
+    : null;
+  const evidence =
+    finding?.detail
+      ?.split(";")
+      .map((s) => s.trim())
+      .filter(Boolean) ?? [];
+  const evidenceIsList = evidence.length > 1;
+
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-5">
+    <div className="w-full space-y-6">
       <Link
         href="/insights"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -58,37 +84,59 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
         />
       ) : (
         <>
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <SeverityBadge severity={finding.severity} />
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${m.badge}`}
-              >
-                <m.icon className="size-3.5" /> {m.label}
-              </span>
-              {finding.count && finding.count > 1 ? (
-                <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                  {finding.count} affected
+          {/* Header: title + badges + lifecycle on the left; lifecycle actions on the right,
+              wrapping under a long title rather than squeezing it. */}
+          <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
+            <div className="min-w-0 flex-1 space-y-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <SeverityBadge severity={finding.severity} />
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${m.badge}`}
+                >
+                  <m.icon className="size-3.5" /> {m.label}
                 </span>
-              ) : null}
-              {mute ? (
-                <span className="rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                  Muted
-                </span>
-              ) : null}
+                {finding.count && finding.count > 1 ? (
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    {finding.count} affected
+                  </span>
+                ) : null}
+                {mute ? (
+                  <span className="rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    Muted
+                  </span>
+                ) : null}
+                {finding.regressedAt ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning">
+                    <RotateCcw className="size-3" /> Regressed
+                  </span>
+                ) : null}
+              </div>
+              <h1 className="text-2xl font-semibold leading-snug tracking-tight">
+                {finding.title}
+              </h1>
+              {/* Lifecycle + provenance strip. */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                {firstSeen ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Clock className="size-3.5" /> Detected {timeAgo(firstSeen)}
+                  </span>
+                ) : null}
+                {ageDays !== null && ageDays >= 1 ? <span>Open {ageDays}d</span> : null}
+                {finding.guidance?.source ? <span>Guidance: {finding.guidance.source}</span> : null}
+              </div>
             </div>
-            <h1 className="text-xl font-semibold leading-snug">{finding.title}</h1>
+            <div className="shrink-0">
+              <FindingActions orgId={shell.orgId} findingId={finding.id} muted={mute !== null} />
+            </div>
           </div>
 
-          {/* Lifecycle: recheck (re-sync + confirm) and mute/accept-risk. */}
-          <FindingActions orgId={shell.orgId} findingId={finding.id} muted={mute !== null} />
-
+          {/* Why it matters / How to fix. */}
           {finding.guidance ? (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 lg:grid-cols-2">
               <Card>
-                <CardContent className="space-y-1.5 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Why it matters
+                <CardContent className="space-y-2 p-5">
+                  <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <ShieldAlert className="size-3.5" /> Why it matters
                   </p>
                   <p className="text-sm leading-relaxed text-foreground/90">
                     {finding.guidance.why}
@@ -96,9 +144,9 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="space-y-1.5 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    How to fix
+                <CardContent className="space-y-2 p-5">
+                  <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <Wrench className="size-3.5" /> How to fix
                   </p>
                   <p className="text-sm leading-relaxed text-foreground/90">
                     {finding.guidance.fix}
@@ -106,25 +154,50 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
                 </CardContent>
               </Card>
             </div>
-          ) : (
-            <Card>
-              <CardContent className="p-4 text-sm text-muted-foreground">
-                {finding.detail}
-              </CardContent>
-            </Card>
-          )}
+          ) : null}
 
+          {/* Evidence — the affected resources, shown inline (not just a link out). */}
           {finding.detail ? (
             <Card>
-              <CardContent className="space-y-1.5 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  What Atlas found
-                </p>
-                <p className="text-sm leading-relaxed text-muted-foreground">{finding.detail}</p>
+              <CardContent className="space-y-3 p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <Boxes className="size-3.5" /> Evidence
+                    {evidenceIsList ? (
+                      <span className="font-normal normal-case text-muted-foreground/70">
+                        · {evidence.length} affected
+                      </span>
+                    ) : null}
+                  </p>
+                  {finding.href ? (
+                    <Link
+                      href={finding.href}
+                      className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      Open in Explore <ArrowRight className="size-3.5" />
+                    </Link>
+                  ) : null}
+                </div>
+                {evidenceIsList ? (
+                  <ul className="divide-y divide-border overflow-hidden rounded-md border border-border">
+                    {evidence.map((item, i) => (
+                      <li
+                        key={i}
+                        className="flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors hover:bg-muted/40"
+                      >
+                        <Boxes className="size-4 shrink-0 text-muted-foreground" />
+                        <span className="font-mono text-[13px] text-foreground/90">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm leading-relaxed text-muted-foreground">{finding.detail}</p>
+                )}
               </CardContent>
             </Card>
           ) : null}
 
+          {/* Primary CTA. */}
           <div className="flex flex-wrap items-center gap-3">
             <Link
               href={`/ask?q=${encodeURIComponent(`How do I fix: ${finding.title}?`)}`}
@@ -132,19 +205,6 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
             >
               <AtlasAiMark size={15} className="size-4" /> Ask Atlas how to fix this
             </Link>
-            {finding.href ? (
-              <Link
-                href={finding.href}
-                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-              >
-                View evidence <ArrowRight className="size-3.5" />
-              </Link>
-            ) : null}
-            {finding.guidance?.source ? (
-              <span className="ml-auto text-xs text-muted-foreground/70">
-                Guidance: {finding.guidance.source}
-              </span>
-            ) : null}
           </div>
         </>
       )}
