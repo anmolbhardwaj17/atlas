@@ -50,7 +50,7 @@ export function PostureRadar({ posture }: { posture: Posture }) {
   return (
     <svg
       viewBox="0 0 320 300"
-      className="mx-auto block h-auto w-full max-w-[420px]"
+      className="mx-auto block h-auto w-full max-w-[560px]"
       role="img"
       aria-label="Posture by pillar"
     >

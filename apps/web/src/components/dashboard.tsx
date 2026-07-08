@@ -29,6 +29,18 @@ import { KIND_LOGO } from "@/lib/kind-visual";
 import { severityMeta, PROVIDER_META } from "@/lib/taxonomy";
 import { apiGet, type ApiOk } from "@/lib/api";
 
+/** Connection provider → brand-logo key, split by the card each feeds. */
+const CLOUD_LOGO: Record<string, string> = {
+  aws: "aws",
+  azure: "microsoft-azure",
+  gcp: "google-cloud",
+};
+const CODE_LOGO: Record<string, string> = {
+  github: "github-icon",
+  bitbucket: "bitbucket",
+  gitlab: "gitlab",
+};
+
 interface Finding {
   id: string;
   severity: string;
@@ -87,8 +99,11 @@ export async function Dashboard({
   role: string;
   name?: string | null;
 }) {
-  const res = await apiGet<ApiOk<Summary>>("/summary", { token, orgId });
-  const s = res.body?.data;
+  const [summaryRes, connRes] = await Promise.all([
+    apiGet<ApiOk<Summary>>("/summary", { token, orgId }),
+    apiGet<ApiOk<Array<{ provider: string }>>>("/connections", { token, orgId }),
+  ]);
+  const s = summaryRes.body?.data;
 
   // Empty graph → the onboarding first-run experience.
   if (!s || s.inventory.resources === 0) {
@@ -102,6 +117,13 @@ export async function Dashboard({
   const hasInfra = inv.services + inv.datastores + inv.clouds > 0;
   const hasCode = inv.repositories > 0;
   const inventoryCols = 1 + (hasInfra ? 1 : 0) + (hasCode ? 1 : 0);
+
+  // Logos of the connected sources feeding each card (shown top-right of Infrastructure / Code).
+  const providers = (connRes.body?.data ?? []).map((c) => c.provider);
+  const isStr = (x: string | undefined): x is string => Boolean(x);
+  const uniq = (xs: string[]) => [...new Set(xs)];
+  const cloudLogos = uniq(providers.map((p) => CLOUD_LOGO[p]).filter(isStr));
+  const codeLogos = uniq(providers.map((p) => CODE_LOGO[p]).filter(isStr));
 
   return (
     <div className="space-y-6">
@@ -140,6 +162,7 @@ export async function Dashboard({
           <InventoryCard
             title="Infrastructure"
             columns={1}
+            icons={cloudLogos}
             rows={[
               { icon: Boxes, label: "Services", value: inv.services },
               { icon: Database, label: "Datastores", value: inv.datastores },
@@ -159,6 +182,7 @@ export async function Dashboard({
           <InventoryCard
             title="Code"
             columns={2}
+            icons={codeLogos}
             rows={[
               { icon: GitBranch, label: "Repositories", value: inv.repositories },
               { icon: FolderGit2, label: "Projects", value: inv.projects },
