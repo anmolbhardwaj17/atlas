@@ -136,7 +136,6 @@ export async function Dashboard({
       {/* Three equal cards: the posture radar, then Infrastructure and Code, each listing their
           counts as rows. Infra/Code only appear when that side is connected. */}
       <div className={cn("grid gap-4", inventoryCols >= 3 ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
-        <PostureCard posture={s.insights.posture} />
         {hasInfra ? (
           <InventoryCard
             title="Infrastructure"
@@ -174,6 +173,7 @@ export async function Dashboard({
             ]}
           />
         ) : null}
+        <PostureCard posture={s.insights.posture} />
       </div>
 
       <Insights insights={s.insights} />
