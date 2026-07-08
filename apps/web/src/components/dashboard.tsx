@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PostureRadar, type Posture } from "@/components/dashboard/posture-radar";
-import { initials } from "@/components/user-avatar";
 import { cn } from "@/lib/cn";
 import { Onboarding } from "@/components/onboarding";
 import { AskLauncher } from "@/components/dashboard/ask-launcher";
@@ -46,6 +45,17 @@ function avatarColor(seed: string): string {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
   return AVATAR_COLORS[h % AVATAR_COLORS.length] ?? "bg-slate-500";
+}
+
+/** First + last initial (pure, server-safe — the shared one lives in a client module). */
+function contribInitials(name: string): string {
+  const parts = name
+    .trim()
+    .split(/[\s@._-]+/)
+    .filter(Boolean);
+  const a = parts[0]?.[0] ?? "";
+  const b = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
+  return (a + b).toUpperCase() || "?";
 }
 
 interface Finding {
@@ -742,7 +752,7 @@ function Leaderboard({
                       avatarColor(it.name),
                     )}
                   >
-                    {initials(it.name, it.name)}
+                    {contribInitials(it.name)}
                   </span>
                 ) : null}
                 <span className="w-24 shrink-0 truncate">{it.name}</span>
