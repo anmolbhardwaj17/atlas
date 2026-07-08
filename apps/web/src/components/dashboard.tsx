@@ -713,35 +713,22 @@ function Leaderboard({
         {items.length === 0 ? (
           <p className="text-sm text-muted-foreground">{emptyLabel}</p>
         ) : (
-          <ul className="space-y-0.5">
-            {items.map((it, i) => (
-              <li
-                key={it.name}
-                className="relative flex items-center gap-2.5 overflow-hidden rounded-lg px-2.5 py-2"
-              >
-                <span
-                  className="absolute inset-y-0 left-0 rounded-lg bg-brand/15"
-                  style={{ width: `${Math.max(8, Math.round((it.count / max) * 100))}%` }}
-                  aria-hidden
-                />
-                <span className="relative w-4 shrink-0 text-center text-xs font-medium tabular-nums text-muted-foreground">
-                  {i + 1}
-                </span>
+          <ul className="space-y-3">
+            {items.map((it) => (
+              <li key={it.name} className="flex items-center gap-3 text-sm">
                 {avatars ? (
-                  <UserAvatar
-                    name={it.name}
-                    email={it.name}
-                    size={22}
-                    className="relative shrink-0"
-                  />
+                  <UserAvatar name={it.name} email={it.name} size={24} className="shrink-0" />
                 ) : null}
-                <span
-                  className="relative min-w-0 flex-1 truncate text-sm font-medium"
-                  title={it.name}
-                >
+                <span className="w-28 shrink-0 truncate font-medium" title={it.name}>
                   {it.name}
                 </span>
-                <span className="relative shrink-0 text-sm font-semibold tabular-nums">
+                <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-[#2684ff]"
+                    style={{ width: `${Math.max(6, Math.round((it.count / max) * 100))}%` }}
+                  />
+                </div>
+                <span className="w-8 shrink-0 text-right font-semibold tabular-nums">
                   {it.count}
                 </span>
               </li>
