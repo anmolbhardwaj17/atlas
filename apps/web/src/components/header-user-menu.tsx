@@ -26,12 +26,10 @@ const THEME_KEY = "atlas.theme";
  * strategy) and persists the choice.
  */
 export function HeaderUserMenu({
-  orgName,
   email,
   name,
   avatarUrl,
 }: {
-  orgName: string;
   email: string;
   name?: string | null | undefined;
   avatarUrl?: string | null | undefined;
@@ -142,8 +140,6 @@ export function HeaderUserMenu({
           <LogOut />
           Sign out
         </DropdownMenuItem>
-
-        <p className="truncate px-2 pb-1 pt-1 text-[11px] text-muted-foreground">{orgName}</p>
       </DropdownMenuContent>
     </DropdownMenu>
   );

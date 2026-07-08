@@ -15,7 +15,6 @@ import { Separator } from "@/components/ui/separator";
  * + ⌘K search). Server component; the interactive pieces are client islands.
  */
 export function AppShell({
-  orgName,
   email,
   orgId,
   title,
@@ -23,7 +22,6 @@ export function AppShell({
   avatarUrl,
   children,
 }: {
-  orgName: string;
   email: string;
   orgId?: string;
   title?: string;
@@ -36,7 +34,7 @@ export function AppShell({
       <AppSidebar />
       <SidebarInset>
         <BreadcrumbProvider>
-          <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur">
+          <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
             <SidebarTrigger className="-ml-1" />
             {/* Page breadcrumb (published per-page); falls back to an optional title. The app name
                 already lives in the sidebar brand, so we don't repeat "Atlas" here. */}
@@ -47,10 +45,10 @@ export function AppShell({
                 <span className="text-sm font-medium">{title}</span>
               </>
             ) : null}
-            <div className="ml-auto flex items-center gap-1.5">
+            <div className="ml-auto flex items-center gap-2.5">
               {orgId && <CommandTrigger />}
               {orgId && <NotificationBell orgId={orgId} />}
-              <HeaderUserMenu orgName={orgName} email={email} name={name} avatarUrl={avatarUrl} />
+              <HeaderUserMenu email={email} name={name} avatarUrl={avatarUrl} />
             </div>
           </header>
           <div className="flex-1 p-4 md:p-6">

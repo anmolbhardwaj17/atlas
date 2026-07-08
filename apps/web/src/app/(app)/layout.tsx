@@ -14,13 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const shell = await requireShell();
   return (
-    <AppShell
-      orgName={shell.orgName}
-      email={shell.email}
-      orgId={shell.orgId}
-      name={shell.name}
-      avatarUrl={shell.avatarUrl}
-    >
+    <AppShell email={shell.email} orgId={shell.orgId} name={shell.name} avatarUrl={shell.avatarUrl}>
       {children}
       <WelcomeGate name={shell.name} />
     </AppShell>
