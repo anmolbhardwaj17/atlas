@@ -13,6 +13,7 @@ interface InsightsData {
   summary: InsightsSummary;
   findings: Finding[];
   mutes: Mute[];
+  lastSyncedAt: string | null;
 }
 
 /**
@@ -31,6 +32,7 @@ export default async function InsightsPage() {
       summary={data?.summary ?? null}
       findings={data?.findings ?? []}
       mutes={data?.mutes ?? []}
+      lastSyncedAt={data?.lastSyncedAt ?? null}
     />
   );
 }

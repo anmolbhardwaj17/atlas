@@ -65,6 +65,9 @@ export class GraphController {
         ...bySeverity,
         pipelineCoverage: s.insights.pipelineCoverage,
       },
+      // Data freshness for the honest "findings reflect your sync from X ago" line - findings are
+      // derived live, so this (not a per-finding timestamp) is the real recency signal (P4/P7).
+      lastSyncedAt: s.trust.lastSyncAt,
       findings: s.findings.map((f) => ({
         id: f.id,
         severity: f.severity,

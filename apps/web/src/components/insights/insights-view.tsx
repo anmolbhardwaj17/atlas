@@ -10,6 +10,7 @@ import {
   Cog,
   DollarSign,
   Gauge,
+  History,
   Search,
   ShieldCheck,
   Sparkles,
@@ -110,6 +111,19 @@ const SEV_DOT: Record<string, string> = {
   low: "bg-inferred-low",
 };
 
+/** Compact relative time for the data-freshness line ("just now", "5m ago", "3h ago", "2d ago"). */
+function timeAgo(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "unknown";
+  const s = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
 /**
  * Insights (Atlas Knowledge Engine) - the ADVISORY layer. A scannable posture summary + a dense,
  * filterable findings table; each row opens a detail page with the full guidance, evidence, and
@@ -119,10 +133,12 @@ export function InsightsView({
   summary,
   findings,
   mutes = [],
+  lastSyncedAt = null,
 }: {
   summary: InsightsSummary | null;
   findings: Finding[];
   mutes?: Mute[];
+  lastSyncedAt?: string | null;
 }) {
   const router = useRouter();
   const mutedSet = React.useMemo(() => new Set(mutes.map((m) => m.findingId)), [mutes]);
@@ -182,10 +198,19 @@ export function InsightsView({
   return (
     <div className="w-full space-y-6">
       <header className="space-y-1">
-        <h1 className="text-xl font-semibold">Insights</h1>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h1 className="text-xl font-semibold">Insights</h1>
+          {lastSyncedAt ? (
+            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <History className="size-3.5" />
+              Reflects your sync from {timeAgo(lastSyncedAt)}
+            </span>
+          ) : null}
+        </div>
         <p className="max-w-2xl text-sm text-muted-foreground">
           What to act on - grounded findings with best-practice guidance. Open any one for the full
-          fix, evidence, and to track it. Recomputed live from your latest sync.
+          fix, evidence, and to track it. Findings are derived live from your graph, so a real fix
+          clears them on the next sync.
         </p>
       </header>
 
