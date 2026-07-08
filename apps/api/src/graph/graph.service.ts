@@ -77,6 +77,8 @@ export interface Finding {
   /** Click-through to the evidence (a node, edge, filtered list, or settings). */
   href: string | null;
   count?: number;
+  /** The specific affected nodes, when the finding names them — each deep-links to /explore/:id. */
+  evidence?: Array<{ id: string; label: string }>;
 }
 
 /** Persisted lifecycle of a finding (docs/09): open/resolved + when first/last seen + regression. */
@@ -784,6 +786,10 @@ export class GraphService {
           .join("; "),
         href: first ? `/explore/${first.id}` : "/explore?kind=aws.securitygroup",
         count: openSgs2.length,
+        evidence: openSgs2.map((g) => ({
+          id: g.id,
+          label: `${g.name ?? g.id}${g.ports ? ` (port ${g.ports})` : ""}`,
+        })),
       });
     }
     const misnamed = (base.publicElbs ?? []).filter((l) => /private|internal/i.test(l.name ?? ""));
@@ -797,6 +803,7 @@ export class GraphService {
         detail: `${misnamed.map((l) => l.name).join(", ")} - the scheme says internet-facing; either the name or the exposure is wrong.`,
         href: first ? `/explore/${first.id}` : "/explore?kind=aws.elb",
         count: misnamed.length,
+        evidence: misnamed.map((l) => ({ id: l.id, label: l.name ?? l.id })),
       });
     }
 
@@ -815,6 +822,7 @@ export class GraphService {
           )}${wild.length > 5 ? ` (+${wild.length - 5} more)` : ""} - a compromise of anything assuming these roles is a compromise of the whole account.`,
         href: "/explore?kind=aws.iam.role",
         count: wild.length,
+        evidence: wild.map((r) => ({ id: r.id, label: r.name ?? r.id })),
       });
     }
     const singleAz = base.singleAzDbs ?? [];
@@ -828,6 +836,7 @@ export class GraphService {
         detail: `${singleAz.map((d) => d.name ?? d.id).join(", ")} - one AZ outage takes ${singleAz.length > 1 ? "them" : "it"} down; enable Multi-AZ for production data.`,
         href: first ? `/explore/${first.id}` : "/explore?kind=aws.rds.instance",
         count: singleAz.length,
+        evidence: singleAz.map((d) => ({ id: d.id, label: d.name ?? d.id })),
       });
     }
 
@@ -849,6 +858,10 @@ export class GraphService {
           : "",
         href: worst ? `/explore/${worst.id}` : "/map",
         count: unhealthyNodes.length,
+        evidence: unhealthyNodes.map((n) => ({
+          id: n.id,
+          label: `${n.name ?? n.id} - ${n.reason ?? n.state}`,
+        })),
       });
     }
     const STALE_MS = 7 * 24 * 60 * 60 * 1000;

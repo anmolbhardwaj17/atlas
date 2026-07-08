@@ -3,6 +3,8 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { CommandPalette } from "@/components/command-palette";
 import { CommandTrigger } from "@/components/command-trigger";
 import { NotificationBell } from "@/components/notification-bell";
+import { BreadcrumbProvider } from "@/components/breadcrumb-context";
+import { HeaderBreadcrumbs } from "@/components/header-breadcrumbs";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 
@@ -32,24 +34,27 @@ export function AppShell({
     <SidebarProvider>
       <AppSidebar orgName={orgName} email={email} name={name} avatarUrl={avatarUrl} />
       <SidebarInset>
-        <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur">
-          <SidebarTrigger className="-ml-1" />
-          {/* Optional page title only — the app name already lives in the sidebar brand, so we
-              don't repeat "Atlas" here. */}
-          {title ? (
-            <>
-              <Separator orientation="vertical" className="mr-1 h-4" />
-              <span className="text-sm font-medium">{title}</span>
-            </>
-          ) : null}
-          <div className="ml-auto flex items-center gap-1.5">
-            {orgId && <CommandTrigger />}
-            {orgId && <NotificationBell orgId={orgId} />}
+        <BreadcrumbProvider>
+          <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur">
+            <SidebarTrigger className="-ml-1" />
+            {/* Page breadcrumb (published per-page); falls back to an optional title. The app name
+                already lives in the sidebar brand, so we don't repeat "Atlas" here. */}
+            <HeaderBreadcrumbs />
+            {title ? (
+              <>
+                <Separator orientation="vertical" className="mr-1 h-4" />
+                <span className="text-sm font-medium">{title}</span>
+              </>
+            ) : null}
+            <div className="ml-auto flex items-center gap-1.5">
+              {orgId && <CommandTrigger />}
+              {orgId && <NotificationBell orgId={orgId} />}
+            </div>
+          </header>
+          <div className="flex-1 p-4 md:p-6">
+            <div className="mx-auto w-full max-w-6xl">{children}</div>
           </div>
-        </header>
-        <div className="flex-1 p-4 md:p-6">
-          <div className="mx-auto w-full max-w-6xl">{children}</div>
-        </div>
+        </BreadcrumbProvider>
       </SidebarInset>
       {orgId && <CommandPalette orgId={orgId} />}
     </SidebarProvider>

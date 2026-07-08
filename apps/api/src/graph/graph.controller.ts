@@ -86,6 +86,7 @@ export class GraphController {
           detail: f.detail,
           href: f.href,
           ...(f.count !== undefined ? { count: f.count } : {}),
+          ...(f.evidence ? { evidence: f.evidence } : {}),
           guidance: guidanceFor(f.category),
           firstSeenAt: st?.firstSeenAt ?? null,
           regressedAt: st?.regressedAt ?? null,

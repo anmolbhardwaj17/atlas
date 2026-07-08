@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Boxes, Clock, RotateCcw, ShieldAlert, Wrench } from "lucide-react";
+import { ArrowRight, Boxes, Clock, RotateCcw, ShieldAlert, Wrench } from "lucide-react";
 import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { SeverityBadge } from "@/components/tags";
 import { AtlasAiMark } from "@/components/brand";
+import { SetBreadcrumbs } from "@/components/breadcrumb-context";
 import { ErrorState } from "@/components/patterns/empty-state";
 import { FindingActions } from "@/components/insights/finding-actions";
 import { pillarMeta } from "@/components/insights/pillars";
@@ -53,21 +54,23 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
   const ageDays = firstSeen
     ? Math.floor((Date.now() - new Date(firstSeen).getTime()) / 86_400_000)
     : null;
+  // Prefer the structured node evidence (deep-linkable) when the API provides it; otherwise parse
+  // the detail string into a list (a "; "-joined resource list), else fall back to a paragraph.
+  const nodeEvidence = finding?.evidence ?? [];
+  const hasNodeEvidence = nodeEvidence.length > 0;
   const evidence =
     finding?.detail
       ?.split(";")
       .map((s) => s.trim())
       .filter(Boolean) ?? [];
   const evidenceIsList = evidence.length > 1;
+  const affectedCount = hasNodeEvidence ? nodeEvidence.length : evidence.length;
 
   return (
     <div className="w-full space-y-6">
-      <Link
-        href="/insights"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" /> Insights
-      </Link>
+      <SetBreadcrumbs
+        items={[{ label: "Insights", href: "/insights" }, { label: finding?.title ?? "Finding" }]}
+      />
 
       {!finding ? (
         <ErrorState
@@ -88,6 +91,10 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
               wrapping under a long title rather than squeezing it. */}
           <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
             <div className="min-w-0 flex-1 space-y-2.5">
+              <h1 className="text-2xl font-semibold leading-snug tracking-tight">
+                {finding.title}
+              </h1>
+              {/* Badges below the title. */}
               <div className="flex flex-wrap items-center gap-2">
                 <SeverityBadge severity={finding.severity} />
                 <span
@@ -111,9 +118,6 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
                   </span>
                 ) : null}
               </div>
-              <h1 className="text-2xl font-semibold leading-snug tracking-tight">
-                {finding.title}
-              </h1>
               {/* Lifecycle + provenance strip. */}
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 {firstSeen ? (
@@ -163,9 +167,9 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
                 <div className="flex items-center justify-between gap-3">
                   <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <Boxes className="size-3.5" /> Evidence
-                    {evidenceIsList ? (
+                    {affectedCount > 1 ? (
                       <span className="font-normal normal-case text-muted-foreground/70">
-                        · {evidence.length} affected
+                        · {affectedCount} affected
                       </span>
                     ) : null}
                   </p>
@@ -178,13 +182,27 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
                     </Link>
                   ) : null}
                 </div>
-                {evidenceIsList ? (
+                {hasNodeEvidence ? (
+                  <ul className="divide-y divide-border overflow-hidden rounded-md border border-border">
+                    {nodeEvidence.map((n) => (
+                      <li key={n.id}>
+                        <Link
+                          href={`/explore/${n.id}`}
+                          className="flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors hover:bg-muted/40"
+                        >
+                          <Boxes className="size-4 shrink-0 text-muted-foreground" />
+                          <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-foreground/90">
+                            {n.label}
+                          </span>
+                          <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                ) : evidenceIsList ? (
                   <ul className="divide-y divide-border overflow-hidden rounded-md border border-border">
                     {evidence.map((item, i) => (
-                      <li
-                        key={i}
-                        className="flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors hover:bg-muted/40"
-                      >
+                      <li key={i} className="flex items-center gap-2.5 px-3 py-2.5 text-sm">
                         <Boxes className="size-4 shrink-0 text-muted-foreground" />
                         <span className="font-mono text-[13px] text-foreground/90">{item}</span>
                       </li>

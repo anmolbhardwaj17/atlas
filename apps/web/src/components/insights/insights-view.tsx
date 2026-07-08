@@ -17,6 +17,8 @@ export interface Finding {
   detail: string;
   href: string | null;
   count?: number;
+  /** Specific affected nodes (deep-link each to /explore/:id), when the finding names them. */
+  evidence?: Array<{ id: string; label: string }>;
   guidance: { why: string; fix: string; pillar: string; source: string } | null;
   // Lifecycle overlay (persisted, reconciled each sync).
   firstSeenAt?: string | null;

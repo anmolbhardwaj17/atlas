@@ -108,7 +108,14 @@ export function FindingActions({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Button size="sm" variant="outline" onClick={() => void recheck()} disabled={busy !== null}>
+      {/* Recheck = the positive "I fixed it" action → green. Mute = accepting risk → amber caution. */}
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => void recheck()}
+        disabled={busy !== null}
+        className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+      >
         {busy === "recheck" ? (
           <Loader2 className="size-3.5 animate-spin" />
         ) : (
@@ -116,7 +123,17 @@ export function FindingActions({
         )}
         I fixed it - recheck
       </Button>
-      <Button size="sm" variant="ghost" onClick={() => void toggleMute()} disabled={busy !== null}>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => void toggleMute()}
+        disabled={busy !== null}
+        className={
+          muted
+            ? ""
+            : "border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
+        }
+      >
         {busy === "mute" ? (
           <Loader2 className="size-3.5 animate-spin" />
         ) : muted ? (
