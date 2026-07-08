@@ -139,6 +139,7 @@ export async function Dashboard({
         {hasInfra ? (
           <InventoryCard
             title="Infrastructure"
+            columns={1}
             rows={[
               { icon: Boxes, label: "Services", value: inv.services },
               { icon: Database, label: "Datastores", value: inv.datastores },
@@ -157,6 +158,7 @@ export async function Dashboard({
         {hasCode ? (
           <InventoryCard
             title="Code"
+            columns={2}
             rows={[
               { icon: GitBranch, label: "Repositories", value: inv.repositories },
               { icon: FolderGit2, label: "Projects", value: inv.projects },
@@ -245,9 +247,7 @@ function PostureCard({ posture }: { posture: Posture }) {
   return (
     <Card className="w-full shadow-sm">
       <CardContent className="flex h-full flex-col p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Posture by area
-        </p>
+        <p className="text-sm font-medium text-muted-foreground">Posture by area</p>
         <div className="flex flex-1 items-center justify-center py-1">
           <PostureRadar posture={posture} />
         </div>
@@ -613,17 +613,22 @@ function Insights({ insights }: { insights: Summary["insights"] }) {
 
   return (
     <div>
-      <h2 className="text-base font-semibold">Insights</h2>
-      <p className="mb-3 text-xs text-muted-foreground">
-        Pull requests raised in the last 30 days (open or merged).
-      </p>
+      <div className="mb-3">
+        <div className="flex items-center gap-2">
+          {logo ? <CloudIcon name={logo} className="size-4" /> : null}
+          <h2 className="text-base font-semibold">Insights</h2>
+        </div>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Delivery activity over the last 30 days — who&apos;s shipping, what&apos;s active, and
+          CI/CD coverage.
+        </p>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Leaderboard
           title="Top contributors"
           subtitle="PRs raised · 30d"
           items={topContributors}
           href={userHref}
-          logo={logo}
           avatars
           emptyLabel="No PRs in the last 30 days yet."
         />
@@ -632,20 +637,17 @@ function Insights({ insights }: { insights: Summary["insights"] }) {
           subtitle="PRs · 30d"
           items={mostActiveRepos}
           href={repoHref}
-          logo={logo}
           emptyLabel="No PRs in the last 30 days yet."
         />
         <Card>
           <CardContent className="p-5">
             <div className="flex items-baseline justify-between">
-              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Pipeline coverage
-              </div>
+              <div className="text-sm font-medium">Pipeline coverage</div>
               <span className="text-xs tabular-nums text-muted-foreground">
                 {pipelineCoverage.withPipeline}/{pipelineCoverage.total} repos
               </span>
             </div>
-            <div className="mt-1 flex items-center gap-1.5 text-2xl font-semibold tabular-nums">
+            <div className="mt-5 flex items-center gap-1.5 text-2xl font-semibold tabular-nums">
               {pct}%
               {pct >= 80 ? (
                 <TrendingUp className="size-4 text-success" />
@@ -685,7 +687,6 @@ function Leaderboard({
   subtitle,
   items,
   href,
-  logo = null,
   avatars = false,
   emptyLabel = "None yet.",
 }: {
@@ -693,7 +694,6 @@ function Leaderboard({
   subtitle: string;
   items: Array<{ name: string; count: number }>;
   href: string;
-  logo?: string | null;
   avatars?: boolean;
   emptyLabel?: string;
 }) {
@@ -702,10 +702,7 @@ function Leaderboard({
     <Card>
       <CardContent className="p-5">
         <div className="mb-3 flex items-baseline justify-between">
-          <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {logo ? <CloudIcon name={logo} className="size-3.5" /> : null}
-            {title}
-          </div>
+          <div className="text-sm font-medium">{title}</div>
           <Link href={href} className="text-xs text-muted-foreground hover:text-foreground">
             {subtitle}
           </Link>
@@ -719,7 +716,7 @@ function Leaderboard({
                 {avatars ? (
                   <UserAvatar name={it.name} email={it.name} size={24} className="shrink-0" />
                 ) : null}
-                <span className="w-28 shrink-0 truncate font-medium" title={it.name}>
+                <span className="w-28 shrink-0 truncate" title={it.name}>
                   {it.name}
                 </span>
                 <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
@@ -747,28 +744,73 @@ interface InventoryRow {
   sub?: string | undefined;
 }
 
-/** One inventory card (Infrastructure / Code): a titled card whose counts are listed as rows that
- *  stretch to fill the card, so it stands level with the posture radar beside it. */
-function InventoryCard({ title, rows }: { title: string; rows: InventoryRow[] }) {
+/** One inventory card (Infrastructure / Code): a titled card whose counts are a grid of mini
+ *  tiles — Infrastructure as 3-in-a-row, Code as a 2×2 — that fill the card. */
+function InventoryCard({
+  title,
+  rows,
+  columns,
+  icons = [],
+}: {
+  title: string;
+  rows: InventoryRow[];
+  columns: 1 | 2 | 3;
+  /** Logo keys of the connected sources feeding this card (shown top-right). */
+  icons?: string[];
+}) {
+  const single = columns === 1;
+  const gridCls = columns === 1 ? "grid-cols-1" : columns === 2 ? "grid-cols-2" : "grid-cols-3";
   return (
     <Card className="flex h-full flex-col shadow-sm">
       <CardContent className="flex h-full flex-col p-5">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
-        <div className="mt-1 flex flex-1 flex-col divide-y divide-border">
-          {rows.map((r) => (
-            <div key={r.label} className="flex flex-1 items-center justify-between gap-3 py-3">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <r.icon className="size-4 shrink-0 text-muted-foreground" />
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium">{r.label}</div>
-                  {r.sub ? <div className="text-xs text-muted-foreground">{r.sub}</div> : null}
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          {icons.length ? (
+            <div className="flex items-center gap-1.5">
+              {icons.map((l) => (
+                <CloudIcon key={l} name={l} className="size-5" />
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <div className={cn("mt-3 grid flex-1 gap-3", gridCls)}>
+          {rows.map((r) =>
+            single ? (
+              // Full-width row tile: icon + label on the left, big value on the right.
+              <div
+                key={r.label}
+                className="flex items-center justify-between gap-3 rounded-lg bg-muted/50 px-4"
+              >
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <r.icon className="size-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium">{r.label}</div>
+                    {r.sub ? <div className="text-xs text-muted-foreground">{r.sub}</div> : null}
+                  </div>
+                </div>
+                <div className="shrink-0 text-2xl font-semibold tabular-nums">
+                  {r.value.toLocaleString()}
                 </div>
               </div>
-              <div className="shrink-0 text-2xl font-semibold tabular-nums">
-                {r.value.toLocaleString()}
+            ) : (
+              // Compact grid tile: label on top, value below.
+              <div
+                key={r.label}
+                className="flex flex-col justify-between gap-3 rounded-lg bg-muted/50 p-3.5"
+              >
+                <div className="flex items-center gap-2.5">
+                  <r.icon className="size-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate text-sm font-medium">{r.label}</span>
+                </div>
+                <div>
+                  <div className="text-2xl font-semibold tabular-nums">
+                    {r.value.toLocaleString()}
+                  </div>
+                  {r.sub ? <div className="text-[11px] text-muted-foreground">{r.sub}</div> : null}
+                </div>
               </div>
-            </div>
-          ))}
+            ),
+          )}
         </div>
       </CardContent>
     </Card>

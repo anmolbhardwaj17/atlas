@@ -50,7 +50,7 @@ export function PostureRadar({ posture }: { posture: Posture }) {
   return (
     <svg
       viewBox="0 0 320 300"
-      className="mx-auto block h-auto w-full max-w-[340px]"
+      className="mx-auto block h-auto w-full max-w-[420px]"
       role="img"
       aria-label="Posture by pillar"
     >
@@ -73,15 +73,15 @@ export function PostureRadar({ posture }: { posture: Posture }) {
           />
         );
       })}
-      {/* Data polygon (brand accent). */}
+      {/* Data polygon — a lighter green than the brand mark so the area reads soft. */}
       <polygon
         points={dataPolygon}
-        className="fill-brand/20 stroke-brand"
+        className="fill-emerald-400/20 stroke-emerald-500"
         strokeWidth={2}
         strokeLinejoin="round"
       />
       {dataPoints.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r={2.5} className="fill-brand" />
+        <circle key={i} cx={p.x} cy={p.y} r={2.5} className="fill-emerald-500" />
       ))}
       {/* Axis labels — name over score, stacked so long names never clip. */}
       {AXES.map((ax, i) => {
