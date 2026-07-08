@@ -209,7 +209,7 @@ function TrustPulse({ trust, inv }: { trust: Summary["trust"]; inv: Summary["inv
       <span aria-hidden>·</span>
       <span className="inline-flex items-center gap-1.5">
         <span
-          className={`size-1.5 rounded-full ${allHealthy ? "bg-success" : "bg-sev-medium"}`}
+          className={`size-1.5 rounded-full ${allHealthy ? "bg-emerald-500" : "bg-amber-500"}`}
           aria-hidden
         />
         {trust.healthySources}/{trust.sources} sources healthy
@@ -293,9 +293,9 @@ function FindingsCard({ findings }: { findings: Finding[] }) {
   }
   const total = findings.length;
   const seg = [
-    { n: sev.high, color: "bg-sev-high", label: "High" },
-    { n: sev.medium, color: "bg-sev-medium", label: "Medium" },
-    { n: sev.low, color: "bg-sev-low", label: "Low" },
+    { n: sev.high, color: "bg-red-500", label: "High" },
+    { n: sev.medium, color: "bg-amber-500", label: "Medium" },
+    { n: sev.low, color: "bg-blue-500", label: "Low" },
   ];
   return (
     <Card className="shadow-sm">
@@ -349,7 +349,7 @@ function FindingsCard({ findings }: { findings: Finding[] }) {
 function SourcesCard({ trust, inv }: { trust: Summary["trust"]; inv: Summary["inventory"] }) {
   const ratio = trust.sources > 0 ? trust.healthySources / trust.sources : 0;
   const pct = Math.round(ratio * 100);
-  const barColor = ratio >= 1 ? "bg-success" : ratio > 0 ? "bg-sev-medium" : "bg-sev-high";
+  const barColor = ratio >= 1 ? "bg-emerald-500" : ratio > 0 ? "bg-amber-500" : "bg-red-500";
   return (
     <Card className="shadow-sm">
       <CardContent className="flex h-full flex-col p-5">
@@ -615,7 +615,7 @@ function Insights({ insights }: { insights: Summary["insights"] }) {
               {pct >= 80 ? (
                 <TrendingUp className="size-4 text-success" />
               ) : pct < 50 ? (
-                <TrendingDown className="size-4 text-sev-high" />
+                <TrendingDown className="size-4 text-red-500" />
               ) : null}
             </div>
             <div className="mt-3">
