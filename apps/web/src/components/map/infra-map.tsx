@@ -17,7 +17,7 @@ import {
   type Edge,
   type NodeMouseHandler,
 } from "@xyflow/react";
-import { ListFilter, Search, Shield, Stethoscope, X } from "lucide-react";
+import { Clock, ListFilter, Search, Shield, Stethoscope, X } from "lucide-react";
 import { buildLayout } from "@/lib/map-layout";
 import { kindShort } from "@/lib/kind-visual";
 import { edgeCrossing, CROSS_COLOR, type MapData, type MapNode } from "@/lib/map-types";
@@ -63,6 +63,10 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
   // graph by runtime health — broken/degraded nodes stay lit, everything healthy recedes, so
   // "what's on fire" reads in one glance. Default off.
   const [healthLens, setHealthLens] = useState(false);
+
+  // "What changed" lens: highlight recently-observed (new) or drifted (stale/deleted) nodes; the
+  // rest recede. Answers "what moved lately" at a glance.
+  const [changedLens, setChangedLens] = useState(false);
 
   // Kind filter: pick one or more resource kinds to focus (empty = show everything). Non-matching
   // nodes recede, same as the Health lens. The chip list is the kinds actually present.
@@ -214,6 +218,25 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
           </button>
           <button
             type="button"
+            onClick={() => setChangedLens((v) => !v)}
+            aria-pressed={changedLens}
+            title={
+              changedLens
+                ? "Back to the normal map"
+                : "Highlight recently added or drifted resources"
+            }
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-medium transition-colors",
+              changedLens
+                ? "border-transparent bg-foreground text-background"
+                : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
+            )}
+          >
+            <Clock className="size-3.5" />
+            Changed
+          </button>
+          <button
+            type="button"
             onClick={() => setShowFilters((v) => !v)}
             aria-pressed={showFilters || kindFilter.size > 0}
             title="Filter the map by resource kind"
@@ -300,6 +323,7 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
             onToggleCollapse={toggleCollapse}
             showSecurity={showSecurity}
             healthLens={healthLens}
+            changedLens={changedLens}
             kindFilter={kindFilter}
           />
         </ReactFlowProvider>
@@ -325,22 +349,12 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
  */
 /** Edge decoration for hover/selection: the active node's edges light up and reveal their
  *  label; everything else fades so the traced path is the only story on screen. */
-function decorateEdges(
-  edges: Edge[],
-  activeId: string | null,
-  opts: { focusSet: Set<string> | null; healthLens: boolean; alertIds: Set<string> },
-): Edge[] {
-  const { focusSet, healthLens, alertIds } = opts;
-  if (!activeId && !focusSet && !healthLens) return edges;
+function decorateEdges(edges: Edge[], activeId: string | null, litSet: Set<string> | null): Edge[] {
+  if (!activeId && !litSet) return edges;
   return edges.map((e) => {
     const touches = !!activeId && (e.source === activeId || e.target === activeId);
-    // "In scope" = part of the blast radius (both ends in focus), or — in the Health lens — an
-    // edge that touches something unhealthy. Otherwise the edge recedes.
-    const inScope = focusSet
-      ? focusSet.has(e.source) && focusSet.has(e.target)
-      : healthLens
-        ? alertIds.has(e.source) || alertIds.has(e.target)
-        : true;
+    // An edge stays lit only when BOTH endpoints are lit; otherwise it recedes with them.
+    const inScope = litSet ? litSet.has(e.source) && litSet.has(e.target) : true;
     return {
       ...e,
       label: touches ? ((e.data as { label?: string } | undefined)?.label ?? "") : undefined,
@@ -367,6 +381,7 @@ function Flow({
   onToggleCollapse,
   showSecurity,
   healthLens,
+  changedLens,
   kindFilter,
 }: {
   data: MapData;
@@ -380,6 +395,7 @@ function Flow({
   onToggleCollapse: (id: string) => void;
   showSecurity: boolean;
   healthLens: boolean;
+  changedLens: boolean;
   kindFilter: Set<string>;
 }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -523,6 +539,38 @@ function Flow({
     return s;
   }, [layout.nodes]);
 
+  // Recently-changed nodes: newly observed (firstSeen within a week) or drifted (status not active).
+  const changedIds = useMemo(() => {
+    const s = new Set<string>();
+    const now = Date.now();
+    const WINDOW = 7 * 24 * 60 * 60 * 1000;
+    for (const n of layout.nodes) {
+      const nd = (n.data as { node?: MapNode }).node;
+      if (!nd) continue;
+      const fresh = !!nd.firstSeen && now - new Date(nd.firstSeen).getTime() < WINDOW;
+      if (fresh || (nd.status && nd.status !== "active")) s.add(n.id);
+    }
+    return s;
+  }, [layout.nodes]);
+
+  // One "lit" set unifies every focus mode: a blast-radius click wins; otherwise a node is lit if it
+  // passes every ACTIVE lens (Health ∪ Changed) and the kind filter. null = nothing is filtering.
+  const litSet = useMemo(() => {
+    if (focusSet) return focusSet;
+    const lensActive = healthLens || changedLens;
+    if (!lensActive && kindFilter.size === 0) return null;
+    const s = new Set<string>();
+    for (const n of layout.nodes) {
+      if (n.type !== "resource") continue;
+      const kind = (n.data as { node: MapNode }).node.kind;
+      const passLens =
+        !lensActive || (healthLens && alertIds.has(n.id)) || (changedLens && changedIds.has(n.id));
+      const passKind = kindFilter.size === 0 || kindFilter.has(kind);
+      if (passLens && passKind) s.add(n.id);
+    }
+    return s;
+  }, [focusSet, healthLens, changedLens, kindFilter, alertIds, changedIds, layout.nodes]);
+
   const [nodes, setNodes, onNodesChange] = useNodesState(layout.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layout.edges);
   const { fitView } = useReactFlow();
@@ -563,32 +611,20 @@ function Flow({
 
   // Edges re-decorate on hover/selection/lens WITHOUT refitting the viewport.
   useEffect(() => {
-    setEdges(decorateEdges(layout.edges, activeId, { focusSet, healthLens, alertIds }));
-  }, [layout, activeId, focusSet, healthLens, alertIds, setEdges]);
+    setEdges(decorateEdges(layout.edges, activeId, litSet));
+  }, [layout, activeId, litSet, setEdges]);
 
-  // Nodes re-decorate in place (dim) for the blast-radius focus, the Health lens, and the kind
-  // filter — no refit. A click's blast radius takes priority; otherwise a node stays lit only if it
-  // passes every active lens/filter.
+  // Nodes re-decorate in place (dim) from the unified litSet (focus / lenses / filter) — no refit.
   useEffect(() => {
     setNodes((nds) =>
       nds.map((n) => {
         if (n.type !== "resource") return n;
-        let dim: boolean;
-        if (focusSet) {
-          dim = !focusSet.has(n.id);
-        } else if (healthLens || kindFilter.size > 0) {
-          const passHealth = !healthLens || alertIds.has(n.id);
-          const passKind =
-            kindFilter.size === 0 || kindFilter.has((n.data as { node: MapNode }).node.kind);
-          dim = !(passHealth && passKind);
-        } else {
-          dim = false;
-        }
+        const dim = litSet ? !litSet.has(n.id) : false;
         if (Boolean((n.data as { dim?: boolean }).dim) === dim) return n;
         return { ...n, data: { ...n.data, dim } };
       }),
     );
-  }, [focusSet, healthLens, alertIds, kindFilter, setNodes, layout]);
+  }, [litSet, setNodes, layout]);
 
   const onNodeClick: NodeMouseHandler = (_evt, node) => {
     onSelect(node.type === "resource" ? node.id : null);

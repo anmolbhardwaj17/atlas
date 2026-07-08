@@ -22,6 +22,9 @@ export interface MapNode {
   environment: string;
   accountRef: string | null;
   health?: NodeHealth | null;
+  /** When Atlas first/last observed this node (ISO). Drives the "what changed" lens. */
+  firstSeen?: string;
+  lastSeen?: string;
   /** Full node attributes (the /graph API ships them) - the detail panel's key facts. */
   attributes?: Record<string, unknown>;
 }
