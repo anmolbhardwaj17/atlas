@@ -780,9 +780,9 @@ function Leaderboard({
                 <span className="w-28 shrink-0 truncate" title={it.name}>
                   {it.name}
                 </span>
-                <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
+                <div className="h-2.5 flex-1 overflow-hidden rounded-sm bg-muted">
                   <div
-                    className="h-full rounded-full bg-[#2684ff]"
+                    className="h-full rounded-sm bg-[#2684ff]"
                     style={{ width: `${Math.max(6, Math.round((it.count / max) * 100))}%` }}
                   />
                 </div>
