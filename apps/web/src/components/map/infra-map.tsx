@@ -57,6 +57,11 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
   // boundary-audit view. Default off - flow first, boundaries on demand.
   const [showSecurity, setShowSecurity] = useState(false);
 
+  // Health lens (operational-intelligence north star): OFF = normal map; ON = recolour the whole
+  // graph by runtime health — broken/degraded nodes stay lit, everything healthy recedes, so
+  // "what's on fire" reads in one glance. Default off.
+  const [healthLens, setHealthLens] = useState(false);
+
   // Protection is a PROPERTY, not a flow: a security group fanning out to five resources
   // drew the longest, noisiest rails on the canvas. By default PROTECTS edges become a
   // shield chip on the protected node (full list in its detail panel); an SG whose only
@@ -167,6 +172,25 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
             <Shield className="size-3.5" />
             Security
           </button>
+          <button
+            type="button"
+            onClick={() => setHealthLens((v) => !v)}
+            aria-pressed={healthLens}
+            title={
+              healthLens
+                ? "Back to the normal map"
+                : "Highlight unhealthy resources — dim everything that's healthy"
+            }
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-medium transition-colors",
+              healthLens
+                ? "border-transparent bg-danger text-white"
+                : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
+            )}
+          >
+            <Stethoscope className="size-3.5" />
+            Health
+          </button>
           {cross.crossCloud + cross.crossAccount > 0 && (
             <span
               className="flex items-center gap-1.5 rounded-full border border-transparent px-2.5 py-1 font-medium"
@@ -202,6 +226,7 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
             collapsed={effectiveCollapsed}
             onToggleCollapse={toggleCollapse}
             showSecurity={showSecurity}
+            healthLens={healthLens}
           />
         </ReactFlowProvider>
         {!selected && <Legend />}
@@ -226,18 +251,30 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
  */
 /** Edge decoration for hover/selection: the active node's edges light up and reveal their
  *  label; everything else fades so the traced path is the only story on screen. */
-function decorateEdges(edges: Edge[], activeId: string | null): Edge[] {
-  if (!activeId) return edges;
+function decorateEdges(
+  edges: Edge[],
+  activeId: string | null,
+  opts: { focusSet: Set<string> | null; healthLens: boolean; alertIds: Set<string> },
+): Edge[] {
+  const { focusSet, healthLens, alertIds } = opts;
+  if (!activeId && !focusSet && !healthLens) return edges;
   return edges.map((e) => {
-    const touches = e.source === activeId || e.target === activeId;
+    const touches = !!activeId && (e.source === activeId || e.target === activeId);
+    // "In scope" = part of the blast radius (both ends in focus), or — in the Health lens — an
+    // edge that touches something unhealthy. Otherwise the edge recedes.
+    const inScope = focusSet
+      ? focusSet.has(e.source) && focusSet.has(e.target)
+      : healthLens
+        ? alertIds.has(e.source) || alertIds.has(e.target)
+        : true;
     return {
       ...e,
       label: touches ? ((e.data as { label?: string } | undefined)?.label ?? "") : undefined,
       labelShowBg: true,
-      zIndex: touches ? 7 : (e.zIndex ?? 1),
+      zIndex: touches ? 7 : inScope ? 3 : (e.zIndex ?? 1),
       style: {
         ...e.style,
-        opacity: touches ? 1 : 0.12,
+        opacity: !inScope ? 0.08 : touches ? 1 : 0.9,
         strokeWidth: touches ? 2.25 : (e.style?.strokeWidth ?? 1.5),
       },
     };
@@ -255,6 +292,7 @@ function Flow({
   collapsed,
   onToggleCollapse,
   showSecurity,
+  healthLens,
 }: {
   data: MapData;
   canvasEdges: MapData["edges"];
@@ -266,6 +304,7 @@ function Flow({
   collapsed: Set<string>;
   onToggleCollapse: (id: string) => void;
   showSecurity: boolean;
+  healthLens: boolean;
 }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const activeId = hoveredId ?? selectedId;
@@ -344,6 +383,49 @@ function Flow({
     openPrByRepo,
   ]);
 
+  // Undirected adjacency over the drawn edges — powers blast-radius highlighting.
+  const adjacency = useMemo(() => {
+    const adj = new Map<string, Set<string>>();
+    const link = (a: string, b: string) => {
+      if (!adj.has(a)) adj.set(a, new Set());
+      adj.get(a)?.add(b);
+    };
+    for (const e of layout.edges) {
+      link(e.source, e.target);
+      link(e.target, e.source);
+    }
+    return adj;
+  }, [layout.edges]);
+
+  // Blast radius: the selected node + everything connected to it (up/downstream, transitively).
+  // Clicking a node dims everything outside this set so you see exactly what it touches.
+  const focusSet = useMemo(() => {
+    if (!selectedId) return null;
+    const seen = new Set<string>([selectedId]);
+    const stack = [selectedId];
+    while (stack.length) {
+      const cur = stack.pop();
+      if (cur === undefined) break;
+      for (const nb of adjacency.get(cur) ?? []) {
+        if (!seen.has(nb)) {
+          seen.add(nb);
+          stack.push(nb);
+        }
+      }
+    }
+    return seen;
+  }, [selectedId, adjacency]);
+
+  // Nodes with a runtime problem — the Health lens keeps these lit and recedes everything else.
+  const alertIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const n of layout.nodes) {
+      const st = (n.data as { node?: MapNode }).node?.health?.state;
+      if (st === "unhealthy" || st === "degraded") s.add(n.id);
+    }
+    return s;
+  }, [layout.nodes]);
+
   const [nodes, setNodes, onNodesChange] = useNodesState(layout.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layout.edges);
   const { fitView } = useReactFlow();
@@ -382,10 +464,22 @@ function Flow({
     };
   }, [layout, setNodes, fitView, fitOpts, showSecurity]);
 
-  // Edges re-decorate on hover/selection WITHOUT refitting the viewport.
+  // Edges re-decorate on hover/selection/lens WITHOUT refitting the viewport.
   useEffect(() => {
-    setEdges(decorateEdges(layout.edges, activeId));
-  }, [layout, activeId, setEdges]);
+    setEdges(decorateEdges(layout.edges, activeId, { focusSet, healthLens, alertIds }));
+  }, [layout, activeId, focusSet, healthLens, alertIds, setEdges]);
+
+  // Nodes re-decorate in place (dim) for the blast-radius focus and the Health lens — no refit.
+  useEffect(() => {
+    setNodes((nds) =>
+      nds.map((n) => {
+        if (n.type !== "resource") return n;
+        const dim = focusSet ? !focusSet.has(n.id) : healthLens ? !alertIds.has(n.id) : false;
+        if (Boolean((n.data as { dim?: boolean }).dim) === dim) return n;
+        return { ...n, data: { ...n.data, dim } };
+      }),
+    );
+  }, [focusSet, healthLens, alertIds, setNodes, layout]);
 
   const onNodeClick: NodeMouseHandler = (_evt, node) => {
     onSelect(node.type === "resource" ? node.id : null);

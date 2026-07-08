@@ -41,6 +41,8 @@ export function ResourceNode({ data, selected }: NodeProps) {
     openPrCount?: number;
     /** Security groups protecting this node - protection reads as a chip, not canvas rails. */
     protectedBy?: string[];
+    /** Recede this node (Health lens / blast-radius focus dims everything out of scope). */
+    dim?: boolean;
   };
   const node = d.node;
   const collapse = d.collapse;
@@ -65,11 +67,12 @@ export function ResourceNode({ data, selected }: NodeProps) {
       className={cn(
         "relative flex w-[190px] items-center gap-2.5 rounded-lg border bg-card px-3 py-2 shadow-sm",
         "duration-200 animate-in fade-in zoom-in-95",
-        "transition-[transform,box-shadow,border-color] hover:-translate-y-0.5 hover:shadow-md",
+        "transition-[transform,box-shadow,border-color,opacity,filter] hover:-translate-y-0.5 hover:shadow-md",
         selected
           ? "border-foreground ring-1 ring-foreground"
           : (healthRing ?? "border-border hover:border-foreground/40"),
         stale && "opacity-60",
+        d.dim && "opacity-30 grayscale",
       )}
       title={
         health && health.state !== "healthy"
