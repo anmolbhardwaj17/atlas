@@ -42,17 +42,6 @@ const CODE_LOGO: Record<string, string> = {
   bitbucket: "bitbucket",
   gitlab: "gitlab",
 };
-/** Any connectable provider → brand-logo key (for the Sources list). */
-const PROVIDER_LOGO: Record<string, string> = {
-  ...CLOUD_LOGO,
-  ...CODE_LOGO,
-  datadog: "datadog",
-  jenkins: "jenkins",
-  grafana: "grafana",
-  circleci: "circleci",
-  argocd: "argocd",
-};
-
 interface ConnectionLite {
   provider: string;
   displayName: string;
@@ -460,14 +449,6 @@ function SourcesCard({
   connections: ConnectionLite[];
   trust: Summary["trust"];
 }) {
-  const dot = (status: string) =>
-    status === "connected"
-      ? "bg-emerald-500"
-      : status === "degraded"
-        ? "bg-amber-500"
-        : "bg-red-500";
-  const statusLabel = (status: string) =>
-    status === "connected" ? "Healthy" : status === "degraded" ? "Degraded" : "Error";
   return (
     <Card className="shadow-sm">
       <CardContent className="flex h-full flex-col p-5">
@@ -483,26 +464,19 @@ function SourcesCard({
         {connections.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">No sources connected yet.</p>
         ) : (
-          <ul className="mt-3 flex-1 space-y-3">
-            {connections.map((c) => {
-              const logo = PROVIDER_LOGO[c.provider];
-              return (
-                <li key={c.displayName} className="flex items-center gap-2.5">
-                  {/* White chip keeps dark brand marks (AWS) legible in dark mode. */}
-                  <span className="grid size-7 shrink-0 place-items-center rounded-md bg-white ring-1 ring-black/5">
-                    {logo ? <CloudIcon name={logo} className="size-4" /> : null}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
+          <div className="flex flex-1 items-center gap-4 py-1">
+            <SourcesDonut connections={connections} />
+            <ul className="min-w-0 flex-1 space-y-1.5">
+              {connections.map((c) => (
+                <li key={c.displayName} className="flex items-center gap-2 text-xs">
+                  <span className={cn("size-1.5 shrink-0 rounded-full", statusDot(c.status))} />
+                  <span className="min-w-0 flex-1 truncate text-muted-foreground">
                     {c.displayName}
                   </span>
-                  <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className={cn("size-1.5 rounded-full", dot(c.status))} />
-                    {statusLabel(c.status)}
-                  </span>
                 </li>
-              );
-            })}
-          </ul>
+              ))}
+            </ul>
+          </div>
         )}
         {trust.lastSyncAt ? (
           <p className="mt-auto pt-3 text-xs text-muted-foreground">
@@ -511,6 +485,54 @@ function SourcesCard({
         ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+const statusDot = (status: string) =>
+  status === "connected" ? "bg-emerald-500" : status === "degraded" ? "bg-amber-500" : "bg-red-500";
+
+/** A donut split into one segment per source, coloured by health; healthy/total in the centre. */
+function SourcesDonut({ connections }: { connections: ConnectionLite[] }) {
+  const n = connections.length;
+  const r = 44;
+  const sw = 12;
+  const circ = 2 * Math.PI * r;
+  const gap = n > 1 ? 8 : 0;
+  const seg = circ / n - gap;
+  const stroke = (status: string) =>
+    status === "connected"
+      ? "stroke-emerald-500"
+      : status === "degraded"
+        ? "stroke-amber-500"
+        : "stroke-red-500";
+  const healthy = connections.filter((c) => c.status === "connected").length;
+  return (
+    <div className="relative grid size-[112px] shrink-0 place-items-center">
+      <svg viewBox="0 0 112 112" className="size-[112px] -rotate-90">
+        <circle cx="56" cy="56" r={r} fill="none" className="stroke-muted" strokeWidth={sw} />
+        {connections.map((c, i) => (
+          <circle
+            key={c.displayName}
+            cx="56"
+            cy="56"
+            r={r}
+            fill="none"
+            strokeWidth={sw}
+            strokeLinecap="round"
+            className={stroke(c.status)}
+            strokeDasharray={`${seg.toFixed(1)} ${(circ - seg).toFixed(1)}`}
+            strokeDashoffset={(-i * (circ / n)).toFixed(1)}
+          />
+        ))}
+      </svg>
+      <div className="absolute text-center leading-none">
+        <div className="text-xl font-semibold tabular-nums">
+          {healthy}
+          <span className="text-sm text-muted-foreground">/{n}</span>
+        </div>
+        <div className="mt-1 text-[10px] text-muted-foreground">healthy</div>
+      </div>
+    </div>
   );
 }
 
@@ -729,14 +751,7 @@ function Insights({ insights }: { insights: Summary["insights"] }) {
         </p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Leaderboard
-          title="Top contributors"
-          subtitle="PRs raised · 30d"
-          items={topContributors}
-          href={userHref}
-          avatars
-          emptyLabel="No PRs in the last 30 days yet."
-        />
+        <ContributorsCard items={topContributors} subtitle="PRs raised · 30d" href={userHref} />
         <Leaderboard
           title="Most active repos"
           subtitle="PRs · 30d"
@@ -784,6 +799,98 @@ function TickMeter({ pct, ticks = 30 }: { pct: number; ticks?: number }) {
         <span key={i} className={cn("flex-1 rounded-full", i < filled ? fill : "bg-muted")} />
       ))}
     </div>
+  );
+}
+
+/** Palette for the contributor donut — a spread of blues (a la shadcn's pie-chart demo). */
+const DONUT_COLORS = ["#2684ff", "#4c9aff", "#0052cc", "#79b8ff", "#1d4ed8", "#93c5fd"];
+
+/** Top contributors as a donut (shadcn "donut with text"): a segment per person sized by their
+ *  PR count, with the total PRs in the centre and a compact legend beside it. */
+function ContributorsCard({
+  items,
+  subtitle,
+  href,
+}: {
+  items: Array<{ name: string; count: number }>;
+  subtitle: string;
+  href: string;
+}) {
+  const total = items.reduce((sum, it) => sum + it.count, 0);
+  const r = 44;
+  const sw = 12;
+  const circ = 2 * Math.PI * r;
+  const gap = items.length > 1 ? 4 : 0;
+  let acc = 0;
+  const segs = items.map((it, i) => {
+    const len = total > 0 ? (it.count / total) * circ : 0;
+    const seg = {
+      dash: Math.max(0, len - gap),
+      offset: -acc,
+      color: DONUT_COLORS[i % DONUT_COLORS.length] ?? "#2684ff",
+    };
+    acc += len;
+    return seg;
+  });
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="mb-3 flex items-baseline justify-between">
+          <div className="text-sm font-medium">Top contributors</div>
+          <Link href={href} className="text-xs text-muted-foreground hover:text-foreground">
+            {subtitle}
+          </Link>
+        </div>
+        {items.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No PRs in the last 30 days yet.</p>
+        ) : (
+          <div className="flex items-center gap-5">
+            <div className="relative grid size-[124px] shrink-0 place-items-center">
+              <svg viewBox="0 0 112 112" className="size-[124px] -rotate-90">
+                <circle
+                  cx="56"
+                  cy="56"
+                  r={r}
+                  fill="none"
+                  className="stroke-muted"
+                  strokeWidth={sw}
+                />
+                {segs.map((sgm, i) => (
+                  <circle
+                    key={items[i]?.name ?? i}
+                    cx="56"
+                    cy="56"
+                    r={r}
+                    fill="none"
+                    stroke={sgm.color}
+                    strokeWidth={sw}
+                    strokeLinecap="butt"
+                    strokeDasharray={`${sgm.dash.toFixed(1)} ${(circ - sgm.dash).toFixed(1)}`}
+                    strokeDashoffset={sgm.offset.toFixed(1)}
+                  />
+                ))}
+              </svg>
+              <div className="absolute text-center leading-none">
+                <div className="text-2xl font-semibold tabular-nums">{total}</div>
+                <div className="mt-1 text-[10px] text-muted-foreground">PRs</div>
+              </div>
+            </div>
+            <ul className="min-w-0 flex-1 space-y-2">
+              {items.map((it, i) => (
+                <li key={it.name} className="flex items-center gap-2 text-sm">
+                  <span
+                    className="size-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: DONUT_COLORS[i % DONUT_COLORS.length] }}
+                  />
+                  <span className="min-w-0 flex-1 truncate">{it.name}</span>
+                  <span className="shrink-0 font-semibold tabular-nums">{it.count}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
