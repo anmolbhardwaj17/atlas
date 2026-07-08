@@ -33,6 +33,7 @@ import {
   BitbucketSetup,
   JenkinsSetup,
 } from "@/components/integrations/provider-setup";
+import Link from "next/link";
 import { PROVIDERS, ProviderLogo, type ProviderMeta } from "@/components/integrations/providers";
 import {
   createConnection,
@@ -40,8 +41,13 @@ import {
   deleteConnection,
   triggerSync,
   type ConnectionSummary,
+  type ChannelSummary,
 } from "@/lib/browser-api";
 import { cn } from "@/lib/cn";
+
+/** Alert-channel setup + management lives in Settings → Notifications (webhook + test); the hub
+ *  deep-links there so there's one source of truth for the steps. */
+const ALERTS_SETTINGS_HREF = "/settings#notifications";
 
 /** The right setup steps for each connectable provider. */
 function ProviderSetup({ providerId }: { providerId: string }) {
@@ -78,10 +84,12 @@ const CREDENTIAL_NOUN: Record<string, string> = {
 export function IntegrationsHub({
   orgId,
   connections,
+  channels = [],
   canManage,
 }: {
   orgId: string;
   connections: ConnectionSummary[];
+  channels?: ChannelSummary[];
   canManage: boolean;
 }) {
   const [connectProvider, setConnectProvider] = React.useState<ProviderMeta | null>(null);
@@ -94,12 +102,17 @@ export function IntegrationsHub({
     arr.push(c);
     byProvider.set(c.provider, arr);
   }
+  // Alert channels are keyed by kind (slack/discord/msteams), which match the provider ids.
+  const channelByKind = new Map<string, ChannelSummary>(channels.map((c) => [c.kind, c]));
 
   const q = query.trim().toLowerCase();
   const hasConn = (id: string) => (byProvider.get(id)?.length ?? 0) > 0;
+  // "Connected" spans both graph sources and enabled alert channels.
+  const isConnected = (p: ProviderMeta) =>
+    p.category === "Alerts" ? channelByKind.get(p.id)?.enabled === true : hasConn(p.id);
   // Row order (stable within each tier, so category grouping from PROVIDERS survives): connected
   // first (what's already set up), then available-to-connect, then everything "coming soon" last.
-  const rank = (p: ProviderMeta) => (hasConn(p.id) ? 0 : p.status === "coming-soon" ? 2 : 1);
+  const rank = (p: ProviderMeta) => (isConnected(p) ? 0 : p.status === "coming-soon" ? 2 : 1);
   const rows = PROVIDERS.filter(
     (p) =>
       (tab === "All" || p.category === tab) &&
@@ -153,16 +166,25 @@ export function IntegrationsHub({
         </div>
       ) : (
         <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
-          {rows.map((p) => (
-            <ProviderRow
-              key={p.id}
-              provider={p}
-              connections={byProvider.get(p.id) ?? []}
-              canManage={canManage}
-              orgId={orgId}
-              onConnect={() => setConnectProvider(p)}
-            />
-          ))}
+          {rows.map((p) =>
+            p.category === "Alerts" ? (
+              <AlertProviderRow
+                key={p.id}
+                provider={p}
+                channel={channelByKind.get(p.id)}
+                canManage={canManage}
+              />
+            ) : (
+              <ProviderRow
+                key={p.id}
+                provider={p}
+                connections={byProvider.get(p.id) ?? []}
+                canManage={canManage}
+                orgId={orgId}
+                onConnect={() => setConnectProvider(p)}
+              />
+            ),
+          )}
         </div>
       )}
 
@@ -206,6 +228,57 @@ function LogoShowcase() {
             className="size-9 shrink-0 opacity-90 transition-opacity hover:opacity-100 sm:size-11"
           />
         ))}
+      </div>
+    </div>
+  );
+}
+
+/** An outbound alert channel (Slack/Discord/Teams) as a list row. These don't sync a graph —
+ *  they're an incoming webhook set up in Settings → Notifications — so the row mirrors that
+ *  state (Connected + hint) and deep-links there to connect/manage/test. */
+function AlertProviderRow({
+  provider,
+  channel,
+  canManage,
+}: {
+  provider: ProviderMeta;
+  channel: ChannelSummary | undefined;
+  canManage: boolean;
+}) {
+  const connected = channel?.enabled === true;
+  return (
+    <div className="flex items-center gap-4 bg-card px-4 py-5">
+      <div className="grid size-10 shrink-0 place-items-center">
+        <ProviderLogo provider={provider} className="size-7" />
+      </div>
+      <Link href={ALERTS_SETTINGS_HREF} className="group min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate font-medium group-hover:underline">{provider.name}</span>
+          <span className="hidden shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground sm:inline">
+            {provider.category}
+          </span>
+        </div>
+        <p className="truncate text-sm text-muted-foreground">
+          {connected ? `Connected${channel?.hint ? ` · ${channel.hint}` : ""}` : provider.blurb}
+        </p>
+      </Link>
+      <div className="flex shrink-0 items-center gap-2">
+        {connected ? (
+          <Link
+            href={ALERTS_SETTINGS_HREF}
+            className="inline-flex h-9 items-center gap-1.5 rounded-md bg-foreground px-3 text-sm font-medium text-background transition-opacity hover:opacity-90"
+          >
+            <Check className="size-4 text-emerald-400" /> Connected
+          </Link>
+        ) : canManage ? (
+          <Link href={ALERTS_SETTINGS_HREF}>
+            <Button variant="outline" className="h-9">
+              Connect
+            </Button>
+          </Link>
+        ) : (
+          <span className="text-xs text-muted-foreground">Ask an admin</span>
+        )}
       </div>
     </div>
   );

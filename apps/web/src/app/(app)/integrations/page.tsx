@@ -1,7 +1,7 @@
 import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
 import { IntegrationsHub } from "@/components/integrations/integrations-hub";
-import type { ConnectionSummary } from "@/lib/browser-api";
+import type { ConnectionSummary, ChannelSummary } from "@/lib/browser-api";
 
 export const dynamic = "force-dynamic";
 
@@ -12,18 +12,19 @@ export const dynamic = "force-dynamic";
  */
 export default async function IntegrationsPage() {
   const shell = await requireShell();
-  const connections =
-    (
-      await apiGet<ApiOk<ConnectionSummary[]>>("/connections", {
-        token: shell.token,
-        orgId: shell.orgId,
-      })
-    ).body?.data ?? [];
+  const auth = { token: shell.token, orgId: shell.orgId };
+  // Graph-source connections (AWS/GitHub/…) + outbound alert channels (Slack/Discord/Teams) — the
+  // hub surfaces both, so a connected Slack channel reads as "Connected" here too.
+  const [connections, channels] = await Promise.all([
+    apiGet<ApiOk<ConnectionSummary[]>>("/connections", auth).then((r) => r.body?.data ?? []),
+    apiGet<ApiOk<ChannelSummary[]>>("/notifications", auth).then((r) => r.body?.data ?? []),
+  ]);
 
   return (
     <IntegrationsHub
       orgId={shell.orgId}
       connections={connections}
+      channels={channels}
       canManage={shell.role === "Owner" || shell.role === "Admin"}
     />
   );

@@ -88,7 +88,12 @@ export function SettingsView({
         </Card>
       </div>
 
-      {isAdmin ? <NotificationsSettingsCard orgId={orgId} initial={notify} /> : null}
+      {/* Anchor target so the Integrations hub can deep-link straight to alert-channel setup. */}
+      {isAdmin ? (
+        <div id="notifications" className="scroll-mt-24">
+          <NotificationsSettingsCard orgId={orgId} initial={notify} />
+        </div>
+      ) : null}
       {isAdmin ? <LlmSettingsCard orgId={orgId} initial={llm} /> : null}
 
       <OrgPanel orgId={orgId} initialMembers={members} initialInvites={invites} />

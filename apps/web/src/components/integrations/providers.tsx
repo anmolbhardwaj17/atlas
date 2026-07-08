@@ -129,12 +129,13 @@ export const PROVIDERS: ProviderMeta[] = [
     blurb: "Dashboards, alerts, and metrics - health signal on the graph.",
     logo: "grafana",
   },
-  // ── Alerts (outbound channels — where Atlas sends findings/incidents) ──
+  // ── Alerts (outbound channels — where Atlas sends findings/incidents; set up via an incoming
+  //    webhook in Settings → Notifications) ──
   {
     id: "slack",
     name: "Slack",
     category: "Alerts",
-    status: "coming-soon",
+    status: "available",
     blurb: "Send findings and incident alerts to a channel.",
     logo: "slack-icon",
   },
@@ -142,7 +143,7 @@ export const PROVIDERS: ProviderMeta[] = [
     id: "discord",
     name: "Discord",
     category: "Alerts",
-    status: "coming-soon",
+    status: "available",
     blurb: "Post findings and incident alerts to a server.",
     logo: "discord-icon",
   },
@@ -150,7 +151,7 @@ export const PROVIDERS: ProviderMeta[] = [
     id: "msteams",
     name: "Microsoft Teams",
     category: "Alerts",
-    status: "coming-soon",
+    status: "available",
     blurb: "Route findings and incident alerts to a Teams channel.",
     logo: "microsoft-teams",
   },
