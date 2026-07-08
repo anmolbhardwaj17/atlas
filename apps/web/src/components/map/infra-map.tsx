@@ -7,6 +7,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
   Background,
+  BackgroundVariant,
   Controls,
   MiniMap,
   useNodesState,
@@ -138,16 +139,15 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-col items-start gap-3">
         <div className="space-y-1.5">
           <h1 className="text-2xl font-semibold tracking-tight">Infrastructure map</h1>
           <p className="text-sm text-muted-foreground">
-            Your estate as one flow - traffic enters on the left and moves right through compute
-            into data. Repositories that deploy sit beside their compute; the rest wait in the code
-            shelf below until a link is found.
+            Your infrastructure and code, wired together — follow it left to right, from entry
+            points through compute into your data stores.
           </p>
         </div>
-        <span className="flex items-center gap-3 text-xs text-muted-foreground">
+        <span className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           <button
             type="button"
             onClick={() => setShowSecurity((v) => !v)}
@@ -179,7 +179,6 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
               {cross.crossAccount > 0 && `${cross.crossAccount} cross-account`}
             </span>
           )}
-          <Legend />
         </span>
       </div>
 
@@ -202,8 +201,10 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
             connectedIds={connectedIds}
             collapsed={effectiveCollapsed}
             onToggleCollapse={toggleCollapse}
+            showSecurity={showSecurity}
           />
         </ReactFlowProvider>
+        {!selected && <Legend />}
         {selected && (
           <DetailPanel
             node={selected}
@@ -253,6 +254,7 @@ function Flow({
   connectedIds,
   collapsed,
   onToggleCollapse,
+  showSecurity,
 }: {
   data: MapData;
   canvasEdges: MapData["edges"];
@@ -263,6 +265,7 @@ function Flow({
   connectedIds: Set<string>;
   collapsed: Set<string>;
   onToggleCollapse: (id: string) => void;
+  showSecurity: boolean;
 }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const activeId = hoveredId ?? selectedId;
@@ -358,8 +361,15 @@ function Flow({
     return { padding: 0.2, maxZoom: 1, ...(refs.length > 0 ? { nodes: refs } : {}) };
   }, [layout.nodes, layout.edges]);
 
+  // The Security toggle should feel like an in-place change on the SAME view — reveal/hide the
+  // security groups + PROTECTS edges without re-framing the canvas (re-fitting made it feel like a
+  // brand-new map you had to re-read). So we skip the fit when only `showSecurity` flipped.
+  const prevSecurity = useRef(showSecurity);
   useEffect(() => {
     setNodes(layout.nodes);
+    const securityToggled = prevSecurity.current !== showSecurity;
+    prevSecurity.current = showSecurity;
+    if (securityToggled) return;
     // Fit AFTER the store has the new nodes and painted them (double rAF) - fitting in the same
     // tick reads the stale store and zooms to the wrong box (the blank first paint).
     let raf2 = 0;
@@ -370,7 +380,7 @@ function Flow({
       cancelAnimationFrame(raf1);
       if (raf2) cancelAnimationFrame(raf2);
     };
-  }, [layout, setNodes, fitView, fitOpts]);
+  }, [layout, setNodes, fitView, fitOpts, showSecurity]);
 
   // Edges re-decorate on hover/selection WITHOUT refitting the viewport.
   useEffect(() => {
@@ -403,29 +413,40 @@ function Flow({
       fitView
       fitViewOptions={fitOpts}
       minZoom={0.1}
-      proOptions={{ hideAttribution: false }}
+      proOptions={{ hideAttribution: true }}
     >
-      <Background gap={20} color="hsl(var(--border))" />
+      <Background
+        variant={BackgroundVariant.Dots}
+        gap={22}
+        size={1.6}
+        color="hsl(var(--muted-foreground) / 0.25)"
+      />
       <Controls showInteractive={false} />
-      <MiniMap pannable zoomable nodeColor="hsl(var(--muted-foreground))" />
+      <MiniMap
+        pannable
+        zoomable
+        nodeColor="hsl(var(--muted-foreground))"
+        style={{ width: 160, height: 120 }}
+      />
     </ReactFlow>
   );
 }
 
+/** Edge legend — floats in the map's top-right corner as a small overlay panel. */
 function Legend() {
   return (
-    <>
-      <span className="flex items-center gap-1">
+    <div className="absolute right-3 top-3 z-10 flex flex-col gap-1.5 rounded-lg border border-border bg-background/80 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur">
+      <span className="flex items-center gap-1.5">
         <span className="h-px w-4 bg-foreground" /> observed
       </span>
-      <span className="flex items-center gap-1">
+      <span className="flex items-center gap-1.5">
         <span className="h-px w-4 border-t border-dashed border-muted-foreground" /> inferred
       </span>
-      <span className="flex items-center gap-1">
-        <span className="h-0.5 w-4 rounded" style={{ backgroundColor: CROSS_COLOR }} />{" "}
+      <span className="flex items-center gap-1.5">
+        <span className="h-0.5 w-4 rounded" style={{ backgroundColor: CROSS_COLOR }} />
         cross-boundary
       </span>
-    </>
+    </div>
   );
 }
 
