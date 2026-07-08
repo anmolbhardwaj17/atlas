@@ -345,19 +345,26 @@ function Flow({
   const [edges, setEdges, onEdgesChange] = useEdgesState(layout.edges);
   const { fitView } = useReactFlow();
 
+  // Default view: frame the linked flow (nodes with edges), not the whole canvas — otherwise the
+  // tall "unlinked" shelves shrink the graph to nothing. Cap zoom so it opens readable, not huge.
+  const fitOpts = useMemo(() => {
+    const refs = layout.nodes.filter((n) => connectedIds.has(n.id)).map((n) => ({ id: n.id }));
+    return { padding: 0.2, maxZoom: 1, ...(refs.length > 0 ? { nodes: refs } : {}) };
+  }, [layout.nodes, connectedIds]);
+
   useEffect(() => {
     setNodes(layout.nodes);
     // Fit AFTER the store has the new nodes and painted them (double rAF) - fitting in the same
     // tick reads the stale store and zooms to the wrong box (the blank first paint).
     let raf2 = 0;
     const raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => void fitView({ padding: 0.18, duration: 250 }));
+      raf2 = requestAnimationFrame(() => void fitView({ ...fitOpts, duration: 250 }));
     });
     return () => {
       cancelAnimationFrame(raf1);
       if (raf2) cancelAnimationFrame(raf2);
     };
-  }, [layout, setNodes, fitView]);
+  }, [layout, setNodes, fitView, fitOpts]);
 
   // Edges re-decorate on hover/selection WITHOUT refitting the viewport.
   useEffect(() => {
@@ -383,11 +390,12 @@ function Flow({
       nodeTypes={nodeTypes}
       onNodeClick={onNodeClick}
       onPaneClick={() => onSelect(null)}
-      onInit={(inst) => void inst.fitView({ padding: 0.15 })}
+      onInit={(inst) => void inst.fitView(fitOpts)}
       nodesDraggable={false}
       nodesConnectable={false}
       elementsSelectable
       fitView
+      fitViewOptions={fitOpts}
       minZoom={0.1}
       proOptions={{ hideAttribution: false }}
     >
