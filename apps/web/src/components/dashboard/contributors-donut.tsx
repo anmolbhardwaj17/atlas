@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Label, Pie, PieChart } from "recharts";
+import { Label, Pie, PieChart, Tooltip } from "recharts";
 import { Card, CardContent } from "@/components/ui/card";
 
 /** Blue palette (a la shadcn's pie demo) for the contributor segments. */
@@ -38,16 +38,29 @@ export function ContributorsDonut({
         {items.length === 0 ? (
           <p className="text-sm text-muted-foreground">No PRs in the last 30 days yet.</p>
         ) : (
-          <div className="flex items-center gap-4">
-            <PieChart width={140} height={140} className="shrink-0">
+          <div className="mt-1 flex justify-center">
+            <PieChart width={220} height={200}>
+              <Tooltip
+                cursor={false}
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const p = payload[0] as { name?: string; value?: number };
+                  return (
+                    <div className="rounded-md border border-border bg-background px-2.5 py-1.5 text-xs shadow-md">
+                      <span className="font-medium">{p.name}</span>{" "}
+                      <span className="tabular-nums text-muted-foreground">· {p.value} PRs</span>
+                    </div>
+                  );
+                }}
+              />
               <Pie
                 data={data}
                 dataKey="value"
                 nameKey="name"
                 cx="50%"
                 cy="50%"
-                innerRadius={42}
-                outerRadius={64}
+                innerRadius={62}
+                outerRadius={92}
                 paddingAngle={2}
                 stroke="none"
                 isAnimationActive={false}
@@ -65,13 +78,13 @@ export function ContributorsDonut({
                           <tspan
                             x={viewBox.cx}
                             y={viewBox.cy}
-                            className="fill-foreground text-2xl font-semibold"
+                            className="fill-foreground text-3xl font-semibold"
                           >
                             {total.toLocaleString()}
                           </tspan>
                           <tspan
                             x={viewBox.cx}
-                            y={(viewBox.cy || 0) + 20}
+                            y={(viewBox.cy || 0) + 24}
                             className="fill-muted-foreground text-xs"
                           >
                             PRs
@@ -84,18 +97,6 @@ export function ContributorsDonut({
                 />
               </Pie>
             </PieChart>
-            <ul className="min-w-0 flex-1 space-y-2">
-              {items.map((it, i) => (
-                <li key={it.name} className="flex items-center gap-2 text-sm">
-                  <span
-                    className="size-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: PALETTE[i % PALETTE.length] }}
-                  />
-                  <span className="min-w-0 flex-1 truncate">{it.name}</span>
-                  <span className="shrink-0 font-semibold tabular-nums">{it.count}</span>
-                </li>
-              ))}
-            </ul>
           </div>
         )}
       </CardContent>
