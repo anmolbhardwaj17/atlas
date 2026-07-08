@@ -2,8 +2,35 @@ import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfidenceBadge } from "@/components/certainty";
+import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
 import { ErrorState } from "@/components/patterns/empty-state";
+import { kindIcon, kindStyle, kindShort, KIND_LOGO } from "@/lib/kind-visual";
+import { PROVIDER_META } from "@/lib/taxonomy";
+import { cn } from "@/lib/cn";
 import type { TraversalResult } from "@/lib/graph-types";
+
+function nodeLogo(kind: string): string | null {
+  const svc = KIND_LOGO[kind];
+  if (svc && hasCloudIcon(svc)) return svc;
+  const brand = PROVIDER_META[kind.split(".")[0] ?? ""]?.logo;
+  return brand && hasCloudIcon(brand) ? brand : null;
+}
+
+/** The resource's service/provider icon (matches the Explore list). */
+function NodeIcon({ kind }: { kind: string }) {
+  const logo = nodeLogo(kind);
+  const Icon = kindIcon(kind);
+  return (
+    <span
+      className={cn(
+        "grid size-6 shrink-0 place-items-center rounded-md",
+        logo ? "bg-muted/60" : kindStyle(kind),
+      )}
+    >
+      {logo ? <CloudIcon name={logo} className="size-4" /> : <Icon className="size-3.5" />}
+    </span>
+  );
+}
 
 /**
  * Blast-radius / dependencies panel (docs/09 §5.4). List-first (a11y - the graph canvas
@@ -87,13 +114,20 @@ export function ImpactPanel({
                     <li key={item.node.id} className="rounded-md border border-border">
                       <details className="group">
                         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm">
-                          <Link
-                            href={`/explore/${item.node.id}`}
-                            className="min-w-0 truncate hover:text-primary"
-                          >
-                            <span className="text-muted-foreground">{item.node.kind}</span> ·{" "}
-                            {item.node.name ?? item.node.urn}
-                          </Link>
+                          <span className="flex min-w-0 items-center gap-2.5">
+                            <NodeIcon kind={item.node.kind} />
+                            <span className="min-w-0">
+                              <Link
+                                href={`/explore/${item.node.id}`}
+                                className="block truncate font-medium hover:text-primary"
+                              >
+                                {item.node.name ?? item.node.urn}
+                              </Link>
+                              <span className="text-xs text-muted-foreground">
+                                {kindShort(item.node.kind)}
+                              </span>
+                            </span>
+                          </span>
                           <span className="flex shrink-0 items-center gap-2">
                             <ConfidenceBadge tier={item.pathConfidence} />
                             <span className="text-xs text-muted-foreground group-open:hidden">

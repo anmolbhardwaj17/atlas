@@ -63,7 +63,7 @@ export function ResourceNode({ data, selected }: NodeProps) {
   return (
     <div
       className={cn(
-        "flex w-[190px] items-center gap-2.5 rounded-lg border bg-card px-3 py-2 shadow-sm",
+        "relative flex w-[190px] items-center gap-2.5 rounded-lg border bg-card px-3 py-2 shadow-sm",
         "duration-200 animate-in fade-in zoom-in-95",
         "transition-[transform,box-shadow,border-color] hover:-translate-y-0.5 hover:shadow-md",
         selected
@@ -77,6 +77,13 @@ export function ResourceNode({ data, selected }: NodeProps) {
           : node.urn
       }
     >
+      {/* Broken-right-now reads at a glance — a red pulse ring emanates from the node. */}
+      {health?.state === "unhealthy" ? (
+        <span
+          className="pointer-events-none absolute inset-0 animate-ping rounded-lg ring-2 ring-danger/40"
+          aria-hidden
+        />
+      ) : null}
       <Handle
         type="target"
         position={Position.Left}

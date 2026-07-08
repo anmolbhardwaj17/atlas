@@ -227,7 +227,7 @@ export function NodeConnections({
         </Card>
       ) : (
         <>
-          <NodeGraph nodes={model.nodes} edges={model.edges} />
+          <NodeGraph nodes={model.nodes} edges={model.edges} danger={tab === "blast"} />
 
           {/* Accessible list beneath the graph (a11y + inline provenance). */}
           {tab === "connections" ? (

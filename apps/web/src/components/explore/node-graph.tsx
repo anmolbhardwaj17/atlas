@@ -77,10 +77,12 @@ export function NodeGraph({
   nodes,
   edges,
   height = 360,
+  danger = false,
 }: {
   nodes: Node[];
   edges: Edge[];
   height?: number;
+  danger?: boolean;
 }) {
   const router = useRouter();
   const onNodeClick: NodeMouseHandler = (_e, node) => {
@@ -89,9 +91,23 @@ export function NodeGraph({
   };
   return (
     <div
-      className="w-full overflow-hidden rounded-lg border border-border bg-muted/20"
+      className={cn(
+        "relative w-full overflow-hidden rounded-lg border bg-muted/20",
+        danger ? "border-danger/30" : "border-border",
+      )}
       style={{ height }}
     >
+      {/* Blast radius reads as danger — a slow pulsing red bloom behind the graph. */}
+      {danger ? (
+        <div
+          className="pointer-events-none absolute inset-0 z-0 animate-pulse"
+          style={{
+            background:
+              "radial-gradient(circle at 50% 45%, hsl(var(--danger) / 0.14), transparent 62%)",
+          }}
+          aria-hidden
+        />
+      ) : null}
       <ReactFlowProvider>
         <ReactFlow
           nodes={nodes}
