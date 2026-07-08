@@ -17,10 +17,20 @@ import {
   type Edge,
   type NodeMouseHandler,
 } from "@xyflow/react";
-import { Clock, ListFilter, Search, Shield, Stethoscope, X } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  Clock,
+  ListFilter,
+  Search,
+  Shield,
+  Stethoscope,
+  X,
+} from "lucide-react";
 import { buildLayout } from "@/lib/map-layout";
-import { kindShort } from "@/lib/kind-visual";
+import { kindShort, kindIcon, KIND_LOGO } from "@/lib/kind-visual";
 import { edgeCrossing, CROSS_COLOR, type MapData, type MapNode } from "@/lib/map-types";
+import { CloudIcon } from "@/components/cloud-icon";
 import { ResourceNode, EnvLaneNode } from "@/components/map/resource-node";
 import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
 import { cn } from "@/lib/cn";
@@ -235,26 +245,71 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
             <Clock className="size-3.5" />
             Changed
           </button>
-          <button
-            type="button"
-            onClick={() => setShowFilters((v) => !v)}
-            aria-pressed={showFilters || kindFilter.size > 0}
-            title="Filter the map by resource kind"
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-medium transition-colors",
-              showFilters || kindFilter.size > 0
-                ? "border-transparent bg-foreground text-background"
-                : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
-            )}
-          >
-            <ListFilter className="size-3.5" />
-            Filter
-            {kindFilter.size > 0 ? (
-              <span className="rounded-full bg-background/20 px-1 text-[10px] tabular-nums">
-                {kindFilter.size}
-              </span>
+          <span className="relative">
+            <button
+              type="button"
+              onClick={() => setShowFilters((v) => !v)}
+              aria-pressed={showFilters || kindFilter.size > 0}
+              title="Filter the map by resource kind"
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-medium transition-colors",
+                showFilters || kindFilter.size > 0
+                  ? "border-transparent bg-foreground text-background"
+                  : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
+              )}
+            >
+              <ListFilter className="size-3.5" />
+              Filter
+              {kindFilter.size > 0 ? (
+                <span className="rounded-full bg-background/20 px-1 text-[10px] tabular-nums">
+                  {kindFilter.size}
+                </span>
+              ) : null}
+            </button>
+            {showFilters ? (
+              <div className="absolute left-0 top-full z-20 mt-1.5 max-h-72 w-56 overflow-auto rounded-lg border border-border bg-background/95 p-1.5 shadow-md backdrop-blur">
+                <div className="flex items-center justify-between px-1.5 pb-1.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+                    Filter by kind
+                  </span>
+                  {kindFilter.size > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setKindFilter(new Set())}
+                      className="text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                    >
+                      Clear
+                    </button>
+                  ) : null}
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  {kinds.map((k) => {
+                    const on = kindFilter.has(k);
+                    return (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => toggleKind(k)}
+                        aria-pressed={on}
+                        className={cn(
+                          "flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-xs transition-colors",
+                          on
+                            ? "bg-muted text-foreground"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                        )}
+                      >
+                        <span className="grid size-5 shrink-0 place-items-center rounded bg-muted/70">
+                          <KindGlyph kind={k} className="size-3.5" />
+                        </span>
+                        <span className="min-w-0 flex-1 truncate">{kindShort(k)}</span>
+                        {on ? <Check className="size-3.5 shrink-0" /> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             ) : null}
-          </button>
+          </span>
           {cross.crossCloud + cross.crossAccount > 0 && (
             <span
               className="flex items-center gap-1.5 rounded-full border border-transparent px-2.5 py-1 font-medium"
@@ -268,38 +323,6 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
             </span>
           )}
         </span>
-        {showFilters ? (
-          <div className="flex flex-wrap items-center gap-1.5">
-            {kinds.map((k) => {
-              const on = kindFilter.has(k);
-              return (
-                <button
-                  key={k}
-                  type="button"
-                  onClick={() => toggleKind(k)}
-                  aria-pressed={on}
-                  className={cn(
-                    "rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors",
-                    on
-                      ? "border-transparent bg-foreground text-background"
-                      : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
-                  )}
-                >
-                  {kindShort(k)}
-                </button>
-              );
-            })}
-            {kindFilter.size > 0 ? (
-              <button
-                type="button"
-                onClick={() => setKindFilter(new Set())}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground"
-              >
-                <X className="size-3" /> Clear
-              </button>
-            ) : null}
-          </div>
-        ) : null}
       </div>
 
       {data.truncated && (
@@ -559,22 +582,21 @@ function Flow({
     return s;
   }, [layout.nodes]);
 
-  // One "lit" set unifies every focus mode: an ask-query and a blast-radius click win; otherwise a
-  // node is lit if it passes every ACTIVE lens (Health ∪ Changed) and the kind filter. null =
-  // nothing is filtering.
+  // One "lit" set unifies every focus mode. An ask-query and a blast-radius click win outright;
+  // otherwise each active control NARROWS (AND): a node stays lit only if it passes Health AND
+  // Changed AND the kind filter. null = nothing is filtering (everything lit).
   const litSet = useMemo(() => {
     if (queryIds) return queryIds;
     if (focusSet) return focusSet;
-    const lensActive = healthLens || changedLens;
-    if (!lensActive && kindFilter.size === 0) return null;
+    if (!healthLens && !changedLens && kindFilter.size === 0) return null;
     const s = new Set<string>();
     for (const n of layout.nodes) {
       if (n.type !== "resource") continue;
       const kind = (n.data as { node: MapNode }).node.kind;
-      const passLens =
-        !lensActive || (healthLens && alertIds.has(n.id)) || (changedLens && changedIds.has(n.id));
+      const passHealth = !healthLens || alertIds.has(n.id);
+      const passChanged = !changedLens || changedIds.has(n.id);
       const passKind = kindFilter.size === 0 || kindFilter.has(kind);
-      if (passLens && passKind) s.add(n.id);
+      if (passHealth && passChanged && passKind) s.add(n.id);
     }
     return s;
   }, [queryIds, focusSet, healthLens, changedLens, kindFilter, alertIds, changedIds, layout.nodes]);
@@ -744,6 +766,15 @@ function Flow({
   );
 }
 
+/** The brand/kind glyph for a resource kind — the real cloud/service logo when we have one, else
+ *  the kind's lucide icon. Mirrors ResourceNode so search + filters read like the canvas. */
+function KindGlyph({ kind, className = "" }: { kind: string; className?: string }) {
+  const logo = KIND_LOGO[kind];
+  if (logo) return <CloudIcon name={logo} className={className} />;
+  const Icon = kindIcon(kind);
+  return <Icon className={className} />;
+}
+
 /** Find-a-resource search — floats top-left of the canvas. Matches on name/kind; picking a result
  *  selects it (lighting its blast radius) and centres the viewport on it. */
 function MapSearch({
@@ -846,13 +877,18 @@ function MapSearch({
                 onMouseEnter={() => setActive(i)}
                 onClick={() => pick(m.id, m.name)}
                 className={cn(
-                  "flex w-full flex-col items-start px-2.5 py-1.5 text-left",
+                  "flex w-full items-center gap-2 px-2.5 py-1.5 text-left",
                   i === active ? "bg-muted" : "hover:bg-muted",
                 )}
               >
-                <span className="max-w-full truncate font-medium">{m.name}</span>
-                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                  {m.kind}
+                <span className="grid size-6 shrink-0 place-items-center rounded-md bg-muted/60">
+                  <KindGlyph kind={m.kind} className="size-3.5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block max-w-full truncate font-medium">{m.name}</span>
+                  <span className="block truncate text-[10px] uppercase tracking-wide text-muted-foreground">
+                    {m.kind}
+                  </span>
                 </span>
               </button>
             </li>
@@ -866,12 +902,33 @@ function MapSearch({
   );
 }
 
-/** Legend — floats top-right. Explains both the edge styles and the node states so the canvas
- *  is decodable without hovering. */
+/** Legend — floats top-right. Collapsed to a small pill by default (it ate real estate); click to
+ *  expand the full edge + node key. */
 function Legend() {
+  const [open, setOpen] = useState(false);
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/80 px-2.5 py-1.5 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur transition-colors hover:text-foreground"
+      >
+        <ChevronDown className="size-3.5" />
+        Legend
+      </button>
+    );
+  }
   return (
-    <div className="absolute right-3 top-3 z-10 flex flex-col gap-2 rounded-lg border border-border bg-background/80 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur">
-      <div className="flex flex-col gap-1.5">
+    <div className="absolute right-3 top-3 z-10 flex w-44 flex-col gap-2 rounded-lg border border-border bg-background/80 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur">
+      <button
+        type="button"
+        onClick={() => setOpen(false)}
+        className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70 hover:text-foreground"
+      >
+        Legend
+        <ChevronDown className="size-3.5 rotate-180" />
+      </button>
+      <div className="flex flex-col gap-1.5 border-t border-border pt-2">
         <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
           Edges
         </span>
