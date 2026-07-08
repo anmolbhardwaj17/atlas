@@ -42,7 +42,7 @@ export default function DashboardLoading() {
                 <Skeleton className="h-4 w-28" />
               </div>
               <ul className="divide-y divide-border">
-                {Array.from({ length: 3 }).map((_, i) => (
+                {Array.from({ length: 4 }).map((_, i) => (
                   <li key={i} className="flex items-start gap-3 px-2 py-3">
                     <Skeleton className="mt-1.5 size-2 shrink-0 rounded-full" />
                     <div className="min-w-0 flex-1 space-y-2">

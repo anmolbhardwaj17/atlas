@@ -485,7 +485,7 @@ function SourcesCard({
 function NeedsAttention({ findings }: { findings: Finding[] }) {
   // The dashboard only teases the top findings; the full advisory treatment (why/how‑to‑fix,
   // Ask Atlas) lives in Insights.
-  const shown = findings.slice(0, 3);
+  const shown = findings.slice(0, 4);
   return (
     <Card>
       <CardContent className="p-5">
@@ -624,11 +624,6 @@ function FindingRow({ f }: { f: Finding }) {
           )}
         >
           {f.severity}
-          {f.count && f.count > 1 ? (
-            <span className="ml-1.5 font-normal normal-case tabular-nums text-muted-foreground">
-              · {f.count} affected
-            </span>
-          ) : null}
         </span>
       </div>
     </div>
