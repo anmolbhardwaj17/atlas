@@ -1,7 +1,7 @@
 "use client";
 
 import "@xyflow/react/dist/style.css";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import {
   ReactFlow,
@@ -584,6 +584,7 @@ function MapSearch({
 }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
   const matches = useMemo(() => {
     const t = q.trim().toLowerCase();
     if (!t) return [];
@@ -591,6 +592,31 @@ function MapSearch({
       .filter((n) => n.name.toLowerCase().includes(t) || n.kind.toLowerCase().includes(t))
       .slice(0, 8);
   }, [q, nodes]);
+
+  const pick = (id: string, name: string) => {
+    onPick(id);
+    setQ(name);
+    setOpen(false);
+  };
+
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setOpen(false);
+      return;
+    }
+    if (!open || matches.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActive((a) => (a + 1) % matches.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActive((a) => (a - 1 + matches.length) % matches.length);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const m = matches[Math.min(active, matches.length - 1)];
+      if (m) pick(m.id, m.name);
+    }
+  };
 
   return (
     <div className="w-60">
@@ -600,8 +626,10 @@ function MapSearch({
           value={q}
           onChange={(e) => {
             setQ(e.target.value);
+            setActive(0);
             setOpen(true);
           }}
+          onKeyDown={onKeyDown}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 120)}
           placeholder="Find a resource…"
@@ -623,17 +651,17 @@ function MapSearch({
       </div>
       {open && matches.length > 0 ? (
         <ul className="mt-1 max-h-64 overflow-auto rounded-lg border border-border bg-background/95 py-1 text-xs shadow-md backdrop-blur">
-          {matches.map((m) => (
+          {matches.map((m, i) => (
             <li key={m.id}>
               <button
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  onPick(m.id);
-                  setQ(m.name);
-                  setOpen(false);
-                }}
-                className="flex w-full flex-col items-start px-2.5 py-1.5 text-left hover:bg-muted"
+                onMouseEnter={() => setActive(i)}
+                onClick={() => pick(m.id, m.name)}
+                className={cn(
+                  "flex w-full flex-col items-start px-2.5 py-1.5 text-left",
+                  i === active ? "bg-muted" : "hover:bg-muted",
+                )}
               >
                 <span className="max-w-full truncate font-medium">{m.name}</span>
                 <span className="text-[10px] uppercase tracking-wide text-muted-foreground">

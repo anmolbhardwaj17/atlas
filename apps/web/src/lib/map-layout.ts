@@ -47,7 +47,7 @@ export function buildLayout(
   const infraShelf = unlinked.filter((n) => !n.kind.endsWith(".repository"));
 
   const g = new dagre.graphlib.Graph();
-  g.setGraph({ rankdir: "LR", nodesep: 26, ranksep: 110, marginx: 16, marginy: 16 });
+  g.setGraph({ rankdir: "LR", nodesep: 42, ranksep: 150, marginx: 16, marginy: 16 });
   g.setDefaultEdgeLabel(() => ({}));
   for (const n of flowNodes) g.setNode(n.id, { width: NODE_W, height: NODE_H });
   for (const e of mapEdges) {
