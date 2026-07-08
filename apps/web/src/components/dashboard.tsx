@@ -178,6 +178,14 @@ export async function Dashboard({
         />
       </div>
 
+      {/* What needs action sits high — right under the pulse — paired with what just changed. */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <NeedsAttention findings={s.findings} />
+        </div>
+        <RecentActivity activity={s.activity} />
+      </div>
+
       <AskLauncher />
 
       {/* Three equal cards: the posture radar, then Infrastructure and Code, each listing their
@@ -228,13 +236,6 @@ export async function Dashboard({
       </div>
 
       <Insights insights={s.insights} />
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <NeedsAttention findings={s.findings} />
-        </div>
-        <RecentActivity activity={s.activity} />
-      </div>
 
       <MapPreview inv={inv} cross={s.crossBoundary} />
     </div>
