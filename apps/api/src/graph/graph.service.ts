@@ -242,6 +242,8 @@ export interface TraversalResult {
   root: NodeSummary;
   impacted: Array<{
     node: NodeSummary;
+    /** The node one hop closer to the root on this path — lets the UI draw the real tree edge. */
+    parentId: string;
     distance: number;
     via: EdgeVia[];
     pathConfidence: string;
@@ -1759,7 +1761,13 @@ export class GraphService {
           const via = r.edge_path
             .map((eid) => edgeDetails.get(eid))
             .filter((v): v is EdgeVia => v !== undefined);
-          return { node, distance: r.depth, via, pathConfidence: rankToConfidence(r.weakest) };
+          return {
+            node,
+            parentId: r.parent_id,
+            distance: r.depth,
+            via,
+            pathConfidence: rankToConfidence(r.weakest),
+          };
         })
         .filter((x): x is TraversalResult["impacted"][number] => x !== null);
 

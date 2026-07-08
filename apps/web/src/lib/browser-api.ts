@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { apiUrl } from "@/lib/env";
+import type { EdgeDetail } from "@/lib/graph-types";
 
 /**
  * Client-side Atlas API access for the interactive surfaces (Ask AI SSE stream, ⌘K search).
@@ -65,6 +66,18 @@ export async function searchNodes(
   if (!res.ok) return [];
   const body = (await res.json()) as { data: SearchHit[] };
   return body.data ?? [];
+}
+
+/** Fetch one edge's full detail (rule + evidence + provenance) — for the inline "why" accordion. */
+export async function getEdgeDetail(orgId: string, edgeId: string): Promise<EdgeDetail | null> {
+  const token = await getClientToken();
+  if (!token) return null;
+  const res = await fetch(`${apiUrl()}/edges/${edgeId}`, {
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) return null;
+  const body = (await res.json()) as { data: EdgeDetail };
+  return body.data ?? null;
 }
 
 export interface DemoSeedResult {

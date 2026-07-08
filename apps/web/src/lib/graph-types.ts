@@ -63,6 +63,8 @@ export interface TraversalResult {
   root: NodeSummary;
   impacted: Array<{
     node: NodeSummary;
+    /** The node one hop closer to the root on this path (draw the real edge, not a guess). */
+    parentId: string;
     distance: number;
     via: EdgeVia[];
     pathConfidence: string;
