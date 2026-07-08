@@ -63,7 +63,7 @@ export function AskLauncher() {
             e.preventDefault();
             go(q);
           }}
-          className="relative"
+          className="relative max-w-2xl"
         >
           <input
             value={q}
