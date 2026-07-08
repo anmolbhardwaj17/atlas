@@ -222,9 +222,9 @@ export async function Dashboard({
 
       <Insights insights={s.insights} />
 
-      <MapPreview inv={inv} cross={s.crossBoundary} />
-
       <RecentActivity activity={s.activity} />
+
+      <MapPreview inv={inv} cross={s.crossBoundary} />
     </div>
   );
 }
@@ -485,7 +485,7 @@ function RecentActivity({ activity }: { activity: ActivityItem[] }) {
           <Activity className="size-4 text-muted-foreground" />
           Recent activity
         </h2>
-        <ul className="grid gap-x-8 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="-mx-2 divide-y divide-border">
           {activity.map((a, i) => (
             <ActivityRow key={i} a={a} />
           ))}
@@ -507,19 +507,17 @@ function ActivityRow({ a }: { a: ActivityItem }) {
         <Icon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
       )}
       <div className="min-w-0 flex-1">
-        <div className="truncate">
+        <div>
           <span className="text-muted-foreground">{label}: </span>
           <span className="font-medium">{a.title}</span>
         </div>
-        {a.subtitle ? (
-          <div className="truncate text-xs text-muted-foreground">{a.subtitle}</div>
-        ) : null}
+        {a.subtitle ? <div className="text-xs text-muted-foreground">{a.subtitle}</div> : null}
       </div>
       <span className="shrink-0 text-xs text-muted-foreground">{timeAgo(a.at)}</span>
     </div>
   );
   return (
-    <li className="min-w-0 py-2.5">
+    <li className="px-2 py-2.5">
       {href ? (
         <Link href={href} className="block hover:opacity-80">
           {inner}

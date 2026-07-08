@@ -124,6 +124,24 @@ export default function DashboardLoading() {
         </div>
       </div>
 
+      {/* Recent activity — full-width card, single-column rows. */}
+      <Card>
+        <CardContent className="p-5">
+          <Skeleton className="mb-3 h-5 w-32" />
+          <ul className="-mx-2 divide-y divide-border">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <li key={i} className="flex items-start gap-2.5 px-2 py-2.5">
+                <Skeleton className="mt-0.5 size-4 shrink-0" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Skeleton className="h-4 w-1/3" />
+                </div>
+                <Skeleton className="h-3 w-10 shrink-0" />
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+
       {/* Map preview banner. */}
       <Card>
         <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
@@ -135,25 +153,6 @@ export default function DashboardLoading() {
             </div>
           </div>
           <Skeleton className="h-9 w-28 rounded-md" />
-        </CardContent>
-      </Card>
-
-      {/* Recent activity — full-width card. */}
-      <Card>
-        <CardContent className="p-5">
-          <Skeleton className="mb-3 h-5 w-32" />
-          <ul className="grid gap-x-8 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <li key={i} className="flex items-start gap-2.5 py-2.5">
-                <Skeleton className="mt-0.5 size-4 shrink-0" />
-                <div className="min-w-0 flex-1 space-y-1.5">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-3 w-1/2" />
-                </div>
-                <Skeleton className="h-3 w-10 shrink-0" />
-              </li>
-            ))}
-          </ul>
         </CardContent>
       </Card>
     </div>
