@@ -134,7 +134,7 @@ export async function Dashboard({
           fills its spare horizontal room. Infrastructure/Code each show only when connected. */}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,340px)_1fr]">
         <PostureCard posture={s.insights.posture} />
-        <div className="flex h-full flex-col justify-between gap-5">
+        <div className="flex h-full flex-col gap-4">
           {inv.services + inv.datastores + inv.clouds > 0 && (
             <StatGroup label="Infrastructure">
               <Stat icon={Boxes} label="Services" value={inv.services} />
@@ -735,13 +735,13 @@ function Leaderboard({
 
 function StatGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
+    <div className="flex flex-1 flex-col">
       <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      {/* flex-wrap (not a fixed grid) so each row fills evenly regardless of card count — 3 infra
-          or 4 code cards both stretch to a full, intentional-looking row. */}
-      <div className="flex flex-wrap gap-3">{children}</div>
+      {/* flex-1 so the card row grows to fill the column height (matching the radar on the left);
+          flex-wrap keeps 3 infra / 4 code cards on one row that stretches evenly. */}
+      <div className="flex flex-1 flex-wrap gap-3">{children}</div>
     </div>
   );
 }
@@ -758,8 +758,8 @@ function Stat({
   sub?: string | undefined;
 }) {
   return (
-    <Card className="min-w-[150px] flex-1 shadow-sm transition-colors hover:border-foreground/20">
-      <CardContent className="flex items-center justify-between gap-3 px-3.5 py-3">
+    <Card className="flex min-w-[150px] flex-1 flex-col shadow-sm transition-colors hover:border-foreground/20">
+      <CardContent className="flex flex-1 items-center justify-between gap-3 px-3.5 py-3">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <Icon className="size-3.5 shrink-0" />
