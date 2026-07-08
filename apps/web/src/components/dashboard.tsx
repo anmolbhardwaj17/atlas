@@ -42,6 +42,23 @@ const CODE_LOGO: Record<string, string> = {
   bitbucket: "bitbucket",
   gitlab: "gitlab",
 };
+/** Any connectable provider → brand-logo key (for the Sources list). */
+const PROVIDER_LOGO: Record<string, string> = {
+  ...CLOUD_LOGO,
+  ...CODE_LOGO,
+  datadog: "datadog",
+  jenkins: "jenkins",
+  grafana: "grafana",
+  circleci: "circleci",
+  argocd: "argocd",
+};
+
+interface ConnectionLite {
+  provider: string;
+  displayName: string;
+  status: string;
+  demo: boolean;
+}
 
 interface Finding {
   id: string;
@@ -103,7 +120,7 @@ export async function Dashboard({
 }) {
   const [summaryRes, connRes] = await Promise.all([
     apiGet<ApiOk<Summary>>("/summary", { token, orgId }),
-    apiGet<ApiOk<Array<{ provider: string }>>>("/connections", { token, orgId }),
+    apiGet<ApiOk<ConnectionLite[]>>("/connections", { token, orgId }),
   ]);
   const s = summaryRes.body?.data;
 
@@ -120,8 +137,9 @@ export async function Dashboard({
   const hasCode = inv.repositories > 0;
   const inventoryCols = 1 + (hasInfra ? 1 : 0) + (hasCode ? 1 : 0);
 
-  // Logos of the connected sources feeding each card (shown top-right of Infrastructure / Code).
-  const providers = (connRes.body?.data ?? []).map((c) => c.provider);
+  // Real (non-demo) connections drive both the connected-source logos and the Sources card.
+  const connections = (connRes.body?.data ?? []).filter((c) => !c.demo);
+  const providers = connections.map((c) => c.provider);
   const isStr = (x: string | undefined): x is string => Boolean(x);
   const uniq = (xs: string[]) => [...new Set(xs)];
   const cloudLogos = uniq(providers.map((p) => CLOUD_LOGO[p]).filter(isStr));
@@ -152,7 +170,7 @@ export async function Dashboard({
       <div className="grid gap-4 lg:grid-cols-3">
         <HealthCard health={health} />
         <FindingsCard findings={s.findings} />
-        <SourcesCard trust={trust} inv={inv} />
+        <SourcesCard connections={connections} trust={trust} />
       </div>
 
       <AskLauncher />
@@ -327,18 +345,30 @@ function HealthGauge({ score, label, tone }: { score: number; label: string; ton
   });
   return (
     <svg viewBox="0 0 200 112" className={cn("w-full max-w-[240px]", tone)} role="img">
-      {ticks.map((t, i) => (
-        <line
-          key={i}
-          x1={t.x1}
-          y1={t.y1}
-          x2={t.x2}
-          y2={t.y2}
-          strokeWidth={4}
-          strokeLinecap="round"
-          className={t.on ? "stroke-current" : "stroke-muted"}
-        />
-      ))}
+      {ticks.map((t, i) => {
+        // Speedometer gradient: each filled tick is coloured by its position (red → amber → green),
+        // so the arc reads red at a low score and greens up as it climbs. Unfilled ticks are muted.
+        const v = (i / (N - 1)) * 100;
+        const cls = !t.on
+          ? "stroke-muted"
+          : v >= 66
+            ? "stroke-emerald-500"
+            : v >= 40
+              ? "stroke-amber-500"
+              : "stroke-red-500";
+        return (
+          <line
+            key={i}
+            x1={t.x1}
+            y1={t.y1}
+            x2={t.x2}
+            y2={t.y2}
+            strokeWidth={4}
+            strokeLinecap="round"
+            className={cls}
+          />
+        );
+      })}
       <text
         x="100"
         y="82"
@@ -423,10 +453,21 @@ function FindingsCard({ findings }: { findings: Finding[] }) {
 }
 
 /** Sources health pulse — how trustworthy the picture is, at a glance. */
-function SourcesCard({ trust, inv }: { trust: Summary["trust"]; inv: Summary["inventory"] }) {
-  const ratio = trust.sources > 0 ? trust.healthySources / trust.sources : 0;
-  const pct = Math.round(ratio * 100);
-  const barColor = ratio >= 1 ? "bg-emerald-500" : ratio > 0 ? "bg-amber-500" : "bg-red-500";
+function SourcesCard({
+  connections,
+  trust,
+}: {
+  connections: ConnectionLite[];
+  trust: Summary["trust"];
+}) {
+  const dot = (status: string) =>
+    status === "connected"
+      ? "bg-emerald-500"
+      : status === "degraded"
+        ? "bg-amber-500"
+        : "bg-red-500";
+  const statusLabel = (status: string) =>
+    status === "connected" ? "Healthy" : status === "degraded" ? "Degraded" : "Error";
   return (
     <Card className="shadow-sm">
       <CardContent className="flex h-full flex-col p-5">
@@ -439,18 +480,35 @@ function SourcesCard({ trust, inv }: { trust: Summary["trust"]; inv: Summary["in
             Manage <ChevronRight className="size-3.5" />
           </Link>
         </div>
-        <p className="mt-1 text-3xl font-semibold tabular-nums">
-          {trust.healthySources}
-          <span className="text-lg text-muted-foreground">/{trust.sources}</span>
-        </p>
-        <p className="text-xs text-muted-foreground">healthy connections</p>
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
-          <div className={cn("h-full rounded-full", barColor)} style={{ width: `${pct}%` }} />
-        </div>
-        <p className="mt-auto pt-3 text-xs text-muted-foreground">
-          {inv.clouds > 0 ? `${inv.clouds} cloud${inv.clouds === 1 ? "" : "s"}` : "Code sources"}
-          {trust.lastSyncAt ? ` · synced ${timeAgo(trust.lastSyncAt)}` : ""}
-        </p>
+        {connections.length === 0 ? (
+          <p className="mt-3 text-sm text-muted-foreground">No sources connected yet.</p>
+        ) : (
+          <ul className="mt-3 flex-1 space-y-3">
+            {connections.map((c) => {
+              const logo = PROVIDER_LOGO[c.provider];
+              return (
+                <li key={c.displayName} className="flex items-center gap-2.5">
+                  {/* White chip keeps dark brand marks (AWS) legible in dark mode. */}
+                  <span className="grid size-7 shrink-0 place-items-center rounded-md bg-white ring-1 ring-black/5">
+                    {logo ? <CloudIcon name={logo} className="size-4" /> : null}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                    {c.displayName}
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className={cn("size-1.5 rounded-full", dot(c.status))} />
+                    {statusLabel(c.status)}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {trust.lastSyncAt ? (
+          <p className="mt-auto pt-3 text-xs text-muted-foreground">
+            Synced {timeAgo(trust.lastSyncAt)}
+          </p>
+        ) : null}
       </CardContent>
     </Card>
   );
