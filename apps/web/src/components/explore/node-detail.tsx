@@ -38,11 +38,15 @@ export function NodeDetailView({
         <div className="flex flex-wrap items-center gap-2">
           <span
             className={cn(
-              "grid size-9 shrink-0 place-items-center rounded-lg",
+              "grid size-8 shrink-0 place-items-center rounded-md",
               logo ? "bg-muted/60" : kindStyle(node.kind),
             )}
           >
-            {logo ? <CloudIcon name={logo} className="size-5" /> : <KindIcon className="size-5" />}
+            {logo ? (
+              <CloudIcon name={logo} className="size-5" />
+            ) : (
+              <KindIcon className="size-[18px]" />
+            )}
           </span>
           <h1 className="text-xl font-semibold">{node.name ?? "unnamed"}</h1>
           <ConfidenceBadge tier={node.confidence} />

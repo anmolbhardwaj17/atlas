@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { withOrgScope, type Db } from "@atlas/db";
 import type { PoolClient } from "pg";
+import { guidanceFor } from "@atlas/ai";
 import { PG_POOL } from "../core/tokens";
 import { ApiException } from "../common/errors";
 import {
@@ -125,6 +126,14 @@ export interface DashboardSummary {
     topContributors: Array<{ name: string; count: number }>;
     mostActiveRepos: Array<{ name: string; count: number }>;
     pipelineCoverage: { withPipeline: number; total: number };
+    posture: {
+      security: number;
+      reliability: number;
+      cost: number;
+      performance: number;
+      hygiene: number;
+      operations: number;
+    };
     codeProvider: string | null;
   };
 }
@@ -1015,6 +1024,25 @@ export class GraphService {
     const rank = { high: 0, medium: 1, low: 2 };
     findings.sort((a, b) => rank[a.severity] - rank[b.severity]);
 
+    // ── Posture by pillar (AWS Well-Architected axes) ──────────────────────────
+    // Each pillar starts at 100 (all clear) and is pulled down by its findings, weighted by
+    // severity. A radar of these shows *where* the estate is weak, not just the overall score.
+    const posture = {
+      security: 100,
+      reliability: 100,
+      cost: 100,
+      performance: 100,
+      hygiene: 100,
+      operations: 100,
+    };
+    const pillarPenalty = { high: 22, medium: 10, low: 4 };
+    for (const f of findings) {
+      const pillar = guidanceFor(f.category)?.pillar as keyof typeof posture | undefined;
+      if (pillar && pillar in posture) {
+        posture[pillar] = Math.max(0, posture[pillar] - pillarPenalty[f.severity]);
+      }
+    }
+
     // ── Recent activity (human, PR-centric - not raw graph edges) ──────────────
     const since = new Date(now - 30 * 24 * 60 * 60 * 1000);
     const activity = await this.recentActivity(orgId, since, 6);
@@ -1052,6 +1080,7 @@ export class GraphService {
           withPipeline: Math.max(0, base.repositories - base.noPipeline),
           total: base.repositories,
         },
+        posture,
         // Which code host the PR/repo leaderboards come from, so the UI can brand them
         // dynamically (Bitbucket today, GitHub/GitLab when connected) instead of hardcoding.
         codeProvider:

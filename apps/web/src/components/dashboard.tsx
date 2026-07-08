@@ -17,6 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { PostureRadar, type Posture } from "@/components/dashboard/posture-radar";
 import { cn } from "@/lib/cn";
 import { Onboarding } from "@/components/onboarding";
 import { AskLauncher } from "@/components/dashboard/ask-launcher";
@@ -67,6 +68,7 @@ interface Summary {
     topContributors: Array<{ name: string; count: number }>;
     mostActiveRepos: Array<{ name: string; count: number }>;
     pipelineCoverage: { withPipeline: number; total: number };
+    posture: Posture;
     codeProvider: string | null;
   };
 }
@@ -117,6 +119,8 @@ export async function Dashboard({
         <FindingsCard findings={s.findings} />
         <SourcesCard trust={trust} inv={inv} />
       </div>
+
+      <PostureCard posture={s.insights.posture} />
 
       <AskLauncher />
 
@@ -221,6 +225,64 @@ function TrustPulse({ trust, inv }: { trust: Summary["trust"]; inv: Summary["inv
         </>
       ) : null}
     </p>
+  );
+}
+
+/** Posture by area — the radar (where the estate is weak) + a weakest-first bar list. */
+function PostureCard({ posture }: { posture: Posture }) {
+  const areas = (
+    [
+      ["security", "Security"],
+      ["reliability", "Reliability"],
+      ["cost", "Cost"],
+      ["performance", "Performance"],
+      ["hygiene", "Hygiene"],
+      ["operations", "Operations"],
+    ] as const
+  ).map(([key, label]) => ({ key, label, score: posture[key] }));
+  const ranked = [...areas].sort((a, b) => a.score - b.score);
+  return (
+    <Card className="shadow-sm">
+      <CardContent className="grid items-center gap-6 p-5 sm:grid-cols-[minmax(0,320px)_1fr]">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Posture by area
+          </p>
+          <div className="mt-2">
+            <PostureRadar posture={posture} />
+          </div>
+        </div>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Estate health across the six Well-Architected pillars, scored from your findings —
+            weakest first.
+          </p>
+          <ul className="space-y-2">
+            {ranked.map((a) => (
+              <li key={a.key} className="flex items-center gap-3 text-sm">
+                <span className="w-24 shrink-0">{a.label}</span>
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={cn(
+                      "h-full rounded-full",
+                      a.score >= 85
+                        ? "bg-emerald-500"
+                        : a.score >= 60
+                          ? "bg-amber-500"
+                          : "bg-red-500",
+                    )}
+                    style={{ width: `${a.score}%` }}
+                  />
+                </div>
+                <span className="w-8 shrink-0 text-right tabular-nums text-muted-foreground">
+                  {Math.round(a.score)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
