@@ -400,6 +400,9 @@ function Flow({
 }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const activeId = hoveredId ?? selectedId;
+  // "Ask the map": a query highlights every matching node (null = no query). While a query is
+  // active the shelves auto-expand so matches hiding in them aren't missed.
+  const [queryIds, setQueryIds] = useState<Set<string> | null>(null);
   // The unlinked "shelves" collapse to a single labelled banner. Both start collapsed — a wall of
   // unlinked repos/resources is noise by default; expand a banner to browse (or use search).
   const [collapsedShelves, setCollapsedShelves] = useState<Set<string>>(
@@ -449,7 +452,9 @@ function Flow({
     const visibleNodes = data.nodes.filter((n) => !hiddenSet.has(n.id));
     const ids = new Set(visibleNodes.map((n) => n.id));
     const visibleEdges = canvasEdges.filter((e) => ids.has(e.from) && ids.has(e.to));
-    const l = buildLayout(visibleNodes, visibleEdges, collapsedShelves);
+    // A query expands the shelves so matches inside them render and can be highlighted.
+    const shelvesForLayout = queryIds ? new Set<string>() : collapsedShelves;
+    const l = buildLayout(visibleNodes, visibleEdges, shelvesForLayout);
     // Attach collapse state (drives the ⊕/⊖ toggle), an open-PR count, and the shield chip
     // (who protects this node) so protection reads on the card, not as canvas rails.
     l.nodes = l.nodes.map((nd) => {
@@ -494,6 +499,7 @@ function Flow({
     openPrByRepo,
     collapsedShelves,
     toggleShelf,
+    queryIds,
   ]);
 
   // Undirected adjacency over the drawn edges — powers blast-radius highlighting.
@@ -553,9 +559,11 @@ function Flow({
     return s;
   }, [layout.nodes]);
 
-  // One "lit" set unifies every focus mode: a blast-radius click wins; otherwise a node is lit if it
-  // passes every ACTIVE lens (Health ∪ Changed) and the kind filter. null = nothing is filtering.
+  // One "lit" set unifies every focus mode: an ask-query and a blast-radius click win; otherwise a
+  // node is lit if it passes every ACTIVE lens (Health ∪ Changed) and the kind filter. null =
+  // nothing is filtering.
   const litSet = useMemo(() => {
+    if (queryIds) return queryIds;
     if (focusSet) return focusSet;
     const lensActive = healthLens || changedLens;
     if (!lensActive && kindFilter.size === 0) return null;
@@ -569,7 +577,7 @@ function Flow({
       if (passLens && passKind) s.add(n.id);
     }
     return s;
-  }, [focusSet, healthLens, changedLens, kindFilter, alertIds, changedIds, layout.nodes]);
+  }, [queryIds, focusSet, healthLens, changedLens, kindFilter, alertIds, changedIds, layout.nodes]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layout.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layout.edges);
@@ -648,6 +656,7 @@ function Flow({
   );
   const onPick = useCallback(
     (id: string) => {
+      setQueryIds(null);
       onSelect(id);
       requestAnimationFrame(
         () => void fitView({ nodes: [{ id }], duration: 500, maxZoom: 1.3, padding: 0.5 }),
@@ -655,6 +664,45 @@ function Flow({
     },
     [onSelect, fitView],
   );
+
+  // "Ask the map": match the query across ALL nodes (name/kind) and light every hit. Empty query
+  // clears the highlight. Matching over data.nodes (not just on-canvas) so shelf hits count — the
+  // layout expands the shelves whenever a query is active.
+  const onSearch = useCallback(
+    (q: string) => {
+      const t = q.trim().toLowerCase();
+      if (!t) {
+        setQueryIds(null);
+        return;
+      }
+      onSelect(null);
+      const ids = new Set(
+        data.nodes
+          .filter(
+            (n) => (n.name ?? "").toLowerCase().includes(t) || n.kind.toLowerCase().includes(t),
+          )
+          .map((n) => n.id),
+      );
+      setQueryIds(ids);
+    },
+    [data.nodes, onSelect],
+  );
+
+  // When a query resolves, frame its matches (once the expanded-shelf nodes have painted).
+  useEffect(() => {
+    if (!queryIds || queryIds.size === 0) return;
+    const refs = [...queryIds].map((id) => ({ id }));
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(
+        () => void fitView({ nodes: refs, duration: 500, maxZoom: 1.1, padding: 0.35 }),
+      );
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      if (raf2) cancelAnimationFrame(raf2);
+    };
+  }, [queryIds, fitView]);
 
   return (
     <ReactFlow
@@ -683,7 +731,7 @@ function Flow({
         color="hsl(var(--muted-foreground) / 0.25)"
       />
       <Panel position="top-left">
-        <MapSearch nodes={searchNodes} onPick={onPick} />
+        <MapSearch nodes={searchNodes} onPick={onPick} onSearch={onSearch} />
       </Panel>
       <Controls showInteractive={false} />
       <MiniMap
@@ -701,13 +749,18 @@ function Flow({
 function MapSearch({
   nodes,
   onPick,
+  onSearch,
 }: {
   nodes: { id: string; name: string; kind: string }[];
   onPick: (id: string) => void;
+  onSearch: (q: string) => void;
 }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
+  // Whether the user has arrow-navigated the suggestions — decides what Enter does (jump to the
+  // navigated result vs. highlight ALL matches).
+  const moved = useRef(false);
   const matches = useMemo(() => {
     const t = q.trim().toLowerCase();
     if (!t) return [];
@@ -727,17 +780,26 @@ function MapSearch({
       setOpen(false);
       return;
     }
-    if (!open || matches.length === 0) return;
     if (e.key === "ArrowDown") {
+      if (matches.length === 0) return;
       e.preventDefault();
+      moved.current = true;
       setActive((a) => (a + 1) % matches.length);
     } else if (e.key === "ArrowUp") {
+      if (matches.length === 0) return;
       e.preventDefault();
+      moved.current = true;
       setActive((a) => (a - 1 + matches.length) % matches.length);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const m = matches[Math.min(active, matches.length - 1)];
-      if (m) pick(m.id, m.name);
+      // Arrow-navigated → jump to that result; plain Enter → highlight every match on the canvas.
+      if (moved.current && matches.length > 0) {
+        const m = matches[Math.min(active, matches.length - 1)];
+        if (m) pick(m.id, m.name);
+      } else {
+        onSearch(q);
+        setOpen(false);
+      }
     }
   };
 
@@ -750,12 +812,13 @@ function MapSearch({
           onChange={(e) => {
             setQ(e.target.value);
             setActive(0);
+            moved.current = false;
             setOpen(true);
           }}
           onKeyDown={onKeyDown}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 120)}
-          placeholder="Find a resource…"
+          placeholder="Search or ask the map…"
           className="w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
         />
         {q ? (
@@ -764,6 +827,7 @@ function MapSearch({
             onClick={() => {
               setQ("");
               setOpen(false);
+              onSearch("");
             }}
             className="shrink-0 text-muted-foreground hover:text-foreground"
             aria-label="Clear search"
@@ -793,6 +857,9 @@ function MapSearch({
               </button>
             </li>
           ))}
+          <li className="mt-1 border-t border-border px-2.5 pb-0.5 pt-1.5 text-[10px] text-muted-foreground/70">
+            ↵ Enter to highlight all matches · ↑↓ to jump to one
+          </li>
         </ul>
       ) : null}
     </div>
