@@ -7,8 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OrgPanel } from "@/app/org-panel";
 import { ProfileCard } from "@/components/settings/profile-card";
 import { LlmSettingsCard } from "@/components/settings/llm-settings";
-import { NotificationsSettingsCard } from "@/components/settings/notifications-settings";
-import type { LlmSettings, ChannelSummary } from "@/lib/browser-api";
+import type { LlmSettings } from "@/lib/browser-api";
 
 interface MemberDto {
   userId: string;
@@ -28,8 +27,9 @@ interface InvitationDto {
 
 /**
  * Settings - a single, constrained column. There isn't enough here to warrant tabs or a
- * sub-nav; everything is visible at a glance. Admin-only blocks (alerts, AI model, activity
- * log) simply don't render for non-admins - matching what the API enforces.
+ * sub-nav; everything is visible at a glance. Admin-only blocks (AI model, activity log)
+ * simply don't render for non-admins - matching what the API enforces. Alert channels
+ * (Slack/Discord/Teams) live in the Integrations hub, not here.
  */
 export function SettingsView({
   orgId,
@@ -41,7 +41,6 @@ export function SettingsView({
   members,
   invites,
   llm,
-  notify,
   securitySlot,
 }: {
   orgId: string;
@@ -53,7 +52,6 @@ export function SettingsView({
   members: MemberDto[];
   invites: InvitationDto[];
   llm: LlmSettings | null;
-  notify: ChannelSummary[] | null;
   /** Server-rendered audit log, passed as a slot (it's an async server component and can't be
       imported into this client component). */
   securitySlot: ReactNode;
@@ -88,12 +86,6 @@ export function SettingsView({
         </Card>
       </div>
 
-      {/* Anchor target so the Integrations hub can deep-link straight to alert-channel setup. */}
-      {isAdmin ? (
-        <div id="notifications" className="scroll-mt-24">
-          <NotificationsSettingsCard orgId={orgId} initial={notify} />
-        </div>
-      ) : null}
       {isAdmin ? <LlmSettingsCard orgId={orgId} initial={llm} /> : null}
 
       <OrgPanel orgId={orgId} initialMembers={members} initialInvites={invites} />

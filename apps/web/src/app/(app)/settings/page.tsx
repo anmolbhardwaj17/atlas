@@ -2,7 +2,7 @@ import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
 import { SettingsView } from "@/components/settings/settings-view";
 import { AuditLog } from "@/components/settings/audit-log";
-import type { LlmSettings, ChannelSummary } from "@/lib/browser-api";
+import type { LlmSettings } from "@/lib/browser-api";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +27,7 @@ export default async function SettingsPage() {
   const auth = { token: shell.token, orgId: shell.orgId };
   const isAdmin = shell.role === "Owner" || shell.role === "Admin";
   // Server-fetch everything with the reliable server session (no client auth race).
-  const [members, invites, llm, notify] = await Promise.all([
+  const [members, invites, llm] = await Promise.all([
     apiGet<ApiOk<MemberDto[]>>(`/orgs/${shell.orgId}/members`, auth).then(
       (r) => r.body?.data ?? [],
     ),
@@ -35,7 +35,6 @@ export default async function SettingsPage() {
       (r) => r.body?.data ?? [],
     ),
     apiGet<ApiOk<LlmSettings | null>>("/ai/settings", auth).then((r) => r.body?.data ?? null),
-    apiGet<ApiOk<ChannelSummary[]>>("/notifications", auth).then((r) => r.body?.data ?? null),
   ]);
 
   return (
@@ -49,7 +48,6 @@ export default async function SettingsPage() {
       members={members}
       invites={invites}
       llm={llm}
-      notify={notify}
       securitySlot={isAdmin ? <AuditLog orgId={shell.orgId} token={shell.token} /> : null}
     />
   );

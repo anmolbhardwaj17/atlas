@@ -228,20 +228,31 @@ const TABS = ["All", "Cloud", "Code", "CI/CD", "Observability", "Alerts"] as con
 // offer. Logos only (no labels, no status).
 const SHOWCASE_LOGOS = Array.from(new Set(PROVIDERS.map((p) => p.logo)));
 
-/** A compact, decorative wall of everything Atlas connects — sits in the top-right of the header.
- *  Tile-less; the left edge fades into the page so it blends toward the title on its left. */
+/** A compact, decorative wall of everything Atlas connects — top-right of the header, laid out in
+ *  two rows that run off the right edge of the page (negative margin cancels the content padding)
+ *  and fade at both edges so it blends into the frame. The top row reaches a touch further right
+ *  than the bottom (bottom is nudged in) so it feels organic, not gridded. */
 function LogoShowcase() {
   const logos = SHOWCASE_LOGOS.filter((l) => hasCloudIcon(l));
+  const mid = Math.ceil(logos.length / 2);
+  const top = logos.slice(0, mid);
+  const bottom = logos.slice(mid);
+  const Row = ({ items, className }: { items: string[]; className?: string }) => (
+    <div className={cn("flex w-max gap-3", className)}>
+      {items.map((logo) => (
+        <CloudIcon
+          key={logo}
+          name={logo}
+          className="size-7 opacity-90 transition-opacity hover:opacity-100"
+        />
+      ))}
+    </div>
+  );
   return (
-    <div className="[mask-image:linear-gradient(to_right,transparent,black_22%,black_100%)]">
-      <div className="flex flex-wrap items-center justify-end gap-2.5">
-        {logos.map((logo) => (
-          <CloudIcon
-            key={logo}
-            name={logo}
-            className="size-7 shrink-0 opacity-90 transition-opacity hover:opacity-100"
-          />
-        ))}
+    <div className="-mr-4 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_14%,black_86%,transparent)] md:-mr-6">
+      <div className="flex flex-col gap-2 pl-6">
+        <Row items={top} />
+        <Row items={bottom} className="-translate-x-6" />
       </div>
     </div>
   );
@@ -285,9 +296,13 @@ function AlertProviderRow({
               {provider.category}
             </span>
           </div>
-          <p className="truncate text-sm text-muted-foreground">
-            {connected && channel ? `Added ${timeAgo(channel.createdAt)}` : provider.blurb}
-          </p>
+          {connected && channel ? (
+            <p className="truncate text-sm">
+              <span className="text-xs text-success">Added {timeAgo(channel.createdAt)}</span>
+            </p>
+          ) : (
+            <p className="truncate text-sm text-muted-foreground">{provider.blurb}</p>
+          )}
         </button>
         <div className="flex shrink-0 items-center gap-2">
           {connected ? (
