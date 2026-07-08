@@ -77,6 +77,8 @@ export interface Finding {
   detail: string;
   /** Click-through to the evidence (a node, edge, filtered list, or settings). */
   href: string | null;
+  /** Well-Architected pillar (from the shared guidance pack) — drives the category chip. */
+  pillar?: string | null;
   count?: number;
   /** The specific affected nodes, when the finding names them — each deep-links to /explore/:id. */
   evidence?: Array<{ id: string; label: string }>;
@@ -1025,6 +1027,10 @@ export class GraphService {
 
     const rank = { high: 0, medium: 1, low: 2 };
     findings.sort((a, b) => rank[a.severity] - rank[b.severity]);
+
+    // Tag each finding with its Well-Architected pillar from the shared guidance pack, so the
+    // dashboard's category chip is the SAME dynamic pillar the Insights page shows.
+    for (const f of findings) f.pillar = guidanceFor(f.category)?.pillar ?? null;
 
     // ── Posture by pillar (AWS Well-Architected axes) ──────────────────────────
     // Each pillar starts at 100 (all clear) and is pulled down by its findings, weighted by

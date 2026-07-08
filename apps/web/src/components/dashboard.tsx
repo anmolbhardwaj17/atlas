@@ -16,18 +16,11 @@ import {
   TrendingDown,
   TriangleAlert,
   Activity,
-  ShieldCheck,
-  ShieldAlert,
-  HeartPulse,
-  PlugZap,
-  Waypoints,
-  Clock,
-  Sparkles,
-  Package,
   type LucideIcon,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PostureRadar, type Posture } from "@/components/dashboard/posture-radar";
+import { pillarMeta } from "@/components/insights/pillars";
 import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/cn";
 import { Onboarding } from "@/components/onboarding";
@@ -76,6 +69,7 @@ interface Finding {
   title: string;
   detail: string;
   href: string | null;
+  pillar?: string | null;
   count?: number;
 }
 interface ActivityItem {
@@ -487,8 +481,8 @@ function NeedsAttention({ findings }: { findings: Finding[] }) {
   // Ask Atlas) lives in Insights.
   const shown = findings.slice(0, 4);
   return (
-    <Card>
-      <CardContent className="p-5">
+    <Card className="h-full">
+      <CardContent className="flex h-full flex-col p-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-base font-semibold">
             <TriangleAlert className="size-4 text-muted-foreground" />
@@ -523,7 +517,7 @@ function NeedsAttention({ findings }: { findings: Finding[] }) {
             {findings.length > shown.length ? (
               <Link
                 href="/insights"
-                className="mt-2 flex items-center justify-center gap-1 rounded-lg py-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+                className="mt-auto flex items-center justify-center gap-1 rounded-lg pt-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
               >
                 Show more <ChevronRight className="size-3.5" />
               </Link>
@@ -534,52 +528,6 @@ function NeedsAttention({ findings }: { findings: Finding[] }) {
     </Card>
   );
 }
-
-// Presentation for each finding category — a tasteful tinted chip (10% bg + inset ring), mirroring
-// the Insights "Category" column so the two surfaces read the same. Not identical, just consistent.
-const CATEGORY_META: Record<string, { icon: LucideIcon; badge: string }> = {
-  "Security posture": {
-    icon: ShieldCheck,
-    badge: "bg-violet-500/10 text-violet-700 ring-violet-500/20 dark:text-violet-300",
-  },
-  Vulnerabilities: {
-    icon: ShieldAlert,
-    badge: "bg-rose-500/10 text-rose-700 ring-rose-500/20 dark:text-rose-300",
-  },
-  "Service health": {
-    icon: HeartPulse,
-    badge: "bg-sky-500/10 text-sky-700 ring-sky-500/20 dark:text-sky-300",
-  },
-  "Source health": {
-    icon: PlugZap,
-    badge: "bg-teal-500/10 text-teal-700 ring-teal-500/20 dark:text-teal-300",
-  },
-  "Cross-boundary": {
-    icon: Waypoints,
-    badge: "bg-indigo-500/10 text-indigo-700 ring-indigo-500/20 dark:text-indigo-300",
-  },
-  "Blast radius": {
-    icon: Waypoints,
-    badge: "bg-amber-500/10 text-amber-700 ring-amber-500/20 dark:text-amber-300",
-  },
-  Freshness: {
-    icon: Clock,
-    badge: "bg-cyan-500/10 text-cyan-700 ring-cyan-500/20 dark:text-cyan-300",
-  },
-  "Code hygiene": {
-    icon: Sparkles,
-    badge: "bg-teal-500/10 text-teal-700 ring-teal-500/20 dark:text-teal-300",
-  },
-  "Dependency sprawl": {
-    icon: Package,
-    badge: "bg-indigo-500/10 text-indigo-700 ring-indigo-500/20 dark:text-indigo-300",
-  },
-};
-const GENERAL_CATEGORY = {
-  icon: TriangleAlert,
-  badge: "bg-muted text-muted-foreground ring-border",
-};
-const categoryMeta = (c: string) => CATEGORY_META[c] ?? GENERAL_CATEGORY;
 
 const SEV_DOT: Record<string, string> = {
   high: "bg-danger",
@@ -593,7 +541,8 @@ const SEV_TEXT: Record<string, string> = {
 };
 
 function FindingRow({ f }: { f: Finding }) {
-  const cat = categoryMeta(f.category);
+  // Same pillar chip the Insights page renders — driven by the pillar the API tags dynamically.
+  const m = pillarMeta(f.pillar ?? undefined);
   const body = (
     <div className="group flex items-start gap-3 px-2 py-3 transition-colors hover:bg-muted/50">
       <span
@@ -607,15 +556,15 @@ function FindingRow({ f }: { f: Finding }) {
         <div className="text-sm font-medium text-foreground group-hover:underline">{f.title}</div>
         <div className="mt-0.5 line-clamp-1 text-[13px] text-muted-foreground">{f.detail}</div>
       </div>
-      {/* Severity + category + scope sit on the right, aligned as a compact meta stack. */}
+      {/* Category (pillar) + severity sit on the right, aligned as a compact meta stack. */}
       <div className="flex shrink-0 flex-col items-end gap-1.5 text-right">
         <span
           className={cn(
-            "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset",
-            cat.badge,
+            "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
+            m.badge,
           )}
         >
-          <cat.icon className="size-3" /> {f.category}
+          <m.icon className="size-3.5" /> {m.label}
         </span>
         <span
           className={cn(
@@ -642,7 +591,7 @@ function RecentActivity({ activity }: { activity: ActivityItem[] }) {
         {activity.length === 0 ? (
           <p className="text-sm text-muted-foreground">No recent changes.</p>
         ) : (
-          <ul className="space-y-3">
+          <ul className="-mx-2 divide-y divide-border">
             {activity.map((a, i) => (
               <ActivityRow key={i} a={a} />
             ))}
@@ -693,7 +642,7 @@ function ActivityRow({ a }: { a: ActivityItem }) {
     </div>
   );
   return (
-    <li>
+    <li className="px-2 py-3">
       {href ? (
         <Link href={href} className="block hover:opacity-80">
           {inner}
