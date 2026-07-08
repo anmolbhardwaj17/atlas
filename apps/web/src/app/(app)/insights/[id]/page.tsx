@@ -6,10 +6,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { SeverityBadge } from "@/components/tags";
 import { AtlasAiMark } from "@/components/brand";
 import { ErrorState } from "@/components/patterns/empty-state";
+import { FindingActions } from "@/components/insights/finding-actions";
 import {
   pillarMeta,
   type Finding,
   type InsightsSummary,
+  type Mute,
 } from "@/components/insights/insights-view";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +19,7 @@ export const dynamic = "force-dynamic";
 interface InsightsData {
   summary: InsightsSummary;
   findings: Finding[];
+  mutes: Mute[];
 }
 
 /**
@@ -32,6 +35,7 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
     orgId: shell.orgId,
   });
   const finding = res.body?.data?.findings.find((f) => f.id === id) ?? null;
+  const mute = res.body?.data?.mutes.find((mm) => mm.findingId === id) ?? null;
   const m = pillarMeta(finding?.guidance?.pillar);
 
   return (
@@ -69,9 +73,17 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
                   {finding.count} affected
                 </span>
               ) : null}
+              {mute ? (
+                <span className="rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  Muted
+                </span>
+              ) : null}
             </div>
             <h1 className="text-xl font-semibold leading-snug">{finding.title}</h1>
           </div>
+
+          {/* Lifecycle: recheck (re-sync + confirm) and mute/accept-risk. */}
+          <FindingActions orgId={shell.orgId} findingId={finding.id} muted={mute !== null} />
 
           {finding.guidance ? (
             <div className="grid gap-4 sm:grid-cols-2">

@@ -1,4 +1,5 @@
-import { Controller, Get, Param, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { z } from "zod";
 import { AuthGuard } from "../auth/auth.guard";
 import { TenantScopeGuard } from "../auth/tenant-scope.guard";
 import { RolesGuard } from "../auth/roles.guard";
@@ -16,6 +17,8 @@ import {
   TimelineQuerySchema,
   TraversalQuerySchema,
 } from "./dto";
+
+const MuteFindingSchema = z.object({ reason: z.string().trim().max(280).optional() }).strict();
 
 /**
  * Graph read API (docs/08 §9). Org selected via `X-Atlas-Org` (TenantScopeGuard); all
@@ -52,7 +55,8 @@ export class GraphController {
   @Get("insights")
   @Roles("Member")
   async insights(@Req() req: AuthedRequest): Promise<unknown> {
-    const s = await this.graph.summary(org(req).id);
+    const orgId = org(req).id;
+    const [s, mutes] = await Promise.all([this.graph.summary(orgId), this.graph.listMutes(orgId)]);
     const bySeverity = { high: 0, medium: 0, low: 0 };
     for (const f of s.findings) bySeverity[f.severity] += 1;
     return {
@@ -71,7 +75,27 @@ export class GraphController {
         ...(f.count !== undefined ? { count: f.count } : {}),
         guidance: guidanceFor(f.category),
       })),
+      mutes,
     };
+  }
+
+  @Post("insights/:id/mute")
+  @Roles("Member")
+  async muteFinding(
+    @Req() req: AuthedRequest,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ): Promise<{ ok: true }> {
+    const { reason } = parseBody(MuteFindingSchema, body);
+    await this.graph.muteFinding(org(req).id, id, reason ?? null, req.auth?.userId ?? null);
+    return { ok: true };
+  }
+
+  @Delete("insights/:id/mute")
+  @Roles("Member")
+  async unmuteFinding(@Req() req: AuthedRequest, @Param("id") id: string): Promise<{ ok: true }> {
+    await this.graph.unmuteFinding(org(req).id, id);
+    return { ok: true };
   }
 
   @Get("graph")

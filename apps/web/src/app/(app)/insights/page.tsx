@@ -4,6 +4,7 @@ import {
   InsightsView,
   type Finding,
   type InsightsSummary,
+  type Mute,
 } from "@/components/insights/insights-view";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
 interface InsightsData {
   summary: InsightsSummary;
   findings: Finding[];
+  mutes: Mute[];
 }
 
 /**
@@ -24,5 +26,11 @@ export default async function InsightsPage() {
     orgId: shell.orgId,
   });
   const data = res.body?.data;
-  return <InsightsView summary={data?.summary ?? null} findings={data?.findings ?? []} />;
+  return (
+    <InsightsView
+      summary={data?.summary ?? null}
+      findings={data?.findings ?? []}
+      mutes={data?.mutes ?? []}
+    />
+  );
 }

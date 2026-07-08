@@ -236,6 +236,48 @@ export interface TraversalResult {
 export class GraphService {
   constructor(@Inject(PG_POOL) private readonly db: Db) {}
 
+  // ── Muted / accepted-risk findings (Insights lifecycle) ──────────────────────
+  // Findings are derived live from the graph; muting persists a human "accept/dismiss"
+  // decision keyed by the stable finding id, so it survives recomputes until unmuted.
+
+  async listMutes(
+    orgId: string,
+  ): Promise<Array<{ findingId: string; reason: string | null; mutedAt: string }>> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      const { rows } = await c.query<{ finding_id: string; reason: string | null; muted_at: Date }>(
+        `SELECT finding_id, reason, muted_at FROM muted_findings ORDER BY muted_at DESC`,
+      );
+      return rows.map((r) => ({
+        findingId: r.finding_id,
+        reason: r.reason,
+        mutedAt: r.muted_at.toISOString(),
+      }));
+    });
+  }
+
+  async muteFinding(
+    orgId: string,
+    findingId: string,
+    reason: string | null,
+    userId: string | null,
+  ): Promise<void> {
+    await withOrgScope(this.db, orgId, (c) =>
+      c.query(
+        `INSERT INTO muted_findings (org_id, finding_id, reason, muted_by)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (org_id, finding_id) DO UPDATE
+           SET reason = EXCLUDED.reason, muted_by = EXCLUDED.muted_by, muted_at = now()`,
+        [orgId, findingId, reason, userId],
+      ),
+    );
+  }
+
+  async unmuteFinding(orgId: string, findingId: string): Promise<void> {
+    await withOrgScope(this.db, orgId, (c) =>
+      c.query(`DELETE FROM muted_findings WHERE finding_id = $1`, [findingId]),
+    );
+  }
+
   /** Org overview for the dashboard (docs/09 §5.2): counts + tiers + freshness. */
   async overview(orgId: string): Promise<OverviewResult> {
     return withOrgScope(this.db, orgId, async (c) => {

@@ -36,6 +36,11 @@ export interface InsightsSummary {
   low: number;
   pipelineCoverage: { withPipeline: number; total: number };
 }
+export interface Mute {
+  findingId: string;
+  reason: string | null;
+  mutedAt: string;
+}
 
 export const PILLAR_META: Record<string, { label: string; icon: LucideIcon }> = {
   security: { label: "Security", icon: ShieldCheck },
@@ -68,28 +73,45 @@ const SEV_DOT: Record<string, string> = {
 export function InsightsView({
   summary,
   findings,
+  mutes = [],
 }: {
   summary: InsightsSummary | null;
   findings: Finding[];
+  mutes?: Mute[];
 }) {
   const router = useRouter();
+  const mutedSet = React.useMemo(() => new Set(mutes.map((m) => m.findingId)), [mutes]);
+
   const sorted = React.useMemo(
     () => [...findings].sort((a, b) => (SEV_ORDER[a.severity] ?? 3) - (SEV_ORDER[b.severity] ?? 3)),
     [findings],
   );
+  // Muted findings are still flagged, but the user chose to accept/dismiss them - keep them out
+  // of the active list (their own tab) so the counts reflect what actually needs action.
+  const active = React.useMemo(() => sorted.filter((f) => !mutedSet.has(f.id)), [sorted, mutedSet]);
+  const muted = React.useMemo(() => sorted.filter((f) => mutedSet.has(f.id)), [sorted, mutedSet]);
+
+  const sevCounts = React.useMemo(() => {
+    const c = { high: 0, medium: 0, low: 0 };
+    for (const f of active) c[f.severity] += 1;
+    return c;
+  }, [active]);
+
+  const [tab, setTab] = React.useState<"active" | "muted">("active");
+  const base = tab === "muted" ? muted : active;
 
   const pillars = React.useMemo(() => {
     const counts = new Map<string, number>();
-    for (const f of sorted) {
+    for (const f of base) {
       const p = f.guidance?.pillar ?? "general";
       counts.set(p, (counts.get(p) ?? 0) + 1);
     }
     return [...counts.entries()].sort((a, b) => b[1] - a[1]);
-  }, [sorted]);
+  }, [base]);
 
   const [pillar, setPillar] = React.useState<string>("all");
   const shown =
-    pillar === "all" ? sorted : sorted.filter((f) => (f.guidance?.pillar ?? "general") === pillar);
+    pillar === "all" ? base : base.filter((f) => (f.guidance?.pillar ?? "general") === pillar);
 
   const cov = summary?.pipelineCoverage;
   const covPct = cov && cov.total > 0 ? Math.round((cov.withPipeline / cov.total) * 100) : null;
@@ -107,19 +129,9 @@ export function InsightsView({
 
       {/* Posture summary: severity tiles + CI/CD coverage. */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <SeverityTile
-          label="High priority"
-          n={summary?.high ?? 0}
-          sev="high"
-          hint="Fix these first"
-        />
-        <SeverityTile
-          label="Medium"
-          n={summary?.medium ?? 0}
-          sev="medium"
-          hint="Worth addressing"
-        />
-        <SeverityTile label="Low" n={summary?.low ?? 0} sev="low" hint="Nice to clean up" />
+        <SeverityTile label="High priority" n={sevCounts.high} sev="high" hint="Fix these first" />
+        <SeverityTile label="Medium" n={sevCounts.medium} sev="medium" hint="Worth addressing" />
+        <SeverityTile label="Low" n={sevCounts.low} sev="low" hint="Nice to clean up" />
         <Card>
           <CardContent className="p-4">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -147,11 +159,23 @@ export function InsightsView({
         </Card>
       </div>
 
+      {/* Active vs muted (accepted-risk). */}
+      {muted.length > 0 ? (
+        <div className="flex items-center gap-1 border-b border-border">
+          <TabButton active={tab === "active"} onClick={() => setTab("active")}>
+            Active <span className="text-muted-foreground">{active.length}</span>
+          </TabButton>
+          <TabButton active={tab === "muted"} onClick={() => setTab("muted")}>
+            Muted <span className="text-muted-foreground">{muted.length}</span>
+          </TabButton>
+        </div>
+      ) : null}
+
       {/* Pillar filter. */}
       {pillars.length > 1 ? (
         <div className="flex flex-wrap gap-2">
           <Chip active={pillar === "all"} onClick={() => setPillar("all")}>
-            All <span className="text-muted-foreground">{sorted.length}</span>
+            All <span className="text-muted-foreground">{base.length}</span>
           </Chip>
           {pillars.map(([p, n]) => {
             const m = pillarMeta(p);
@@ -171,9 +195,11 @@ export function InsightsView({
           <CardContent className="py-14 text-center">
             <AtlasAiMark size={28} className="mx-auto mb-3 size-7" />
             <p className="text-sm text-muted-foreground">
-              {sorted.length === 0
-                ? "Nothing needs attention right now - the graph doesn't flag any issues. You're in good shape."
-                : "No findings in this category."}
+              {tab === "muted"
+                ? "Nothing muted. Accepted-risk or dismissed findings will collect here."
+                : active.length === 0
+                  ? "Nothing needs attention right now - the graph doesn't flag any issues. You're in good shape."
+                  : "No findings in this category."}
             </p>
           </CardContent>
         </Card>
@@ -276,6 +302,31 @@ function SeverityTile({
         <p className="mt-1 text-xs text-muted-foreground">{n > 0 ? hint : "All clear"}</p>
       </CardContent>
     </Card>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+        active
+          ? "border-foreground text-foreground"
+          : "border-transparent text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
   );
 }
 

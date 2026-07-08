@@ -664,3 +664,47 @@ export async function testChannel(
 export async function removeChannel(orgId: string, kind: ChannelKind): Promise<ChannelSummary[]> {
   return notifyReq<ChannelSummary[]>(orgId, `/channels/${kind}`, "DELETE");
 }
+
+/** Mute / accept-risk a finding (persists a human decision, keyed by the stable finding id). */
+export async function muteFinding(
+  orgId: string,
+  findingId: string,
+  reason?: string,
+): Promise<void> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/insights/${encodeURIComponent(findingId)}/mute`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "X-Atlas-Org": orgId,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(reason ? { reason } : {}),
+  });
+  if (!res.ok) throw new Error(`Couldn't mute (${res.status}).`);
+}
+
+export async function unmuteFinding(orgId: string, findingId: string): Promise<void> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/insights/${encodeURIComponent(findingId)}/mute`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) throw new Error(`Couldn't unmute (${res.status}).`);
+}
+
+/** Current active finding ids (used to confirm whether a finding cleared after a recheck). */
+export async function getActiveFindingIds(orgId: string): Promise<string[]> {
+  const token = await getClientToken();
+  if (!token) return [];
+  const res = await fetch(`${apiUrl()}/insights`, {
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) return [];
+  const body = (await res.json().catch(() => null)) as {
+    data?: { findings?: { id: string }[] };
+  } | null;
+  return (body?.data?.findings ?? []).map((f) => f.id);
+}
