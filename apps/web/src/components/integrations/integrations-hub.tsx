@@ -25,15 +25,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { StatusBadge } from "@/components/certainty";
-import { CloudIcon } from "@/components/cloud-icon";
 import {
   AwsSetup,
   GithubSetup,
   AzureSetup,
   GcpSetup,
   BitbucketSetup,
+  JenkinsSetup,
 } from "@/components/integrations/provider-setup";
-import { PROVIDERS, type ProviderMeta } from "@/components/integrations/providers";
+import { PROVIDERS, ProviderLogo, type ProviderMeta } from "@/components/integrations/providers";
 import {
   createConnection,
   verifyConnection,
@@ -54,6 +54,8 @@ function ProviderSetup({ providerId }: { providerId: string }) {
       return <GcpSetup />;
     case "bitbucket":
       return <BitbucketSetup />;
+    case "jenkins":
+      return <JenkinsSetup />;
     default:
       return <GithubSetup />;
   }
@@ -142,7 +144,7 @@ function ProviderTile({
       <CardContent className="flex h-full flex-col gap-3 p-5">
         <div className="flex items-start gap-3">
           <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-border bg-background">
-            <CloudIcon name={provider.logo} className="size-6" />
+            <ProviderLogo provider={provider} className="size-6" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
@@ -394,13 +396,16 @@ function ConnectSheet({
   const [regions, setRegions] = React.useState("us-east-1");
   const [accessKeyId, setAccessKeyId] = React.useState("");
   const [secretAccessKey, setSecretAccessKey] = React.useState("");
+  // Jenkins: server URL + username (email state reused as the username field) + API token (token).
+  const [baseUrl, setBaseUrl] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Live credential flows: Bitbucket (email + API token) and AWS (access key + secret key).
+  // Live credential flows: Bitbucket (email + token), AWS (access keys), Jenkins (url + user + token).
   const isBitbucket = provider?.id === "bitbucket";
   const isAws = provider?.id === "aws";
-  const needsCreds = isBitbucket || isAws;
+  const isJenkins = provider?.id === "jenkins";
+  const needsCreds = isBitbucket || isAws || isJenkins;
 
   // Reset the form whenever a different provider's sheet opens.
   React.useEffect(() => {
@@ -412,6 +417,7 @@ function ConnectSheet({
       setRegions("us-east-1");
       setAccessKeyId("");
       setSecretAccessKey("");
+      setBaseUrl("");
       setError(null);
       setBusy(false);
     }
@@ -470,6 +476,31 @@ function ConnectSheet({
           setBusy(false);
           return;
         }
+      } else if (isJenkins) {
+        if (!baseUrl.trim()) {
+          setError("Enter your Jenkins server URL (e.g. https://ci.acme.com).");
+          setBusy(false);
+          return;
+        }
+        if (!email.trim() || !token.trim()) {
+          setError("Enter the Jenkins username and API token.");
+          setBusy(false);
+          return;
+        }
+        const conn = await createConnection(orgId, provider.id, name.trim(), {
+          baseUrl: baseUrl.trim(),
+        });
+        const verified = await verifyConnection(orgId, conn.id, {
+          username: email.trim(),
+          apiToken: token.trim(),
+        });
+        if (verified.status === "error") {
+          setError(
+            "Jenkins rejected the credentials - check the server URL, username, and API token.",
+          );
+          setBusy(false);
+          return;
+        }
       } else {
         await createConnection(orgId, provider.id, name.trim());
       }
@@ -494,7 +525,7 @@ function ConnectSheet({
             <SheetHeader>
               <SheetTitle className="flex items-center gap-2.5">
                 <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-border bg-background">
-                  <CloudIcon name={provider.logo} className="size-5" />
+                  <ProviderLogo provider={provider} className="size-5" />
                 </span>
                 Connect {provider.name}
               </SheetTitle>
@@ -607,6 +638,52 @@ function ConnectSheet({
                       <p className="text-xs text-muted-foreground">
                         Sent once to verify + stored encrypted in the secrets broker - never saved
                         in the database or shown again. Use an IAM user with a read-only policy.
+                      </p>
+                    </div>
+                  </>
+                ) : isJenkins ? (
+                  <>
+                    <div className="space-y-2">
+                      <label htmlFor="jk-url" className="text-sm font-medium">
+                        Jenkins server URL
+                      </label>
+                      <Input
+                        id="jk-url"
+                        value={baseUrl}
+                        onChange={(e) => setBaseUrl(e.target.value)}
+                        placeholder="https://ci.acme.com"
+                        autoComplete="off"
+                        spellCheck={false}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="jk-user" className="text-sm font-medium">
+                        Username
+                      </label>
+                      <Input
+                        id="jk-user"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="A read-only Jenkins user"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="jk-token" className="text-sm font-medium">
+                        API token
+                      </label>
+                      <Input
+                        id="jk-token"
+                        type="password"
+                        value={token}
+                        onChange={(e) => setToken(e.target.value)}
+                        placeholder="User → Configure → API Token"
+                        autoComplete="off"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Sent once to verify + stored encrypted in the secrets broker - never saved
+                        in the database or shown again. Use a user with Overall/Read + Job/Read
+                        only.
                       </p>
                     </div>
                   </>

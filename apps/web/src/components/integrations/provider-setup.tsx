@@ -155,6 +155,30 @@ read:repository:bitbucket
 read:pullrequest:bitbucket
 read:pipeline:bitbucket`;
 
+export function JenkinsSetup() {
+  return (
+    <div className="space-y-5">
+      <Steps>
+        <Step title="Create a read-only Jenkins user + API token">
+          Use a Jenkins user with only <InlineCode>Overall/Read</InlineCode> +{" "}
+          <InlineCode>Job/Read</InlineCode> (no Build/Configure). Under{" "}
+          <strong>User → Configure → API Token</strong>, generate a token.
+        </Step>
+        <Step title="Give Atlas the server URL, username + token">
+          Atlas reaches your Jenkins over HTTPS with the username + API token (read-only — it never
+          triggers builds). Self-hosted Jenkins must be reachable from Atlas.
+        </Step>
+        <Step title="Atlas links deploys to infrastructure">
+          From each job's pipeline Atlas reads its deploy targets (ECR pushes,{" "}
+          <InlineCode>aws ecs</InlineCode>/<InlineCode>lambda</InlineCode>) and connects{" "}
+          <em>what ships</em> to the running services it deploys — closing the loop from a PR to
+          production.
+        </Step>
+      </Steps>
+    </div>
+  );
+}
+
 export function BitbucketSetup() {
   return (
     <div className="space-y-5">
