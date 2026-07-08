@@ -32,6 +32,22 @@ export function AskLauncher() {
         className="pointer-events-none absolute -right-16 -top-20 size-52 rounded-full bg-brand/15 blur-3xl"
         aria-hidden
       />
+      {/* Big Atlas company mark, green-tinted, bleeding off the top-right corner. The PNG is
+          monochrome, so we recolour it to brand green by masking a green box with its shape. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-16 -top-20 hidden size-[280px] bg-brand/[0.12] sm:block"
+        style={{
+          maskImage: "url(/atlas-logo.png)",
+          maskSize: "contain",
+          maskRepeat: "no-repeat",
+          maskPosition: "center",
+          WebkitMaskImage: "url(/atlas-logo.png)",
+          WebkitMaskSize: "contain",
+          WebkitMaskRepeat: "no-repeat",
+          WebkitMaskPosition: "center",
+        }}
+      />
       <div className="relative">
         <div className="mb-1.5 flex items-center gap-1.5">
           <AtlasAiMark size={26} className="-ml-1 size-[26px] shrink-0" />

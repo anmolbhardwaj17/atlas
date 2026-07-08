@@ -16,6 +16,14 @@ import {
   TrendingDown,
   TriangleAlert,
   Activity,
+  ShieldCheck,
+  ShieldAlert,
+  HeartPulse,
+  PlugZap,
+  Waypoints,
+  Clock,
+  Sparkles,
+  Package,
   type LucideIcon,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,10 +36,9 @@ import { RefreshLatest } from "@/components/dashboard/refresh-latest";
 import { ContributorsDonut } from "@/components/dashboard/contributors-donut";
 import { FindingsDonut } from "@/components/dashboard/findings-donut";
 import { CountUp } from "@/components/dashboard/count-up";
-import { SeverityBadge } from "@/components/tags";
 import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
 import { KIND_LOGO } from "@/lib/kind-visual";
-import { severityMeta, PROVIDER_META } from "@/lib/taxonomy";
+import { PROVIDER_META } from "@/lib/taxonomy";
 import { apiGet, type ApiOk } from "@/lib/api";
 
 /** Connection provider → brand-logo key, split by the card each feeds. */
@@ -178,8 +185,9 @@ export async function Dashboard({
         />
       </div>
 
-      {/* What needs action sits high — right under the pulse — paired with what just changed. */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      {/* What needs action sits high — right under the pulse — paired with what just changed.
+          gap-4 matches the KPI row above so the columns line up. */}
+      <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <NeedsAttention findings={s.findings} />
         </div>
@@ -507,19 +515,19 @@ function NeedsAttention({ findings }: { findings: Finding[] }) {
           </div>
         ) : (
           <>
-            <ul className="space-y-2">
+            <ul className="-mx-2 divide-y divide-border">
               {shown.map((f) => (
                 <FindingRow key={f.id} f={f} />
               ))}
             </ul>
-            <Link
-              href="/insights"
-              className="mt-3 block text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
-            >
-              {findings.length > shown.length
-                ? `+${findings.length - shown.length} more · see how to fix in Insights →`
-                : "See how to fix these in Insights →"}
-            </Link>
+            {findings.length > shown.length ? (
+              <Link
+                href="/insights"
+                className="mt-2 flex items-center justify-center gap-1 rounded-lg py-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+              >
+                Show more <ChevronRight className="size-3.5" />
+              </Link>
+            ) : null}
           </>
         )}
       </CardContent>
@@ -527,25 +535,106 @@ function NeedsAttention({ findings }: { findings: Finding[] }) {
   );
 }
 
+// Presentation for each finding category — a tasteful tinted chip (10% bg + inset ring), mirroring
+// the Insights "Category" column so the two surfaces read the same. Not identical, just consistent.
+const CATEGORY_META: Record<string, { icon: LucideIcon; badge: string }> = {
+  "Security posture": {
+    icon: ShieldCheck,
+    badge: "bg-violet-500/10 text-violet-700 ring-violet-500/20 dark:text-violet-300",
+  },
+  Vulnerabilities: {
+    icon: ShieldAlert,
+    badge: "bg-rose-500/10 text-rose-700 ring-rose-500/20 dark:text-rose-300",
+  },
+  "Service health": {
+    icon: HeartPulse,
+    badge: "bg-sky-500/10 text-sky-700 ring-sky-500/20 dark:text-sky-300",
+  },
+  "Source health": {
+    icon: PlugZap,
+    badge: "bg-teal-500/10 text-teal-700 ring-teal-500/20 dark:text-teal-300",
+  },
+  "Cross-boundary": {
+    icon: Waypoints,
+    badge: "bg-indigo-500/10 text-indigo-700 ring-indigo-500/20 dark:text-indigo-300",
+  },
+  "Blast radius": {
+    icon: Waypoints,
+    badge: "bg-amber-500/10 text-amber-700 ring-amber-500/20 dark:text-amber-300",
+  },
+  Freshness: {
+    icon: Clock,
+    badge: "bg-cyan-500/10 text-cyan-700 ring-cyan-500/20 dark:text-cyan-300",
+  },
+  "Code hygiene": {
+    icon: Sparkles,
+    badge: "bg-teal-500/10 text-teal-700 ring-teal-500/20 dark:text-teal-300",
+  },
+  "Dependency sprawl": {
+    icon: Package,
+    badge: "bg-indigo-500/10 text-indigo-700 ring-indigo-500/20 dark:text-indigo-300",
+  },
+};
+const GENERAL_CATEGORY = {
+  icon: TriangleAlert,
+  badge: "bg-muted text-muted-foreground ring-border",
+};
+const categoryMeta = (c: string) => CATEGORY_META[c] ?? GENERAL_CATEGORY;
+
+const SEV_DOT: Record<string, string> = {
+  high: "bg-danger",
+  medium: "bg-warning",
+  low: "bg-inferred-low",
+};
+const SEV_TEXT: Record<string, string> = {
+  high: "text-danger",
+  medium: "text-warning",
+  low: "text-inferred-low",
+};
+
 function FindingRow({ f }: { f: Finding }) {
-  const accent = severityMeta(f.severity).accent;
+  const cat = categoryMeta(f.category);
   const body = (
-    <div className="flex items-start gap-3 rounded-md border border-border p-3 transition-colors hover:bg-muted/40">
+    <div className="group flex items-start gap-3 px-2 py-3 transition-colors hover:bg-muted/50">
       <span
-        className={`mt-0.5 h-full w-0.5 shrink-0 self-stretch rounded-full ${accent}`}
+        className={cn(
+          "mt-1.5 size-2 shrink-0 rounded-full",
+          SEV_DOT[f.severity] ?? "bg-muted-foreground",
+        )}
         aria-hidden
       />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <SeverityBadge severity={f.severity} />
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">
-            {f.category}
+          <span
+            className={cn(
+              "text-[11px] font-semibold uppercase tracking-wide",
+              SEV_TEXT[f.severity] ?? "text-muted-foreground",
+            )}
+          >
+            {f.severity}
           </span>
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset",
+              cat.badge,
+            )}
+          >
+            <cat.icon className="size-3" /> {f.category}
+          </span>
+          {f.count && f.count > 1 ? (
+            <span className="text-[11px] tabular-nums text-muted-foreground">
+              {f.count} affected
+            </span>
+          ) : null}
         </div>
-        <div className="mt-1.5 text-sm font-medium">{f.title}</div>
-        <div className="text-sm text-muted-foreground">{f.detail}</div>
+        <div className="mt-1 text-sm font-medium text-foreground group-hover:underline">
+          {f.title}
+        </div>
+        <div className="mt-0.5 line-clamp-1 text-[13px] text-muted-foreground">{f.detail}</div>
       </div>
-      {f.href ? <ChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" /> : null}
+      {f.href ? (
+        <ChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-foreground" />
+      ) : null}
     </div>
   );
   return <li>{f.href ? <Link href={f.href}>{body}</Link> : body}</li>;
