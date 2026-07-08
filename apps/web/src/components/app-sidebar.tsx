@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Boxes,
@@ -10,19 +10,14 @@ import {
   Lightbulb,
   Plug,
   Settings,
-  ChevronsUpDown,
-  LogOut,
   Loader2,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { AtlasLogo, AtlasAiMark } from "@/components/brand";
-import { UserAvatar } from "@/components/user-avatar";
 // import { CloudIcon } from "@/components/cloud-icon"; // used by ConnectAppsCard (disabled for now)
 // import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -32,14 +27,6 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 const NAV = [
   {
@@ -141,30 +128,12 @@ function ConnectAppsCard() {
 }
 */
 
-export function AppSidebar({
-  orgName,
-  email,
-  name,
-  avatarUrl,
-}: {
-  orgName: string;
-  email: string;
-  name?: string | null | undefined;
-  avatarUrl?: string | null | undefined;
-}) {
+export function AppSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   // Dynamic routes wait for a server round-trip before the URL/loading boundary changes, so a
   // click can feel frozen. Show an instant spinner on the clicked item until the route commits.
   const [pendingHref, setPendingHref] = React.useState<string | null>(null);
   React.useEffect(() => setPendingHref(null), [pathname]);
-
-  async function signOut() {
-    await createClient().auth.signOut();
-    router.refresh();
-  }
-
-  const displayName = name?.trim() || email || "Account";
 
   return (
     <Sidebar collapsible="icon">
@@ -174,8 +143,7 @@ export function AppSidebar({
             <SidebarMenuButton size="lg" asChild>
               <Link href="/dashboard">
                 <AtlasLogo size={32} spin className="size-8 shrink-0" />
-                {/* Just the product name here - the org is shown by the account menu at the
-                    bottom, so we don't repeat it. */}
+                {/* Just the product name here - the account/org lives in the top-right header menu. */}
                 <span className="flex flex-1 items-center truncate text-lg font-semibold">
                   Atlas
                 </span>
@@ -219,46 +187,6 @@ export function AppSidebar({
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter>
-        {/* <ConnectAppsCard /> — disabled for now; see the commented component below. */}
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton
-                  size="lg"
-                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-                >
-                  <UserAvatar value={avatarUrl} name={name} email={email} size={32} />
-                  <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-medium">{displayName}</span>
-                    <span className="truncate text-xs text-muted-foreground">{orgName}</span>
-                  </div>
-                  <ChevronsUpDown className="ml-auto size-4" />
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="w-[--radix-dropdown-menu-trigger-width] min-w-56"
-                side="top"
-                align="end"
-                sideOffset={4}
-              >
-                <DropdownMenuLabel className="font-normal">
-                  <div className="grid text-sm leading-tight">
-                    <span className="truncate font-medium">{displayName}</span>
-                    <span className="truncate text-xs text-muted-foreground">{email}</span>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => void signOut()}>
-                  <LogOut />
-                  Sign out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );

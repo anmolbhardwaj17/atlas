@@ -3,6 +3,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { CommandPalette } from "@/components/command-palette";
 import { CommandTrigger } from "@/components/command-trigger";
 import { NotificationBell } from "@/components/notification-bell";
+import { HeaderUserMenu } from "@/components/header-user-menu";
 import { BreadcrumbProvider } from "@/components/breadcrumb-context";
 import { HeaderBreadcrumbs } from "@/components/header-breadcrumbs";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -32,7 +33,7 @@ export function AppShell({
 }) {
   return (
     <SidebarProvider>
-      <AppSidebar orgName={orgName} email={email} name={name} avatarUrl={avatarUrl} />
+      <AppSidebar />
       <SidebarInset>
         <BreadcrumbProvider>
           <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur">
@@ -49,6 +50,7 @@ export function AppShell({
             <div className="ml-auto flex items-center gap-1.5">
               {orgId && <CommandTrigger />}
               {orgId && <NotificationBell orgId={orgId} />}
+              <HeaderUserMenu orgName={orgName} email={email} name={name} avatarUrl={avatarUrl} />
             </div>
           </header>
           <div className="flex-1 p-4 md:p-6">
