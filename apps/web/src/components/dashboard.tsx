@@ -604,37 +604,33 @@ function FindingRow({ f }: { f: Finding }) {
         aria-hidden
       />
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={cn(
-              "text-[11px] font-semibold uppercase tracking-wide",
-              SEV_TEXT[f.severity] ?? "text-muted-foreground",
-            )}
-          >
-            {f.severity}
-          </span>
-          <span
-            className={cn(
-              "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset",
-              cat.badge,
-            )}
-          >
-            <cat.icon className="size-3" /> {f.category}
-          </span>
-          {f.count && f.count > 1 ? (
-            <span className="text-[11px] tabular-nums text-muted-foreground">
-              {f.count} affected
-            </span>
-          ) : null}
-        </div>
-        <div className="mt-1 text-sm font-medium text-foreground group-hover:underline">
-          {f.title}
-        </div>
+        <div className="text-sm font-medium text-foreground group-hover:underline">{f.title}</div>
         <div className="mt-0.5 line-clamp-1 text-[13px] text-muted-foreground">{f.detail}</div>
       </div>
-      {f.href ? (
-        <ChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-foreground" />
-      ) : null}
+      {/* Severity + category + scope sit on the right, aligned as a compact meta stack. */}
+      <div className="flex shrink-0 flex-col items-end gap-1.5 text-right">
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset",
+            cat.badge,
+          )}
+        >
+          <cat.icon className="size-3" /> {f.category}
+        </span>
+        <span
+          className={cn(
+            "text-[11px] font-semibold uppercase tracking-wide",
+            SEV_TEXT[f.severity] ?? "text-muted-foreground",
+          )}
+        >
+          {f.severity}
+          {f.count && f.count > 1 ? (
+            <span className="ml-1.5 font-normal normal-case tabular-nums text-muted-foreground">
+              · {f.count} affected
+            </span>
+          ) : null}
+        </span>
+      </div>
     </div>
   );
   return <li>{f.href ? <Link href={f.href}>{body}</Link> : body}</li>;
