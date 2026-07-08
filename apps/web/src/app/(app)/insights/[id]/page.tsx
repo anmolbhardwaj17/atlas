@@ -7,12 +7,8 @@ import { SeverityBadge } from "@/components/tags";
 import { AtlasAiMark } from "@/components/brand";
 import { ErrorState } from "@/components/patterns/empty-state";
 import { FindingActions } from "@/components/insights/finding-actions";
-import {
-  pillarMeta,
-  type Finding,
-  type InsightsSummary,
-  type Mute,
-} from "@/components/insights/insights-view";
+import { pillarMeta } from "@/components/insights/pillars";
+import { type Finding, type InsightsSummary, type Mute } from "@/components/insights/insights-view";
 
 export const dynamic = "force-dynamic";
 
