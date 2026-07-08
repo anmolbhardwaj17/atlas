@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
+import { SetBreadcrumbs } from "@/components/breadcrumb-context";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfidenceBadge } from "@/components/certainty";
 import type { EdgeDetail } from "@/lib/graph-types";
@@ -23,6 +24,9 @@ export default async function EdgePage({ params }: { params: Promise<{ id: strin
 
   return (
     <>
+      <SetBreadcrumbs
+        items={[{ label: "Explore", href: "/explore" }, { label: edge?.type ?? "Relationship" }]}
+      />
       {edge ? (
         <div className="space-y-6">
           <div>

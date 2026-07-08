@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Boxes, Clock, RotateCcw, ShieldAlert, Wrench } from "lucide-react";
+import { ArrowRight, Box, Clock, RotateCcw, ScanSearch, ShieldAlert, Wrench } from "lucide-react";
 import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
@@ -160,59 +160,57 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
             </div>
           ) : null}
 
-          {/* Evidence — the affected resources, shown inline (not just a link out). */}
+          {/* Evidence — the affected resources, shown inline (no card; it's raw proof). */}
           {finding.detail ? (
-            <Card>
-              <CardContent className="space-y-3 p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    <Boxes className="size-3.5" /> Evidence
-                    {affectedCount > 1 ? (
-                      <span className="font-normal normal-case text-muted-foreground/70">
-                        · {affectedCount} affected
-                      </span>
-                    ) : null}
-                  </p>
-                  {finding.href ? (
-                    <Link
-                      href={finding.href}
-                      className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      Open in Explore <ArrowRight className="size-3.5" />
-                    </Link>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <ScanSearch className="size-3.5" /> Evidence
+                  {affectedCount > 1 ? (
+                    <span className="font-normal normal-case text-muted-foreground/70">
+                      · {affectedCount} affected
+                    </span>
                   ) : null}
-                </div>
-                {hasNodeEvidence ? (
-                  <ul className="divide-y divide-border overflow-hidden rounded-md border border-border">
-                    {nodeEvidence.map((n) => (
-                      <li key={n.id}>
-                        <Link
-                          href={`/explore/${n.id}`}
-                          className="flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors hover:bg-muted/40"
-                        >
-                          <Boxes className="size-4 shrink-0 text-muted-foreground" />
-                          <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-foreground/90">
-                            {n.label}
-                          </span>
-                          <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                ) : evidenceIsList ? (
-                  <ul className="divide-y divide-border overflow-hidden rounded-md border border-border">
-                    {evidence.map((item, i) => (
-                      <li key={i} className="flex items-center gap-2.5 px-3 py-2.5 text-sm">
-                        <Boxes className="size-4 shrink-0 text-muted-foreground" />
-                        <span className="font-mono text-[13px] text-foreground/90">{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm leading-relaxed text-muted-foreground">{finding.detail}</p>
-                )}
-              </CardContent>
-            </Card>
+                </p>
+                {finding.href ? (
+                  <Link
+                    href={finding.href}
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    Open in Explore <ArrowRight className="size-3.5" />
+                  </Link>
+                ) : null}
+              </div>
+              {hasNodeEvidence ? (
+                <ul className="divide-y divide-border overflow-hidden rounded-md border border-border">
+                  {nodeEvidence.map((n) => (
+                    <li key={n.id}>
+                      <Link
+                        href={`/explore/${n.id}`}
+                        className="flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors hover:bg-muted/40"
+                      >
+                        <Box className="size-4 shrink-0 text-muted-foreground" />
+                        <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-foreground/90">
+                          {n.label}
+                        </span>
+                        <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : evidenceIsList ? (
+                <ul className="divide-y divide-border overflow-hidden rounded-md border border-border">
+                  {evidence.map((item, i) => (
+                    <li key={i} className="flex items-center gap-2.5 px-3 py-2.5 text-sm">
+                      <Box className="size-4 shrink-0 text-muted-foreground" />
+                      <span className="font-mono text-[13px] text-foreground/90">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm leading-relaxed text-muted-foreground">{finding.detail}</p>
+              )}
+            </div>
           ) : null}
 
           {/* Primary CTA. */}

@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
+import { SetBreadcrumbs } from "@/components/breadcrumb-context";
 import { NodeDetailView } from "@/components/explore/node-detail";
 import type { NodeDetail, EdgeDto, NodeEvent } from "@/lib/graph-types";
 
@@ -21,11 +21,9 @@ export default async function NodePage({ params }: { params: Promise<{ id: strin
 
   return (
     <>
-      <div className="mb-5">
-        <Link href="/explore" className="text-sm text-muted-foreground hover:text-foreground">
-          ← Explore
-        </Link>
-      </div>
+      <SetBreadcrumbs
+        items={[{ label: "Explore", href: "/explore" }, { label: node?.name ?? "Resource" }]}
+      />
       {node ? (
         <NodeDetailView node={node} edges={edges} events={events} />
       ) : (

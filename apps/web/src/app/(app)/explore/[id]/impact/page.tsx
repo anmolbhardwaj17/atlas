@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
+import { SetBreadcrumbs } from "@/components/breadcrumb-context";
 import { ImpactPanel } from "@/components/explore/impact-panel";
 import type { NodeDetail, TraversalResult } from "@/lib/graph-types";
 
@@ -24,14 +24,13 @@ export default async function ImpactPage({ params }: { params: Promise<{ id: str
 
   return (
     <>
-      <div className="mb-5">
-        <Link
-          href={`/explore/${id}`}
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
-          ← Back to node
-        </Link>
-      </div>
+      <SetBreadcrumbs
+        items={[
+          { label: "Explore", href: "/explore" },
+          { label: node?.name ?? "Resource", href: `/explore/${id}` },
+          { label: "Impact" },
+        ]}
+      />
 
       {node ? (
         <div className="space-y-6">

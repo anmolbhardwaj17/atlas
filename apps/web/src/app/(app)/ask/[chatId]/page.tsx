@@ -1,5 +1,6 @@
 import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
+import { SetBreadcrumbs } from "@/components/breadcrumb-context";
 import { AskWorkspace } from "@/components/ask/ask-workspace";
 import type { ConversationSummary } from "@/lib/browser-api";
 
@@ -21,13 +22,18 @@ export default async function AskConversationPage({
     token: shell.token,
     orgId: shell.orgId,
   });
+  const list = convos.body?.data ?? [];
+  const title = list.find((c) => c.id === chatId)?.title ?? "Conversation";
 
   return (
-    <AskWorkspace
-      orgId={shell.orgId}
-      suggestions={[]}
-      initialConversations={convos.body?.data ?? []}
-      initialConversationId={chatId}
-    />
+    <>
+      <SetBreadcrumbs items={[{ label: "Ask Atlas", href: "/ask" }, { label: title }]} />
+      <AskWorkspace
+        orgId={shell.orgId}
+        suggestions={[]}
+        initialConversations={list}
+        initialConversationId={chatId}
+      />
+    </>
   );
 }
