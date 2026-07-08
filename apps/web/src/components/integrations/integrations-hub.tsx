@@ -138,12 +138,12 @@ export function IntegrationsHub({
   ).sort((a, b) => rank(a) - rank(b));
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       {/* Header: title on the left, a decorative wall of everything we connect on the right. */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
+      <div className="flex flex-col gap-4 pb-1 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-2">
           <h1 className="text-xl font-semibold">Integrations and connected apps</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
             Connect your cloud, code, CI/CD, and observability accounts. Atlas builds one cited
             graph across everything you connect.
           </p>
