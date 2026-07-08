@@ -766,7 +766,8 @@ function Stat({
               {label}
             </span>
           </div>
-          {sub ? <div className="mt-0.5 text-[11px] text-muted-foreground">{sub}</div> : null}
+          {/* Always reserve the sub line (nbsp when empty) so every card is the same height. */}
+          <div className="mt-0.5 text-[11px] text-muted-foreground">{sub ?? " "}</div>
         </div>
         <div className="shrink-0 text-xl font-semibold tabular-nums">
           {typeof value === "number" ? value.toLocaleString() : value}

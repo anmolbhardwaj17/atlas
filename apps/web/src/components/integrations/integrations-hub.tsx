@@ -141,7 +141,7 @@ export function IntegrationsHub({
     <div className="flex flex-col gap-8">
       {/* Header: title on the left, a decorative wall of everything we connect on the right. */}
       <div className="flex flex-col gap-4 pb-1 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 space-y-2">
+        <div className="min-w-0 space-y-1.5">
           <h1 className="text-2xl font-semibold tracking-tight">Integrations and connected apps</h1>
           <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
             Connect your cloud, code, CI/CD, and observability accounts. Atlas builds one cited
@@ -228,31 +228,21 @@ const TABS = ["All", "Cloud", "Code", "CI/CD", "Observability", "Alerts"] as con
 // offer. Logos only (no labels, no status).
 const SHOWCASE_LOGOS = Array.from(new Set(PROVIDERS.map((p) => p.logo)));
 
-/** A compact, decorative wall of everything Atlas connects — top-right of the header, laid out in
- *  two rows that run off the right edge of the page (negative margin cancels the content padding)
- *  and fade at both edges so it blends into the frame. The top row reaches a touch further right
- *  than the bottom (bottom is nudged in) so it feels organic, not gridded. */
+/** A compact, decorative wall of everything Atlas connects — top-right of the header. A tidy,
+ *  right-aligned two-row grid (aligned columns, even gaps) that fades on its left edge so it
+ *  blends toward the title; the right edge sits clean against the page. */
 function LogoShowcase() {
   const logos = SHOWCASE_LOGOS.filter((l) => hasCloudIcon(l));
-  const mid = Math.ceil(logos.length / 2);
-  const top = logos.slice(0, mid);
-  const bottom = logos.slice(mid);
-  const Row = ({ items, className }: { items: string[]; className?: string }) => (
-    <div className={cn("flex w-max gap-4", className)}>
-      {items.map((logo) => (
-        <CloudIcon
-          key={logo}
-          name={logo}
-          className="size-9 opacity-90 transition-opacity hover:opacity-100"
-        />
-      ))}
-    </div>
-  );
   return (
-    <div className="-mr-4 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_12%,black_66%,transparent)] md:-mr-6">
-      <div className="flex flex-col gap-3 pl-8">
-        <Row items={top} />
-        <Row items={bottom} className="-translate-x-10" />
+    <div className="flex justify-end [mask-image:linear-gradient(to_right,transparent,black_28%)]">
+      <div className="grid grid-flow-col grid-rows-2 place-items-center gap-x-4 gap-y-3.5">
+        {logos.map((logo) => (
+          <CloudIcon
+            key={logo}
+            name={logo}
+            className="size-8 opacity-90 transition-opacity hover:opacity-100"
+          />
+        ))}
       </div>
     </div>
   );

@@ -97,17 +97,6 @@ export function NodeGraph({
       )}
       style={{ height }}
     >
-      {/* Blast radius reads as danger — a slow pulsing red bloom behind the graph. */}
-      {danger ? (
-        <div
-          className="pointer-events-none absolute inset-0 z-0 animate-pulse"
-          style={{
-            background:
-              "radial-gradient(circle at 50% 45%, hsl(var(--danger) / 0.14), transparent 62%)",
-          }}
-          aria-hidden
-        />
-      ) : null}
       <ReactFlowProvider>
         <ReactFlow
           nodes={nodes}

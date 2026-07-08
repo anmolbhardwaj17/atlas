@@ -20,8 +20,8 @@ export default async function MapPage() {
   if (!data || data.nodes.length === 0) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-xl font-semibold">Infrastructure map</h1>
+        <div className="space-y-1.5">
+          <h1 className="text-2xl font-semibold tracking-tight">Infrastructure map</h1>
           <p className="text-sm text-muted-foreground">
             Your estate as one flow - resources on the left route through compute into data.
           </p>

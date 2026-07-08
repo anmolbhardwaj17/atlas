@@ -152,9 +152,9 @@ export function InsightsView({
 
   return (
     <div className="w-full space-y-6">
-      <header className="space-y-1">
+      <header className="space-y-1.5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 className="text-xl font-semibold">Insights</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Insights</h1>
           {lastSyncedAt ? (
             <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
               <History className="size-3.5" />

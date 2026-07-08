@@ -17,6 +17,8 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { AtlasLogo, AtlasAiMark } from "@/components/brand";
 import { UserAvatar } from "@/components/user-avatar";
+import { CloudIcon } from "@/components/cloud-icon";
+import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
@@ -79,6 +81,52 @@ const NAV = [
     match: (p: string) => p.startsWith("/settings"),
   },
 ];
+
+/** A dismissible "Connect your apps" promo at the bottom of the sidebar — an aurora tile of app
+ *  logos over a Connect (→ Integrations) / Close pair. Hidden when the sidebar collapses to icons,
+ *  and stays dismissed (localStorage) once closed. */
+const CONNECT_CARD_KEY = "atlas.connectAppsDismissed";
+const PROMO_LOGOS = ["github-icon", "slack-icon", "discord-icon", "notion", "figma"];
+
+function ConnectAppsCard() {
+  // Start hidden to avoid a flash before we can read the dismissed flag on the client.
+  const [dismissed, setDismissed] = React.useState(true);
+  React.useEffect(() => {
+    setDismissed(localStorage.getItem(CONNECT_CARD_KEY) === "1");
+  }, []);
+  if (dismissed) return null;
+
+  const close = () => {
+    localStorage.setItem(CONNECT_CARD_KEY, "1");
+    setDismissed(true);
+  };
+
+  return (
+    <div className="mb-1 overflow-hidden rounded-xl border border-sidebar-border bg-sidebar-accent/40 group-data-[collapsible=icon]:hidden">
+      <div className="flex items-center justify-center gap-1.5 bg-gradient-to-br from-violet-300 via-sky-200 to-emerald-200 px-3 py-4 dark:from-violet-500/50 dark:via-sky-500/40 dark:to-emerald-500/40">
+        {PROMO_LOGOS.map((l) => (
+          <div key={l} className="grid size-8 place-items-center rounded-lg bg-white shadow-sm">
+            <CloudIcon name={l} className="size-5" />
+          </div>
+        ))}
+      </div>
+      <div className="space-y-2.5 p-3">
+        <div>
+          <p className="text-sm font-semibold">Connect your apps</p>
+          <p className="text-xs text-muted-foreground">For more powerful functionality</p>
+        </div>
+        <div className="flex gap-2">
+          <Button asChild size="sm" className="h-8 flex-1">
+            <Link href="/integrations">Connect</Link>
+          </Button>
+          <Button size="sm" variant="outline" className="h-8 flex-1" onClick={close}>
+            Close
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function AppSidebar({
   orgName,
@@ -159,6 +207,7 @@ export function AppSidebar({
       </SidebarContent>
 
       <SidebarFooter>
+        <ConnectAppsCard />
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>

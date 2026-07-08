@@ -71,8 +71,8 @@ export default async function ExplorePage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Explore</h1>
+      <div className="space-y-1.5">
+        <h1 className="text-2xl font-semibold tracking-tight">Explore</h1>
         <p className="text-sm text-muted-foreground">
           Your infrastructure and code - repositories, services, datastores, and cloud resources.
           Filter by type, source, or status; click through for provenance and connections.

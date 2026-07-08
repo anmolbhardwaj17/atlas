@@ -139,8 +139,8 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Infrastructure map</h1>
+        <div className="space-y-1.5">
+          <h1 className="text-2xl font-semibold tracking-tight">Infrastructure map</h1>
           <p className="text-sm text-muted-foreground">
             Your estate as one flow - traffic enters on the left and moves right through compute
             into data. Repositories that deploy sit beside their compute; the rest wait in the code

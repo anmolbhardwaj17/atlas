@@ -93,7 +93,7 @@ export function PostureRadar({ posture }: { posture: Posture }) {
             <tspan x={p.x} y={p.y} className="fill-muted-foreground">
               {ax.label}
             </tspan>
-            <tspan x={p.x} y={p.y} dy="12" className="fill-foreground font-semibold">
+            <tspan x={p.x} y={p.y} dy="11" className="fill-foreground font-semibold">
               {Math.round(posture[ax.key])}
             </tspan>
           </text>

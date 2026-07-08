@@ -77,13 +77,6 @@ export function ResourceNode({ data, selected }: NodeProps) {
           : node.urn
       }
     >
-      {/* Broken-right-now reads at a glance — a red pulse ring emanates from the node. */}
-      {health?.state === "unhealthy" ? (
-        <span
-          className="pointer-events-none absolute inset-0 animate-ping rounded-lg ring-2 ring-danger/40"
-          aria-hidden
-        />
-      ) : null}
       <Handle
         type="target"
         position={Position.Left}
@@ -117,7 +110,7 @@ export function ResourceNode({ data, selected }: NodeProps) {
           >
             <span
               className={cn(
-                "size-1.5 shrink-0 animate-pulse rounded-full",
+                "size-1.5 shrink-0 rounded-full",
                 health.state === "unhealthy" ? "bg-danger" : "bg-warning",
               )}
             />

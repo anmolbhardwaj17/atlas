@@ -54,7 +54,7 @@ export function NodeDetailView({
               <KindIcon className="size-[18px]" />
             )}
           </span>
-          <h1 className="text-xl font-semibold">{node.name ?? "unnamed"}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{node.name ?? "unnamed"}</h1>
           <ConfidenceBadge tier={node.confidence} />
           <FreshnessTag status={node.status} />
           {(() => {

@@ -31,7 +31,7 @@ export default async function EdgePage({ params }: { params: Promise<{ id: strin
         <div className="space-y-6">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-semibold">{edge.type}</h1>
+              <h1 className="text-2xl font-semibold tracking-tight">{edge.type}</h1>
               <ConfidenceBadge tier={edge.confidence} evidence={`origin: ${edge.origin}`} />
             </div>
             <p className="mt-2 flex flex-wrap items-center gap-2 text-sm">
