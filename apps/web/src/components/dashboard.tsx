@@ -14,6 +14,8 @@ import {
   Map as MapIcon,
   TrendingUp,
   TrendingDown,
+  TriangleAlert,
+  Activity,
   type LucideIcon,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -447,7 +449,10 @@ function NeedsAttention({ findings }: { findings: Finding[] }) {
     <Card>
       <CardContent className="p-5">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold">Needs attention</h2>
+          <h2 className="flex items-center gap-2 text-base font-semibold">
+            <TriangleAlert className="size-4 text-muted-foreground" />
+            Needs attention
+          </h2>
           {findings.length > 0 ? (
             <Link
               href="/insights"
@@ -517,7 +522,10 @@ function RecentActivity({ activity }: { activity: ActivityItem[] }) {
   return (
     <Card>
       <CardContent className="p-5">
-        <h2 className="mb-3 text-base font-semibold">Recent activity</h2>
+        <h2 className="mb-3 flex items-center gap-2 text-base font-semibold">
+          <Activity className="size-4 text-muted-foreground" />
+          Recent activity
+        </h2>
         {activity.length === 0 ? (
           <p className="text-sm text-muted-foreground">No recent changes.</p>
         ) : (
