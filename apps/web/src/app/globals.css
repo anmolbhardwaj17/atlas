@@ -49,7 +49,7 @@
 
     /* Semantic status colors (the one place we use hue in the mono UI). */
     --success: 142 52% 43%;
-    --warning: 35 92% 33%;
+    --warning: 24 94% 48%;
     --danger: 0 72% 45%;
 
     /* Atlas brand accent — the green sampled from the Atlas AI mark. The one identity hue;
@@ -110,7 +110,7 @@
     --stale: 0 0% 42%;
 
     --success: 142 60% 55%;
-    --warning: 40 90% 60%;
+    --warning: 28 96% 60%;
     --danger: 0 72% 62%;
 
     --brand: 142 46% 52%;

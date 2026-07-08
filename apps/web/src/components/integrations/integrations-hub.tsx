@@ -184,21 +184,9 @@ export function IntegrationsHub({
 
 const TABS = ["All", "Cloud", "Code", "CI/CD", "Observability"] as const;
 
-// A decorative wall of the tools Atlas actually connects across — the real providers plus the
-// infra/DevOps ecosystem we build the graph from. Domain-relevant only (no consumer/productivity
-// apps we don't integrate). Logos only (no labels, no status).
-const SHOWCASE_LOGOS = Array.from(
-  new Set([
-    ...PROVIDERS.map((p) => p.logo),
-    "kubernetes",
-    "terraform-icon",
-    "pulumi",
-    "docker-icon",
-    "prometheus",
-    "sentry-icon",
-    "pagerduty",
-  ]),
-);
+// A decorative wall of exactly the integrations in the catalog above — nothing we don't actually
+// offer. Logos only (no labels, no status).
+const SHOWCASE_LOGOS = Array.from(new Set(PROVIDERS.map((p) => p.logo)));
 
 /** The stylish logo wall at the bottom — everything Atlas plugs into. Borderless, with the row
  *  edges faded into the page so it reads as a decorative footer, not a boxed card. */
@@ -247,16 +235,36 @@ function ProviderRow({
     if (connected) setManageOpen(true);
   };
 
-  // Once connected, the blurb gives way to a one-line summary of the real state at a glance.
+  // Once connected, the blurb gives way to a one-line summary of the real state at a glance —
+  // always the sync/resources fact, with an attention note appended if a connection is degraded
+  // (so a degraded source still shows what it managed to pull, not just the warning).
   let summary = provider.blurb;
   if (connected) {
     const only = connections.length === 1 ? connections[0] : undefined;
-    if (anySyncing) summary = "Syncing — pulling the latest data…";
-    else if (needsAttention > 0)
-      summary = `${needsAttention} need${needsAttention === 1 ? "s" : ""} attention`;
-    else if (only?.lastSync)
-      summary = `Synced ${timeAgo(only.lastSync.finishedAt)} · ${only.lastSync.resources} resources`;
-    else summary = `${connections.length} connections · all healthy`;
+    if (anySyncing) {
+      summary = "Syncing — pulling the latest data…";
+    } else {
+      const parts: string[] = [];
+      if (only?.lastSync && only.lastSync.status === "failed") {
+        parts.push(`Last sync failed ${timeAgo(only.lastSync.finishedAt)}`);
+      } else if (only?.lastSync) {
+        parts.push(
+          `Synced ${timeAgo(only.lastSync.finishedAt)} · ${only.lastSync.resources} resources`,
+        );
+      } else if (only) {
+        parts.push("Connected · not synced yet");
+      } else {
+        parts.push(`${connections.length} connections`);
+      }
+      if (needsAttention > 0) {
+        parts.push(
+          connections.length === 1
+            ? "needs attention"
+            : `${needsAttention} need${needsAttention === 1 ? "s" : ""} attention`,
+        );
+      }
+      summary = parts.join(" · ");
+    }
   }
 
   return (
