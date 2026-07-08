@@ -1,7 +1,15 @@
 "use client";
 
 import "@xyflow/react/dist/style.css";
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import {
   ReactFlow,
@@ -21,16 +29,19 @@ import {
   Check,
   ChevronDown,
   Clock,
+  CornerDownLeft,
   ListFilter,
   Map as MapIcon,
   Search,
   Shield,
+  Square,
   Stethoscope,
   X,
 } from "lucide-react";
 import { buildLayout } from "@/lib/map-layout";
 import { kindShort, kindIcon, KIND_LOGO } from "@/lib/kind-visual";
 import { edgeCrossing, CROSS_COLOR, type MapData, type MapNode } from "@/lib/map-types";
+import { createConversation, streamAskWS } from "@/lib/browser-api";
 import { CloudIcon } from "@/components/cloud-icon";
 import { AtlasAiMark } from "@/components/brand";
 import { ResourceNode, EnvLaneNode } from "@/components/map/resource-node";
@@ -61,7 +72,7 @@ const segCls = (active: boolean) =>
 // Repositories are kept: the ones that deploy join the flow, the rest go to a code shelf.
 const NON_MAP_KIND = /\.(project|pipeline|workflow|user|team|pullrequest|pull_request)$/;
 
-export function InfraMap({ data: rawData }: { data: MapData }) {
+export function InfraMap({ data: rawData, orgId }: { data: MapData; orgId: string }) {
   // Drop only the granular code activity (projects/pipelines/PRs/users) - a project fanning
   // out to its PRs is what buried the flow. EVERY repository stays: a repo that deploys joins
   // the infra flow beside its compute; a repo with no infra link lands in a compact code
@@ -335,6 +346,7 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
         <ReactFlowProvider>
           <Flow
             data={data}
+            orgId={orgId}
             canvasEdges={canvasEdges}
             protectedBy={protectedBy}
             selectedId={selectedId}
@@ -392,6 +404,7 @@ function decorateEdges(edges: Edge[], activeId: string | null, litSet: Set<strin
 
 function Flow({
   data,
+  orgId,
   canvasEdges,
   protectedBy,
   selectedId,
@@ -406,6 +419,7 @@ function Flow({
   kindFilter,
 }: {
   data: MapData;
+  orgId: string;
   canvasEdges: MapData["edges"];
   protectedBy: Map<string, string[]>;
   selectedId: string | null;
@@ -423,9 +437,34 @@ function Flow({
   const activeId = hoveredId ?? selectedId;
   // Minimap is collapsed by default (it ate a corner); a small button toggles it.
   const [showMinimap, setShowMinimap] = useState(false);
-  // "Ask the map": a query highlights every matching node (null = no query). While a query is
-  // active the shelves auto-expand so matches hiding in them aren't missed.
+  // "Ask the map": the set of nodes the AI cited (or a jump target) lights up; everything else
+  // recedes (null = nothing highlighted). While a set is active the shelves auto-expand so matches
+  // hiding in them aren't missed.
   const [queryIds, setQueryIds] = useState<Set<string> | null>(null);
+  // The streaming AI answer (null = the box is idle). Its node citations feed `queryIds` live, so
+  // the graph lights up as Atlas cites its evidence — the P4 money shot on the canvas.
+  const [ask, setAsk] = useState<AskState | null>(null);
+  const convoRef = useRef<string | null>(null);
+  const askAbortRef = useRef<AbortController | null>(null);
+  // Fitting the viewport to the cited nodes is a discrete event (once, when the answer lands) — a
+  // nonce triggers it, decoupled from the per-citation `queryIds` churn so the view doesn't jump
+  // on every token. `queryIdsRef` lets that effect read the freshest set without depending on it.
+  const [fitNonce, setFitNonce] = useState(0);
+  const queryIdsRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    queryIdsRef.current = queryIds;
+  }, [queryIds]);
+  const nodeById = useMemo(() => {
+    const m = new Map<string, MapNode>();
+    for (const n of data.nodes) m.set(n.id, n);
+    return m;
+  }, [data.nodes]);
+  // Edge id → its endpoints, so a cited EDGE ("X depends on Y") lights both nodes it connects.
+  const edgeById = useMemo(() => {
+    const m = new Map<string, { from: string; to: string }>();
+    for (const e of data.edges) m.set(e.id, { from: e.from, to: e.to });
+    return m;
+  }, [data.edges]);
   // The unlinked "shelves" collapse to a single labelled banner. Both start collapsed — a wall of
   // unlinked repos/resources is noise by default; expand a banner to browse (or use search).
   const [collapsedShelves, setCollapsedShelves] = useState<Set<string>>(
@@ -702,9 +741,10 @@ function Flow({
         }),
     [layout.nodes],
   );
-  const onPick = useCallback(
+  // Centre the viewport on one node and select it (lights its blast radius). Reused by the
+  // typeahead jump and by clicking a source in the AI answer.
+  const jumpTo = useCallback(
     (id: string) => {
-      setQueryIds(null);
       onSelect(id);
       requestAnimationFrame(
         () => void fitView({ nodes: [{ id }], duration: 500, maxZoom: 1.3, padding: 0.5 }),
@@ -713,44 +753,166 @@ function Flow({
     [onSelect, fitView],
   );
 
-  // "Ask the map": match the query across ALL nodes (name/kind) and light every hit. Empty query
-  // clears the highlight. Matching over data.nodes (not just on-canvas) so shelf hits count — the
-  // layout expands the shelves whenever a query is active.
-  const onSearch = useCallback(
-    (q: string) => {
-      const t = q.trim().toLowerCase();
-      if (!t) {
-        setQueryIds(null);
-        return;
-      }
-      onSelect(null);
-      const ids = new Set(
-        data.nodes
-          .filter(
-            (n) => (n.name ?? "").toLowerCase().includes(t) || n.kind.toLowerCase().includes(t),
-          )
-          .map((n) => n.id),
-      );
-      setQueryIds(ids);
+  // Typeahead pick: a plain resource jump — clears any AI highlight/answer and centres the node.
+  const onPick = useCallback(
+    (id: string) => {
+      setQueryIds(null);
+      setAsk(null);
+      jumpTo(id);
     },
-    [data.nodes, onSelect],
+    [jumpTo],
   );
 
-  // When a query resolves, frame its matches (once the expanded-shelf nodes have painted).
+  // Clear the AI answer: abort any in-flight stream and drop the highlight.
+  const closeAsk = useCallback(() => {
+    askAbortRef.current?.abort();
+    askAbortRef.current = null;
+    setAsk(null);
+    setQueryIds(null);
+  }, []);
+
+  // Stop generating but keep whatever streamed so far on screen.
+  const stopAsk = useCallback(() => {
+    askAbortRef.current?.abort();
+    askAbortRef.current = null;
+    setAsk((a) => (a ? { ...a, phase: "done" } : a));
+  }, []);
+
+  // Ask the map a real question. Routes through the same retrieval-first, cited answer engine as
+  // Ask Atlas (WS with an SSE fallback). Node citations light up on the canvas as they stream in;
+  // when the answer lands we frame them. Everything is grounded — P1/P4.
+  const runAsk = useCallback(
+    async (question: string) => {
+      const q = question.trim();
+      if (!q) return;
+      askAbortRef.current?.abort();
+      const ac = new AbortController();
+      askAbortRef.current = ac;
+      onSelect(null);
+      setQueryIds(null);
+      setAsk({
+        question: q,
+        phase: "searching",
+        steps: [],
+        text: "",
+        citations: [],
+        nodeIds: [],
+        confidence: null,
+        caveats: [],
+        error: null,
+      });
+      const cited = new Set<string>();
+      try {
+        if (!convoRef.current) convoRef.current = await createConversation(orgId, `Map · ${q}`);
+        const convId = convoRef.current;
+        if (!convId) {
+          setAsk((a) =>
+            a ? { ...a, phase: "error", error: "Couldn’t start a conversation." } : a,
+          );
+          return;
+        }
+        for await (const ev of streamAskWS(orgId, convId, q, ac.signal)) {
+          if (ac.signal.aborted) return;
+          switch (ev.type) {
+            case "retrieval_step": {
+              const label = toolLabel(ev.tool);
+              setAsk((a) =>
+                a
+                  ? {
+                      ...a,
+                      phase: "searching",
+                      steps: a.steps[a.steps.length - 1] === label ? a.steps : [...a.steps, label],
+                    }
+                  : a,
+              );
+              break;
+            }
+            case "retrieval":
+              setAsk((a) => (a ? { ...a, phase: "thinking" } : a));
+              break;
+            case "token":
+              setAsk((a) => (a ? { ...a, phase: "answering", text: a.text + ev.text } : a));
+              break;
+            case "citation": {
+              const c = ev.citation;
+              // A node citation lights that node; an edge citation lights both endpoints (only ids
+              // that are actually on the map). Keep insertion order for the Source chips.
+              const before = cited.size;
+              if (c.kind === "node") {
+                if (nodeById.has(c.id)) cited.add(c.id);
+              } else if (c.kind === "edge") {
+                const e = edgeById.get(c.id);
+                if (e) {
+                  if (nodeById.has(e.from)) cited.add(e.from);
+                  if (nodeById.has(e.to)) cited.add(e.to);
+                }
+              }
+              const grew = cited.size > before;
+              setAsk((a) =>
+                a
+                  ? {
+                      ...a,
+                      citations: [
+                        ...a.citations,
+                        {
+                          number: c.number,
+                          marker: c.marker,
+                          kind: c.kind,
+                          id: c.id,
+                          confidence: c.confidence,
+                        },
+                      ],
+                      ...(grew ? { nodeIds: [...cited] } : {}),
+                    }
+                  : a,
+              );
+              if (grew) setQueryIds(new Set(cited));
+              break;
+            }
+            case "confidence":
+              setAsk((a) => (a ? { ...a, confidence: ev.overall, caveats: ev.caveats } : a));
+              break;
+            case "error":
+              setAsk((a) => (a ? { ...a, phase: "error", error: ev.message } : a));
+              break;
+            case "done":
+              break;
+          }
+        }
+        setAsk((a) => (a ? { ...a, phase: a.phase === "error" ? "error" : "done" } : a));
+        if (cited.size > 0) setFitNonce((n) => n + 1);
+      } catch {
+        if (!ac.signal.aborted) {
+          setAsk((a) => (a ? { ...a, phase: "error", error: "The stream was interrupted." } : a));
+        }
+      } finally {
+        if (askAbortRef.current === ac) askAbortRef.current = null;
+      }
+    },
+    [orgId, onSelect, nodeById, edgeById],
+  );
+
+  // Frame the cited nodes — once, when the answer lands (bumped nonce), after the expanded-shelf
+  // nodes have painted.
   useEffect(() => {
-    if (!queryIds || queryIds.size === 0) return;
-    const refs = [...queryIds].map((id) => ({ id }));
+    if (fitNonce === 0) return;
+    const ids = queryIdsRef.current;
+    if (!ids || ids.size === 0) return;
+    const refs = [...ids].map((id) => ({ id }));
     let raf2 = 0;
     const raf1 = requestAnimationFrame(() => {
       raf2 = requestAnimationFrame(
-        () => void fitView({ nodes: refs, duration: 500, maxZoom: 1.1, padding: 0.35 }),
+        () => void fitView({ nodes: refs, duration: 500, maxZoom: 1.1, padding: 0.4 }),
       );
     });
     return () => {
       cancelAnimationFrame(raf1);
       if (raf2) cancelAnimationFrame(raf2);
     };
-  }, [queryIds, fitView]);
+  }, [fitNonce, fitView]);
+
+  // Abort a running stream if the map unmounts.
+  useEffect(() => () => askAbortRef.current?.abort(), []);
 
   return (
     <ReactFlow
@@ -779,7 +941,18 @@ function Flow({
         color="hsl(var(--muted-foreground) / 0.25)"
       />
       <Panel position="top-left">
-        <MapSearch nodes={searchNodes} onPick={onPick} onSearch={onSearch} />
+        <div className="flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2">
+          <MapSearch nodes={searchNodes} onPick={onPick} onAsk={runAsk} onClear={closeAsk} />
+          {ask ? (
+            <MapAnswer
+              ask={ask}
+              resolve={(id) => nodeById.get(id) ?? null}
+              onJump={jumpTo}
+              onStop={stopAsk}
+              onClose={closeAsk}
+            />
+          ) : null}
+        </div>
       </Panel>
       <Controls showInteractive={false} />
       {showMinimap ? (
@@ -814,23 +987,308 @@ function KindGlyph({ kind, className = "" }: { kind: string; className?: string 
   return <Icon className={className} />;
 }
 
-/** Find-a-resource search — floats top-left of the canvas. Matches on name/kind; picking a result
- *  selects it (lighting its blast radius) and centres the viewport on it. */
+// ── Ask the map (AI) ─────────────────────────────────────────────────────────
+interface AskCitation {
+  number: number;
+  marker: string;
+  kind: "node" | "edge" | "computed";
+  id: string;
+  confidence: string | null;
+}
+interface AskState {
+  question: string;
+  /** searching/thinking = pre-token wait; answering = streaming; done/error = settled. */
+  phase: "searching" | "thinking" | "answering" | "done" | "error";
+  steps: string[];
+  text: string;
+  citations: AskCitation[];
+  /** The on-map nodes the answer grounds in (node citations + endpoints of cited edges), in the
+   *  order first cited — these light up on the canvas and appear as clickable Source chips. */
+  nodeIds: string[];
+  confidence: string | null;
+  caveats: string[];
+  error: string | null;
+}
+
+/** Friendly label for a retrieval tool (the agentic loop's "show your work" trace). Mirrors the
+ *  Ask Atlas page so the map speaks the same language. */
+function toolLabel(tool: string): string {
+  switch (tool) {
+    case "search":
+      return "Searched the graph";
+    case "get_node":
+      return "Read a node";
+    case "get_neighbors":
+      return "Read relationships";
+    case "traverse":
+      return "Traced impact";
+    case "timeline":
+      return "Checked recent changes";
+    case "estate_overview":
+      return "Read estate overview";
+    default:
+      return `Ran ${tool}`;
+  }
+}
+
+/** Quiet trust line: a coloured dot + label + source count (mirrors Ask Atlas' TrustHint). */
+const TRUST_FALLBACK = { dot: "bg-muted-foreground", label: "No grounded data" };
+const TRUST: Record<string, { dot: string; label: string }> = {
+  observed: { dot: "bg-success", label: "Observed" },
+  "inferred-high": { dot: "bg-warning", label: "Inferred" },
+  "inferred-low": { dot: "bg-warning", label: "Inferred · low confidence" },
+  advisory: { dot: "bg-brand", label: "Recommendation" },
+  insufficient: TRUST_FALLBACK,
+};
+
+function TypingDots() {
+  return (
+    <span className="inline-flex items-center gap-1 leading-none" aria-label="Thinking">
+      <span className="size-1 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.2s]" />
+      <span className="size-1 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.1s]" />
+      <span className="size-1 animate-bounce rounded-full bg-muted-foreground/60" />
+    </span>
+  );
+}
+
+/** Render the model's light markdown inline — **bold**, `code`, and citation markers ([N1]/[E2]/…).
+ *  On the map, a NODE citation is a button that jumps to it on the canvas; edge/computed markers
+ *  deep-link out to Explore. Unresolved markers (citations arrive after tokens) stay hidden. */
+function renderMapRich(
+  text: string,
+  cites: Map<string, AskCitation>,
+  onJump: (id: string) => void,
+): ReactNode[] {
+  const out: ReactNode[] = [];
+  const re = /\*\*(.+?)\*\*|`([^`]+)`|\[([NEA]\d+)\]/g;
+  const sup =
+    "mx-px inline-flex h-3.5 min-w-3.5 items-center justify-center rounded bg-muted px-0.5 align-super text-[10px] font-medium text-muted-foreground transition-colors hover:bg-foreground hover:text-background";
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let key = 0;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    if (m[1] !== undefined) {
+      out.push(<strong key={key++}>{m[1]}</strong>);
+    } else if (m[2] !== undefined) {
+      out.push(
+        <code key={key++} className="rounded bg-muted px-1 py-0.5 text-[0.85em]">
+          {m[2]}
+        </code>,
+      );
+    } else {
+      const c = cites.get(m[3] as string);
+      if (c && c.kind === "node") {
+        out.push(
+          <button
+            key={key++}
+            type="button"
+            onClick={() => onJump(c.id)}
+            title={`Source ${c.number} · jump to it on the map`}
+            className={sup}
+          >
+            {c.number}
+          </button>,
+        );
+      } else if (c) {
+        out.push(
+          <Link
+            key={key++}
+            href={c.kind === "edge" ? `/explore/edge/${c.id}` : "/dashboard"}
+            title={`Source ${c.number}`}
+            className={sup}
+          >
+            {c.number}
+          </Link>,
+        );
+      }
+      // unresolved marker → dropped until its citation arrives
+    }
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+
+/**
+ * The streamed AI answer to a map question — floats under the command bar. Shows the retrieval
+ * "show your work" trace while it thinks, then the cited answer, then a Sources row of the cited
+ * nodes (click to jump on the canvas) and a confidence tier. Every claim is grounded (P4); an
+ * insufficient-grounding answer reads as an honest "I don't know" (US-11), never a fabrication.
+ */
+function MapAnswer({
+  ask,
+  resolve,
+  onJump,
+  onStop,
+  onClose,
+}: {
+  ask: AskState;
+  resolve: (id: string) => MapNode | null;
+  onJump: (id: string) => void;
+  onStop: () => void;
+  onClose: () => void;
+}) {
+  const streaming =
+    ask.phase === "searching" || ask.phase === "thinking" || ask.phase === "answering";
+  const thinking = streaming && ask.text.length === 0;
+  const honest = ask.confidence === "insufficient";
+  const citeByMarker = useMemo(
+    () => new Map(ask.citations.map((c) => [c.marker, c])),
+    [ask.citations],
+  );
+  // Sources = the on-map nodes the answer grounds in (node citations + cited-edge endpoints).
+  const sources = ask.nodeIds;
+  const trust = ask.confidence ? (TRUST[ask.confidence] ?? TRUST_FALLBACK) : null;
+
+  return (
+    <div className="flex max-h-[62vh] w-full flex-col overflow-hidden rounded-lg border border-border bg-background/95 shadow-lg backdrop-blur">
+      <div className="flex items-start gap-2 border-b border-border px-3 py-2">
+        <AtlasAiMark size={16} className={cn("mt-0.5 shrink-0", thinking && "animate-ai-pulse")} />
+        <p className="min-w-0 flex-1 text-xs font-medium leading-snug text-foreground">
+          {ask.question}
+        </p>
+        {streaming ? (
+          <button
+            type="button"
+            onClick={onStop}
+            title="Stop generating"
+            aria-label="Stop generating"
+            className="shrink-0 text-muted-foreground hover:text-foreground"
+          >
+            <Square className="size-3 fill-current" />
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={onClose}
+          title="Close"
+          aria-label="Close answer"
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+        >
+          <X className="size-3.5" />
+        </button>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2.5 text-xs leading-relaxed">
+        {ask.error ? (
+          <p className="rounded-md border border-danger/30 bg-danger/10 px-2 py-1.5 text-danger">
+            {ask.error}
+          </p>
+        ) : thinking ? (
+          <div className="space-y-1.5">
+            <span className="flex items-center gap-2 text-muted-foreground">
+              <TypingDots />
+              {ask.phase === "thinking" ? "Thinking…" : "Searching your graph…"}
+            </span>
+            {ask.steps.length > 0 ? (
+              <ul className="space-y-0.5 pl-0.5">
+                {ask.steps.map((s, i) => (
+                  <li
+                    key={i}
+                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
+                  >
+                    <Check className="size-3 shrink-0 text-success" />
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : ask.text.length === 0 ? (
+          <p className="rounded-md border border-warning/30 bg-warning/10 px-2 py-1.5 text-warning">
+            No answer came back — the model may be rate-limited. Try again, or pick a model in
+            Settings.
+          </p>
+        ) : (
+          <p
+            className={cn(
+              "whitespace-pre-wrap",
+              honest ? "text-muted-foreground" : "text-foreground",
+            )}
+          >
+            {renderMapRich(ask.text, citeByMarker, onJump)}
+            {streaming ? <span className="ml-0.5 animate-pulse">▌</span> : null}
+          </p>
+        )}
+
+        {ask.caveats.length > 0 ? (
+          <ul className="mt-2 space-y-0.5">
+            {ask.caveats.map((c) => (
+              <li key={c} className="text-[11px] text-inferred-low">
+                ⚠ {c}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+
+      {!thinking && (sources.length > 0 || trust) ? (
+        <div className="space-y-2 border-t border-border px-3 py-2">
+          {sources.length > 0 ? (
+            <div className="space-y-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60">
+                On the map
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {sources.map((id) => {
+                  const n = resolve(id);
+                  if (!n) return null;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => onJump(id)}
+                      title="Jump to it on the map"
+                      className="inline-flex max-w-[10rem] items-center gap-1 rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+                    >
+                      <KindGlyph kind={n.kind} className="size-3 shrink-0" />
+                      <span className="truncate">{n.name ?? n.kind}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+          {trust && !streaming ? (
+            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5">
+                <span className={cn("size-1.5 rounded-full", trust.dot)} />
+                {trust.label}
+              </span>
+              {ask.citations.length > 0 ? (
+                <span className="text-muted-foreground/70">
+                  · {ask.citations.length} source{ask.citations.length > 1 ? "s" : ""}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** The map command bar — floats top-left of the canvas. Two jobs in one box: type a resource name
+ *  to JUMP to it (typeahead), or ask a natural-language question to route through Atlas AI, which
+ *  lights the cited nodes on the canvas. The first dropdown row is always the AI ask (default
+ *  Enter action); resource matches follow. Arrow keys move through both. */
 function MapSearch({
   nodes,
   onPick,
-  onSearch,
+  onAsk,
+  onClear,
 }: {
   nodes: { id: string; name: string; kind: string }[];
   onPick: (id: string) => void;
-  onSearch: (q: string) => void;
+  onAsk: (q: string) => void;
+  onClear: () => void;
 }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+  // Active row: 0 = the "Ask Atlas" action, 1..n = resource matches. Defaults to 0 so a plain Enter
+  // asks the question; arrow down into the list to jump to a specific resource instead.
   const [active, setActive] = useState(0);
-  // Whether the user has arrow-navigated the suggestions — decides what Enter does (jump to the
-  // navigated result vs. highlight ALL matches).
-  const moved = useRef(false);
   // Animated placeholder: crossfade the leading glyph + hint between "search" and "ask" while the
   // box is empty AND unfocused, so it advertises both jobs without fighting you once you're in it.
   const [phase, setPhase] = useState(0);
@@ -846,13 +1304,25 @@ function MapSearch({
     if (!t) return [];
     return nodes
       .filter((n) => n.name.toLowerCase().includes(t) || n.kind.toLowerCase().includes(t))
-      .slice(0, 8);
+      .slice(0, 6);
   }, [q, nodes]);
+  const rowCount = matches.length + 1; // +1 for the Ask row at index 0
 
   const pick = (id: string, name: string) => {
     onPick(id);
     setQ(name);
     setOpen(false);
+  };
+  const askNow = () => {
+    if (!q.trim()) return;
+    onAsk(q);
+    setOpen(false);
+  };
+  const clear = () => {
+    setQ("");
+    setOpen(false);
+    setActive(0);
+    onClear();
   };
 
   const onKeyDown = (e: KeyboardEvent) => {
@@ -861,30 +1331,28 @@ function MapSearch({
       return;
     }
     if (e.key === "ArrowDown") {
-      if (matches.length === 0) return;
       e.preventDefault();
-      moved.current = true;
-      setActive((a) => (a + 1) % matches.length);
+      setOpen(true);
+      setActive((a) => (a + 1) % rowCount);
     } else if (e.key === "ArrowUp") {
-      if (matches.length === 0) return;
       e.preventDefault();
-      moved.current = true;
-      setActive((a) => (a - 1 + matches.length) % matches.length);
+      setOpen(true);
+      setActive((a) => (a - 1 + rowCount) % rowCount);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      // Arrow-navigated → jump to that result; plain Enter → highlight every match on the canvas.
-      if (moved.current && matches.length > 0) {
-        const m = matches[Math.min(active, matches.length - 1)];
-        if (m) pick(m.id, m.name);
+      // Row 0 (or nothing navigated) → ask Atlas; any resource row → jump to it.
+      if (active === 0) {
+        askNow();
       } else {
-        onSearch(q);
-        setOpen(false);
+        const m = matches[active - 1];
+        if (m) pick(m.id, m.name);
+        else askNow();
       }
     }
   };
 
   return (
-    <div className="w-60">
+    <div className="w-full">
       <div className="flex items-center gap-2 rounded-lg border border-border bg-background/85 px-2.5 py-1.5 shadow-sm backdrop-blur">
         {/* Crossfading glyph: magnifier ⇄ Atlas AI mark (only while idle & empty). */}
         <span className="relative size-3.5 shrink-0 text-muted-foreground">
@@ -910,7 +1378,6 @@ function MapSearch({
             onChange={(e) => {
               setQ(e.target.value);
               setActive(0);
-              moved.current = false;
               setOpen(true);
             }}
             onKeyDown={onKeyDown}
@@ -963,47 +1430,73 @@ function MapSearch({
         {q ? (
           <button
             type="button"
-            onClick={() => {
-              setQ("");
-              setOpen(false);
-              onSearch("");
-            }}
+            onClick={clear}
             className="shrink-0 text-muted-foreground hover:text-foreground"
-            aria-label="Clear search"
+            aria-label="Clear"
           >
             <X className="size-3.5" />
           </button>
         ) : null}
       </div>
-      {open && matches.length > 0 ? (
-        <ul className="mt-1 max-h-64 overflow-auto rounded-lg border border-border bg-background/95 py-1 text-xs shadow-md backdrop-blur">
-          {matches.map((m, i) => (
-            <li key={m.id}>
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onMouseEnter={() => setActive(i)}
-                onClick={() => pick(m.id, m.name)}
-                className={cn(
-                  "flex w-full items-center gap-2 px-2.5 py-1.5 text-left",
-                  i === active ? "bg-muted" : "hover:bg-muted",
-                )}
-              >
-                <span className="grid size-6 shrink-0 place-items-center rounded-md bg-muted/60">
-                  <KindGlyph kind={m.kind} className="size-3.5" />
+      {open && q.trim() ? (
+        <ul className="mt-1 max-h-72 overflow-auto rounded-lg border border-border bg-background/95 py-1 text-xs shadow-md backdrop-blur">
+          {/* Row 0 — ask Atlas the whole question. */}
+          <li>
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onMouseEnter={() => setActive(0)}
+              onClick={askNow}
+              className={cn(
+                "flex w-full items-center gap-2 px-2.5 py-1.5 text-left",
+                active === 0 ? "bg-muted" : "hover:bg-muted",
+              )}
+            >
+              <span className="grid size-6 shrink-0 place-items-center rounded-md bg-brand/10">
+                <AtlasAiMark size={14} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">
+                  Ask Atlas: <span className="text-muted-foreground">“{q.trim()}”</span>
                 </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block max-w-full truncate font-medium">{m.name}</span>
-                  <span className="block truncate text-[10px] uppercase tracking-wide text-muted-foreground">
-                    {m.kind}
-                  </span>
+                <span className="block truncate text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Grounded, cited answer
                 </span>
-              </button>
-            </li>
-          ))}
-          <li className="mt-1 border-t border-border px-2.5 pb-0.5 pt-1.5 text-[10px] text-muted-foreground/70">
-            ↵ Enter to highlight all matches · ↑↓ to jump to one
+              </span>
+              <CornerDownLeft className="size-3.5 shrink-0 text-muted-foreground/60" />
+            </button>
           </li>
+          {matches.length > 0 ? (
+            <>
+              <li className="px-2.5 pb-0.5 pt-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60">
+                Jump to a resource
+              </li>
+              {matches.map((m, i) => (
+                <li key={m.id}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onMouseEnter={() => setActive(i + 1)}
+                    onClick={() => pick(m.id, m.name)}
+                    className={cn(
+                      "flex w-full items-center gap-2 px-2.5 py-1.5 text-left",
+                      active === i + 1 ? "bg-muted" : "hover:bg-muted",
+                    )}
+                  >
+                    <span className="grid size-6 shrink-0 place-items-center rounded-md bg-muted/60">
+                      <KindGlyph kind={m.kind} className="size-3.5" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block max-w-full truncate font-medium">{m.name}</span>
+                      <span className="block truncate text-[10px] uppercase tracking-wide text-muted-foreground">
+                        {m.kind}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </>
+          ) : null}
         </ul>
       ) : null}
     </div>
