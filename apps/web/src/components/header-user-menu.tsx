@@ -66,7 +66,7 @@ export function HeaderUserMenu({
         <button
           type="button"
           aria-label="Account menu"
-          className="rounded-full outline-none ring-offset-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="rounded-full outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-border"
         >
           <UserAvatar
             value={avatarUrl}

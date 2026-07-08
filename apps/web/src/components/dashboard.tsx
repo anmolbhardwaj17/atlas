@@ -134,7 +134,7 @@ export async function Dashboard({
           fills its spare horizontal room. Infrastructure/Code each show only when connected. */}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,340px)_1fr]">
         <PostureCard posture={s.insights.posture} />
-        <div className="flex h-full flex-col justify-center gap-5">
+        <div className="flex h-full flex-col justify-between gap-5">
           {inv.services + inv.datastores + inv.clouds > 0 && (
             <StatGroup label="Infrastructure">
               <Stat icon={Boxes} label="Services" value={inv.services} />
@@ -239,11 +239,11 @@ function TrustPulse({ trust, inv }: { trust: Summary["trust"]; inv: Summary["inv
 function PostureCard({ posture }: { posture: Posture }) {
   return (
     <Card className="w-full shadow-sm">
-      <CardContent className="flex h-full flex-col p-5">
+      <CardContent className="flex h-full flex-col p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Posture by area
         </p>
-        <div className="flex flex-1 items-center justify-center">
+        <div className="flex flex-1 items-center justify-center py-1">
           <PostureRadar posture={posture} />
         </div>
       </CardContent>
