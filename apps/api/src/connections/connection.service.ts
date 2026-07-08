@@ -105,8 +105,9 @@ export class ConnectionService {
       status: LastSyncDto["status"];
       finished_at: Date;
       stats: Record<string, unknown>;
+      scope_result: unknown;
     }>(
-      `SELECT DISTINCT ON (connection_id) connection_id, status, finished_at, stats
+      `SELECT DISTINCT ON (connection_id) connection_id, status, finished_at, stats, scope_result
          FROM sync_runs
          WHERE connection_id = ANY($1::uuid[]) AND finished_at IS NOT NULL
          ORDER BY connection_id, finished_at DESC`,
@@ -121,6 +122,10 @@ export class ConnectionService {
           resources: Number(r.stats["persisted"] ?? 0),
           edges: Number(r.stats["edges"] ?? 0),
           scopesFailed: Number(r.stats["scopesFailed"] ?? 0),
+          // scope_result is the finalize() failedScopes array (string[]); reaped runs store an object.
+          skippedScopes: Array.isArray(r.scope_result)
+            ? r.scope_result.filter((s): s is string => typeof s === "string")
+            : [],
         },
       ]),
     );

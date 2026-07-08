@@ -338,6 +338,27 @@ function ConnectionRow({
               )}
             </div>
 
+            {/* What was skipped this sync (when we have no explicit permission list to show). */}
+            {missingPerms.length === 0 &&
+            conn.lastSync?.status === "partial" &&
+            (conn.lastSync.skippedScopes?.length ?? 0) > 0 ? (
+              <div className="rounded-md border border-warning/30 bg-warning/5 p-3">
+                <p className="text-xs font-medium text-warning">
+                  Skipped this sync — usually a missing read permission on the token:
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {(conn.lastSync.skippedScopes ?? []).map((s) => (
+                    <code
+                      key={s}
+                      className="rounded border border-warning/30 bg-warning/10 px-1.5 py-0.5 font-mono text-[11px] text-warning"
+                    >
+                      {s}
+                    </code>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             {/* Missing permissions — the detail, now with room to breathe. */}
             {conn.status === "degraded" && missingPerms.length > 0 ? (
               <div className="rounded-md border border-warning/30 bg-warning/5 p-3">

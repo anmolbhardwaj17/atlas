@@ -121,6 +121,7 @@ export interface LastSyncSummary {
   resources: number;
   edges: number;
   scopesFailed: number;
+  skippedScopes?: string[];
 }
 
 export interface ConnectionSummary {

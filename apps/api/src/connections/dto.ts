@@ -28,6 +28,8 @@ export interface LastSyncDto {
   edges: number;
   /** Scopes (service/region pairs) that failed - e.g. denied permission probes. */
   scopesFailed: number;
+  /** The specific scope keys that were skipped (so the UI can say *what*, not just how many). */
+  skippedScopes: string[];
 }
 
 /** Response DTO - secrets are NEVER present (docs/08 §4 DD-2; secret_ref is internal). */
