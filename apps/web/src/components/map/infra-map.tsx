@@ -17,8 +17,9 @@ import {
   type Edge,
   type NodeMouseHandler,
 } from "@xyflow/react";
-import { Search, Shield, Stethoscope, X } from "lucide-react";
+import { ListFilter, Search, Shield, Stethoscope, X } from "lucide-react";
 import { buildLayout } from "@/lib/map-layout";
+import { kindShort } from "@/lib/kind-visual";
 import { edgeCrossing, CROSS_COLOR, type MapData, type MapNode } from "@/lib/map-types";
 import { ResourceNode, EnvLaneNode } from "@/components/map/resource-node";
 import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
@@ -62,6 +63,25 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
   // graph by runtime health — broken/degraded nodes stay lit, everything healthy recedes, so
   // "what's on fire" reads in one glance. Default off.
   const [healthLens, setHealthLens] = useState(false);
+
+  // Kind filter: pick one or more resource kinds to focus (empty = show everything). Non-matching
+  // nodes recede, same as the Health lens. The chip list is the kinds actually present.
+  const [showFilters, setShowFilters] = useState(false);
+  const [kindFilter, setKindFilter] = useState<Set<string>>(new Set());
+  const kinds = useMemo(
+    () => [...new Set(data.nodes.map((n) => n.kind))].sort((a, b) => a.localeCompare(b)),
+    [data.nodes],
+  );
+  const toggleKind = useCallback(
+    (k: string) =>
+      setKindFilter((prev) => {
+        const next = new Set(prev);
+        if (next.has(k)) next.delete(k);
+        else next.add(k);
+        return next;
+      }),
+    [],
+  );
 
   // Protection is a PROPERTY, not a flow: a security group fanning out to five resources
   // drew the longest, noisiest rails on the canvas. By default PROTECTS edges become a
@@ -192,6 +212,26 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
             <Stethoscope className="size-3.5" />
             Health
           </button>
+          <button
+            type="button"
+            onClick={() => setShowFilters((v) => !v)}
+            aria-pressed={showFilters || kindFilter.size > 0}
+            title="Filter the map by resource kind"
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-medium transition-colors",
+              showFilters || kindFilter.size > 0
+                ? "border-transparent bg-foreground text-background"
+                : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
+            )}
+          >
+            <ListFilter className="size-3.5" />
+            Filter
+            {kindFilter.size > 0 ? (
+              <span className="rounded-full bg-background/20 px-1 text-[10px] tabular-nums">
+                {kindFilter.size}
+              </span>
+            ) : null}
+          </button>
           {cross.crossCloud + cross.crossAccount > 0 && (
             <span
               className="flex items-center gap-1.5 rounded-full border border-transparent px-2.5 py-1 font-medium"
@@ -205,6 +245,38 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
             </span>
           )}
         </span>
+        {showFilters ? (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {kinds.map((k) => {
+              const on = kindFilter.has(k);
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => toggleKind(k)}
+                  aria-pressed={on}
+                  className={cn(
+                    "rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors",
+                    on
+                      ? "border-transparent bg-foreground text-background"
+                      : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
+                  )}
+                >
+                  {kindShort(k)}
+                </button>
+              );
+            })}
+            {kindFilter.size > 0 ? (
+              <button
+                type="button"
+                onClick={() => setKindFilter(new Set())}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-3" /> Clear
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {data.truncated && (
@@ -228,6 +300,7 @@ export function InfraMap({ data: rawData }: { data: MapData }) {
             onToggleCollapse={toggleCollapse}
             showSecurity={showSecurity}
             healthLens={healthLens}
+            kindFilter={kindFilter}
           />
         </ReactFlowProvider>
         {!selected && <Legend />}
@@ -294,6 +367,7 @@ function Flow({
   onToggleCollapse,
   showSecurity,
   healthLens,
+  kindFilter,
 }: {
   data: MapData;
   canvasEdges: MapData["edges"];
@@ -306,6 +380,7 @@ function Flow({
   onToggleCollapse: (id: string) => void;
   showSecurity: boolean;
   healthLens: boolean;
+  kindFilter: Set<string>;
 }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const activeId = hoveredId ?? selectedId;
@@ -491,17 +566,29 @@ function Flow({
     setEdges(decorateEdges(layout.edges, activeId, { focusSet, healthLens, alertIds }));
   }, [layout, activeId, focusSet, healthLens, alertIds, setEdges]);
 
-  // Nodes re-decorate in place (dim) for the blast-radius focus and the Health lens — no refit.
+  // Nodes re-decorate in place (dim) for the blast-radius focus, the Health lens, and the kind
+  // filter — no refit. A click's blast radius takes priority; otherwise a node stays lit only if it
+  // passes every active lens/filter.
   useEffect(() => {
     setNodes((nds) =>
       nds.map((n) => {
         if (n.type !== "resource") return n;
-        const dim = focusSet ? !focusSet.has(n.id) : healthLens ? !alertIds.has(n.id) : false;
+        let dim: boolean;
+        if (focusSet) {
+          dim = !focusSet.has(n.id);
+        } else if (healthLens || kindFilter.size > 0) {
+          const passHealth = !healthLens || alertIds.has(n.id);
+          const passKind =
+            kindFilter.size === 0 || kindFilter.has((n.data as { node: MapNode }).node.kind);
+          dim = !(passHealth && passKind);
+        } else {
+          dim = false;
+        }
         if (Boolean((n.data as { dim?: boolean }).dim) === dim) return n;
         return { ...n, data: { ...n.data, dim } };
       }),
     );
-  }, [focusSet, healthLens, alertIds, setNodes, layout]);
+  }, [focusSet, healthLens, alertIds, kindFilter, setNodes, layout]);
 
   const onNodeClick: NodeMouseHandler = (_evt, node) => {
     onSelect(node.type === "resource" ? node.id : null);
