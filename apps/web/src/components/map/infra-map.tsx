@@ -309,6 +309,21 @@ function Flow({
 }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const activeId = hoveredId ?? selectedId;
+  // The unlinked "shelves" collapse to a single labelled banner. Both start collapsed — a wall of
+  // unlinked repos/resources is noise by default; expand a banner to browse (or use search).
+  const [collapsedShelves, setCollapsedShelves] = useState<Set<string>>(
+    new Set(["shelf-code", "shelf-unconnected"]),
+  );
+  const toggleShelf = useCallback(
+    (id: string) =>
+      setCollapsedShelves((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      }),
+    [],
+  );
   // Descendants of any collapsed node are hidden (BFS down the containment tree, cycle-safe).
   const hiddenSet = useMemo(() => {
     const hidden = new Set<string>();
@@ -343,10 +358,14 @@ function Flow({
     const visibleNodes = data.nodes.filter((n) => !hiddenSet.has(n.id));
     const ids = new Set(visibleNodes.map((n) => n.id));
     const visibleEdges = canvasEdges.filter((e) => ids.has(e.from) && ids.has(e.to));
-    const l = buildLayout(visibleNodes, visibleEdges);
+    const l = buildLayout(visibleNodes, visibleEdges, collapsedShelves);
     // Attach collapse state (drives the ⊕/⊖ toggle), an open-PR count, and the shield chip
     // (who protects this node) so protection reads on the card, not as canvas rails.
     l.nodes = l.nodes.map((nd) => {
+      // Shelf banners get their expand/collapse handler wired in here.
+      if (nd.type === "envLane") {
+        return { ...nd, data: { ...nd.data, onToggle: () => toggleShelf(nd.id) } };
+      }
       if (nd.type !== "resource") return nd;
       const kids = childrenOf.get(nd.id);
       const openPrCount = openPrByRepo.get(nd.id) ?? 0;
@@ -382,6 +401,8 @@ function Flow({
     connectedIds,
     onToggleCollapse,
     openPrByRepo,
+    collapsedShelves,
+    toggleShelf,
   ]);
 
   // Undirected adjacency over the drawn edges — powers blast-radius highlighting.
@@ -627,20 +648,40 @@ function MapSearch({
   );
 }
 
-/** Edge legend — floats in the map's top-right corner as a small overlay panel. */
+/** Legend — floats top-right. Explains both the edge styles and the node states so the canvas
+ *  is decodable without hovering. */
 function Legend() {
   return (
-    <div className="absolute right-3 top-3 z-10 flex flex-col gap-1.5 rounded-lg border border-border bg-background/80 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur">
-      <span className="flex items-center gap-1.5">
-        <span className="h-px w-4 bg-foreground" /> observed
-      </span>
-      <span className="flex items-center gap-1.5">
-        <span className="h-px w-4 border-t border-dashed border-muted-foreground" /> inferred
-      </span>
-      <span className="flex items-center gap-1.5">
-        <span className="h-0.5 w-4 rounded" style={{ backgroundColor: CROSS_COLOR }} />
-        cross-boundary
-      </span>
+    <div className="absolute right-3 top-3 z-10 flex flex-col gap-2 rounded-lg border border-border bg-background/80 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur">
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+          Edges
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-px w-4 bg-foreground" /> observed
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-px w-4 border-t border-dashed border-muted-foreground" /> inferred
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-0.5 w-4 rounded" style={{ backgroundColor: CROSS_COLOR }} />
+          cross-boundary
+        </span>
+      </div>
+      <div className="flex flex-col gap-1.5 border-t border-border pt-2">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+          Nodes
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="size-2 rounded-full bg-danger" /> unhealthy
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="size-2 rounded-full bg-warning" /> degraded
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Shield className="size-3" /> protected by a security group
+        </span>
+      </div>
     </div>
   );
 }

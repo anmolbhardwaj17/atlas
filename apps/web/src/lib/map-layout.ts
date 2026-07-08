@@ -21,7 +21,11 @@ export interface LayoutResult {
   edges: Edge[];
 }
 
-export function buildLayout(mapNodes: MapNode[], mapEdges: MapEdge[]): LayoutResult {
+export function buildLayout(
+  mapNodes: MapNode[],
+  mapEdges: MapEdge[],
+  collapsedShelves: Set<string> = new Set(),
+): LayoutResult {
   const byId = new Map(mapNodes.map((n) => [n.id, n]));
 
   // Partition: nodes with a visible edge join the dagre flow; the rest (real estate too -
@@ -79,43 +83,56 @@ export function buildLayout(mapNodes: MapNode[], mapEdges: MapEdge[]): LayoutRes
   const HEADER = 34;
   const cols = Math.max(3, Math.min(6, Math.floor((flowMaxX || 900) / (NODE_W + GAP_X)) || 4));
 
-  const addShelf = (id: string, label: string, shelfNodes: MapNode[]): void => {
+  const addShelf = (id: string, label: string, hint: string, shelfNodes: MapNode[]): void => {
     if (shelfNodes.length === 0) return;
+    const collapsed = collapsedShelves.has(id);
     const rows = Math.ceil(shelfNodes.length / cols);
     const shelfW = cols * NODE_W + (cols - 1) * GAP_X + PAD * 2;
-    const shelfH = rows * NODE_H + (rows - 1) * GAP_Y + HEADER + PAD * 2;
+    const shelfH = collapsed ? HEADER + PAD : rows * NODE_H + (rows - 1) * GAP_Y + HEADER + PAD * 2;
     const shelfY = cursorY + 72;
     outNodes.push({
       id,
       type: "envLane",
       position: { x: 0, y: shelfY },
-      data: { label, count: shelfNodes.length },
+      data: { label, hint, count: shelfNodes.length, collapsible: true, collapsed },
       draggable: false,
       selectable: false,
       width: shelfW,
       height: shelfH,
       style: { width: shelfW, height: shelfH, zIndex: 0 },
     });
-    shelfNodes.forEach((n, i) => {
-      outNodes.push({
-        id: n.id,
-        type: "resource",
-        position: {
-          x: PAD + (i % cols) * (NODE_W + GAP_X),
-          y: shelfY + HEADER + PAD + Math.floor(i / cols) * (NODE_H + GAP_Y),
-        },
-        data: { node: n },
-        draggable: false,
-        width: NODE_W,
-        height: NODE_H,
-        style: { zIndex: 1 },
+    if (!collapsed) {
+      shelfNodes.forEach((n, i) => {
+        outNodes.push({
+          id: n.id,
+          type: "resource",
+          position: {
+            x: PAD + (i % cols) * (NODE_W + GAP_X),
+            y: shelfY + HEADER + PAD + Math.floor(i / cols) * (NODE_H + GAP_Y),
+          },
+          data: { node: n },
+          draggable: false,
+          width: NODE_W,
+          height: NODE_H,
+          style: { zIndex: 1 },
+        });
       });
-    });
+    }
     cursorY = shelfY + shelfH;
   };
 
-  addShelf("shelf-code", "Repositories - no infrastructure link found yet", codeShelf);
-  addShelf("shelf-unconnected", "Infrastructure - no observed connections yet", infraShelf);
+  addShelf(
+    "shelf-code",
+    "Repositories with no infrastructure link yet",
+    "Connect CI/CD so Atlas can tie these repos to what they deploy.",
+    codeShelf,
+  );
+  addShelf(
+    "shelf-unconnected",
+    "Infrastructure with no observed connections yet",
+    "No edges observed yet — they may be unused, or a connector is missing scope.",
+    infraShelf,
+  );
 
   // "Flow" edges carry traffic/data → animate them so the map feels alive; structural edges
   // (CONTAINS/OWNED_BY/…) stay static so the motion means something.

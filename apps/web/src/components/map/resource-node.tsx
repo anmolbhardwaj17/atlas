@@ -175,19 +175,56 @@ export function ResourceNode({ data, selected }: NodeProps) {
   );
 }
 
-/** The labeled frame behind each environment's resources. Non-interactive. */
+/** The labeled frame behind a shelf of resources. Collapsible: when collapsed it's just the
+ *  labelled banner (+ a hint), so a long list of unlinked repos doesn't wall off the map. */
 export function EnvLaneNode({ data }: NodeProps) {
-  const d = data as { label: string; count: number };
+  const d = data as {
+    label: string;
+    count: number;
+    hint?: string;
+    collapsible?: boolean;
+    collapsed?: boolean;
+    onToggle?: () => void;
+  };
   return (
-    <div className="size-full rounded-xl border border-dashed border-border/80 bg-muted/20">
-      <div className="flex items-center gap-2 px-3 py-1.5">
+    <div
+      className={cn(
+        "size-full rounded-xl border border-dashed border-border/80 bg-muted/20",
+        d.collapsed && "bg-muted/30",
+      )}
+    >
+      <button
+        type="button"
+        disabled={!d.collapsible}
+        onClick={(e) => {
+          e.stopPropagation();
+          d.onToggle?.();
+        }}
+        className={cn(
+          "nodrag flex w-full items-center gap-2 px-3 py-1.5 text-left",
+          d.collapsible && "cursor-pointer",
+        )}
+        title={d.collapsible ? (d.collapsed ? "Expand" : "Collapse") : undefined}
+      >
+        {d.collapsible ? (
+          d.collapsed ? (
+            <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+          )
+        ) : null}
         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           {d.label}
         </span>
         <span className="rounded-full bg-muted px-1.5 text-[10px] tabular-nums text-muted-foreground">
           {d.count}
         </span>
-      </div>
+        {d.collapsed && d.hint ? (
+          <span className="truncate text-[11px] normal-case text-muted-foreground/70">
+            · {d.hint}
+          </span>
+        ) : null}
+      </button>
     </div>
   );
 }
