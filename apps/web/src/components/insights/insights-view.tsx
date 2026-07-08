@@ -220,9 +220,9 @@ export function InsightsView({
         </div>
       ) : null}
 
-      {/* Pillar filter. */}
+      {/* Pillar filter (segmented control, matching the Integrations tabs). */}
       {pillars.length > 1 ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="inline-flex flex-wrap gap-1 rounded-lg border border-border bg-muted p-1">
           <Chip active={pillar === "all"} onClick={() => setPillar("all")}>
             All <span className="text-muted-foreground">{base.length}</span>
           </Chip>
@@ -230,7 +230,7 @@ export function InsightsView({
             const m = pillarMeta(p);
             return (
               <Chip key={p} active={pillar === p} onClick={() => setPillar(p)}>
-                <m.icon className={cn("size-3.5", pillar === p ? "" : m.tone)} /> {m.label}{" "}
+                <m.icon className={cn("size-3.5", pillar === p ? m.tone : "")} /> {m.label}{" "}
                 <span className="text-muted-foreground">{n}</span>
               </Chip>
             );
@@ -250,16 +250,16 @@ export function InsightsView({
             className="h-9 w-full rounded-md border border-border bg-transparent pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground/40"
           />
         </div>
-        <div className="flex items-center gap-0.5 rounded-md border border-border p-0.5">
+        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted p-1">
           {(["all", "high", "medium", "low"] as const).map((s) => (
             <button
               key={s}
               type="button"
               onClick={() => setSev(s)}
               className={cn(
-                "rounded px-2.5 py-1 text-xs font-medium capitalize transition-colors",
+                "rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors",
                 sev === s
-                  ? "bg-foreground text-background"
+                  ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
@@ -483,10 +483,10 @@ function Chip({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+        "inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors",
         active
-          ? "border-transparent bg-foreground text-background"
-          : "border-border text-muted-foreground hover:text-foreground",
+          ? "bg-background text-foreground shadow-sm"
+          : "text-muted-foreground hover:text-foreground",
       )}
     >
       {children}

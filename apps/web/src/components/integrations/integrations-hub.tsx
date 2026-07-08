@@ -299,7 +299,7 @@ function AlertProviderRow({
             <button
               type="button"
               onClick={open}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-foreground px-3 text-sm font-medium text-background transition-opacity hover:opacity-90"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-foreground px-3 text-sm font-medium text-background transition-opacity hover:opacity-90 dark:bg-secondary dark:text-foreground"
             >
               <Check className="size-4 text-emerald-400" /> Connected
             </button>
@@ -620,7 +620,7 @@ function ProviderRow({
               <button
                 type="button"
                 onClick={openManage}
-                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-foreground px-3 text-sm font-medium text-background transition-opacity hover:opacity-90"
+                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-foreground px-3 text-sm font-medium text-background transition-opacity hover:opacity-90 dark:bg-secondary dark:text-foreground"
               >
                 <Check className="size-4 text-emerald-400" />
                 {connections.length > 1 ? `${connections.length} connected` : "Connected"}

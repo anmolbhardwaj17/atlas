@@ -142,7 +142,7 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/dashboard">
-                <AtlasLogo size={32} spin className="size-8 shrink-0" />
+                <AtlasLogo size={32} spin className="size-8 shrink-0 dark:invert" />
                 {/* Just the product name here - the account/org lives in the top-right header menu. */}
                 <span className="flex flex-1 items-center truncate text-lg font-semibold">
                   Atlas

@@ -169,7 +169,7 @@ export function AskWorkspace({
               onClick={newChat}
               className={cn(
                 "flex flex-1 items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/50",
-                highlightId === null && "border-primary/40",
+                highlightId === null && "bg-muted/50",
               )}
             >
               <Plus className="size-4" /> New chat

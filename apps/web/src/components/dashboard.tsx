@@ -103,7 +103,7 @@ export async function Dashboard({
   return (
     <div className="space-y-6">
       {/* Hero band — a greeting with personality + the estate pulse, the way in. */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
             {greeting()}
@@ -111,7 +111,14 @@ export async function Dashboard({
           </h1>
           <TrustPulse trust={trust} inv={inv} />
         </div>
-        {canManage ? <RefreshLatest orgId={orgId} /> : null}
+        <div className="flex items-center gap-2.5">
+          {trust.lastSyncAt ? (
+            <span className="text-xs text-muted-foreground">
+              synced {timeAgo(trust.lastSyncAt)}
+            </span>
+          ) : null}
+          {canManage ? <RefreshLatest orgId={orgId} /> : null}
+        </div>
       </div>
 
       {/* Hero grid — one focal point (health, in Atlas green) + posture + sources. */}
@@ -224,12 +231,6 @@ function TrustPulse({ trust, inv }: { trust: Summary["trust"]; inv: Summary["inv
         />
         {trust.healthySources}/{trust.sources} sources healthy
       </span>
-      {trust.lastSyncAt ? (
-        <>
-          <span aria-hidden>·</span>
-          <span>synced {timeAgo(trust.lastSyncAt)}</span>
-        </>
-      ) : null}
     </p>
   );
 }
