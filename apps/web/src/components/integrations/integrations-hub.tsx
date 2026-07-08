@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Loader2, Trash2, RefreshCw } from "lucide-react";
+import { Plus, Loader2, Trash2, RefreshCw, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -320,9 +320,23 @@ function ConnectionRow({
         </span>
       ) : null}
       {conn.status === "degraded" && missingPerms.length > 0 ? (
-        <span className="text-xs text-warning" title={missingPerms.join(", ")}>
-          Missing read access: <span className="font-mono">{missingPerms.join(", ")}</span>
-        </span>
+        <div className="mt-1 rounded-md border border-warning/30 bg-warning/5 p-2.5 text-xs">
+          <p className="flex items-center gap-1.5 font-medium text-warning">
+            <ShieldAlert className="size-3.5 shrink-0" />
+            {missingPerms.length} permission{missingPerms.length === 1 ? "" : "s"} missing — grant
+            these for full coverage
+          </p>
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {missingPerms.map((p) => (
+              <code
+                key={p}
+                className="rounded border border-warning/30 bg-warning/10 px-1.5 py-0.5 font-mono text-[11px] text-warning"
+              >
+                {p}
+              </code>
+            ))}
+          </div>
+        </div>
       ) : null}
       {note ? <span className="text-xs text-danger">{note}</span> : null}
 

@@ -160,7 +160,7 @@ function ConfiguredChannel({
         <span className="truncate font-mono text-xs text-muted-foreground">{channel.hint}</span>
       </span>
       <span className="flex shrink-0 items-center gap-2">
-        <Button size="sm" variant="outline" onClick={() => void test()} disabled={busy !== null}>
+        <Button size="sm" variant="default" onClick={() => void test()} disabled={busy !== null}>
           {busy === "test" ? (
             <Loader2 className="size-3.5 animate-spin" />
           ) : (
