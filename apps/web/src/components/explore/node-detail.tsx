@@ -2,7 +2,20 @@ import Link from "next/link";
 import { ArrowUpRight, ArrowDownLeft, Zap, Stethoscope } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
+import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
+import { kindIcon, kindStyle, KIND_LOGO } from "@/lib/kind-visual";
+import { PROVIDER_META } from "@/lib/taxonomy";
+import { cn } from "@/lib/cn";
 import type { NodeDetail, EdgeDto, NodeEvent } from "@/lib/graph-types";
+
+/** The real logo for a node: its specific service logo (aws-ec2…) if we have one, else the
+ *  provider's brand mark (aws / github / gcp…). Mirrors the Explore list. */
+function nodeLogo(kind: string): string | null {
+  const svc = KIND_LOGO[kind];
+  if (svc && hasCloudIcon(svc)) return svc;
+  const brand = PROVIDER_META[kind.split(".")[0] ?? ""]?.logo;
+  return brand && hasCloudIcon(brand) ? brand : null;
+}
 
 /** Node detail (docs/09 §5.3): header + attributes + provenance disclosure + connections. */
 export function NodeDetailView({
@@ -16,11 +29,21 @@ export function NodeDetailView({
 }) {
   const outgoing = edges.filter((e) => e.from.id === node.id);
   const incoming = edges.filter((e) => e.to.id === node.id);
+  const logo = nodeLogo(node.kind);
+  const KindIcon = kindIcon(node.kind);
 
   return (
     <div className="space-y-6">
       <div>
         <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={cn(
+              "grid size-9 shrink-0 place-items-center rounded-lg",
+              logo ? "bg-muted/60" : kindStyle(node.kind),
+            )}
+          >
+            {logo ? <CloudIcon name={logo} className="size-5" /> : <KindIcon className="size-5" />}
+          </span>
           <h1 className="text-xl font-semibold">{node.name ?? "unnamed"}</h1>
           <ConfidenceBadge tier={node.confidence} />
           <FreshnessTag status={node.status} />
