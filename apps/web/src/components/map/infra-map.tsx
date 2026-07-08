@@ -345,12 +345,18 @@ function Flow({
   const [edges, setEdges, onEdgesChange] = useEdgesState(layout.edges);
   const { fitView } = useReactFlow();
 
-  // Default view: frame the linked flow (nodes with edges), not the whole canvas — otherwise the
-  // tall "unlinked" shelves shrink the graph to nothing. Cap zoom so it opens readable, not huge.
+  // Default view: frame the flow actually drawn on the canvas (nodes touched by an edge), not the
+  // whole graph — otherwise the tall "unlinked" shelves shrink it to nothing. Cap zoom so it opens
+  // readable, not huge.
   const fitOpts = useMemo(() => {
-    const refs = layout.nodes.filter((n) => connectedIds.has(n.id)).map((n) => ({ id: n.id }));
+    const inFlow = new Set<string>();
+    for (const e of layout.edges) {
+      inFlow.add(e.source);
+      inFlow.add(e.target);
+    }
+    const refs = layout.nodes.filter((n) => inFlow.has(n.id)).map((n) => ({ id: n.id }));
     return { padding: 0.2, maxZoom: 1, ...(refs.length > 0 ? { nodes: refs } : {}) };
-  }, [layout.nodes, connectedIds]);
+  }, [layout.nodes, layout.edges]);
 
   useEffect(() => {
     setNodes(layout.nodes);
