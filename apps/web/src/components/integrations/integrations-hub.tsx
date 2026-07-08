@@ -142,7 +142,7 @@ export function IntegrationsHub({
       {/* Header: title on the left, a decorative wall of everything we connect on the right. */}
       <div className="flex flex-col gap-4 pb-1 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-2">
-          <h1 className="text-xl font-semibold">Integrations and connected apps</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Integrations and connected apps</h1>
           <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
             Connect your cloud, code, CI/CD, and observability accounts. Atlas builds one cited
             graph across everything you connect.
@@ -249,7 +249,7 @@ function LogoShowcase() {
     </div>
   );
   return (
-    <div className="-mr-4 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_12%,black_88%,transparent)] md:-mr-6">
+    <div className="-mr-4 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_12%,black_66%,transparent)] md:-mr-6">
       <div className="flex flex-col gap-3 pl-8">
         <Row items={top} />
         <Row items={bottom} className="-translate-x-10" />
