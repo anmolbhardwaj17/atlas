@@ -121,43 +121,48 @@ export async function Dashboard({
         <SourcesCard trust={trust} inv={inv} />
       </div>
 
-      <PostureCard posture={s.insights.posture} />
-
       <AskLauncher />
 
-      {/* At a glance - human inventory. Infrastructure and Code rows each show only when
-          that side of the estate is connected, so a code-only or infra-only org isn't all zeros. */}
-      {inv.services + inv.datastores + inv.clouds > 0 && (
-        <StatGroup label="Infrastructure">
-          <Stat icon={Boxes} label="Services" value={inv.services} />
-          <Stat icon={Database} label="Datastores" value={inv.datastores} />
-          <Stat
-            icon={Cloud}
-            label="Clouds"
-            value={inv.clouds}
-            sub={
-              inv.accounts > 0 ? `${inv.accounts} account${inv.accounts > 1 ? "s" : ""}` : undefined
-            }
-          />
-        </StatGroup>
-      )}
-      {inv.repositories > 0 && (
-        <StatGroup label="Code">
-          <Stat icon={GitBranch} label="Repositories" value={inv.repositories} />
-          <Stat icon={FolderGit2} label="Projects" value={inv.projects} />
-          <Stat
-            icon={Play}
-            label="Pipelines"
-            value={inv.pipelines}
-            sub={
-              inv.pullRequests > 0
-                ? `${inv.pullRequests} open PR${inv.pullRequests > 1 ? "s" : ""}`
-                : undefined
-            }
-          />
-          <Stat icon={Users} label="Contributors" value={inv.contributors} />
-        </StatGroup>
-      )}
+      {/* Risk posture (radar) + inventory side by side — the radar is square, so the inventory
+          fills its spare horizontal room. Infrastructure/Code each show only when connected. */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,340px)_1fr]">
+        <PostureCard posture={s.insights.posture} />
+        <div className="space-y-4">
+          {inv.services + inv.datastores + inv.clouds > 0 && (
+            <StatGroup label="Infrastructure">
+              <Stat icon={Boxes} label="Services" value={inv.services} />
+              <Stat icon={Database} label="Datastores" value={inv.datastores} />
+              <Stat
+                icon={Cloud}
+                label="Clouds"
+                value={inv.clouds}
+                sub={
+                  inv.accounts > 0
+                    ? `${inv.accounts} account${inv.accounts > 1 ? "s" : ""}`
+                    : undefined
+                }
+              />
+            </StatGroup>
+          )}
+          {inv.repositories > 0 && (
+            <StatGroup label="Code">
+              <Stat icon={GitBranch} label="Repositories" value={inv.repositories} />
+              <Stat icon={FolderGit2} label="Projects" value={inv.projects} />
+              <Stat
+                icon={Play}
+                label="Pipelines"
+                value={inv.pipelines}
+                sub={
+                  inv.pullRequests > 0
+                    ? `${inv.pullRequests} open PR${inv.pullRequests > 1 ? "s" : ""}`
+                    : undefined
+                }
+              />
+              <Stat icon={Users} label="Contributors" value={inv.contributors} />
+            </StatGroup>
+          )}
+        </div>
+      </div>
 
       <Insights insights={s.insights} />
 
@@ -232,7 +237,7 @@ function TrustPulse({ trust, inv }: { trust: Summary["trust"]; inv: Summary["inv
 /** Posture by area — a compact square radar widget (where the estate is weak, by pillar). */
 function PostureCard({ posture }: { posture: Posture }) {
   return (
-    <Card className="w-full shadow-sm sm:max-w-sm">
+    <Card className="w-full shadow-sm">
       <CardContent className="p-5">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Posture by area
