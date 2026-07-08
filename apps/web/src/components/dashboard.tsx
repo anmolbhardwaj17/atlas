@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PostureRadar, type Posture } from "@/components/dashboard/posture-radar";
+import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/cn";
 import { Onboarding } from "@/components/onboarding";
 import { AskLauncher } from "@/components/dashboard/ask-launcher";
@@ -612,6 +613,7 @@ function Insights({ insights }: { insights: Summary["insights"] }) {
           items={topContributors}
           href={userHref}
           logo={logo}
+          avatars
           emptyLabel="No PRs in the last 30 days yet."
         />
         <Leaderboard
@@ -652,19 +654,16 @@ function Insights({ insights }: { insights: Summary["insights"] }) {
 }
 
 /**
- * A "tick meter" — a row of thin bars, filled to the value. A calmer, more data-instrument look
- * than a solid progress bar (the pattern the user flagged). Filled ticks use the foreground so it
- * stays mono; coverage isn't a status signal, so no hue. Purely decorative → aria-hidden.
+ * A "tick meter" — a row of thin bars, filled to the value (a calmer, data-instrument look than a
+ * solid progress bar). Filled ticks are colored by coverage level (green good → amber → red).
  */
 function TickMeter({ pct, ticks = 30 }: { pct: number; ticks?: number }) {
   const filled = Math.round((Math.max(0, Math.min(100, pct)) / 100) * ticks);
+  const fill = pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-red-500";
   return (
     <div className="flex h-7 items-stretch gap-[2px]" aria-hidden>
       {Array.from({ length: ticks }).map((_, i) => (
-        <span
-          key={i}
-          className={cn("flex-1 rounded-full", i < filled ? "bg-foreground" : "bg-muted")}
-        />
+        <span key={i} className={cn("flex-1 rounded-full", i < filled ? fill : "bg-muted")} />
       ))}
     </div>
   );
@@ -676,6 +675,7 @@ function Leaderboard({
   items,
   href,
   logo = null,
+  avatars = false,
   emptyLabel = "None yet.",
 }: {
   title: string;
@@ -683,6 +683,7 @@ function Leaderboard({
   items: Array<{ name: string; count: number }>;
   href: string;
   logo?: string | null;
+  avatars?: boolean;
   emptyLabel?: string;
 }) {
   const max = items[0]?.count ?? 1;
@@ -703,8 +704,11 @@ function Leaderboard({
         ) : (
           <ul className="space-y-2">
             {items.map((it) => (
-              <li key={it.name} className="flex items-center gap-3 text-sm">
-                <span className="w-28 shrink-0 truncate">{it.name}</span>
+              <li key={it.name} className="flex items-center gap-2.5 text-sm">
+                {avatars ? (
+                  <UserAvatar name={it.name} email={it.name} size={22} className="shrink-0" />
+                ) : null}
+                <span className="w-24 shrink-0 truncate">{it.name}</span>
                 <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
                   <div
                     className="h-full rounded-full bg-foreground/60"
@@ -747,15 +751,19 @@ function Stat({
 }) {
   return (
     <Card className="shadow-sm transition-colors hover:border-foreground/20">
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Icon className="size-3.5" />
-          <span className="text-[11px] font-medium uppercase tracking-wide">{label}</span>
+      <CardContent className="flex items-center justify-between gap-3 px-3.5 py-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <Icon className="size-3.5 shrink-0" />
+            <span className="truncate text-[11px] font-medium uppercase tracking-wide">
+              {label}
+            </span>
+          </div>
+          {sub ? <div className="mt-0.5 text-[11px] text-muted-foreground">{sub}</div> : null}
         </div>
-        <div className="mt-1.5 text-2xl font-semibold tabular-nums">
+        <div className="shrink-0 text-xl font-semibold tabular-nums">
           {typeof value === "number" ? value.toLocaleString() : value}
         </div>
-        {sub ? <div className="text-xs text-muted-foreground">{sub}</div> : null}
       </CardContent>
     </Card>
   );
