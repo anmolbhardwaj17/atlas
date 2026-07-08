@@ -165,7 +165,13 @@ export function IntegrationsHub({
         </div>
       )}
 
-      <LogoShowcase />
+      {/* A decorative footer, set well apart from the table so it reads as page-bottom flourish. */}
+      <div className="pt-16">
+        <p className="mb-4 text-center text-xs text-muted-foreground">
+          One graph across your whole stack
+        </p>
+        <LogoShowcase />
+      </div>
 
       <ConnectSheet
         provider={connectProvider}
@@ -178,33 +184,19 @@ export function IntegrationsHub({
 
 const TABS = ["All", "Cloud", "Code", "CI/CD", "Observability"] as const;
 
-// A stylish decorative wall of the tools Atlas connects across — the real provider logos first,
-// then a broad set so the footer reads rich. Logos only (no labels, no status).
+// A decorative wall of the tools Atlas actually connects across — the real providers plus the
+// infra/DevOps ecosystem we build the graph from. Domain-relevant only (no consumer/productivity
+// apps we don't integrate). Logos only (no labels, no status).
 const SHOWCASE_LOGOS = Array.from(
   new Set([
     ...PROVIDERS.map((p) => p.logo),
     "kubernetes",
     "terraform-icon",
+    "pulumi",
     "docker-icon",
     "prometheus",
-    "pagerduty",
     "sentry-icon",
-    "pulumi",
-    "slack-icon",
-    "discord-icon",
-    "jira",
-    "linear-icon",
-    "notion",
-    "figma",
-    "trello",
-    "asana-icon",
-    "zendesk-icon",
-    "dropbox",
-    "google-drive",
-    "google-gmail",
-    "microsoft-onedrive",
-    "mailchimp",
-    "todoist-icon",
+    "pagerduty",
   ]),
 );
 
