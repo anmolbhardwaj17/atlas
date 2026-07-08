@@ -238,21 +238,21 @@ function LogoShowcase() {
   const top = logos.slice(0, mid);
   const bottom = logos.slice(mid);
   const Row = ({ items, className }: { items: string[]; className?: string }) => (
-    <div className={cn("flex w-max gap-3", className)}>
+    <div className={cn("flex w-max gap-4", className)}>
       {items.map((logo) => (
         <CloudIcon
           key={logo}
           name={logo}
-          className="size-7 opacity-90 transition-opacity hover:opacity-100"
+          className="size-9 opacity-90 transition-opacity hover:opacity-100"
         />
       ))}
     </div>
   );
   return (
-    <div className="-mr-4 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_14%,black_86%,transparent)] md:-mr-6">
-      <div className="flex flex-col gap-2 pl-6">
+    <div className="-mr-4 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_12%,black_88%,transparent)] md:-mr-6">
+      <div className="flex flex-col gap-3 pl-8">
         <Row items={top} />
-        <Row items={bottom} className="-translate-x-6" />
+        <Row items={bottom} className="-translate-x-10" />
       </div>
     </div>
   );
