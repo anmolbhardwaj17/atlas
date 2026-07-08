@@ -1,42 +1,48 @@
 "use client";
 
-import * as React from "react";
 import Link from "next/link";
+import { CheckCircle2, ChevronRight } from "lucide-react";
 import { Label, Pie, PieChart, Tooltip } from "recharts";
 import { Card, CardContent } from "@/components/ui/card";
 
-/** Blue palette (a la shadcn's pie demo) for the contributor segments. */
-const PALETTE = ["#2684ff", "#4c9aff", "#0052cc", "#79b8ff", "#1d4ed8", "#93c5fd"];
+const SEVERITIES = [
+  { key: "high", label: "High", color: "#ef4444" },
+  { key: "medium", label: "Medium", color: "#f59e0b" },
+  { key: "low", label: "Low", color: "#3b82f6" },
+] as const;
 
-/**
- * Top contributors as a recharts donut ("donut with text"): a wedge per person sized by PR count,
- * total PRs in the centre, and a compact legend beside it. Fixed-size (no ResponsiveContainer,
- * which under-measures inside flex on recharts v3).
- */
-export function ContributorsDonut({
-  items,
-  subtitle,
-  href,
-}: {
-  items: Array<{ name: string; count: number }>;
-  subtitle: string;
-  href: string;
-}) {
-  const total = React.useMemo(() => items.reduce((a, it) => a + it.count, 0), [items]);
-  const color = (i: number) => PALETTE[i % PALETTE.length] ?? "#2684ff";
-  const data = items.map((it, i) => ({ name: it.name, value: it.count, fill: color(i) }));
+/** Open findings as a donut by severity (High/Medium/Low), total in the centre; hover a wedge to
+ *  see the severity and its count. Same look as the Top-contributors donut. */
+export function FindingsDonut({ findings }: { findings: Array<{ severity: string }> }) {
+  const counts = { high: 0, medium: 0, low: 0 };
+  for (const f of findings) {
+    if (f.severity === "high" || f.severity === "medium" || f.severity === "low") {
+      counts[f.severity] += 1;
+    }
+  }
+  const total = findings.length;
+  const data = SEVERITIES.map((s) => ({
+    name: s.label,
+    value: counts[s.key],
+    fill: s.color,
+  })).filter((d) => d.value > 0);
 
   return (
-    <Card>
-      <CardContent className="p-5">
-        <div className="mb-3 flex items-baseline justify-between">
-          <div className="text-sm font-medium">Top contributors</div>
-          <Link href={href} className="text-xs text-muted-foreground hover:text-foreground">
-            {subtitle}
+    <Card className="shadow-sm">
+      <CardContent className="flex h-full flex-col p-5">
+        <div className="flex items-baseline justify-between">
+          <p className="text-sm font-medium text-muted-foreground">Open findings</p>
+          <Link
+            href="/insights"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Insights <ChevronRight className="size-3.5" />
           </Link>
         </div>
-        {items.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No PRs in the last 30 days yet.</p>
+        {total === 0 ? (
+          <p className="mt-3 flex flex-1 items-center gap-1.5 text-sm text-muted-foreground">
+            <CheckCircle2 className="size-4 text-success" /> Nothing needs attention.
+          </p>
         ) : (
           <div className="mt-1 flex justify-center">
             <PieChart width={168} height={150}>
@@ -48,7 +54,7 @@ export function ContributorsDonut({
                   return (
                     <div className="rounded-md border border-border bg-background px-2.5 py-1.5 text-xs shadow-md">
                       <span className="font-medium">{p.name}</span>{" "}
-                      <span className="tabular-nums text-muted-foreground">· {p.value} PRs</span>
+                      <span className="tabular-nums text-muted-foreground">· {p.value}</span>
                     </div>
                   );
                 }}
@@ -80,14 +86,14 @@ export function ContributorsDonut({
                             y={viewBox.cy}
                             className="fill-foreground text-2xl font-semibold"
                           >
-                            {total.toLocaleString()}
+                            {total}
                           </tspan>
                           <tspan
                             x={viewBox.cx}
                             y={(viewBox.cy || 0) + 20}
                             className="fill-muted-foreground text-xs"
                           >
-                            PRs
+                            open
                           </tspan>
                         </text>
                       );

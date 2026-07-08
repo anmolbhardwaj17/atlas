@@ -26,6 +26,7 @@ import { Onboarding } from "@/components/onboarding";
 import { AskLauncher } from "@/components/dashboard/ask-launcher";
 import { RefreshLatest } from "@/components/dashboard/refresh-latest";
 import { ContributorsDonut } from "@/components/dashboard/contributors-donut";
+import { FindingsDonut } from "@/components/dashboard/findings-donut";
 import { SeverityBadge } from "@/components/tags";
 import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
 import { KIND_LOGO } from "@/lib/kind-visual";
@@ -42,6 +43,16 @@ const CODE_LOGO: Record<string, string> = {
   github: "github-icon",
   bitbucket: "bitbucket",
   gitlab: "gitlab",
+};
+/** Any connectable provider → brand-logo key (for the Sources list). */
+const PROVIDER_LOGO: Record<string, string> = {
+  ...CLOUD_LOGO,
+  ...CODE_LOGO,
+  datadog: "datadog",
+  jenkins: "jenkins",
+  grafana: "grafana",
+  circleci: "circleci",
+  argocd: "argocd",
 };
 interface ConnectionLite {
   provider: string;
@@ -159,8 +170,11 @@ export async function Dashboard({
       {/* Hero grid — one focal point (health, in Atlas green) + posture + sources. */}
       <div className="grid gap-4 lg:grid-cols-3">
         <HealthCard health={health} />
-        <FindingsCard findings={s.findings} />
-        <SourcesCard connections={connections} trust={trust} />
+        <FindingsDonut findings={s.findings} />
+        <SourcesCard
+          connections={connections}
+          syncedLabel={trust.lastSyncAt ? timeAgo(trust.lastSyncAt) : null}
+        />
       </div>
 
       <AskLauncher />
@@ -382,74 +396,22 @@ function HealthGauge({ score, label, tone }: { score: number; label: string; ton
   );
 }
 
-/** Open findings, as a scannable severity bar + counts. The bridge into Insights. */
-function FindingsCard({ findings }: { findings: Finding[] }) {
-  const sev = { high: 0, medium: 0, low: 0 };
-  for (const f of findings) {
-    if (f.severity === "high" || f.severity === "medium" || f.severity === "low") {
-      sev[f.severity] += 1;
-    }
-  }
-  const total = findings.length;
-  const seg = [
-    { n: sev.high, color: "bg-red-500", label: "High" },
-    { n: sev.medium, color: "bg-amber-500", label: "Medium" },
-    { n: sev.low, color: "bg-blue-500", label: "Low" },
-  ];
-  return (
-    <Card className="shadow-sm">
-      <CardContent className="flex h-full flex-col p-5">
-        <div className="flex items-baseline justify-between">
-          <p className="text-sm font-medium text-muted-foreground">Open findings</p>
-          <Link
-            href="/insights"
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Insights <ChevronRight className="size-3.5" />
-          </Link>
-        </div>
-        <p className="mt-1 text-3xl font-semibold tabular-nums">{total}</p>
-        {total > 0 ? (
-          <>
-            <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-muted">
-              {seg.map((x) =>
-                x.n > 0 ? (
-                  <div
-                    key={x.label}
-                    className={x.color}
-                    style={{ width: `${(x.n / total) * 100}%` }}
-                  />
-                ) : null,
-              )}
-            </div>
-            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-              {seg.map((x) => (
-                <span key={x.label} className="inline-flex items-center gap-1.5">
-                  <span className={cn("size-2 rounded-full", x.color)} />
-                  <span className="tabular-nums">{x.n}</span>
-                  <span className="text-muted-foreground">{x.label}</span>
-                </span>
-              ))}
-            </div>
-          </>
-        ) : (
-          <p className="mt-2 flex items-center gap-1.5 text-sm text-muted-foreground">
-            <CheckCircle2 className="size-4 text-success" /> Nothing needs attention.
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-/** Sources health pulse — how trustworthy the picture is, at a glance. */
+/** Connected sources — a compact list: brand logo, name, and a health dot. */
 function SourcesCard({
   connections,
-  trust,
+  syncedLabel,
 }: {
   connections: ConnectionLite[];
-  trust: Summary["trust"];
+  syncedLabel: string | null;
 }) {
+  const dot = (status: string) =>
+    status === "connected"
+      ? "bg-emerald-500"
+      : status === "degraded"
+        ? "bg-amber-500"
+        : "bg-red-500";
+  const label = (status: string) =>
+    status === "connected" ? "Healthy" : status === "degraded" ? "Degraded" : "Error";
   return (
     <Card className="shadow-sm">
       <CardContent className="flex h-full flex-col p-5">
@@ -465,75 +427,30 @@ function SourcesCard({
         {connections.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">No sources connected yet.</p>
         ) : (
-          <div className="flex flex-1 items-center gap-4 py-1">
-            <SourcesDonut connections={connections} />
-            <ul className="min-w-0 flex-1 space-y-1.5">
-              {connections.map((c) => (
-                <li key={c.displayName} className="flex items-center gap-2 text-xs">
-                  <span className={cn("size-1.5 shrink-0 rounded-full", statusDot(c.status))} />
-                  <span className="min-w-0 flex-1 truncate text-muted-foreground">
-                    {c.displayName}
+          <ul className="mt-3 space-y-2.5">
+            {connections.map((c) => {
+              const logo = PROVIDER_LOGO[c.provider];
+              return (
+                <li key={c.displayName} className="flex items-center gap-2.5 text-sm">
+                  {/* White chip keeps dark brand marks (AWS) legible in dark mode. */}
+                  <span className="grid size-6 shrink-0 place-items-center rounded-md bg-white ring-1 ring-black/5">
+                    {logo ? <CloudIcon name={logo} className="size-3.5" /> : null}
                   </span>
+                  <span className="min-w-0 flex-1 truncate font-medium">{c.displayName}</span>
+                  <span
+                    className={cn("size-2 shrink-0 rounded-full", dot(c.status))}
+                    title={label(c.status)}
+                  />
                 </li>
-              ))}
-            </ul>
-          </div>
+              );
+            })}
+          </ul>
         )}
-        {trust.lastSyncAt ? (
-          <p className="mt-auto pt-3 text-xs text-muted-foreground">
-            Synced {timeAgo(trust.lastSyncAt)}
-          </p>
+        {syncedLabel ? (
+          <p className="mt-auto pt-3 text-xs text-muted-foreground">Synced {syncedLabel}</p>
         ) : null}
       </CardContent>
     </Card>
-  );
-}
-
-const statusDot = (status: string) =>
-  status === "connected" ? "bg-emerald-500" : status === "degraded" ? "bg-amber-500" : "bg-red-500";
-
-/** A donut split into one segment per source, coloured by health; healthy/total in the centre. */
-function SourcesDonut({ connections }: { connections: ConnectionLite[] }) {
-  const n = connections.length;
-  const r = 44;
-  const sw = 12;
-  const circ = 2 * Math.PI * r;
-  const gap = n > 1 ? 8 : 0;
-  const seg = circ / n - gap;
-  const stroke = (status: string) =>
-    status === "connected"
-      ? "stroke-emerald-500"
-      : status === "degraded"
-        ? "stroke-amber-500"
-        : "stroke-red-500";
-  const healthy = connections.filter((c) => c.status === "connected").length;
-  return (
-    <div className="relative grid size-[112px] shrink-0 place-items-center">
-      <svg viewBox="0 0 112 112" className="size-[112px] -rotate-90">
-        <circle cx="56" cy="56" r={r} fill="none" className="stroke-muted" strokeWidth={sw} />
-        {connections.map((c, i) => (
-          <circle
-            key={c.displayName}
-            cx="56"
-            cy="56"
-            r={r}
-            fill="none"
-            strokeWidth={sw}
-            strokeLinecap="round"
-            className={stroke(c.status)}
-            strokeDasharray={`${seg.toFixed(1)} ${(circ - seg).toFixed(1)}`}
-            strokeDashoffset={(-i * (circ / n)).toFixed(1)}
-          />
-        ))}
-      </svg>
-      <div className="absolute text-center leading-none">
-        <div className="text-xl font-semibold tabular-nums">
-          {healthy}
-          <span className="text-sm text-muted-foreground">/{n}</span>
-        </div>
-        <div className="mt-1 text-[10px] text-muted-foreground">healthy</div>
-      </div>
-    </div>
   );
 }
 
