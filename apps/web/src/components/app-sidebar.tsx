@@ -102,7 +102,7 @@ function ConnectAppsCard() {
   };
 
   return (
-    <div className="mb-1 overflow-hidden rounded-xl border border-sidebar-border bg-sidebar-accent/40 group-data-[collapsible=icon]:hidden">
+    <div className="mb-1 overflow-hidden rounded-xl border border-sidebar-border bg-background group-data-[collapsible=icon]:hidden">
       <div className="flex items-center justify-center gap-1.5 bg-gradient-to-br from-violet-300 via-sky-200 to-emerald-200 px-3 py-4 dark:from-violet-500/50 dark:via-sky-500/40 dark:to-emerald-500/40">
         {PROMO_LOGOS.map((l) => (
           <div key={l} className="grid size-8 place-items-center rounded-lg bg-white shadow-sm">
