@@ -17,8 +17,8 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { AtlasLogo, AtlasAiMark } from "@/components/brand";
 import { UserAvatar } from "@/components/user-avatar";
-import { CloudIcon } from "@/components/cloud-icon";
-import { Button } from "@/components/ui/button";
+// import { CloudIcon } from "@/components/cloud-icon"; // used by ConnectAppsCard (disabled for now)
+// import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
@@ -82,9 +82,10 @@ const NAV = [
   },
 ];
 
-/** A dismissible "Connect your apps" promo at the bottom of the sidebar — an aurora tile of app
- *  logos over a Connect (→ Integrations) / Close pair. Hidden when the sidebar collapses to icons,
- *  and stays dismissed (localStorage) once closed. */
+/* A dismissible "Connect your apps" promo for the bottom of the sidebar — an aurora tile of app
+ * logos over a Connect (→ Integrations) / Close pair. Disabled for now; re-enable by uncommenting
+ * this block, its <ConnectAppsCard /> use in the footer, and the CloudIcon/Button imports above.
+ *
 const CONNECT_CARD_KEY = "atlas.connectAppsDismissed";
 const PROMO_LOGOS = ["aws", "microsoft-azure", "github-icon", "bitbucket", "slack-icon"];
 
@@ -138,6 +139,7 @@ function ConnectAppsCard() {
     </div>
   );
 }
+*/
 
 export function AppSidebar({
   orgName,
@@ -218,7 +220,7 @@ export function AppSidebar({
       </SidebarContent>
 
       <SidebarFooter>
-        <ConnectAppsCard />
+        {/* <ConnectAppsCard /> — disabled for now; see the commented component below. */}
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
