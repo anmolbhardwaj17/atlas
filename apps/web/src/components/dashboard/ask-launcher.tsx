@@ -81,8 +81,6 @@ export function AskLauncher() {
         </form>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted-foreground">Try</span>
-          <span className="h-4 w-px shrink-0 bg-border" aria-hidden />
           {EXAMPLES.map((ex) => (
             <button
               key={ex}
