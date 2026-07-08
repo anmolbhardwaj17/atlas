@@ -44,14 +44,13 @@ export default function DashboardLoading() {
               <ul className="divide-y divide-border">
                 {Array.from({ length: 4 }).map((_, i) => (
                   <li key={i} className="flex items-start gap-3 px-2 py-3">
-                    <Skeleton className="mt-1.5 size-2 shrink-0 rounded-full" />
                     <div className="min-w-0 flex-1 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Skeleton className="h-3 w-10" />
-                        <Skeleton className="h-4 w-24 rounded-md" />
-                      </div>
                       <Skeleton className="h-4 w-2/3" />
                       <Skeleton className="h-3 w-1/2" />
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1.5">
+                      <Skeleton className="h-5 w-20 rounded-md" />
+                      <Skeleton className="h-4 w-12 rounded-full" />
                     </div>
                   </li>
                 ))}
@@ -63,7 +62,7 @@ export default function DashboardLoading() {
           <CardContent className="p-5">
             <Skeleton className="mb-3 h-5 w-32" />
             <ul className="space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => (
+              {Array.from({ length: 4 }).map((_, i) => (
                 <li key={i} className="flex items-start gap-2.5">
                   <Skeleton className="mt-0.5 size-4 shrink-0" />
                   <div className="min-w-0 flex-1 space-y-1.5">

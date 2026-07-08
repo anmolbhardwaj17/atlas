@@ -529,15 +529,11 @@ function NeedsAttention({ findings }: { findings: Finding[] }) {
   );
 }
 
-const SEV_DOT: Record<string, string> = {
-  high: "bg-danger",
-  medium: "bg-warning",
-  low: "bg-inferred-low",
-};
-const SEV_TEXT: Record<string, string> = {
-  high: "text-danger",
-  medium: "text-warning",
-  low: "text-inferred-low",
+// Severity as a soft tinted pill (not bare text) — reads as a designed badge next to the chip.
+const SEV_PILL: Record<string, string> = {
+  high: "bg-red-500/10 text-red-600 dark:text-red-400",
+  medium: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  low: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
 };
 
 function FindingRow({ f }: { f: Finding }) {
@@ -545,18 +541,11 @@ function FindingRow({ f }: { f: Finding }) {
   const m = pillarMeta(f.pillar ?? undefined);
   const body = (
     <div className="group flex items-start gap-3 px-2 py-3 transition-colors hover:bg-muted/50">
-      <span
-        className={cn(
-          "mt-1.5 size-2 shrink-0 rounded-full",
-          SEV_DOT[f.severity] ?? "bg-muted-foreground",
-        )}
-        aria-hidden
-      />
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium text-foreground group-hover:underline">{f.title}</div>
         <div className="mt-0.5 line-clamp-1 text-[13px] text-muted-foreground">{f.detail}</div>
       </div>
-      {/* Category (pillar) + severity sit on the right, aligned as a compact meta stack. */}
+      {/* Two tidy badges on the right: the pillar chip, then a soft severity pill. */}
       <div className="flex shrink-0 flex-col items-end gap-1.5 text-right">
         <span
           className={cn(
@@ -568,8 +557,8 @@ function FindingRow({ f }: { f: Finding }) {
         </span>
         <span
           className={cn(
-            "text-[11px] font-semibold uppercase tracking-wide",
-            SEV_TEXT[f.severity] ?? "text-muted-foreground",
+            "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+            SEV_PILL[f.severity] ?? "bg-muted text-muted-foreground",
           )}
         >
           {f.severity}
@@ -582,8 +571,8 @@ function FindingRow({ f }: { f: Finding }) {
 
 function RecentActivity({ activity }: { activity: ActivityItem[] }) {
   return (
-    <Card>
-      <CardContent className="p-5">
+    <Card className="h-full">
+      <CardContent className="flex h-full flex-col p-5">
         <h2 className="mb-3 flex items-center gap-2 text-base font-semibold">
           <Activity className="size-4 text-muted-foreground" />
           Recent activity
@@ -591,11 +580,17 @@ function RecentActivity({ activity }: { activity: ActivityItem[] }) {
         {activity.length === 0 ? (
           <p className="text-sm text-muted-foreground">No recent changes.</p>
         ) : (
-          <ul className="-mx-2 divide-y divide-border">
-            {activity.map((a, i) => (
-              <ActivityRow key={i} a={a} />
-            ))}
-          </ul>
+          // The list is absolutely positioned so it doesn't drive the card's height — Needs
+          // attention sets the row height, and any overflow here scrolls internally instead.
+          <div className="relative min-h-0 flex-1">
+            <div className="absolute inset-0 -mx-2 overflow-y-auto">
+              <ul className="divide-y divide-border">
+                {activity.map((a, i) => (
+                  <ActivityRow key={i} a={a} />
+                ))}
+              </ul>
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>
