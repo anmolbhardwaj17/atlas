@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Loader2, Trash2, RefreshCw, ShieldAlert } from "lucide-react";
+import { Plus, Loader2, Trash2, RefreshCw, ShieldAlert, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,6 +61,8 @@ function ProviderSetup({ providerId }: { providerId: string }) {
   }
 }
 
+const CATEGORY_ORDER = ["Cloud", "Code", "CI/CD", "Observability"] as const;
+
 const CREDENTIAL_NOUN: Record<string, string> = {
   aws: "role",
   github: "App",
@@ -103,17 +105,31 @@ export function IntegrationsHub({
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {PROVIDERS.map((p) => (
-          <ProviderTile
-            key={p.id}
-            provider={p}
-            connections={byProvider.get(p.id) ?? []}
-            canManage={canManage}
-            orgId={orgId}
-            onConnect={() => setConnectProvider(p)}
-          />
-        ))}
+      {/* Grouped by category, each with a small heading — Cloud · Code · CI/CD · Observability. */}
+      <div className="space-y-8">
+        {CATEGORY_ORDER.map((cat) => {
+          const items = PROVIDERS.filter((p) => p.category === cat);
+          if (items.length === 0) return null;
+          return (
+            <section key={cat} className="space-y-3">
+              <h2 className="border-b border-border pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {cat}
+              </h2>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {items.map((p) => (
+                  <ProviderTile
+                    key={p.id}
+                    provider={p}
+                    connections={byProvider.get(p.id) ?? []}
+                    canManage={canManage}
+                    orgId={orgId}
+                    onConnect={() => setConnectProvider(p)}
+                  />
+                ))}
+              </div>
+            </section>
+          );
+        })}
       </div>
 
       <ConnectSheet
@@ -146,18 +162,13 @@ function ProviderTile({
           <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-border bg-background">
             <ProviderLogo provider={provider} className="size-6" />
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="truncate font-medium">{provider.name}</span>
-              {comingSoon && (
-                <span className="rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                  Soon
-                </span>
-              )}
-            </div>
-            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              {provider.category}
-            </span>
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="truncate font-medium">{provider.name}</span>
+            {comingSoon && (
+              <span className="rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                Soon
+              </span>
+            )}
           </div>
         </div>
 
@@ -210,6 +221,7 @@ function ConnectionRow({
 }) {
   const router = useRouter();
   const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [detailsOpen, setDetailsOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [triggering, setTriggering] = React.useState(false);
   const [note, setNote] = React.useState<string | null>(null);
@@ -262,8 +274,14 @@ function ConnectionRow({
   }
 
   return (
-    <li className="flex flex-col gap-1 text-sm">
-      <div className="flex items-center justify-between gap-2">
+    <li className="text-sm">
+      {/* Compact row — click to open the detail slide-over. Keeps the tile short regardless of
+          how much a degraded connection has to say. */}
+      <button
+        type="button"
+        onClick={() => setDetailsOpen(true)}
+        className="flex w-full items-center justify-between gap-2 rounded-md py-1 text-left transition-colors hover:bg-muted/50"
+      >
         <span className="min-w-0 truncate">{conn.displayName}</span>
         <span className="flex shrink-0 items-center gap-2">
           {conn.demo ? (
@@ -272,75 +290,106 @@ function ConnectionRow({
             </span>
           ) : null}
           <StatusBadge status={conn.status} />
-          {canManage && canSync ? (
-            <button
-              type="button"
-              onClick={() => void sync()}
-              disabled={triggering || syncing}
-              aria-label="Sync now"
-              title={syncing ? "Sync in progress" : "Sync now - fetch the latest data"}
-              className="text-muted-foreground hover:text-foreground disabled:opacity-50"
-            >
-              <RefreshCw className={cn("size-3.5", (triggering || syncing) && "animate-spin")} />
-            </button>
-          ) : null}
-          {canManage ? (
-            <button
-              type="button"
-              onClick={() => setConfirmOpen(true)}
-              aria-label="Disconnect"
-              title="Disconnect (removes this source's data)"
-              className="text-muted-foreground hover:text-danger"
-            >
-              <Trash2 className="size-3.5" />
-            </button>
-          ) : null}
+          {syncing ? <Loader2 className="size-3.5 animate-spin text-muted-foreground" /> : null}
+          <ChevronRight className="size-4 text-muted-foreground" />
         </span>
-      </div>
-      {syncing ? (
-        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Loader2 className="size-3 animate-spin" />
-          Syncing - pulling the latest data…
-        </span>
-      ) : conn.lastSync ? (
-        <span
-          className={cn(
-            "text-xs",
-            conn.lastSync.status === "failed" ? "text-danger" : "text-muted-foreground",
-          )}
-        >
-          {conn.lastSync.status === "failed"
-            ? `Last sync failed ${timeAgo(conn.lastSync.finishedAt)}`
-            : `Last synced ${timeAgo(conn.lastSync.finishedAt)} · ${conn.lastSync.resources} resources`}
-          {conn.lastSync.status === "partial" && conn.lastSync.scopesFailed > 0 ? (
-            <span className="text-warning">
-              {" "}
-              · {conn.lastSync.scopesFailed} scope{conn.lastSync.scopesFailed === 1 ? "" : "s"}{" "}
-              skipped
-            </span>
-          ) : null}
-        </span>
-      ) : null}
-      {conn.status === "degraded" && missingPerms.length > 0 ? (
-        <div className="mt-1 rounded-md border border-warning/30 bg-warning/5 p-2.5 text-xs">
-          <p className="flex items-center gap-1.5 font-medium text-warning">
-            <ShieldAlert className="size-3.5 shrink-0" />
-            {missingPerms.length} permission{missingPerms.length === 1 ? "" : "s"} missing — grant
-            these for full coverage
-          </p>
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {missingPerms.map((p) => (
-              <code
-                key={p}
-                className="rounded border border-warning/30 bg-warning/10 px-1.5 py-0.5 font-mono text-[11px] text-warning"
-              >
-                {p}
-              </code>
-            ))}
+      </button>
+
+      <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle className="flex flex-wrap items-center gap-2">
+              {conn.displayName} <StatusBadge status={conn.status} />
+            </SheetTitle>
+            <SheetDescription>
+              {conn.demo ? "Sample connection." : "Read-only connection details and sync status."}
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-6 space-y-5 text-sm">
+            {/* Sync status. */}
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Sync
+              </p>
+              {syncing ? (
+                <p className="flex items-center gap-1.5 text-muted-foreground">
+                  <Loader2 className="size-3.5 animate-spin" /> Syncing — pulling the latest data…
+                </p>
+              ) : conn.lastSync ? (
+                <p
+                  className={cn(
+                    conn.lastSync.status === "failed" ? "text-danger" : "text-muted-foreground",
+                  )}
+                >
+                  {conn.lastSync.status === "failed"
+                    ? `Last sync failed ${timeAgo(conn.lastSync.finishedAt)}`
+                    : `Last synced ${timeAgo(conn.lastSync.finishedAt)} · ${conn.lastSync.resources} resources`}
+                  {conn.lastSync.status === "partial" && conn.lastSync.scopesFailed > 0 ? (
+                    <span className="text-warning">
+                      {" "}
+                      · {conn.lastSync.scopesFailed} scope
+                      {conn.lastSync.scopesFailed === 1 ? "" : "s"} skipped
+                    </span>
+                  ) : null}
+                </p>
+              ) : (
+                <p className="text-muted-foreground">Not synced yet.</p>
+              )}
+            </div>
+
+            {/* Missing permissions — the detail, now with room to breathe. */}
+            {conn.status === "degraded" && missingPerms.length > 0 ? (
+              <div className="rounded-md border border-warning/30 bg-warning/5 p-3">
+                <p className="flex items-center gap-1.5 text-xs font-medium text-warning">
+                  <ShieldAlert className="size-3.5 shrink-0" />
+                  {missingPerms.length} permission{missingPerms.length === 1 ? "" : "s"} missing —
+                  grant these for full coverage
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {missingPerms.map((p) => (
+                    <code
+                      key={p}
+                      className="rounded border border-warning/30 bg-warning/10 px-1.5 py-0.5 font-mono text-[11px] text-warning"
+                    >
+                      {p}
+                    </code>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {note ? <p className="text-xs text-danger">{note}</p> : null}
+
+            {/* Actions. */}
+            {canManage ? (
+              <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
+                {canSync ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void sync()}
+                    disabled={triggering || syncing}
+                  >
+                    <RefreshCw
+                      className={cn("size-3.5", (triggering || syncing) && "animate-spin")}
+                    />
+                    {syncing ? "Syncing…" : "Sync now"}
+                  </Button>
+                ) : null}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setConfirmOpen(true)}
+                  className="ml-auto text-muted-foreground hover:bg-danger/10 hover:text-danger"
+                >
+                  <Trash2 className="size-3.5" /> Disconnect
+                </Button>
+              </div>
+            ) : null}
           </div>
-        </div>
-      ) : null}
-      {note ? <span className="text-xs text-danger">{note}</span> : null}
+        </SheetContent>
+      </Sheet>
 
       <AlertDialog open={confirmOpen} onOpenChange={(open) => !busy && setConfirmOpen(open)}>
         <AlertDialogContent>
