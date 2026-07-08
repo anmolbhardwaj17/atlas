@@ -127,7 +127,7 @@ export async function Dashboard({
           fills its spare horizontal room. Infrastructure/Code each show only when connected. */}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,340px)_1fr]">
         <PostureCard posture={s.insights.posture} />
-        <div className="space-y-4">
+        <div className="flex h-full flex-col justify-center gap-5">
           {inv.services + inv.datastores + inv.clouds > 0 && (
             <StatGroup label="Infrastructure">
               <Stat icon={Boxes} label="Services" value={inv.services} />
@@ -238,11 +238,11 @@ function TrustPulse({ trust, inv }: { trust: Summary["trust"]; inv: Summary["inv
 function PostureCard({ posture }: { posture: Posture }) {
   return (
     <Card className="w-full shadow-sm">
-      <CardContent className="p-5">
+      <CardContent className="flex h-full flex-col p-5">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Posture by area
         </p>
-        <div className="mt-1">
+        <div className="flex flex-1 items-center justify-center">
           <PostureRadar posture={posture} />
         </div>
       </CardContent>
@@ -738,7 +738,9 @@ function StatGroup({ label, children }: { label: string; children: React.ReactNo
       <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{children}</div>
+      {/* flex-wrap (not a fixed grid) so each row fills evenly regardless of card count — 3 infra
+          or 4 code cards both stretch to a full, intentional-looking row. */}
+      <div className="flex flex-wrap gap-3">{children}</div>
     </div>
   );
 }
@@ -755,7 +757,7 @@ function Stat({
   sub?: string | undefined;
 }) {
   return (
-    <Card className="shadow-sm transition-colors hover:border-foreground/20">
+    <Card className="min-w-[150px] flex-1 shadow-sm transition-colors hover:border-foreground/20">
       <CardContent className="flex items-center justify-between gap-3 px-3.5 py-3">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 text-muted-foreground">
