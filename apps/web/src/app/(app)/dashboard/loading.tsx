@@ -33,13 +33,13 @@ export default function DashboardLoading() {
       </div>
 
       {/* Ask Atlas (dark hero). */}
-      <div className="rounded-2xl border border-transparent bg-neutral-900 p-6 sm:p-7">
-        <Skeleton className="mb-2 h-5 w-28 bg-white/10" />
-        <Skeleton className="mb-4 h-4 w-full max-w-xl bg-white/10" />
-        <Skeleton className="h-12 w-full rounded-xl bg-white/10" />
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-7">
+        <Skeleton className="mb-2 h-5 w-28" />
+        <Skeleton className="mb-4 h-4 w-full max-w-xl" />
+        <Skeleton className="h-12 w-full rounded-xl" />
         <div className="mt-3 flex flex-wrap gap-2">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-6 w-52 max-w-full rounded-full bg-white/10" />
+            <Skeleton key={i} className="h-6 w-52 max-w-full rounded-full" />
           ))}
         </div>
       </div>
