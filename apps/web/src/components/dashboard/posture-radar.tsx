@@ -16,16 +16,19 @@ const AXES: Array<{ key: keyof Posture; label: string }> = [
   { key: "operations", label: "Operations" },
 ];
 
-const CX = 130;
-const CY = 118;
-const R = 82;
+// Square-ish viewBox with generous margin so the axis labels never clip.
+const CX = 160;
+const CY = 150;
+const R = 76;
 const N = AXES.length;
 
+function angle(i: number): number {
+  return ((-90 + (360 / N) * i) * Math.PI) / 180;
+}
 function coord(i: number, frac: number): { x: number; y: number } {
-  const a = ((-90 + (360 / N) * i) * Math.PI) / 180;
+  const a = angle(i);
   return { x: CX + R * frac * Math.cos(a), y: CY + R * frac * Math.sin(a) };
 }
-
 function polygon(frac: number): string {
   return AXES.map((_, i) => {
     const p = coord(i, frac);
@@ -46,8 +49,8 @@ export function PostureRadar({ posture }: { posture: Posture }) {
 
   return (
     <svg
-      viewBox="0 0 260 210"
-      className="h-auto w-full max-w-[320px]"
+      viewBox="0 0 320 300"
+      className="mx-auto block h-auto w-full max-w-[340px]"
       role="img"
       aria-label="Posture by pillar"
     >
@@ -80,23 +83,19 @@ export function PostureRadar({ posture }: { posture: Posture }) {
       {dataPoints.map((p, i) => (
         <circle key={i} cx={p.x} cy={p.y} r={2.5} className="fill-brand" />
       ))}
-      {/* Axis labels + scores. */}
+      {/* Axis labels — name over score, stacked so long names never clip. */}
       {AXES.map((ax, i) => {
-        const p = coord(i, 1.2);
-        const a = ((-90 + (360 / N) * i) * Math.PI) / 180;
-        const cos = Math.cos(a);
+        const p = coord(i, 1.12);
+        const cos = Math.cos(angle(i));
         const anchor = cos > 0.3 ? "start" : cos < -0.3 ? "end" : "middle";
         return (
-          <text
-            key={ax.key}
-            x={p.x}
-            y={p.y}
-            textAnchor={anchor}
-            dominantBaseline="middle"
-            className="fill-muted-foreground text-[9px]"
-          >
-            <tspan className="font-medium">{ax.label}</tspan>
-            <tspan className="fill-foreground font-semibold"> {Math.round(posture[ax.key])}</tspan>
+          <text key={ax.key} textAnchor={anchor} className="text-[10px]">
+            <tspan x={p.x} y={p.y} className="fill-muted-foreground">
+              {ax.label}
+            </tspan>
+            <tspan x={p.x} y={p.y} dy="12" className="fill-foreground font-semibold">
+              {Math.round(posture[ax.key])}
+            </tspan>
           </text>
         );
       })}

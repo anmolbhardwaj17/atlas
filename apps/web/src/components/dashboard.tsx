@@ -228,82 +228,42 @@ function TrustPulse({ trust, inv }: { trust: Summary["trust"]; inv: Summary["inv
   );
 }
 
-/** Posture by area — the radar (where the estate is weak) + a weakest-first bar list. */
+/** Posture by area — a compact square radar widget (where the estate is weak, by pillar). */
 function PostureCard({ posture }: { posture: Posture }) {
-  const areas = (
-    [
-      ["security", "Security"],
-      ["reliability", "Reliability"],
-      ["cost", "Cost"],
-      ["performance", "Performance"],
-      ["hygiene", "Hygiene"],
-      ["operations", "Operations"],
-    ] as const
-  ).map(([key, label]) => ({ key, label, score: posture[key] }));
-  const ranked = [...areas].sort((a, b) => a.score - b.score);
   return (
-    <Card className="shadow-sm">
-      <CardContent className="grid items-center gap-6 p-5 sm:grid-cols-[minmax(0,320px)_1fr]">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Posture by area
-          </p>
-          <div className="mt-2">
-            <PostureRadar posture={posture} />
-          </div>
-        </div>
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Estate health across the six Well-Architected pillars, scored from your findings —
-            weakest first.
-          </p>
-          <ul className="space-y-2">
-            {ranked.map((a) => (
-              <li key={a.key} className="flex items-center gap-3 text-sm">
-                <span className="w-24 shrink-0">{a.label}</span>
-                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={cn(
-                      "h-full rounded-full",
-                      a.score >= 85
-                        ? "bg-emerald-500"
-                        : a.score >= 60
-                          ? "bg-amber-500"
-                          : "bg-red-500",
-                    )}
-                    style={{ width: `${a.score}%` }}
-                  />
-                </div>
-                <span className="w-8 shrink-0 text-right tabular-nums text-muted-foreground">
-                  {Math.round(a.score)}
-                </span>
-              </li>
-            ))}
-          </ul>
+    <Card className="w-full shadow-sm sm:max-w-sm">
+      <CardContent className="p-5">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Posture by area
+        </p>
+        <div className="mt-1">
+          <PostureRadar posture={posture} />
         </div>
       </CardContent>
     </Card>
   );
 }
 
-/** The focal hero card — estate health in Atlas green, with an SVG ring. The one bold moment. */
+/** Estate health — a plain card with a score ring tinted by the health tier (red→amber→green). */
 function HealthCard({ health }: { health: { score: number; label: string } }) {
+  const tone =
+    health.score >= 85
+      ? "text-emerald-500"
+      : health.score >= 65
+        ? "text-foreground"
+        : health.score >= 40
+          ? "text-amber-500"
+          : "text-red-500";
   return (
-    <Card className="relative overflow-hidden border-transparent bg-brand text-brand-foreground shadow-sm">
-      {/* Soft light bloom for depth. */}
-      <div
-        className="pointer-events-none absolute -right-16 -top-16 size-56 rounded-full opacity-25 blur-2xl"
-        style={{ background: "radial-gradient(circle, white 0%, transparent 70%)" }}
-        aria-hidden
-      />
-      <CardContent className="relative flex items-center gap-5 p-5">
-        <HealthRing score={health.score} />
+    <Card className="shadow-sm">
+      <CardContent className="flex items-center gap-5 p-5">
+        <HealthRing score={health.score} className={tone} />
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-brand-foreground/80">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Estate health
           </p>
-          <p className="mt-1 text-2xl font-semibold leading-none">{health.label}</p>
-          <p className="mt-2 max-w-[16rem] text-xs text-brand-foreground/80">
+          <p className={cn("mt-1 text-2xl font-semibold leading-none", tone)}>{health.label}</p>
+          <p className="mt-2 max-w-[16rem] text-xs text-muted-foreground">
             A roll-up of open findings (by severity) and source health. Open Insights to act.
           </p>
         </div>
@@ -312,13 +272,13 @@ function HealthCard({ health }: { health: { score: number; label: string } }) {
   );
 }
 
-/** SVG progress ring for the health score. Pure, deterministic — no client JS needed. */
-function HealthRing({ score }: { score: number }) {
+/** SVG progress ring for the health score. `className` sets the ring color (currentColor). */
+function HealthRing({ score, className }: { score: number; className?: string }) {
   const r = 30;
   const circ = 2 * Math.PI * r;
   const dash = (score / 100) * circ;
   return (
-    <div className="relative grid size-[84px] shrink-0 place-items-center">
+    <div className={cn("relative grid size-[84px] shrink-0 place-items-center", className)}>
       <svg viewBox="0 0 84 84" className="size-[84px] -rotate-90">
         <circle
           cx="42"
@@ -327,7 +287,7 @@ function HealthRing({ score }: { score: number }) {
           fill="none"
           stroke="currentColor"
           strokeWidth="7"
-          opacity="0.25"
+          opacity="0.2"
         />
         <circle
           cx="42"
@@ -340,7 +300,7 @@ function HealthRing({ score }: { score: number }) {
           strokeDasharray={`${dash} ${circ}`}
         />
       </svg>
-      <span className="absolute text-xl font-semibold tabular-nums">{score}</span>
+      <span className="absolute text-xl font-semibold tabular-nums text-foreground">{score}</span>
     </div>
   );
 }

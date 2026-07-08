@@ -1718,22 +1718,25 @@ export class GraphService {
         node_id: string;
         depth: number;
         edge_path: string[];
+        parent_id: string;
         weakest: number;
       }>(
+        // parent_id = the node one hop closer to the root on this path, so the UI can draw the
+        // actual tree edges (not guessed ones). Root is the parent of the first hop.
         `WITH RECURSIVE trav AS (
            SELECT e.${collectCol} AS node_id, 1 AS depth, ARRAY[e.id] AS edge_path,
-                  ${rankExpr} AS weakest
+                  $1::uuid AS parent_id, ${rankExpr} AS weakest
              FROM edges e
             WHERE e.${startCol} = $1 AND e.status='active' AND e.type = ANY($2)
               AND ${rankExpr} >= $3 AND e.${collectCol} <> $1
            UNION ALL
            SELECT e.${collectCol}, t.depth + 1, t.edge_path || e.id,
-                  LEAST(t.weakest, ${rankExpr})
+                  t.node_id AS parent_id, LEAST(t.weakest, ${rankExpr})
              FROM edges e JOIN trav t ON e.${joinCol} = t.node_id
             WHERE e.status='active' AND e.type = ANY($2) AND ${rankExpr} >= $3
               AND t.depth < $4 AND e.id <> ALL(t.edge_path) AND e.${collectCol} <> $1
          )
-         SELECT DISTINCT ON (node_id) node_id, depth, edge_path, weakest
+         SELECT DISTINCT ON (node_id) node_id, depth, edge_path, parent_id, weakest
            FROM trav ORDER BY node_id, depth ASC, weakest DESC`,
         [id, types, minRank, depth],
       );
