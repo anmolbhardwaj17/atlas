@@ -185,77 +185,79 @@ export function NodeDetailView({
       {/* ── Risks (findings that name this node) ────────────────── */}
       <NodeRisks orgId={orgId} nodeId={node.id} />
 
-      {/* ── Key facts (curated) ────────────────────────────────── */}
-      {facts.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Key facts</CardTitle>
-          </CardHeader>
-          <CardBody>
-            <dl className="grid gap-x-8 gap-y-2.5 sm:grid-cols-2">
-              {facts.map(([label, value]) => (
-                <div
-                  key={label}
-                  className="grid grid-cols-[minmax(0,130px)_1fr] items-baseline gap-x-4"
-                >
-                  <dt className="truncate text-sm text-muted-foreground">{label}</dt>
-                  <dd className="min-w-0 break-all text-sm">{value}</dd>
-                </div>
-              ))}
-            </dl>
-          </CardBody>
-        </Card>
-      ) : null}
+      {/* ── Key facts + Timeline — side by side, equal height ──── */}
+      <div className="grid items-stretch gap-6 lg:grid-cols-2">
+        {facts.length > 0 ? (
+          <Card className={cn("h-full", events.length === 0 && "lg:col-span-2")}>
+            <CardHeader>
+              <CardTitle>Key facts</CardTitle>
+            </CardHeader>
+            <CardBody>
+              <dl className="grid gap-x-8 gap-y-2.5 sm:grid-cols-2">
+                {facts.map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="grid grid-cols-[minmax(0,130px)_1fr] items-baseline gap-x-4"
+                  >
+                    <dt className="truncate text-sm text-muted-foreground">{label}</dt>
+                    <dd className="min-w-0 break-all text-sm">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </CardBody>
+          </Card>
+        ) : null}
 
-      {/* ── Timeline (what changed) ────────────────────────────── */}
-      {events.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Timeline</CardTitle>
-          </CardHeader>
-          <CardBody>
-            {/* What changed, when, by whom (Phase C): CloudTrail config changes, health
+        {/* Timeline (what changed) */}
+        {events.length > 0 ? (
+          <Card className={cn("h-full", facts.length === 0 && "lg:col-span-2")}>
+            <CardHeader>
+              <CardTitle>Timeline</CardTitle>
+            </CardHeader>
+            <CardBody>
+              {/* What changed, when, by whom (Phase C): CloudTrail config changes, health
                 transitions, deploys, merged PRs - newest first, the incident-story view. Rendered
                 as a vertical timeline — dots threaded on a rail — so the sequence reads at a glance. */}
-            <ol className="relative">
-              {events.slice(0, 12).map((e, i, arr) => {
-                const dot =
-                  e.kind === "health_transition"
-                    ? "bg-danger"
-                    : e.kind === "config_change"
-                      ? "bg-warning"
-                      : "bg-muted-foreground";
-                const last = i === arr.length - 1;
-                return (
-                  <li key={e.id} className="relative flex gap-3 pb-5 last:pb-0">
-                    {/* the rail connecting this dot to the next (ring-card on dots masks overlap) */}
-                    {!last ? (
+              <ol className="relative">
+                {events.slice(0, 12).map((e, i, arr) => {
+                  const dot =
+                    e.kind === "health_transition"
+                      ? "bg-danger"
+                      : e.kind === "config_change"
+                        ? "bg-warning"
+                        : "bg-muted-foreground";
+                  const last = i === arr.length - 1;
+                  return (
+                    <li key={e.id} className="relative flex gap-3 pb-5 last:pb-0">
+                      {/* the rail connecting this dot to the next (ring-card on dots masks overlap) */}
+                      {!last ? (
+                        <span
+                          aria-hidden
+                          className="absolute left-[5px] top-4 h-full w-px bg-border"
+                        />
+                      ) : null}
                       <span
-                        aria-hidden
-                        className="absolute left-[5px] top-4 h-full w-px bg-border"
+                        className={cn(
+                          "relative z-10 mt-1 size-2.5 shrink-0 rounded-full ring-4 ring-card",
+                          dot,
+                        )}
                       />
-                    ) : null}
-                    <span
-                      className={cn(
-                        "relative z-10 mt-1 size-2.5 shrink-0 rounded-full ring-4 ring-card",
-                        dot,
-                      )}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm" title={e.title}>
-                        {e.title}
-                      </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {new Date(e.occurredAt).toLocaleString()} · {e.source}
-                      </p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-          </CardBody>
-        </Card>
-      ) : null}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm" title={e.title}>
+                          {e.title}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {new Date(e.occurredAt).toLocaleString()} · {e.source}
+                        </p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            </CardBody>
+          </Card>
+        ) : null}
+      </div>
 
       {/* ── Details on demand: all attributes + evidence/provenance ── */}
       <div className="grid gap-4 lg:grid-cols-2">
