@@ -60,9 +60,9 @@ export function OrgSwitcher() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex h-8 items-center gap-1.5 rounded-md border border-border px-1.5 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <OrgLogo name={current.orgName} logoUrl={current.orgLogoUrl} size={20} />
+          <OrgLogo name={current.orgName} logoUrl={current.orgLogoUrl} size={20} bordered={false} />
           <span className="max-w-[160px] truncate">{current.orgName}</span>
           <ChevronsUpDown className="size-3.5 shrink-0 opacity-50" />
         </button>

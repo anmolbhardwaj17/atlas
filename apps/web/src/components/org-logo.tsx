@@ -9,13 +9,19 @@ export function OrgLogo({
   logoUrl,
   size = 24,
   className,
+  bordered = true,
 }: {
   name: string;
   logoUrl?: string | null;
   size?: number;
   className?: string;
+  bordered?: boolean;
 }) {
-  const box = cn("shrink-0 overflow-hidden rounded border border-border bg-background", className);
+  const box = cn(
+    "shrink-0 overflow-hidden rounded bg-background",
+    bordered && "border border-border",
+    className,
+  );
   if (logoUrl) {
     return (
       // A plain <img>: the logo is a user-supplied URL on a public bucket, and next/image would

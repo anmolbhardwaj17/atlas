@@ -13,6 +13,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { AtlasLogo, AtlasAiMark } from "@/components/brand";
+import { SiftMark } from "@/components/sift-mark";
 // import { CloudIcon } from "@/components/cloud-icon"; // used by ConnectAppsCard (disabled for now)
 // import { Button } from "@/components/ui/button";
 import {
@@ -64,6 +65,8 @@ const WORKSPACE_NAV: NavItem[] = [
     icon: Lightbulb,
     match: (p: string) => p.startsWith("/insights"),
   },
+  // Sift carries its own brand glyph (the shield "S"), not a lucide icon.
+  { href: "/sift", label: "Sift", icon: null, match: (p: string) => p.startsWith("/sift") },
 ];
 
 const MANAGE_NAV: NavItem[] = [
@@ -189,6 +192,8 @@ export function AppSidebar() {
                           <Loader2 className="size-4 shrink-0 animate-spin" />
                         ) : item.icon ? (
                           <item.icon />
+                        ) : item.href === "/sift" ? (
+                          <SiftMark className="size-2.5 shrink-0" />
                         ) : (
                           // The Ask Atlas mark reads a touch bigger than the lucide glyphs (it's a
                           // filled sphere, not a line icon); the row height is fixed so this adds no
