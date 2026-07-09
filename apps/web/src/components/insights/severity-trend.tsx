@@ -6,15 +6,10 @@ export interface TrendPoint {
 }
 
 // Severity hues, matching the shared severityMeta (red / amber / sky).
-const SERIES: Array<{
-  key: "high" | "medium" | "low";
-  label: string;
-  color: string;
-  grad: string;
-}> = [
-  { key: "high", label: "High", color: "#ef4444", grad: "st-high" },
-  { key: "medium", label: "Medium", color: "#f59e0b", grad: "st-med" },
-  { key: "low", label: "Low", color: "#0ea5e9", grad: "st-low" },
+const SERIES: Array<{ key: "high" | "medium" | "low"; label: string; color: string }> = [
+  { key: "high", label: "High", color: "#ef4444" },
+  { key: "medium", label: "Medium", color: "#f59e0b" },
+  { key: "low", label: "Low", color: "#0ea5e9" },
 ];
 
 const W = 320;
@@ -33,7 +28,8 @@ function fmtDay(t: number): string {
 /**
  * Severity trend — how the open High / Medium / Low counts have moved over the window, so you see
  * whether posture is improving or slipping (not just today's totals). Pure SVG (deterministic,
- * matches the dashboard's hand-rolled charts); soft gradient area under each line.
+ * matches the dashboard's hand-rolled charts); lines only — the dotted paper backing is drawn by
+ * the parent card, not here, so it fills the whole area.
  */
 export function SeverityTrend({ data }: { data: TrendPoint[] }) {
   const n = data.length;
@@ -53,7 +49,6 @@ export function SeverityTrend({ data }: { data: TrendPoint[] }) {
 
   const x = (i: number) => PAD.l + (n <= 1 ? IW / 2 : (i / (n - 1)) * IW);
   const y = (v: number) => PAD.t + IH - (v / maxY) * IH;
-  const baseY = PAD.t + IH;
   const line = (key: "high" | "medium" | "low") =>
     data
       .map((d, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(d[key]).toFixed(1)}`)
@@ -67,23 +62,12 @@ export function SeverityTrend({ data }: { data: TrendPoint[] }) {
         role="img"
         aria-label="Severity trend"
       >
-        <defs>
-          {SERIES.map((s) => (
-            <linearGradient key={s.grad} id={s.grad} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={s.color} stopOpacity={0.28} />
-              <stop offset="100%" stopColor={s.color} stopOpacity={0} />
-            </linearGradient>
-          ))}
-        </defs>
         {SERIES.map((s) => {
-          const path = line(s.key);
-          const areaPath = `${path} L${x(n - 1).toFixed(1)},${baseY} L${x(0).toFixed(1)},${baseY} Z`;
           const lastPt = last ? { x: x(n - 1), y: y(last[s.key]) } : null;
           return (
             <g key={s.key} className="chart-fade">
-              <path d={areaPath} fill={`url(#${s.grad})`} />
               <path
-                d={path}
+                d={line(s.key)}
                 fill="none"
                 stroke={s.color}
                 strokeWidth={2}

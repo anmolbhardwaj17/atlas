@@ -221,8 +221,9 @@ export function InsightsView({
         </p>
       </header>
 
-      {/* Posture band: severity counts (rows) · how they're trending · the pillar radar. */}
-      <div className="grid gap-3 lg:grid-cols-3">
+      {/* Posture band: severity counts (rows) · how they're trending · the pillar radar. Kept compact
+          — the radar is width-capped so it doesn't make the whole band tall. */}
+      <div className="grid items-stretch gap-3 lg:grid-cols-3">
         {/* Left — the three severity counts, stacked. */}
         <div className="grid grid-rows-3 gap-3">
           <SeverityTile label="High" n={sevCounts.high} sev="high" hint="Fix these first" />
@@ -232,25 +233,38 @@ export function InsightsView({
 
         {/* Middle — severity trend over time. */}
         <Card>
-          <CardContent className="flex h-full flex-col p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <CardContent className="flex h-full flex-col p-3">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               Trend
             </p>
-            <div className="min-h-0 flex-1">
+            {/* Dotted paper backing the trend area (below the label), so the lines read against a
+                subtle grid. */}
+            <div
+              className="mt-1 min-h-0 flex-1 rounded-md"
+              style={{
+                backgroundImage:
+                  "radial-gradient(hsl(var(--muted-foreground) / 0.2) 1px, transparent 1px)",
+                backgroundSize: "10px 10px",
+                backgroundPosition: "center",
+              }}
+            >
               <SeverityTrend data={trendSeries} />
             </div>
           </CardContent>
         </Card>
 
-        {/* Right — posture by pillar (same radar as the dashboard). */}
+        {/* Right — posture by pillar (same radar as the dashboard). Radar width-capped so the band
+            stays short. */}
         <Card>
-          <CardContent className="flex h-full flex-col p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <CardContent className="flex h-full flex-col p-3">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               Posture by area
             </p>
             <div className="flex min-h-0 flex-1 items-center justify-center">
               {posture ? (
-                <PostureRadar posture={toPosture(posture)} />
+                <div className="w-full max-w-[220px]">
+                  <PostureRadar posture={toPosture(posture)} />
+                </div>
               ) : (
                 <p className="text-xs text-muted-foreground/70">No posture data yet.</p>
               )}
@@ -489,22 +503,22 @@ function SeverityTile({
 }) {
   return (
     <Card className="h-full">
-      <CardContent className="flex h-full flex-col justify-center p-4">
-        <div className="flex items-center gap-2">
-          <span className={cn("size-2 rounded-full", severityMeta(sev).accent)} />
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {label}
-          </p>
-        </div>
+      <CardContent className="flex h-full items-center gap-3 px-4 py-2">
+        <span className={cn("size-2 shrink-0 rounded-full", severityMeta(sev).accent)} />
         <p
           className={cn(
-            "mt-1 text-2xl font-semibold tabular-nums",
-            n > 0 && severityMeta(sev).text,
+            "text-2xl font-semibold tabular-nums",
+            n > 0 ? severityMeta(sev).text : "text-muted-foreground",
           )}
         >
           {n}
         </p>
-        <p className="mt-1 text-xs text-muted-foreground">{n > 0 ? hint : "All clear"}</p>
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {label}
+          </p>
+          <p className="truncate text-[11px] text-muted-foreground">{n > 0 ? hint : "All clear"}</p>
+        </div>
       </CardContent>
     </Card>
   );
