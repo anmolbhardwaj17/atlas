@@ -32,6 +32,7 @@ export default async function ExplorePage({
   const category = first(sp.category);
   const source = first(sp.source);
   const status = first(sp.status);
+  const health = first(sp.health);
   // `kind` stays a deep-link pass-through (e.g. dashboard "Contributors" → ?kind=…). It isn't a
   // UI filter, but when present it drives the list (and bypasses the estate default-hide).
   const kind = first(sp.kind);
@@ -44,6 +45,7 @@ export default async function ExplorePage({
   if (category) params.set("category", category);
   if (source) params.set("source", source);
   if (status) params.set("status", status);
+  if (health) params.set("health", health);
   if (kind) params.set("kind", kind);
   if (cursor) params.set("cursor", cursor);
 
@@ -53,7 +55,10 @@ export default async function ExplorePage({
     apiGet<ApiOk<OverviewFacets>>("/overview", auth),
   ]);
   const nodes = res.body?.data ?? [];
-  const page = res.body?.page;
+  const page = res.body?.page as
+    { nextCursor: string | null; hasMore: boolean; limit: number; total: number } | undefined;
+  const total = page?.total ?? nodes.length;
+  const isFiltered = Boolean(q || category || source || status || health || kind);
 
   // Facet options come from the estate (the API already excludes activity/people/CI), so we only
   // ever offer sources/types that actually have browsable things behind them.
@@ -66,6 +71,7 @@ export default async function ExplorePage({
   if (category) nextParams.set("category", category);
   if (source) nextParams.set("source", source);
   if (status) nextParams.set("status", status);
+  if (health) nextParams.set("health", health);
   if (kind) nextParams.set("kind", kind);
   if (page?.nextCursor) nextParams.set("cursor", page.nextCursor);
 
@@ -80,7 +86,7 @@ export default async function ExplorePage({
       </div>
 
       <NodeFilters
-        values={{ q, category, source, status }}
+        values={{ q, category, source, status, health }}
         sources={sources}
         categories={categories}
       />
@@ -91,7 +97,16 @@ export default async function ExplorePage({
           description={`The graph read failed (status ${res.status}). Try again in a moment.`}
         />
       ) : (
-        <NodesList nodes={nodes} />
+        <div className="space-y-2">
+          {nodes.length > 0 ? (
+            <p className="text-xs text-muted-foreground">
+              {total.toLocaleString()} {isFiltered ? "matching " : ""}
+              {total === 1 ? "resource" : "resources"}
+              {page?.hasMore ? ` · showing first ${nodes.length}` : ""}
+            </p>
+          ) : null}
+          <NodesList nodes={nodes} filtered={isFiltered} />
+        </div>
       )}
 
       {page?.hasMore && page.nextCursor && (

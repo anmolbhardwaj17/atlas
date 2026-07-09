@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { SearchX } from "lucide-react";
-import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
+import { SearchX, Waypoints } from "lucide-react";
+import { FreshnessTag } from "@/components/certainty";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { kindIcon, kindStyle, KIND_LOGO } from "@/lib/kind-visual";
 import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
 import { PROVIDER_META } from "@/lib/taxonomy";
 import { cn } from "@/lib/cn";
-import type { NodeDto } from "@/lib/graph-types";
+import { nodeHealthState, type NodeDto } from "@/lib/graph-types";
 
 /** The real logo for a row: a specific service logo (aws-ec2…) if we have one, else the
  *  provider's brand logo (bitbucket / github / azure / gcp / aws) - the Kind column already
@@ -19,14 +19,42 @@ function rowLogo(kind: string): string | null {
   return brand && hasCloudIcon(brand) ? brand : null;
 }
 
-/** The nodes table (docs/09 §5.3) - kind · name · region, with certainty + freshness legible per row. */
-export function NodesList({ nodes }: { nodes: NodeDto[] }) {
+/** Runtime-health cell: a coloured dot + label. "Not checked" (unknown) is a designed state, shown
+ *  quietly — we never fake green (docs/09 §7). Health is the signal the flat inventory was missing. */
+const HEALTH_META: Record<string, { label: string; dot: string; text: string }> = {
+  healthy: { label: "Healthy", dot: "bg-success", text: "text-success" },
+  degraded: { label: "Degraded", dot: "bg-warning", text: "text-warning" },
+  unhealthy: { label: "Unhealthy", dot: "bg-danger", text: "text-danger" },
+};
+function HealthCell({ node }: { node: NodeDto }) {
+  const state = nodeHealthState(node);
+  const meta = state ? HEALTH_META[state] : undefined;
+  if (!meta) {
+    return <span className="text-xs text-muted-foreground/60">Not checked</span>;
+  }
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 text-xs font-medium", meta.text)}>
+      <span className={cn("size-1.5 rounded-full", meta.dot)} />
+      {meta.label}
+    </span>
+  );
+}
+
+/** The nodes table (docs/09 §5.3) — resource · kind · health · region · freshness. Health is
+ *  surfaced per row so "what's broken" reads at a glance, matching the map + dashboard. */
+export function NodesList({ nodes, filtered = false }: { nodes: NodeDto[]; filtered?: boolean }) {
   if (nodes.length === 0) {
-    return (
+    return filtered ? (
       <EmptyState
         icon={SearchX}
         title="No resources match these filters"
-        description="Try clearing filters, or connect a source and let it sync."
+        description="Try widening or clearing the filters above."
+      />
+    ) : (
+      <EmptyState
+        icon={Waypoints}
+        title="Nothing to explore yet"
+        description="Connect a source (or load sample data from the dashboard) and your estate will appear here."
       />
     );
   }
@@ -37,8 +65,8 @@ export function NodesList({ nodes }: { nodes: NodeDto[] }) {
           <tr>
             <th className="px-4 py-2.5 font-medium">Resource</th>
             <th className="px-4 py-2.5 font-medium">Kind</th>
+            <th className="px-4 py-2.5 font-medium">Health</th>
             <th className="px-4 py-2.5 font-medium">Region</th>
-            <th className="px-4 py-2.5 font-medium">Confidence</th>
             <th className="px-4 py-2.5 font-medium">Status</th>
           </tr>
         </thead>
@@ -75,10 +103,10 @@ export function NodesList({ nodes }: { nodes: NodeDto[] }) {
                     {n.kind}
                   </Badge>
                 </td>
-                <td className="px-4 py-2.5 text-muted-foreground">{n.region ?? "-"}</td>
                 <td className="px-4 py-2.5">
-                  <ConfidenceBadge tier={n.confidence} />
+                  <HealthCell node={n} />
                 </td>
+                <td className="px-4 py-2.5 text-muted-foreground">{n.region ?? "-"}</td>
                 <td className="px-4 py-2.5">
                   <FreshnessTag status={n.status} />
                 </td>

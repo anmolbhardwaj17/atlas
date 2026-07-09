@@ -60,6 +60,8 @@ export const NodeListQuerySchema = z
     region: z.string().min(1).optional(),
     status: z.enum(["active", "stale", "deleted"]).optional(),
     confidence: z.enum(["observed", "inferred-high", "inferred-low"]).optional(),
+    // Runtime health facet (docs/08 §5). Reads attributes.health.state; 'unknown' = never checked.
+    health: z.enum(["healthy", "degraded", "unhealthy", "unknown"]).optional(),
     q: z.string().min(1).max(200).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(50),
     cursor: z.string().min(1).optional(),

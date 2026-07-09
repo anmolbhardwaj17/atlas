@@ -15,6 +15,15 @@ export interface NodeDto {
   lastSeen: string;
 }
 
+/** Point-in-time runtime health, stored inside a node's `attributes.health` (absent = never
+ *  checked). Read it defensively — attributes is free-form JSON. */
+export function nodeHealthState(node: NodeDto): "healthy" | "degraded" | "unhealthy" | null {
+  const h = node.attributes?.health;
+  if (!h || typeof h !== "object") return null;
+  const state = (h as { state?: unknown }).state;
+  return state === "healthy" || state === "degraded" || state === "unhealthy" ? state : null;
+}
+
 export interface NodeProvenance {
   source: string | null;
   syncRunId: string | null;

@@ -13,9 +13,17 @@ export interface NodeFilterValues {
   category: string | undefined;
   source: string | undefined;
   status: string | undefined;
+  health: string | undefined;
 }
 
 const STATUS = ["active", "stale"];
+// Runtime-health facet options (value → label). 'unknown' = never health-checked.
+const HEALTH: Array<[string, string]> = [
+  ["unhealthy", "Unhealthy"],
+  ["degraded", "Degraded"],
+  ["healthy", "Healthy"],
+  ["unknown", "Not checked"],
+];
 const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
 // Friendly labels for the raw provider / node_kinds.category values.
@@ -54,7 +62,9 @@ export function NodeFilters({
   sources: string[];
   categories: string[];
 }) {
-  const hasFilters = Boolean(values.q || values.category || values.source || values.status);
+  const hasFilters = Boolean(
+    values.q || values.category || values.source || values.status || values.health,
+  );
   return (
     <form method="get" className="flex flex-wrap items-center gap-2">
       <Input
@@ -88,6 +98,19 @@ export function NodeFilters({
         {sources.map((s) => (
           <option key={s} value={s}>
             {labelOf(SOURCE_LABEL, s)}
+          </option>
+        ))}
+      </select>
+      <select
+        name="health"
+        defaultValue={values.health ?? ""}
+        aria-label="Filter by health"
+        className={`${select} w-40`}
+      >
+        <option value="">Any health</option>
+        {HEALTH.map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
           </option>
         ))}
       </select>

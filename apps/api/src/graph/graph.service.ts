@@ -43,7 +43,7 @@ const ESTATE_KIND_EXCLUSIONS = `kind NOT LIKE '%.pullrequest' AND kind NOT LIKE 
 
 export interface NodeListResult {
   data: NodeDto[];
-  page: { nextCursor: string | null; hasMore: boolean; limit: number };
+  page: { nextCursor: string | null; hasMore: boolean; limit: number; total: number };
 }
 
 export interface OverviewResult {
@@ -1334,7 +1334,24 @@ export class GraphService {
         where.push(`kind IN (SELECT kind FROM node_kinds WHERE category = ${p(q.category)})`);
       if (q.region) where.push(`region = ${p(q.region)}`);
       if (q.confidence) where.push(`confidence = ${p(q.confidence)}`);
+      // Runtime-health facet: attributes.health.state. 'unknown' = the key is absent (never checked)
+      // — a designed state, not a failure (docs/09 §7). Everything else matches the exact state.
+      if (q.health === "unknown") {
+        where.push(`(attributes->'health' IS NULL OR attributes->'health'->>'state' IS NULL)`);
+      } else if (q.health) {
+        where.push(`attributes->'health'->>'state' = ${p(q.health)}`);
+      }
       if (q.q) where.push(`name ILIKE ${p(`%${q.q}%`)}`);
+
+      // The filter set that defines the result population (everything except the keyset cursor) —
+      // shared by the COUNT (for a true "N resources" total) and the page query.
+      const baseWhere = where.join(" AND ");
+      const { rows: countRows } = await c.query<{ total: string }>(
+        `SELECT COUNT(*)::text AS total FROM nodes WHERE ${baseWhere}`,
+        params,
+      );
+      const total = Number(countRows[0]?.total ?? 0);
+
       if (q.cursor) {
         const cur = decodeCursor(q.cursor);
         where.push(
@@ -1359,6 +1376,7 @@ export class GraphService {
               : null,
           hasMore,
           limit: q.limit,
+          total,
         },
       };
     });
