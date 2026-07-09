@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Lock } from "lucide-react";
 import { CodeBlock } from "@/components/ui/code-block";
 import { Steps, Step } from "@/components/patterns/steps";
 
@@ -167,11 +168,8 @@ export function JenkinsSetup() {
           Build/Configure needed.
         </Step>
         <Step title="Give Atlas the server URL, username + token">
-          Atlas reaches your Jenkins over HTTPS with the username + API token (read-only — it never
-          triggers builds). <strong>If Jenkins is private</strong> — behind a VPN, firewall, or a
-          load-balancer IP allowlist — allowlist Atlas&apos;s outbound IP so it can reach the
-          server. You can still <strong>save the connection now</strong> and re-verify once
-          that&apos;s done — your token stays stored.
+          Atlas reaches your Jenkins over HTTPS with the username + API token — read-only, it never
+          triggers builds.
         </Step>
         <Step title="Atlas links deploys to infrastructure">
           From each job's pipeline Atlas reads its deploy targets (ECR pushes,{" "}
@@ -180,6 +178,17 @@ export function JenkinsSetup() {
           production.
         </Step>
       </Steps>
+      <div className="rounded-md border border-warning/30 bg-warning/5 p-3.5">
+        <p className="flex items-center gap-2 text-sm font-medium text-warning">
+          <Lock className="size-4 shrink-0" />
+          Private Jenkins? Allowlist Atlas first
+        </p>
+        <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+          Behind a VPN or firewall? Atlas can&apos;t reach it until you allowlist its outbound IP.
+          Save now — your token stays stored — then hit <strong>Re-verify</strong> once that&apos;s
+          done.
+        </p>
+      </div>
     </div>
   );
 }
