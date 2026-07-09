@@ -49,19 +49,40 @@ export function toNodeDto(row: NodeRowish): NodeDto {
   };
 }
 
-/** Node-list filters + keyset pagination (docs/08 §5). */
+/** A comma-separated multi-value facet ("aws,github"), whitelisted to `allowed` when given. Empty
+ *  after filtering → undefined (treated as "no filter"). Powers multi-select facets in Explore. */
+const csvFacet = (allowed?: readonly string[]) =>
+  z
+    .string()
+    .min(1)
+    .transform((s) => {
+      const parts = [
+        ...new Set(
+          s
+            .split(",")
+            .map((x) => x.trim())
+            .filter(Boolean),
+        ),
+      ];
+      return allowed ? parts.filter((x) => (allowed as readonly string[]).includes(x)) : parts;
+    })
+    .transform((arr) => (arr.length > 0 ? arr : undefined))
+    .optional();
+
+/** Node-list filters + keyset pagination (docs/08 §5). Product-facing facets accept multiple
+ *  comma-separated values (OR within a facet, AND across facets). */
 export const NodeListQuerySchema = z
   .object({
     kind: z.string().min(1).optional(),
     // Product-facing facets: `source` = the connection provider (aws/bitbucket/…);
-    // `category` = the semantic node_kinds group (code/compute/data/networking/…).
-    source: z.string().min(1).optional(),
-    category: z.string().min(1).optional(),
+    // `category` = the semantic node_kinds group (code/compute/data/networking/…). Both multi-value.
+    source: csvFacet(),
+    category: csvFacet(),
     region: z.string().min(1).optional(),
-    status: z.enum(["active", "stale", "deleted"]).optional(),
+    status: csvFacet(["active", "stale", "deleted"]),
     confidence: z.enum(["observed", "inferred-high", "inferred-low"]).optional(),
     // Runtime health facet (docs/08 §5). Reads attributes.health.state; 'unknown' = never checked.
-    health: z.enum(["healthy", "degraded", "unhealthy", "unknown"]).optional(),
+    health: csvFacet(["healthy", "degraded", "unhealthy", "unknown"]),
     q: z.string().min(1).max(200).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(50),
     cursor: z.string().min(1).optional(),

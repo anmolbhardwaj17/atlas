@@ -1317,7 +1317,11 @@ export class GraphService {
       const params: unknown[] = [];
       const p = (v: unknown): string => `$${params.push(v)}`;
 
-      where.push(q.status ? `status = ${p(q.status)}` : `status <> 'deleted'`);
+      // `$1 IN ($2,$3,…)` for a multi-value facet (OR within the facet).
+      const inList = (col: string, vals: string[]): string =>
+        `${col} IN (${vals.map((v) => p(v)).join(", ")})`;
+
+      where.push(q.status ? inList("status", q.status) : `status <> 'deleted'`);
       if (q.kind) {
         where.push(`kind = ${p(q.kind)}`);
       } else {
@@ -1326,20 +1330,25 @@ export class GraphService {
         // sub-resources. An explicit ?kind can still target those.
         where.push(ESTATE_KIND_EXCLUSIONS);
       }
-      // Product facets: filter by source (connection provider) and/or semantic category.
-      // These compose with the estate exclusions above, so `category=code` still shows only
-      // repos/projects (PRs/users/pipelines stay hidden).
-      if (q.source) where.push(`provider = ${p(q.source)}`);
+      // Product facets: filter by source (connection provider) and/or semantic category. Both
+      // multi-value. They compose with the estate exclusions above, so `category=code` still shows
+      // only repos/projects (PRs/users/pipelines stay hidden).
+      if (q.source) where.push(inList("provider", q.source));
       if (q.category)
-        where.push(`kind IN (SELECT kind FROM node_kinds WHERE category = ${p(q.category)})`);
+        where.push(`kind IN (SELECT kind FROM node_kinds WHERE ${inList("category", q.category)})`);
       if (q.region) where.push(`region = ${p(q.region)}`);
       if (q.confidence) where.push(`confidence = ${p(q.confidence)}`);
       // Runtime-health facet: attributes.health.state. 'unknown' = the key is absent (never checked)
-      // — a designed state, not a failure (docs/09 §7). Everything else matches the exact state.
-      if (q.health === "unknown") {
-        where.push(`(attributes->'health' IS NULL OR attributes->'health'->>'state' IS NULL)`);
-      } else if (q.health) {
-        where.push(`attributes->'health'->>'state' = ${p(q.health)}`);
+      // — a designed state, not a failure (docs/09 §7). Multi-value: OR the requested states, with
+      // 'unknown' matching an absent health key.
+      if (q.health) {
+        const states = q.health.filter((h) => h !== "unknown");
+        const parts: string[] = [];
+        if (states.length > 0) parts.push(inList(`attributes->'health'->>'state'`, states));
+        if (q.health.includes("unknown")) {
+          parts.push(`(attributes->'health' IS NULL OR attributes->'health'->>'state' IS NULL)`);
+        }
+        if (parts.length > 0) where.push(`(${parts.join(" OR ")})`);
       }
       if (q.q) where.push(`name ILIKE ${p(`%${q.q}%`)}`);
 

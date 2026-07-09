@@ -293,7 +293,7 @@ The heart of the read API. All responses carry **provenance + confidence** (AP-4
 
 | Method | Path | Purpose | FR/US |
 |---|---|---|---|
-| `GET` | `/nodes` | list/filter nodes (kind, source, category, region, status, confidence, `health`, `q`); `page.total` = full match count for the result header | FR-5.3 |
+| `GET` | `/nodes` | list/filter nodes (kind, region, confidence, `q`; multi-value CSV facets `source`, `category`, `status`, `health` — OR within a facet, AND across); `page.total` = full match count for the result header | FR-5.3 |
 | `GET` | `/nodes/{id}` | node detail (attributes + provenance) | FR-5.2 |
 | `GET` | `/nodes/{id}/edges` | direct edges (in/out, filter by type/confidence) | FR-5.1 |
 | `GET` | `/nodes/{id}/neighbors` | depth-1 subgraph for viz (node-budgeted) | FR-5.1 |
