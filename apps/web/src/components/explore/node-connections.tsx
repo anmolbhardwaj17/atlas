@@ -107,24 +107,19 @@ function traversalModel(
     b.push(it);
     byDist.set(it.distance, b);
   }
-  const nodes: Node[] = [
-    {
-      id: result.root.id,
-      type: "atlas",
-      position: { x: 0, y: 0 },
-      data: {
-        label: label(result.root),
-        kind: result.root.kind,
-        isCenter: true,
-        // Blast radius radiates outward from the root — pulse to show the reach.
-        ...(dir === "blast" ? { pulse: true } : {}),
-      },
-    },
-  ];
+  const root: Node = {
+    id: result.root.id,
+    type: "atlas",
+    position: { x: 0, y: 0 },
+    data: { label: label(result.root), kind: result.root.kind, isCenter: true },
+  };
+  const nodes: Node[] = [root];
   const rfEdges: Edge[] = [];
+  let reach = 0; // farthest impacted node from the root (flow px) → the pulse's target radius
   for (const [d, items] of byDist) {
     items.forEach((it, i) => {
       const y = (i - (items.length - 1) / 2) * ROW;
+      reach = Math.max(reach, Math.hypot(d * COLX, y));
       nodes.push({
         id: it.node.id,
         type: "atlas",
@@ -144,6 +139,11 @@ function traversalModel(
         ),
       );
     });
+  }
+  // Blast radius radiates outward from the root — pulse rings reach the farthest impacted node
+  // (+ a node half-width so the ring lands on it, not just short of it).
+  if (dir === "blast" && reach > 0) {
+    root.data = { ...root.data, pulse: true, pulseRadius: reach + 130 };
   }
   return { nodes, edges: rfEdges };
 }

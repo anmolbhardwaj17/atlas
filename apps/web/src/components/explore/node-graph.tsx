@@ -31,6 +31,8 @@ export interface GraphNodeData {
   isCenter?: boolean;
   /** Focal node of a blast-radius view → emit radar pulse rings. */
   pulse?: boolean;
+  /** How far (px, in flow coords) the pulse must travel to reach the farthest impacted node. */
+  pulseRadius?: number;
   [key: string]: unknown;
 }
 
@@ -43,14 +45,17 @@ function AtlasGraphNode({ data }: NodeProps) {
   return (
     <div className="relative">
       {d.isCenter && d.pulse
-        ? [0, 1, 2].map((i) => (
-            <span
-              key={i}
-              aria-hidden
-              className="animate-blast-pulse pointer-events-none absolute left-1/2 top-1/2 size-8 rounded-full border border-danger/60 bg-danger/15"
-              style={{ animationDelay: `${i * 0.8}s` }}
-            />
-          ))
+        ? [0, 1, 2].map((i) => {
+            const size = (d.pulseRadius ?? 220) * 2;
+            return (
+              <span
+                key={i}
+                aria-hidden
+                className="animate-blast-pulse pointer-events-none absolute left-1/2 top-1/2 rounded-full bg-danger/25"
+                style={{ width: size, height: size, animationDelay: `${i * 0.85}s` }}
+              />
+            );
+          })
         : null}
       <div
         className={cn(
