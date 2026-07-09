@@ -992,6 +992,9 @@ function ConnectSheet({
   const [baseUrl, setBaseUrl] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  // The connection created on the first attempt — reused if verify fails and the user retries,
+  // so re-clicking "Connect & verify" re-verifies the same row instead of creating duplicates.
+  const createdIdRef = React.useRef<string | null>(null);
 
   // Live credential flows: Bitbucket (email + token), AWS (access keys), Jenkins (url + user + token).
   const isBitbucket = provider?.id === "bitbucket";
@@ -1012,13 +1015,22 @@ function ConnectSheet({
       setBaseUrl("");
       setError(null);
       setBusy(false);
+      createdIdRef.current = null;
     }
   }, [provider]);
 
   async function add() {
     if (!provider || name.trim().length === 0) return;
+    const providerId = provider.id;
     setBusy(true);
     setError(null);
+    // Create the connection once; a retry after a failed verify reuses it (no duplicate rows).
+    const ensureConn = async (config?: Record<string, unknown>): Promise<string> => {
+      if (createdIdRef.current) return createdIdRef.current;
+      const conn = await createConnection(orgId, providerId, name.trim(), config);
+      createdIdRef.current = conn.id;
+      return conn.id;
+    };
     try {
       if (isBitbucket) {
         if (!email.trim() || !token.trim()) {
@@ -1027,8 +1039,8 @@ function ConnectSheet({
           return;
         }
         const config = workspace.trim() ? { workspace: workspace.trim() } : undefined;
-        const conn = await createConnection(orgId, provider.id, name.trim(), config);
-        const verified = await verifyConnection(orgId, conn.id, {
+        const connId = await ensureConn(config);
+        const verified = await verifyConnection(orgId, connId, {
           email: email.trim(),
           apiToken: token.trim(),
         });
@@ -1053,11 +1065,8 @@ function ConnectSheet({
           return;
         }
         // authMode 'keys' → the connector uses the access keys directly (no AssumeRole).
-        const conn = await createConnection(orgId, provider.id, name.trim(), {
-          authMode: "keys",
-          regions: regionList,
-        });
-        const verified = await verifyConnection(orgId, conn.id, {
+        const connId = await ensureConn({ authMode: "keys", regions: regionList });
+        const verified = await verifyConnection(orgId, connId, {
           accessKeyId: accessKeyId.trim(),
           secretAccessKey: secretAccessKey.trim(),
         });
@@ -1079,10 +1088,8 @@ function ConnectSheet({
           setBusy(false);
           return;
         }
-        const conn = await createConnection(orgId, provider.id, name.trim(), {
-          baseUrl: baseUrl.trim(),
-        });
-        const verified = await verifyConnection(orgId, conn.id, {
+        const connId = await ensureConn({ baseUrl: baseUrl.trim() });
+        const verified = await verifyConnection(orgId, connId, {
           username: email.trim(),
           apiToken: token.trim(),
         });
@@ -1094,7 +1101,7 @@ function ConnectSheet({
           return;
         }
       } else {
-        await createConnection(orgId, provider.id, name.trim());
+        await ensureConn();
       }
       toast.success(`Connected ${name.trim()}`, {
         description: needsCreds

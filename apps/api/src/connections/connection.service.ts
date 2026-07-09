@@ -144,7 +144,12 @@ export class ConnectionService {
       newSecretRef = await this.secrets.put(orgId, body.credentials);
     }
 
-    const dto = await withOrgScope(this.db, orgId, async (c) => {
+    // We must PERSIST the failure state (status='error', last_error, and the secret_ref link) even
+    // when verify fails — throwing inside the org-scoped tx would roll it back, leaving the
+    // connection 'pending' with no stored token and breaking "save now, re-verify later". So the
+    // callback RETURNS an outcome (never throws); the 422 is raised after the tx has committed.
+    type VerifyOutcome = { ok: true; dto: ConnectionDto } | { ok: false; message: string };
+    const outcome = await withOrgScope(this.db, orgId, async (c): Promise<VerifyOutcome> => {
       const row = await this.load(c, id);
       const connector = this.registry.get(row.provider);
       if (!connector) {
@@ -152,11 +157,7 @@ export class ConnectionService {
           id,
           `No connector available for provider "${row.provider}" yet.`,
         ]);
-        throw new ApiException(
-          422,
-          "connection_verification_failed",
-          `Provider "${row.provider}" is not available yet.`,
-        );
+        return { ok: false, message: `Provider "${row.provider}" is not available yet.` };
       }
 
       const secretRef = newSecretRef ?? row.secret_ref;
@@ -181,11 +182,7 @@ export class ConnectionService {
           "UPDATE connections SET status = 'error', health = $2, last_error = $3 WHERE id = $1",
           [id, JSON.stringify(health), result.message ?? "verification failed"],
         );
-        throw new ApiException(
-          422,
-          "connection_verification_failed",
-          result.message ?? "Connection verification failed.",
-        );
+        return { ok: false, message: result.message ?? "Connection verification failed." };
       }
 
       const { rows } = await c.query<ConnectionRow>(
@@ -193,15 +190,19 @@ export class ConnectionService {
          RETURNING ${SELECT_COLS}`,
         [id, result.status, JSON.stringify(health)],
       );
-      return toDto(rows[0]);
+      return { ok: true, dto: toDto(rows[0]) };
     });
 
+    // The failure state is now committed; surface the 422 to the caller.
+    if (!outcome.ok) {
+      throw new ApiException(422, "connection_verification_failed", outcome.message);
+    }
     // On a usable connection, kick off the onboarding full sync (FR-1.5). Errors are
     // logged internally so they never fail the verify itself.
-    if (dto.status === "connected" || dto.status === "degraded") {
+    if (outcome.dto.status === "connected" || outcome.dto.status === "degraded") {
       await this.enqueueSyncRun(orgId, id, "onboarding");
     }
-    return dto;
+    return outcome.dto;
   }
 
   /**
