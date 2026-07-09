@@ -113,6 +113,46 @@ export class GraphController {
     };
   }
 
+  /**
+   * Finding detail (the row → drill-in). Enriched single-finding view: the live finding + its
+   * guidance/lifecycle (same assembly as the list, so nothing drifts) + the affected resources
+   * (env/health) + a blast-radius impact aggregate. `finding: null` when it has cleared since the
+   * list was drawn — the page renders the honest auto-resolved state (not a 404).
+   */
+  @Get("insights/:id")
+  @Roles("Member")
+  async findingDetail(@Req() req: AuthedRequest, @Param("id") id: string): Promise<unknown> {
+    const orgId = org(req).id;
+    const [detail, mutes, states] = await Promise.all([
+      this.graph.findingDetail(orgId, id),
+      this.graph.listMutes(orgId),
+      this.graph.listFindingStates(orgId),
+    ]);
+    if (!detail) return { finding: null };
+    const st = states.find((s) => s.findingId === id);
+    const mute = mutes.find((mm) => mm.findingId === id) ?? null;
+    const f = detail.finding;
+    return {
+      finding: {
+        id: f.id,
+        severity: f.severity,
+        category: f.category,
+        title: f.title,
+        detail: f.detail,
+        href: f.href,
+        ...(f.count !== undefined ? { count: f.count } : {}),
+        ...(f.evidence ? { evidence: f.evidence } : {}),
+        guidance: guidanceFor(f.category),
+        firstSeenAt: st?.firstSeenAt ?? null,
+        regressedAt: st?.regressedAt ?? null,
+      },
+      affected: detail.affected,
+      impact: detail.impact,
+      lastSyncedAt: detail.lastSyncedAt,
+      mute,
+    };
+  }
+
   @Post("insights/:id/mute")
   @Roles("Member")
   async muteFinding(

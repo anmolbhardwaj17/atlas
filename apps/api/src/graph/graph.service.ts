@@ -16,6 +16,7 @@ import {
   type GraphQuery,
   type NeighborsQuery,
   type NodeDto,
+  type NodeHealthDto,
   type NodeListQuery,
   type NodeRowish,
   type TimelineQuery,
@@ -82,6 +83,38 @@ export interface Finding {
   count?: number;
   /** The specific affected nodes, when the finding names them — each deep-links to /explore/:id. */
   evidence?: Array<{ id: string; label: string }>;
+}
+
+/** One affected resource on the finding-detail page — the raw evidence node enriched with the two
+ *  things that let a consumer triage it at a glance: which environment it's in (prod jumps out) and
+ *  its current runtime health. */
+export interface AffectedResource {
+  id: string;
+  label: string;
+  kind: string;
+  environment: string;
+  health: NodeHealthDto | null;
+}
+
+/** Blast-radius aggregate for the finding-detail "if unfixed, what's affected" band — the union of
+ *  what depends on the affected resources (inbound impact), so generic guidance becomes THEIR risk. */
+export interface FindingImpact {
+  /** Distinct downstream resources that depend on the affected ones (excludes the roots). */
+  downstream: number;
+  /** A capped sample to render as chips/rows (closest hops first). */
+  sample: Array<{ id: string; label: string; kind: string }>;
+  truncated: boolean;
+}
+
+/** Enriched single-finding view (finding-detail page). The finding itself is assembled by the
+ *  controller (adds guidance/lifecycle, same as the list); the service supplies the parts that need
+ *  DB access: the affected resources and the blast-radius impact. */
+export interface FindingDetail {
+  finding: Finding;
+  affected: AffectedResource[];
+  impact: FindingImpact | null;
+  /** Data freshness — findings are derived live, so this sync time is the honest recency signal. */
+  lastSyncedAt: string | null;
 }
 
 /** Persisted lifecycle of a finding (docs/09): open/resolved + when first/last seen + regression. */
@@ -1450,6 +1483,81 @@ export class GraphService {
         f.href === `/explore/${id}/impact` ||
         (f.evidence?.some((e) => e.id === id) ?? false),
     );
+  }
+
+  /** Enriched single-finding view for the detail page: the live finding + its affected resources
+   *  (env/health, so prod/unhealthy sort first) + a bounded blast-radius impact ("what depends on
+   *  the affected resources"). Reuses summary() so it never drifts from Insights; returns null when
+   *  the finding has cleared since the list was drawn (the page then shows the auto-resolved state). */
+  async findingDetail(orgId: string, id: string): Promise<FindingDetail | null> {
+    const s = await this.summary(orgId);
+    const finding = s.findings.find((f) => f.id === id);
+    if (!finding) return null;
+    const lastSyncedAt = s.trust.lastSyncAt;
+
+    const evidenceIds = (finding.evidence ?? []).map((e) => e.id).filter((x) => UUID_RE.test(x));
+    if (evidenceIds.length === 0) return { finding, affected: [], impact: null, lastSyncedAt };
+
+    // Enrich the affected nodes with environment + runtime health (one batched lookup).
+    const affected = await withOrgScope(this.db, orgId, async (c) => {
+      const { rows } = await c.query<NodeRowish>(
+        `SELECT ${NODE_COLS} FROM nodes WHERE id = ANY($1::uuid[])`,
+        [evidenceIds],
+      );
+      const byId = new Map(rows.map((r) => [r.id, r]));
+      // Preserve the finding's evidence order, then float prod + unhealthy to the top.
+      const list = evidenceIds
+        .map((nid): AffectedResource | null => {
+          const r = byId.get(nid);
+          if (!r) return null;
+          return {
+            id: r.id,
+            label: r.name ?? r.urn ?? r.id,
+            kind: r.kind,
+            environment: inferEnvironment({
+              name: r.name,
+              urn: r.urn,
+              tags: r.tags,
+              attributes: r.attributes,
+            }),
+            health: healthFrom(r.attributes),
+          };
+        })
+        .filter((x): x is AffectedResource => x !== null);
+      const healthRank = (h: NodeHealthDto | null): number =>
+        h?.state === "unhealthy" ? 0 : h?.state === "degraded" ? 1 : 2;
+      return list.sort(
+        (a, b) =>
+          (a.environment === "prod" ? 0 : 1) - (b.environment === "prod" ? 0 : 1) ||
+          healthRank(a.health) - healthRank(b.health),
+      );
+    });
+
+    // Impact — union the inbound blast-radius of the affected roots ("what breaks if these fail").
+    // Bounded (a few roots, shallow, small budget) so the detail page stays fast. P3: if nothing
+    // depends on them, we show no impact band rather than an invented one.
+    const IMPACT_ROOTS = 6;
+    const rootSet = new Set(evidenceIds);
+    const impacted = new Map<string, FindingImpact["sample"][number]>();
+    let truncated = false;
+    for (const rootId of evidenceIds.slice(0, IMPACT_ROOTS)) {
+      const t = await this.blastRadius(orgId, rootId, { depth: 3, nodeBudget: 100 });
+      truncated = truncated || t.truncated;
+      for (const im of t.impacted) {
+        if (rootSet.has(im.node.id) || impacted.has(im.node.id)) continue;
+        impacted.set(im.node.id, {
+          id: im.node.id,
+          label: im.node.name ?? im.node.urn,
+          kind: im.node.kind,
+        });
+      }
+    }
+    const impact: FindingImpact | null =
+      impacted.size > 0
+        ? { downstream: impacted.size, sample: [...impacted.values()].slice(0, 8), truncated }
+        : null;
+
+    return { finding, affected, impact, lastSyncedAt };
   }
 
   async nodeEdges(orgId: string, id: string, q: EdgesQuery): Promise<EdgeDto[]> {
