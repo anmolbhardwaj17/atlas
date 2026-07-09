@@ -159,10 +159,12 @@ export function JenkinsSetup() {
   return (
     <div className="space-y-5">
       <Steps>
-        <Step title="Create a read-only Jenkins user + API token">
-          Use a Jenkins user with only <InlineCode>Overall/Read</InlineCode> +{" "}
-          <InlineCode>Job/Read</InlineCode> (no Build/Configure). Under{" "}
-          <strong>User → Configure → API Token</strong>, generate a token.
+        <Step title="Generate a Jenkins API token">
+          Click your name (top-right) → <strong>Security</strong> → <strong>API Token</strong> →{" "}
+          <InlineCode>Add new Token</InlineCode> → <strong>Generate</strong>, then copy it (Jenkins
+          shows it only once). For least privilege, use a user with only{" "}
+          <InlineCode>Overall/Read</InlineCode> + <InlineCode>Job/Read</InlineCode> — no
+          Build/Configure needed.
         </Step>
         <Step title="Give Atlas the server URL, username + token">
           Atlas reaches your Jenkins over HTTPS with the username + API token (read-only — it never
