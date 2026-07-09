@@ -28,7 +28,16 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 
-const NAV = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard | null;
+  match: (p: string) => boolean;
+}
+
+// Two meaningful groups instead of one catch-all "Platform": what you USE to understand your
+// estate, and what you MANAGE (connections + settings). Item labels mirror each page's H1.
+const WORKSPACE_NAV: NavItem[] = [
   {
     href: "/dashboard",
     label: "Dashboard",
@@ -55,6 +64,9 @@ const NAV = [
     icon: Lightbulb,
     match: (p: string) => p.startsWith("/insights"),
   },
+];
+
+const MANAGE_NAV: NavItem[] = [
   {
     href: "/integrations",
     label: "Integrations",
@@ -154,37 +166,44 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Platform</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {NAV.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton asChild isActive={item.match(pathname)} tooltip={item.label}>
-                    <Link
-                      href={item.href}
-                      onClick={() => {
-                        if (!item.match(pathname)) setPendingHref(item.href);
-                      }}
-                    >
-                      {pendingHref === item.href ? (
-                        <Loader2 className="size-4 shrink-0 animate-spin" />
-                      ) : item.icon ? (
-                        <item.icon />
-                      ) : (
-                        // The Ask Atlas mark reads a touch bigger than the lucide glyphs (it's a
-                        // filled sphere, not a line icon); the row height is fixed so this adds no
-                        // spacing between items.
-                        <AtlasAiMark size={20} className="size-5 shrink-0" />
-                      )}
-                      <span>{item.label}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {(
+          [
+            ["Workspace", WORKSPACE_NAV],
+            ["Manage", MANAGE_NAV],
+          ] as const
+        ).map(([label, items]) => (
+          <SidebarGroup key={label}>
+            <SidebarGroupLabel>{label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {items.map((item) => (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton asChild isActive={item.match(pathname)} tooltip={item.label}>
+                      <Link
+                        href={item.href}
+                        onClick={() => {
+                          if (!item.match(pathname)) setPendingHref(item.href);
+                        }}
+                      >
+                        {pendingHref === item.href ? (
+                          <Loader2 className="size-4 shrink-0 animate-spin" />
+                        ) : item.icon ? (
+                          <item.icon />
+                        ) : (
+                          // The Ask Atlas mark reads a touch bigger than the lucide glyphs (it's a
+                          // filled sphere, not a line icon); the row height is fixed so this adds no
+                          // spacing between items.
+                          <AtlasAiMark size={20} className="size-5 shrink-0" />
+                        )}
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
       <SidebarRail />
