@@ -133,30 +133,40 @@ export function InsightsView({
   const trendSeries = React.useMemo<TrendPoint[]>(() => {
     const DAY = 86_400_000;
     const MAX_DAYS = 30;
+    const today = Math.floor(Date.now() / DAY) * DAY; // start of today (UTC)
     const lived = [...active, ...resolved]; // active = still open; resolved = closed
     const opens = lived
       .map((f) => (f.firstSeenAt ? new Date(f.firstSeenAt).getTime() : null))
       .filter((v): v is number => v !== null);
-    if (opens.length === 0) return [];
-    const today = Math.floor(Date.now() / DAY) * DAY; // start of today (UTC)
-    const firstDay = Math.floor(Math.min(...opens) / DAY) * DAY;
-    // One day before the first finding = the "0" baseline; cap the whole window to MAX_DAYS.
-    const start = Math.max(firstDay - DAY, today - MAX_DAYS * DAY);
     const out: TrendPoint[] = [];
-    for (let t = start; t <= today; t += DAY) {
-      const end = t + DAY;
-      const c = { high: 0, medium: 0, low: 0 };
-      for (const f of lived) {
-        const open = f.firstSeenAt ? new Date(f.firstSeenAt).getTime() : null;
-        if (open === null || open >= end) continue; // not opened by this day
-        const closed = f.resolvedAt ? new Date(f.resolvedAt).getTime() : null;
-        if (closed !== null && closed < t) continue; // already closed before this day
-        c[f.severity] += 1;
+    if (opens.length > 0) {
+      const firstDay = Math.floor(Math.min(...opens) / DAY) * DAY;
+      // One day before the first finding = the "0" baseline; cap the whole window to MAX_DAYS.
+      const start = Math.max(firstDay - DAY, today - MAX_DAYS * DAY);
+      for (let t = start; t <= today; t += DAY) {
+        const end = t + DAY;
+        const c = { high: 0, medium: 0, low: 0 };
+        for (const f of lived) {
+          const open = f.firstSeenAt ? new Date(f.firstSeenAt).getTime() : null;
+          if (open === null || open >= end) continue; // not opened by this day
+          const closed = f.resolvedAt ? new Date(f.resolvedAt).getTime() : null;
+          if (closed !== null && closed < t) continue; // already closed before this day
+          c[f.severity] += 1;
+        }
+        out.push({ t, ...c });
       }
-      out.push({ t, ...c });
+    }
+    // Not enough dated history yet (fresh estate / no persisted lifecycle) → still show today's
+    // snapshot rising from a 0 baseline, as the user expects "from 0 to today". Real per-day
+    // history takes over once syncs accumulate distinct dates.
+    if (out.length < 2) {
+      return [
+        { t: today - DAY, high: 0, medium: 0, low: 0 },
+        { t: today, high: sevCounts.high, medium: sevCounts.medium, low: sevCounts.low },
+      ];
     }
     return out;
-  }, [active, resolved]);
+  }, [active, resolved, sevCounts]);
   const posture = summary?.posture ?? null;
 
   const [tab, setTab] = React.useState<"active" | "muted" | "fixed">("active");
