@@ -7,7 +7,8 @@ import { UserMirrorService } from "../auth/user-mirror.service";
 import { ApiException } from "../common/errors";
 import type { AuthClaims } from "../auth/auth.types";
 import { deriveSlug } from "./slug";
-import type { CreateOrgBody, MemberDto, OrgDto } from "./dto";
+import { OrgLogoService } from "./org-logo.service";
+import type { CreateOrgBody, MemberDto, OrgDto, UpdateOrgBody } from "./dto";
 
 interface OrgRow {
   id: string;
@@ -15,8 +16,12 @@ interface OrgRow {
   name: string;
   plan: string;
   status: string;
+  logo_url: string | null;
   created_at: Date;
 }
+
+/** Shared column list so every org read returns the same DTO shape. */
+const ORG_COLS = "id, slug, name, plan, status, logo_url, created_at";
 
 const UNIQUE_VIOLATION = "23505";
 function isPgUnique(e: unknown): boolean {
@@ -28,6 +33,7 @@ export class OrgService {
   constructor(
     @Inject(PG_POOL) private readonly db: Db,
     private readonly users: UserMirrorService,
+    private readonly logos: OrgLogoService,
   ) {}
 
   /** Create an org; the creator becomes Owner (docs/12 §6.1, BR-ORG-1). The id is
@@ -37,13 +43,16 @@ export class OrgService {
     await this.users.ensureUser(claims); // FK target for the Owner membership
     const orgId = randomUUID();
     const slug = body.slug ?? deriveSlug(body.name);
+    // Upload the logo (if any) up front — the id is fixed, and a failed insert only orphans a
+    // tiny object. Keeps it out of the DB transaction (external network call).
+    const logoUrl = body.logo ? await this.logos.upload(orgId, body.logo) : null;
     try {
       return await withOrgScope(this.db, orgId, async (c) => {
         const { rows } = await c.query<OrgRow>(
-          `INSERT INTO organizations (id, slug, name)
-           VALUES ($1, $2, $3)
-           RETURNING id, slug, name, plan, status, created_at`,
-          [orgId, slug, body.name],
+          `INSERT INTO organizations (id, slug, name, logo_url)
+           VALUES ($1, $2, $3, $4)
+           RETURNING ${ORG_COLS}`,
+          [orgId, slug, body.name, logoUrl],
         );
         await c.query(
           `INSERT INTO memberships (org_id, user_id, role, status)
@@ -61,7 +70,7 @@ export class OrgService {
   async get(orgId: string): Promise<OrgDto> {
     return withOrgScope(this.db, orgId, async (c) => {
       const { rows } = await c.query<OrgRow>(
-        `SELECT id, slug, name, plan, status, created_at FROM organizations WHERE id = $1`,
+        `SELECT ${ORG_COLS} FROM organizations WHERE id = $1`,
         [orgId],
       );
       const row = rows[0];
@@ -70,12 +79,30 @@ export class OrgService {
     });
   }
 
-  async rename(orgId: string, name: string): Promise<OrgDto> {
+  /** Update org identity — rename and/or set/clear the logo (Admin+; docs/12 §5.2). */
+  async update(orgId: string, patch: UpdateOrgBody): Promise<OrgDto> {
+    // The logo upload is an external call — do it before the transaction. `logo: null` clears it.
+    const logoUrl =
+      patch.logo === undefined
+        ? undefined
+        : patch.logo === null
+          ? null
+          : await this.logos.upload(orgId, patch.logo);
+
     return withOrgScope(this.db, orgId, async (c) => {
+      const sets: string[] = [];
+      const params: unknown[] = [orgId];
+      if (patch.name !== undefined) {
+        params.push(patch.name);
+        sets.push(`name = $${params.length}`);
+      }
+      if (logoUrl !== undefined) {
+        params.push(logoUrl);
+        sets.push(`logo_url = $${params.length}`);
+      }
       const { rows } = await c.query<OrgRow>(
-        `UPDATE organizations SET name = $2 WHERE id = $1
-         RETURNING id, slug, name, plan, status, created_at`,
-        [orgId, name],
+        `UPDATE organizations SET ${sets.join(", ")} WHERE id = $1 RETURNING ${ORG_COLS}`,
+        params,
       );
       const row = rows[0];
       if (!row) throw ApiException.notFound();
@@ -198,6 +225,7 @@ function toOrgDto(row: OrgRow | undefined): OrgDto {
     name: row.name,
     plan: row.plan,
     status: row.status,
+    logoUrl: row.logo_url,
     createdAt: row.created_at.toISOString(),
   };
 }

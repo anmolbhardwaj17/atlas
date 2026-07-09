@@ -145,10 +145,12 @@ export class InvitationService {
         name: string;
         plan: string;
         status: string;
+        logo_url: string | null;
         created_at: Date;
-      }>(`SELECT id, slug, name, plan, status, created_at FROM organizations WHERE id = $1`, [
-        invite.org_id,
-      ]);
+      }>(
+        `SELECT id, slug, name, plan, status, logo_url, created_at FROM organizations WHERE id = $1`,
+        [invite.org_id],
+      );
       const org = orgRows[0];
       if (!org) throw ApiException.notFound();
       return {
@@ -158,6 +160,7 @@ export class InvitationService {
           name: org.name,
           plan: org.plan,
           status: org.status,
+          logoUrl: org.logo_url,
           createdAt: org.created_at.toISOString(),
         },
         role: invite.role,

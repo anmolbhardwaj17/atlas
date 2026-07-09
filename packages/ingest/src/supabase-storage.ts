@@ -40,9 +40,17 @@ export function createServiceClient(url: string, serviceRoleKey: string): Supaba
   return createClient(url, serviceRoleKey, { auth: { persistSession: false } });
 }
 
-/** Idempotently ensure a private bucket exists (safe to call repeatedly). */
-export async function ensureBucket(client: SupabaseClient, bucket: string): Promise<void> {
-  const { error } = await client.storage.createBucket(bucket, { public: false });
+/**
+ * Idempotently ensure a bucket exists (safe to call repeatedly). Private by default (raw
+ * snapshots); pass `{ public: true }` for buckets whose objects are served by public URL
+ * (e.g. org logos, which render in the browser without a signed request).
+ */
+export async function ensureBucket(
+  client: SupabaseClient,
+  bucket: string,
+  opts: { public?: boolean } = {},
+): Promise<void> {
+  const { error } = await client.storage.createBucket(bucket, { public: opts.public ?? false });
   if (error && !/already exists/i.test(error.message)) {
     throw new Error(`createBucket(${bucket}) failed: ${error.message}`);
   }

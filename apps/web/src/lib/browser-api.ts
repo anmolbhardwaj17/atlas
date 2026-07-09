@@ -80,7 +80,17 @@ async function errorMessage(res: Response, fallback: string): Promise<string> {
 }
 
 /** Rename the org (Admin+). Returns the new name. */
-export async function renameOrg(orgId: string, name: string): Promise<string> {
+export interface OrgSummary {
+  name: string;
+  logoUrl: string | null;
+}
+
+/** Update the org's identity — rename and/or set/clear the logo (`logo: null` clears it; a
+ *  `data:` URL sets a new one). Admin+; the API validates + stores the image. */
+export async function updateOrg(
+  orgId: string,
+  patch: { name?: string; logo?: string | null },
+): Promise<OrgSummary> {
   const token = await getClientToken();
   if (!token) throw new Error("You're not signed in.");
   const res = await fetch(`${apiUrl()}/orgs/${orgId}`, {
@@ -90,11 +100,11 @@ export async function renameOrg(orgId: string, name: string): Promise<string> {
       "Content-Type": "application/json",
       "X-Atlas-Org": orgId,
     },
-    body: JSON.stringify({ name: name.trim() }),
+    body: JSON.stringify(patch),
   });
-  if (!res.ok) throw new Error(await errorMessage(res, `Couldn't rename (${res.status}).`));
-  const body = (await res.json()) as { data?: { name?: string } };
-  return body.data?.name ?? name.trim();
+  if (!res.ok) throw new Error(await errorMessage(res, `Couldn't save (${res.status}).`));
+  const body = (await res.json()) as { data?: { name?: string; logoUrl?: string | null } };
+  return { name: body.data?.name ?? "", logoUrl: body.data?.logoUrl ?? null };
 }
 
 /** Change a member's role (Admin+; only an Owner may touch an Owner or grant Owner). */
@@ -883,6 +893,7 @@ export interface MyOrg {
   orgId: string;
   orgName: string;
   orgSlug: string;
+  orgLogoUrl: string | null;
   role: string;
 }
 

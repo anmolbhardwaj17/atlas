@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Building2, Check, ChevronsUpDown, Plus } from "lucide-react";
+import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import { getMyOrgs, type MyOrg } from "@/lib/browser-api";
 import { ACTIVE_ORG_COOKIE } from "@/lib/active-org";
+import { OrgLogo } from "@/components/org-logo";
 import { cn } from "@/lib/cn";
 import {
   DropdownMenu,
@@ -61,9 +62,7 @@ export function OrgSwitcher() {
           type="button"
           className="flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <span className="grid size-5 shrink-0 place-items-center rounded border border-border bg-background">
-            <Building2 className="size-3" />
-          </span>
+          <OrgLogo name={current.orgName} logoUrl={current.orgLogoUrl} size={20} />
           <span className="max-w-[160px] truncate">{current.orgName}</span>
           <ChevronsUpDown className="size-3.5 shrink-0 opacity-50" />
         </button>
@@ -74,9 +73,7 @@ export function OrgSwitcher() {
         </DropdownMenuLabel>
         {orgs.map((o) => (
           <DropdownMenuItem key={o.orgId} onClick={() => switchTo(o.orgId)} className="gap-2">
-            <span className="grid size-6 shrink-0 place-items-center rounded border border-border bg-background">
-              <Building2 className="size-3.5" />
-            </span>
+            <OrgLogo name={o.orgName} logoUrl={o.orgLogoUrl} size={24} />
             <span className="min-w-0 flex-1 truncate">{o.orgName}</span>
             <Check
               className={cn("size-4 shrink-0", o.orgId === currentId ? "opacity-100" : "opacity-0")}

@@ -41,6 +41,7 @@ export default async function SettingsPage() {
     <SettingsView
       orgId={shell.orgId}
       orgName={shell.orgName}
+      orgLogoUrl={shell.orgLogoUrl}
       email={shell.email}
       role={shell.role}
       name={shell.name}

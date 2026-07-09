@@ -23,6 +23,7 @@ interface MeMembership {
   orgId: string;
   orgName: string;
   orgSlug: string;
+  orgLogoUrl: string | null;
   role: Role;
 }
 interface MeResponse {
@@ -80,6 +81,7 @@ export class MeController {
         orgId: o.id,
         orgName: o.name,
         orgSlug: o.slug,
+        orgLogoUrl: o.logoUrl,
         role: o.role,
       })),
       defaultOrgId: orgs[0]?.id ?? null,

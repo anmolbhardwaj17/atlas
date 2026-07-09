@@ -7,6 +7,7 @@ export interface OrgMembership {
   id: string;
   slug: string;
   name: string;
+  logoUrl: string | null;
   role: Role;
 }
 
@@ -25,8 +26,17 @@ export class MembershipService {
       org_id: string;
       org_slug: string;
       org_name: string;
+      org_logo_url: string | null;
       role: Role;
-    }>("SELECT org_id, org_slug, org_name, role FROM app_user_memberships($1)", [userId]);
-    return rows.map((r) => ({ id: r.org_id, slug: r.org_slug, name: r.org_name, role: r.role }));
+    }>("SELECT org_id, org_slug, org_name, org_logo_url, role FROM app_user_memberships($1)", [
+      userId,
+    ]);
+    return rows.map((r) => ({
+      id: r.org_id,
+      slug: r.org_slug,
+      name: r.org_name,
+      logoUrl: r.org_logo_url,
+      role: r.role,
+    }));
   }
 }

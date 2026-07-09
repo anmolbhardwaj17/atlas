@@ -24,7 +24,7 @@ import {
   ChangeRoleSchema,
   CreateInviteSchema,
   CreateOrgSchema,
-  RenameOrgSchema,
+  UpdateOrgSchema,
   type InvitationDto,
   type MemberDto,
   type OrgDto,
@@ -68,8 +68,8 @@ export class OrgController {
   @Patch(":orgId")
   @UseGuards(AuthGuard, TenantScopeGuard, RolesGuard)
   @Roles("Admin")
-  async rename(@Req() req: AuthedRequest, @Body() body: unknown): Promise<OrgDto> {
-    return this.orgs.rename(org(req).id, parseBody(RenameOrgSchema, body).name);
+  async update(@Req() req: AuthedRequest, @Body() body: unknown): Promise<OrgDto> {
+    return this.orgs.update(org(req).id, parseBody(UpdateOrgSchema, body));
   }
 
   @Get(":orgId/members")

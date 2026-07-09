@@ -32,6 +32,7 @@ interface InvitationDto {
 export function SettingsView({
   orgId,
   orgName,
+  orgLogoUrl,
   email,
   role,
   name,
@@ -43,6 +44,7 @@ export function SettingsView({
 }: {
   orgId: string;
   orgName: string;
+  orgLogoUrl: string | null;
   email: string;
   role: string;
   name: string | null;
@@ -66,7 +68,7 @@ export function SettingsView({
       {/* Profile + Organization side by side; `items-start` so each sizes to its own content. */}
       <div className="grid gap-6 md:grid-cols-2 md:items-start">
         <ProfileCard name={name} email={email} avatarUrl={avatarUrl} />
-        <OrgCard orgId={orgId} orgName={orgName} canEdit={isAdmin} />
+        <OrgCard orgId={orgId} orgName={orgName} orgLogoUrl={orgLogoUrl} canEdit={isAdmin} />
       </div>
 
       {isAdmin ? <LlmSettingsCard orgId={orgId} initial={llm} /> : null}

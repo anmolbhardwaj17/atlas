@@ -13,6 +13,7 @@ export interface Shell {
   token: string;
   orgId: string;
   orgName: string;
+  orgLogoUrl: string | null;
   role: string;
   email: string;
   name: string | null;
@@ -23,6 +24,7 @@ interface Membership {
   orgId: string;
   orgName: string;
   orgSlug: string;
+  orgLogoUrl: string | null;
   role: string;
 }
 interface MeResponse {
@@ -54,6 +56,7 @@ export const requireShell = cache(async (): Promise<Shell> => {
     token: session.token,
     orgId: active.orgId,
     orgName: active.orgName,
+    orgLogoUrl: active.orgLogoUrl,
     role: active.role,
     email: me.email ?? session.email,
     name: me.name,

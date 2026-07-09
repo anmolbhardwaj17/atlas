@@ -1,6 +1,10 @@
 import { z } from "zod";
 import type { Role } from "@atlas/db";
 
+/** A logo upload: a base64 `data:` URL. Capped generously — base64 of a ~1.5 MB image is ~2 MB of
+ *  chars; the service re-validates the decoded size + mime. */
+const LogoDataUrl = z.string().trim().min(1).max(3_000_000);
+
 /** Request schemas (docs/08 §7). `.strict()` rejects unknown fields (P8). */
 export const CreateOrgSchema = z
   .object({
@@ -9,12 +13,22 @@ export const CreateOrgSchema = z
       .string()
       .regex(/^[a-z0-9-]{3,40}$/, "must be 3-40 chars of a-z, 0-9, or -")
       .optional(),
+    logo: LogoDataUrl.optional(),
   })
   .strict();
 export type CreateOrgBody = z.infer<typeof CreateOrgSchema>;
 
-export const RenameOrgSchema = z.object({ name: z.string().trim().min(1).max(100) }).strict();
-export type RenameOrgBody = z.infer<typeof RenameOrgSchema>;
+/** Update org identity: rename and/or set-or-remove the logo (`logo: null` clears it). */
+export const UpdateOrgSchema = z
+  .object({
+    name: z.string().trim().min(1).max(100).optional(),
+    logo: z.union([LogoDataUrl, z.null()]).optional(),
+  })
+  .strict()
+  .refine((v) => v.name !== undefined || v.logo !== undefined, {
+    message: "Nothing to update.",
+  });
+export type UpdateOrgBody = z.infer<typeof UpdateOrgSchema>;
 
 export const ChangeRoleSchema = z.object({ role: z.enum(["Owner", "Admin", "Member"]) }).strict();
 export type ChangeRoleBody = z.infer<typeof ChangeRoleSchema>;
@@ -35,6 +49,7 @@ export interface OrgDto {
   name: string;
   plan: string;
   status: string;
+  logoUrl: string | null;
   createdAt: string;
 }
 export interface MemberDto {
