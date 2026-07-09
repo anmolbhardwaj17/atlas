@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Building2, Check, Loader2, Pencil, Upload, X } from "lucide-react";
+import { Building2, Check, Loader2, Pencil, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -102,52 +102,63 @@ export function OrgCard({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        {/* Logo — the org's mark, shown across the app. */}
+        {/* Logo — the org's mark, shown across the app. The tile itself is the control: a corner
+            badge shows a + (add) or ✎ (replace), and clicking anywhere on it opens the picker. */}
         <div className="flex items-center gap-4">
-          <OrgLogo name={name} logoUrl={logoUrl} size={56} className="rounded-lg" />
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+            className="hidden"
+            onChange={(e) => void onPickLogo(e)}
+          />
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={logoBusy}
+              aria-label={logoUrl ? "Replace logo" : "Upload logo"}
+              className="group relative shrink-0 rounded-lg outline-none ring-ring transition focus-visible:ring-2 disabled:opacity-70"
+            >
+              <OrgLogo
+                name={name}
+                logoUrl={logoUrl}
+                size={56}
+                className="rounded-lg transition group-hover:brightness-95"
+              />
+              <span className="absolute -bottom-1.5 -right-1.5 grid size-6 place-items-center rounded-full border border-border bg-background text-foreground shadow-sm transition group-hover:bg-accent">
+                {logoBusy ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : logoUrl ? (
+                  <Pencil className="size-3" />
+                ) : (
+                  <Plus className="size-3.5" />
+                )}
+              </span>
+            </button>
+          ) : (
+            <OrgLogo name={name} logoUrl={logoUrl} size={56} className="rounded-lg" />
+          )}
           <div className="min-w-0">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Logo
             </p>
-            {canEdit ? (
-              <div className="mt-1.5 flex items-center gap-2">
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
-                  className="hidden"
-                  onChange={(e) => void onPickLogo(e)}
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={logoBusy}
-                >
-                  {logoBusy ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <Upload className="size-3.5" />
-                  )}
-                  {logoUrl ? "Replace" : "Upload"}
-                </Button>
-                {logoUrl ? (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => void removeLogo()}
-                    disabled={logoBusy}
-                  >
-                    Remove
-                  </Button>
-                ) : null}
-              </div>
-            ) : (
+            <p className="mt-1 text-xs text-muted-foreground">PNG, JPEG, WebP, GIF, or SVG.</p>
+            {canEdit && logoUrl ? (
+              <button
+                type="button"
+                onClick={() => void removeLogo()}
+                disabled={logoBusy}
+                className="mt-1 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:opacity-70"
+              >
+                Remove
+              </button>
+            ) : null}
+            {!canEdit ? (
               <p className="mt-1 text-sm text-muted-foreground">
                 {logoUrl ? "Set by an admin" : "No logo set"}
               </p>
-            )}
-            <p className="mt-1 text-xs text-muted-foreground">PNG, JPEG, WebP, GIF, or SVG.</p>
+            ) : null}
           </div>
         </div>
 
