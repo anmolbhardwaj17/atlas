@@ -7,6 +7,15 @@ import { AtlasAiMark } from "@/components/brand";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/cn";
 import { ProviderIcon } from "@/components/settings/provider-icon";
 import { setLlmSettings, deleteLlmSettings, type LlmSettings } from "@/lib/browser-api";
@@ -94,9 +103,6 @@ const DEFAULT_PROVIDER: ProviderCfg = PROVIDERS.find((p) => p.id === "openrouter
 };
 const providerOf = (id: string): ProviderCfg =>
   PROVIDERS.find((p) => p.id === id) ?? DEFAULT_PROVIDER;
-
-const SELECT_CLASS =
-  "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
 /**
  * BYO-LLM: point Ask AI at your own model (docs/10 §3). Pick a provider - OpenRouter (one key,
@@ -245,24 +251,25 @@ export function LlmSettingsCard({
 
           <label className="space-y-1">
             <span className="text-xs font-medium text-muted-foreground">Model</span>
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              aria-label="Model"
-              className={SELECT_CLASS}
-            >
-              {/* Preserve a saved/custom model that isn't in the curated list. */}
-              {!knownIds.includes(model) ? <option value={model}>{model}</option> : null}
-              {pcfg.groups.map((g) => (
-                <optgroup key={g.title} label={g.title}>
-                  {g.models.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+            <Select value={model} onValueChange={setModel}>
+              <SelectTrigger className="h-9 w-full" aria-label="Model">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {/* Preserve a saved/custom model that isn't in the curated list. */}
+                {!knownIds.includes(model) ? <SelectItem value={model}>{model}</SelectItem> : null}
+                {pcfg.groups.map((g) => (
+                  <SelectGroup key={g.title}>
+                    <SelectLabel>{g.title}</SelectLabel>
+                    {g.models.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
         </div>
 

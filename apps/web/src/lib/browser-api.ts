@@ -63,6 +63,84 @@ export async function updateMyProfile(patch: {
   return { name: body?.data?.name ?? null, avatarUrl: body?.data?.avatarUrl ?? null };
 }
 
+// ── Organization / member management (Admin+; the API enforces role + last-Owner rules) ──────
+export interface MemberDto {
+  userId: string;
+  email: string;
+  name: string | null;
+  avatarUrl: string | null;
+  role: string;
+  status: string;
+}
+
+/** Read the API's error message (for the inline toast) when a mutation is rejected. */
+async function errorMessage(res: Response, fallback: string): Promise<string> {
+  const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+  return body?.error?.message ?? fallback;
+}
+
+/** Rename the org (Admin+). Returns the new name. */
+export async function renameOrg(orgId: string, name: string): Promise<string> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/orgs/${orgId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "X-Atlas-Org": orgId,
+    },
+    body: JSON.stringify({ name: name.trim() }),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Couldn't rename (${res.status}).`));
+  const body = (await res.json()) as { data?: { name?: string } };
+  return body.data?.name ?? name.trim();
+}
+
+/** Change a member's role (Admin+; only an Owner may touch an Owner or grant Owner). */
+export async function changeMemberRole(
+  orgId: string,
+  userId: string,
+  role: "Owner" | "Admin" | "Member",
+): Promise<MemberDto> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/orgs/${orgId}/members/${userId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "X-Atlas-Org": orgId,
+    },
+    body: JSON.stringify({ role }),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Couldn't change role (${res.status}).`));
+  const body = (await res.json()) as { data: MemberDto };
+  return body.data;
+}
+
+/** Remove a member from the org (Admin+; can't remove the last Owner). 204 → no body. */
+export async function removeMember(orgId: string, userId: string): Promise<void> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/orgs/${orgId}/members/${userId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Couldn't remove member (${res.status}).`));
+}
+
+/** Revoke a pending invitation (Admin+). 204 → no body. */
+export async function revokeInvitation(orgId: string, invitationId: string): Promise<void> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/orgs/${orgId}/invitations/${invitationId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Couldn't revoke invite (${res.status}).`));
+}
+
 export interface SearchHit {
   node: { id: string; kind: string; name: string | null };
   score: number;

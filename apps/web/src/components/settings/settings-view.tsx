@@ -1,11 +1,9 @@
 "use client";
 
 import { type ReactNode } from "react";
-import { Building2 } from "lucide-react";
-import { cn } from "@/lib/cn";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OrgPanel } from "@/app/org-panel";
 import { ProfileCard } from "@/components/settings/profile-card";
+import { OrgCard } from "@/components/settings/org-card";
 import { LlmSettingsCard } from "@/components/settings/llm-settings";
 import type { LlmSettings } from "@/lib/browser-api";
 
@@ -69,37 +67,26 @@ export function SettingsView({
           (grid's default align-items: stretch) so they stay level even while editing. */}
       <div className="grid gap-6 md:grid-cols-2">
         <ProfileCard name={name} email={email} avatarUrl={avatarUrl} />
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="size-4" /> Organization
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <dl className="space-y-2 text-sm">
-              <Row label="Name" value={orgName} />
-              <Row label="Organization ID" value={orgId} mono />
-              <Row label="Your role" value={role} />
-            </dl>
-          </CardContent>
-        </Card>
+        <OrgCard
+          orgId={orgId}
+          orgName={orgName}
+          role={role}
+          memberCount={members.length}
+          canEdit={isAdmin}
+        />
       </div>
 
       {isAdmin ? <LlmSettingsCard orgId={orgId} initial={llm} /> : null}
 
-      <OrgPanel orgId={orgId} initialMembers={members} initialInvites={invites} />
+      <OrgPanel
+        orgId={orgId}
+        currentRole={role}
+        currentEmail={email}
+        initialMembers={members}
+        initialInvites={invites}
+      />
 
       {isAdmin ? securitySlot : null}
-    </div>
-  );
-}
-
-function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="flex justify-between gap-4">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className={cn("truncate", mono ? "font-mono text-xs" : "font-medium")}>{value}</dd>
     </div>
   );
 }
