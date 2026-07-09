@@ -1886,6 +1886,9 @@ function DetailPanel({
                     ? "text-warning"
                     : "text-success",
               )}
+              // The checked-at time is locale/timezone-formatted, so the server string ("… AM")
+              // and the browser's ("… am") legitimately differ — tell React not to flag the diff.
+              suppressHydrationWarning
               title={
                 node.health.checkedAt
                   ? `checked ${new Date(node.health.checkedAt).toLocaleTimeString()}`
