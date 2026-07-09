@@ -5,6 +5,7 @@ import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
 import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
 import { AtlasAiMark } from "@/components/brand";
 import { NodeConnections } from "@/components/explore/node-connections";
+import { NodeRisks } from "@/components/explore/node-risks";
 import { CopyButton } from "@/components/explore/copy-button";
 import { kindIcon, kindStyle, KIND_LOGO } from "@/lib/kind-visual";
 import { PROVIDER_META, ENV_STYLE } from "@/lib/taxonomy";
@@ -186,6 +187,9 @@ export function NodeDetailView({
           </Link>
         </div>
       ) : null}
+
+      {/* ── Risks (findings that name this node) ────────────────── */}
+      <NodeRisks orgId={orgId} nodeId={node.id} />
 
       {/* ── Key facts (curated) ────────────────────────────────── */}
       {facts.length > 0 ? (

@@ -1437,6 +1437,21 @@ export class GraphService {
     });
   }
 
+  /** Findings from the authoritative dashboard computation that name THIS node — powers the Risks
+   *  section on the node detail. Reuses summary() so there's no second, drifting rule set (a finding
+   *  shown here is exactly one you'd see in Insights). Matches by evidence node id or an /explore
+   *  deep-link to this node. */
+  async findingsForNode(orgId: string, id: string): Promise<Finding[]> {
+    const { findings } = await this.summary(orgId);
+    const href = `/explore/${id}`;
+    return findings.filter(
+      (f) =>
+        f.href === href ||
+        f.href === `/explore/${id}/impact` ||
+        (f.evidence?.some((e) => e.id === id) ?? false),
+    );
+  }
+
   async nodeEdges(orgId: string, id: string, q: EdgesQuery): Promise<EdgeDto[]> {
     return withOrgScope(this.db, orgId, async (c) => {
       await this.loadNode(c, id); // 404 if absent / cross-tenant

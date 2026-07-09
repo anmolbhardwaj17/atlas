@@ -68,6 +68,30 @@ export async function searchNodes(
   return body.data ?? [];
 }
 
+/** A finding (risk) that names a specific node — the node detail's Risks section. */
+export interface NodeFinding {
+  id: string;
+  severity: "high" | "medium" | "low";
+  category: string;
+  title: string;
+  detail: string;
+  href: string | null;
+  pillar?: string | null;
+  evidence?: Array<{ id: string; label: string }>;
+}
+
+/** Findings/risks that reference this node (reuses the dashboard's authoritative rules). */
+export async function getNodeFindings(orgId: string, nodeId: string): Promise<NodeFinding[]> {
+  const token = await getClientToken();
+  if (!token) return [];
+  const res = await fetch(`${apiUrl()}/nodes/${nodeId}/findings`, {
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) return [];
+  const body = (await res.json().catch(() => null)) as { data?: NodeFinding[] } | null;
+  return body?.data ?? [];
+}
+
 /** Fetch one edge's full detail (rule + evidence + provenance) — for the inline "why" accordion. */
 export async function getEdgeDetail(orgId: string, edgeId: string): Promise<EdgeDetail | null> {
   const token = await getClientToken();

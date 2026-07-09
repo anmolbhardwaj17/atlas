@@ -153,6 +153,12 @@ export class GraphController {
     return this.graph.nodeEvents(org(req).id, id);
   }
 
+  @Get("nodes/:id/findings")
+  @Roles("Member")
+  async nodeFindings(@Req() req: AuthedRequest, @Param("id") id: string): Promise<unknown> {
+    return this.graph.findingsForNode(org(req).id, id);
+  }
+
   @Get("nodes/:id/edges")
   @Roles("Member")
   async nodeEdges(
