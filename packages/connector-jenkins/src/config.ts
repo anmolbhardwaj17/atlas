@@ -15,9 +15,12 @@ export function parseJenkinsConfig(config: Record<string, unknown>): JenkinsConf
   if (typeof raw !== "string" || !raw.trim()) {
     throw new Error("jenkins config: `baseUrl` is required (the Jenkins server URL)");
   }
+  // Default to https:// when the user pastes a bare host (e.g. "jenkins.app.siemba.com").
+  const trimmed = raw.trim();
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
   let url: URL;
   try {
-    url = new URL(raw.trim());
+    url = new URL(withScheme);
   } catch {
     throw new Error("jenkins config: `baseUrl` must be a valid URL");
   }
