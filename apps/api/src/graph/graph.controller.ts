@@ -72,6 +72,9 @@ export class GraphController {
         total: s.findings.length,
         ...bySeverity,
         pipelineCoverage: s.insights.pipelineCoverage,
+        // Per-pillar posture (0-100, same computation as the dashboard) so Insights can show
+        // WHERE the estate is weak, not just totals.
+        posture: s.insights.posture,
       },
       // Data freshness for the honest "findings reflect your sync from X ago" line - findings are
       // derived live, so this (not a per-finding timestamp) is the real recency signal (P4/P7).

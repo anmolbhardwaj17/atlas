@@ -143,8 +143,10 @@ export interface SeverityMeta {
   label: string;
   icon: LucideIcon;
   className: string;
-  /** Left-rail accent used on the finding row. */
+  /** Left-rail accent + dot colour used on the finding row. */
   accent: string;
+  /** Text-only colour (for a tile number / row label), matching the badge hue. */
+  text: string;
 }
 
 export const SEVERITY_META: Record<Severity, SeverityMeta> = {
@@ -153,18 +155,21 @@ export const SEVERITY_META: Record<Severity, SeverityMeta> = {
     icon: AlertTriangle,
     className: "border-transparent bg-red-500/15 text-red-600 dark:text-red-400",
     accent: "bg-red-500",
+    text: "text-red-600 dark:text-red-400",
   },
   medium: {
     label: "Medium",
     icon: AlertCircle,
     className: "border-transparent bg-amber-500/20 text-amber-600 dark:text-amber-400",
     accent: "bg-amber-500",
+    text: "text-amber-600 dark:text-amber-400",
   },
   low: {
     label: "Low",
     icon: Info,
     className: "border-transparent bg-sky-500/15 text-sky-600 dark:text-sky-400",
     accent: "bg-sky-500",
+    text: "text-sky-600 dark:text-sky-400",
   },
 };
 

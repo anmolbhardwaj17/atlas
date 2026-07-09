@@ -3,10 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ChevronRight, History, RotateCcw, Search } from "lucide-react";
+import { ChevronRight, History, RotateCcw, Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { AtlasAiMark } from "@/components/brand";
 import { cn } from "@/lib/cn";
+import { severityMeta } from "@/lib/taxonomy";
 import { pillarMeta } from "./pillars";
 
 export interface Finding {
@@ -31,6 +32,30 @@ export interface InsightsSummary {
   medium: number;
   low: number;
   pipelineCoverage: { withPipeline: number; total: number };
+  /** Per-pillar posture (0-100), same computation as the dashboard. */
+  posture?: Record<string, number>;
+}
+
+const SEV_WEIGHT: Record<string, number> = { high: 3, medium: 2, low: 1 };
+/** Priority score for the "Fix first" strip: severity dominates, then a regression boost, then how
+ *  many resources it affects. Highest wins. */
+function priority(f: Finding): number {
+  return (
+    (SEV_WEIGHT[f.severity] ?? 1) * 1000 + (f.regressedAt ? 500 : 0) + Math.min(f.count ?? 1, 99)
+  );
+}
+const POSTURE_ORDER = [
+  "security",
+  "reliability",
+  "cost",
+  "performance",
+  "operations",
+  "hygiene",
+] as const;
+/** A pre-filled "ask about this finding" question (grounded, cited answer). */
+function findingAskHref(f: Finding): string {
+  const q = `How do I fix "${f.title}"? What's affected, why does it matter, and what are the exact steps?`;
+  return `/ask?q=${encodeURIComponent(q)}`;
 }
 export interface Mute {
   findingId: string;
@@ -39,16 +64,6 @@ export interface Mute {
 }
 
 const SEV_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
-const SEV_TEXT: Record<string, string> = {
-  high: "text-danger",
-  medium: "text-warning",
-  low: "text-inferred-low",
-};
-const SEV_DOT: Record<string, string> = {
-  high: "bg-danger",
-  medium: "bg-warning",
-  low: "bg-inferred-low",
-};
 
 /** Compact relative time for the data-freshness line ("just now", "5m ago", "3h ago", "2d ago"). */
 function timeAgo(iso: string): string {
@@ -113,6 +128,23 @@ export function InsightsView({
     return c;
   }, [active]);
 
+  // "Fix first": the highest-priority active findings (severity × regression × blast).
+  const fixFirst = React.useMemo(
+    () => [...active].sort((a, b) => priority(b) - priority(a)).slice(0, 3),
+    [active],
+  );
+  // Posture-trend at a glance: opened / fixed / regressed in the last 7 days.
+  const trend = React.useMemo(() => {
+    const cut = Date.now() - 7 * 86_400_000;
+    const within = (iso?: string | null) => !!iso && new Date(iso).getTime() >= cut;
+    return {
+      opened: active.filter((f) => within(f.firstSeenAt)).length,
+      fixed: resolved.filter((f) => within(f.resolvedAt)).length,
+      regressed: active.filter((f) => within(f.regressedAt)).length,
+    };
+  }, [active, resolved]);
+  const posture = summary?.posture ?? null;
+
   const [tab, setTab] = React.useState<"active" | "muted" | "fixed">("active");
   const base = tab === "muted" ? muted : tab === "fixed" ? resolvedSorted : active;
 
@@ -146,10 +178,6 @@ export function InsightsView({
     setPillar("all");
   };
 
-  const cov = summary?.pipelineCoverage;
-  const covPct = cov && cov.total > 0 ? Math.round((cov.withPipeline / cov.total) * 100) : null;
-  const covGap = cov ? cov.total - cov.withPipeline : 0;
-
   return (
     <div className="w-full space-y-6">
       <header className="space-y-1.5">
@@ -169,37 +197,112 @@ export function InsightsView({
         </p>
       </header>
 
-      {/* Posture summary: severity tiles + CI/CD coverage. */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Posture summary: severity tiles (CI/CD coverage lives on the dashboard + is already a
+          finding in the list, so it's not repeated here as a tile). */}
+      <div className="grid gap-3 sm:grid-cols-3">
         <SeverityTile label="High priority" n={sevCounts.high} sev="high" hint="Fix these first" />
         <SeverityTile label="Medium" n={sevCounts.medium} sev="medium" hint="Worth addressing" />
         <SeverityTile label="Low" n={sevCounts.low} sev="low" hint="Nice to clean up" />
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              CI/CD coverage
-            </p>
-            {covPct !== null ? (
-              <>
-                <p className="mt-1 text-2xl font-semibold tabular-nums">{covPct}%</p>
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-foreground transition-all"
-                    style={{ width: `${covPct}%` }}
-                  />
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {covGap > 0
-                    ? `${covGap} repo${covGap === 1 ? "" : "s"} without a pipeline`
-                    : "Every repo has a pipeline."}
-                </p>
-              </>
-            ) : (
-              <p className="mt-1 text-sm text-muted-foreground">No repositories yet.</p>
-            )}
-          </CardContent>
-        </Card>
       </div>
+
+      {/* Posture by area + this-week trend. */}
+      {posture || trend.opened + trend.fixed + trend.regressed > 0 ? (
+        <div className="grid gap-3 lg:grid-cols-3">
+          {posture ? (
+            <Card className="lg:col-span-2">
+              <CardContent className="space-y-2.5 p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Posture by area
+                </p>
+                {POSTURE_ORDER.filter((k) => posture[k] !== undefined).map((k) => {
+                  const score = Math.round(posture[k] ?? 100);
+                  const m = pillarMeta(k);
+                  const tone =
+                    score >= 85 ? "bg-success" : score >= 60 ? "bg-warning" : "bg-danger";
+                  return (
+                    <div key={k} className="flex items-center gap-3">
+                      <m.icon className={cn("size-3.5 shrink-0", m.tone)} />
+                      <span className="w-20 shrink-0 text-xs text-muted-foreground">{m.label}</span>
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={cn("h-full rounded-full transition-all", tone)}
+                          style={{ width: `${score}%` }}
+                        />
+                      </div>
+                      <span className="w-7 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                        {score}
+                      </span>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          ) : null}
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                This week
+              </p>
+              <div className="mt-3 space-y-2 text-sm">
+                <TrendRow dot="bg-success" label="Fixed" n={trend.fixed} />
+                <TrendRow dot="bg-muted-foreground" label="New" n={trend.opened} />
+                <TrendRow dot="bg-warning" label="Regressed" n={trend.regressed} />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
+      {/* Fix first — the highest-impact findings, so you know where to start. */}
+      {tab === "active" && !filtering && fixFirst.length > 0 ? (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold">Fix first</p>
+            <Link
+              href={`/ask?q=${encodeURIComponent("What should I fix first, and why? Rank my top risks by impact.")}`}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <AtlasAiMark size={13} className="size-3" /> Ask what to fix first
+            </Link>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            {fixFirst.map((f) => {
+              const m = pillarMeta(f.guidance?.pillar);
+              return (
+                <Link
+                  key={f.id}
+                  href={`/insights/${f.id}`}
+                  className="group flex flex-col gap-1.5 rounded-lg border border-border bg-card p-3 transition-colors hover:border-foreground/30"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className={cn("size-2 rounded-full", severityMeta(f.severity).accent)} />
+                    <span
+                      className={cn(
+                        "text-xs font-medium capitalize",
+                        severityMeta(f.severity).text,
+                      )}
+                    >
+                      {f.severity}
+                    </span>
+                    <m.icon className={cn("ml-auto size-3.5", m.tone)} />
+                  </div>
+                  <p className="text-sm font-medium leading-snug group-hover:underline">
+                    {f.title}
+                  </p>
+                  <p className="line-clamp-2 text-xs text-muted-foreground">
+                    {f.guidance?.why ?? f.detail}
+                  </p>
+                  {f.count && f.count > 1 ? (
+                    <p className="mt-auto pt-1 text-[11px] text-muted-foreground">
+                      {f.count} affected
+                    </p>
+                  ) : null}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
       {/* Active / Muted (accepted-risk) / Fixed (resolved history). */}
       {muted.length > 0 || resolvedSorted.length > 0 ? (
@@ -313,7 +416,7 @@ export function InsightsView({
                   <th className="px-4 py-2.5 text-right font-medium">
                     {tab === "fixed" ? "Fixed" : "Affected"}
                   </th>
-                  <th className="w-8 px-2 py-2.5" />
+                  <th className="w-16 px-2 py-2.5" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -335,13 +438,13 @@ export function InsightsView({
                           <span
                             className={cn(
                               "size-2 rounded-full",
-                              isFixed ? "bg-success" : SEV_DOT[it.severity],
+                              isFixed ? "bg-success" : severityMeta(it.severity).accent,
                             )}
                           />
                           <span
                             className={cn(
                               "text-xs font-medium capitalize",
-                              isFixed ? "text-success" : SEV_TEXT[it.severity],
+                              isFixed ? "text-success" : severityMeta(it.severity).text,
                             )}
                           >
                             {isFixed ? "Fixed" : it.severity}
@@ -392,7 +495,19 @@ export function InsightsView({
                             : "-"}
                       </td>
                       <td className="px-2 py-3">
-                        {isFixed ? null : <ChevronRight className="size-4 text-muted-foreground" />}
+                        {isFixed ? null : (
+                          <span className="flex items-center justify-end gap-0.5">
+                            <Link
+                              href={findingAskHref(it)}
+                              onClick={(e) => e.stopPropagation()}
+                              title="Ask Atlas how to fix this"
+                              className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
+                            >
+                              <AtlasAiMark size={14} className="size-3.5" />
+                            </Link>
+                            <ChevronRight className="size-4 text-muted-foreground" />
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -402,15 +517,6 @@ export function InsightsView({
           </div>
         </Card>
       )}
-
-      {covGap > 0 ? (
-        <Link
-          href={`/ask?q=${encodeURIComponent("How do I improve my CI/CD pipeline coverage?")}`}
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          Improve CI/CD coverage with Atlas <ArrowRight className="size-3.5" />
-        </Link>
-      ) : null}
     </div>
   );
 }
@@ -430,17 +536,32 @@ function SeverityTile({
     <Card>
       <CardContent className="p-4">
         <div className="flex items-center gap-2">
-          <span className={cn("size-2 rounded-full", SEV_DOT[sev])} />
+          <span className={cn("size-2 rounded-full", severityMeta(sev).accent)} />
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {label}
           </p>
         </div>
-        <p className={cn("mt-1 text-2xl font-semibold tabular-nums", n > 0 && SEV_TEXT[sev])}>
+        <p
+          className={cn(
+            "mt-1 text-2xl font-semibold tabular-nums",
+            n > 0 && severityMeta(sev).text,
+          )}
+        >
           {n}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">{n > 0 ? hint : "All clear"}</p>
       </CardContent>
     </Card>
+  );
+}
+
+function TrendRow({ dot, label, n }: { dot: string; label: string; n: number }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className={cn("size-1.5 rounded-full", dot)} />
+      <span className="text-muted-foreground">{label}</span>
+      <span className="ml-auto font-medium tabular-nums">{n}</span>
+    </div>
   );
 }
 
