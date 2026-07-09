@@ -47,7 +47,9 @@ The frontend renders `current` vs `proposed` side-by-side, delta highlighted; "D
 
 ## 5. Before / after visualization
 
-Each proposal renders its small affected subgraph twice — **current** and **proposed** — using node chips (kind icon + label) connected by arrows. **Added** nodes are ghosted/green ("proposed"); removed = struck/red; changed = amber. Small subgraphs (2–6 nodes), so a lightweight diagram beats pulling in the full Map canvas.
+**Now (per-proposal):** each proposal renders its small affected subgraph twice — **current** and **proposed** — on a map-style canvas: node cards with the **real resource icons** (the same `KIND_LOGO`/`CloudIcon` system the Map uses) connected by **curved SVG edges + arrowheads**, laid out left→right by longest-path rank. **Added** nodes/edges are green/dashed ("proposed"); removed = struck/red; changed = amber. Small subgraphs (2–6 nodes), so a self-contained canvas beats embedding N heavy Map instances.
+
+**Roadmap (whole-estate map):** a single **"proposed estate" map** — the entire current graph reused from the `/map` React-Flow canvas, with *all* proposals applied and highlighted, and a **Current ⇄ Proposed toggle** so you can flip your whole infra between "what you run" and "what Atlas recommends." (Deferred by the product owner: per-proposal first, overall map later.)
 
 ## 6. The discuss / debate loop
 
