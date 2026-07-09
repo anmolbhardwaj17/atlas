@@ -6,9 +6,23 @@ import { useRouter } from "next/navigation";
 import { ChevronRight, History, RotateCcw, Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { AtlasAiMark } from "@/components/brand";
+import { PostureRadar, type Posture } from "@/components/dashboard/posture-radar";
+import { SeverityTrend, type TrendPoint } from "./severity-trend";
 import { cn } from "@/lib/cn";
 import { severityMeta } from "@/lib/taxonomy";
 import { pillarMeta } from "./pillars";
+
+/** Fill any missing pillar with a perfect score so the radar always has all six axes. */
+function toPosture(p: Record<string, number>): Posture {
+  return {
+    security: p.security ?? 100,
+    reliability: p.reliability ?? 100,
+    cost: p.cost ?? 100,
+    performance: p.performance ?? 100,
+    hygiene: p.hygiene ?? 100,
+    operations: p.operations ?? 100,
+  };
+}
 
 export interface Finding {
   id: string;
@@ -36,14 +50,6 @@ export interface InsightsSummary {
   posture?: Record<string, number>;
 }
 
-const POSTURE_ORDER = [
-  "security",
-  "reliability",
-  "cost",
-  "performance",
-  "operations",
-  "hygiene",
-] as const;
 /** A pre-filled "ask about this finding" question (grounded, cited answer). */
 function findingAskHref(f: Finding): string {
   const q = `How do I fix "${f.title}"? What's affected, why does it matter, and what are the exact steps?`;
@@ -120,15 +126,28 @@ export function InsightsView({
     return c;
   }, [active]);
 
-  // Posture-trend at a glance: opened / fixed / regressed in the last 7 days.
-  const trend = React.useMemo(() => {
-    const cut = Date.now() - 7 * 86_400_000;
-    const within = (iso?: string | null) => !!iso && new Date(iso).getTime() >= cut;
-    return {
-      opened: active.filter((f) => within(f.firstSeenAt)).length,
-      fixed: resolved.filter((f) => within(f.resolvedAt)).length,
-      regressed: active.filter((f) => within(f.regressedAt)).length,
-    };
+  // Severity trend: reconstruct the open High/Medium/Low counts per day over the window, from each
+  // finding's open (firstSeenAt) → close (resolvedAt) lifecycle, so the chart shows movement.
+  const trendSeries = React.useMemo<TrendPoint[]>(() => {
+    const DAY = 86_400_000;
+    const DAYS = 14;
+    const today = Math.floor(Date.now() / DAY) * DAY; // start of today (UTC)
+    const lived = [...active, ...resolved]; // active = still open; resolved = closed
+    const out: TrendPoint[] = [];
+    for (let d = DAYS - 1; d >= 0; d--) {
+      const start = today - d * DAY;
+      const end = start + DAY;
+      const c = { high: 0, medium: 0, low: 0 };
+      for (const f of lived) {
+        const open = f.firstSeenAt ? new Date(f.firstSeenAt).getTime() : null;
+        if (open === null || open >= end) continue; // not opened by this day
+        const closed = f.resolvedAt ? new Date(f.resolvedAt).getTime() : null;
+        if (closed !== null && closed < start) continue; // already closed before this day
+        c[f.severity] += 1;
+      }
+      out.push({ t: start, ...c });
+    }
+    return out;
   }, [active, resolved]);
   const posture = summary?.posture ?? null;
 
@@ -168,10 +187,10 @@ export function InsightsView({
   return (
     <div className="w-full space-y-6">
       <header className="space-y-1.5">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Insights</h1>
           {lastSyncedAt ? (
-            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
               <History className="size-3.5" />
               Reflects your sync from {timeAgo(lastSyncedAt)}
             </span>
@@ -184,61 +203,43 @@ export function InsightsView({
         </p>
       </header>
 
-      {/* Posture summary: severity tiles (CI/CD coverage lives on the dashboard + is already a
-          finding in the list, so it's not repeated here as a tile). */}
-      <div className="grid gap-3 sm:grid-cols-3">
-        <SeverityTile label="High priority" n={sevCounts.high} sev="high" hint="Fix these first" />
-        <SeverityTile label="Medium" n={sevCounts.medium} sev="medium" hint="Worth addressing" />
-        <SeverityTile label="Low" n={sevCounts.low} sev="low" hint="Nice to clean up" />
-      </div>
-
-      {/* Posture by area + this-week trend. */}
-      {posture || trend.opened + trend.fixed + trend.regressed > 0 ? (
-        <div className="grid gap-3 lg:grid-cols-3">
-          {posture ? (
-            <Card className="lg:col-span-2">
-              <CardContent className="space-y-2.5 p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Posture by area
-                </p>
-                {POSTURE_ORDER.filter((k) => posture[k] !== undefined).map((k) => {
-                  const score = Math.round(posture[k] ?? 100);
-                  const m = pillarMeta(k);
-                  const tone =
-                    score >= 85 ? "bg-success" : score >= 60 ? "bg-warning" : "bg-danger";
-                  return (
-                    <div key={k} className="flex items-center gap-3">
-                      <m.icon className={cn("size-3.5 shrink-0", m.tone)} />
-                      <span className="w-20 shrink-0 text-xs text-muted-foreground">{m.label}</span>
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className={cn("h-full rounded-full transition-all", tone)}
-                          style={{ width: `${score}%` }}
-                        />
-                      </div>
-                      <span className="w-7 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-                        {score}
-                      </span>
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          ) : null}
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                This week
-              </p>
-              <div className="mt-3 space-y-2 text-sm">
-                <TrendRow dot="bg-success" label="Fixed" n={trend.fixed} />
-                <TrendRow dot="bg-muted-foreground" label="New" n={trend.opened} />
-                <TrendRow dot="bg-warning" label="Regressed" n={trend.regressed} />
-              </div>
-            </CardContent>
-          </Card>
+      {/* Posture band: severity counts (rows) · how they're trending · the pillar radar. */}
+      <div className="grid gap-3 lg:grid-cols-3">
+        {/* Left — the three severity counts, stacked. */}
+        <div className="grid grid-rows-3 gap-3">
+          <SeverityTile label="High" n={sevCounts.high} sev="high" hint="Fix these first" />
+          <SeverityTile label="Medium" n={sevCounts.medium} sev="medium" hint="Worth addressing" />
+          <SeverityTile label="Low" n={sevCounts.low} sev="low" hint="Nice to clean up" />
         </div>
-      ) : null}
+
+        {/* Middle — severity trend over time. */}
+        <Card>
+          <CardContent className="flex h-full flex-col p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Trend
+            </p>
+            <div className="min-h-0 flex-1">
+              <SeverityTrend data={trendSeries} />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Right — posture by pillar (same radar as the dashboard). */}
+        <Card>
+          <CardContent className="flex h-full flex-col p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Posture by area
+            </p>
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+              {posture ? (
+                <PostureRadar posture={toPosture(posture)} />
+              ) : (
+                <p className="text-xs text-muted-foreground/70">No posture data yet.</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Active / Muted (accepted-risk) / Fixed (resolved history). */}
       {muted.length > 0 || resolvedSorted.length > 0 ? (
@@ -469,8 +470,8 @@ function SeverityTile({
   hint: string;
 }) {
   return (
-    <Card>
-      <CardContent className="p-4">
+    <Card className="h-full">
+      <CardContent className="flex h-full flex-col justify-center p-4">
         <div className="flex items-center gap-2">
           <span className={cn("size-2 rounded-full", severityMeta(sev).accent)} />
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -488,16 +489,6 @@ function SeverityTile({
         <p className="mt-1 text-xs text-muted-foreground">{n > 0 ? hint : "All clear"}</p>
       </CardContent>
     </Card>
-  );
-}
-
-function TrendRow({ dot, label, n }: { dot: string; label: string; n: number }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className={cn("size-1.5 rounded-full", dot)} />
-      <span className="text-muted-foreground">{label}</span>
-      <span className="ml-auto font-medium tabular-nums">{n}</span>
-    </div>
   );
 }
 
