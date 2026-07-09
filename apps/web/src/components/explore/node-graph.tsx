@@ -47,7 +47,7 @@ function AtlasGraphNode({ data }: NodeProps) {
             <span
               key={i}
               aria-hidden
-              className="animate-blast-pulse pointer-events-none absolute left-1/2 top-1/2 size-8 rounded-full border border-danger/60"
+              className="animate-blast-pulse pointer-events-none absolute left-1/2 top-1/2 size-8 rounded-full border border-danger/60 bg-danger/15"
               style={{ animationDelay: `${i * 0.8}s` }}
             />
           ))
