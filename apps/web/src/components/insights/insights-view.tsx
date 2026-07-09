@@ -36,14 +36,6 @@ export interface InsightsSummary {
   posture?: Record<string, number>;
 }
 
-const SEV_WEIGHT: Record<string, number> = { high: 3, medium: 2, low: 1 };
-/** Priority score for the "Fix first" strip: severity dominates, then a regression boost, then how
- *  many resources it affects. Highest wins. */
-function priority(f: Finding): number {
-  return (
-    (SEV_WEIGHT[f.severity] ?? 1) * 1000 + (f.regressedAt ? 500 : 0) + Math.min(f.count ?? 1, 99)
-  );
-}
 const POSTURE_ORDER = [
   "security",
   "reliability",
@@ -128,11 +120,6 @@ export function InsightsView({
     return c;
   }, [active]);
 
-  // "Fix first": the highest-priority active findings (severity × regression × blast).
-  const fixFirst = React.useMemo(
-    () => [...active].sort((a, b) => priority(b) - priority(a)).slice(0, 3),
-    [active],
-  );
   // Posture-trend at a glance: opened / fixed / regressed in the last 7 days.
   const trend = React.useMemo(() => {
     const cut = Date.now() - 7 * 86_400_000;
@@ -250,57 +237,6 @@ export function InsightsView({
               </div>
             </CardContent>
           </Card>
-        </div>
-      ) : null}
-
-      {/* Fix first — the highest-impact findings, so you know where to start. */}
-      {tab === "active" && !filtering && fixFirst.length > 0 ? (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold">Fix first</p>
-            <Link
-              href={`/ask?q=${encodeURIComponent("What should I fix first, and why? Rank my top risks by impact.")}`}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <AtlasAiMark size={13} className="size-3" /> Ask what to fix first
-            </Link>
-          </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            {fixFirst.map((f) => {
-              const m = pillarMeta(f.guidance?.pillar);
-              return (
-                <Link
-                  key={f.id}
-                  href={`/insights/${f.id}`}
-                  className="group flex flex-col gap-1.5 rounded-lg border border-border bg-card p-3 transition-colors hover:border-foreground/30"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span className={cn("size-2 rounded-full", severityMeta(f.severity).accent)} />
-                    <span
-                      className={cn(
-                        "text-xs font-medium capitalize",
-                        severityMeta(f.severity).text,
-                      )}
-                    >
-                      {f.severity}
-                    </span>
-                    <m.icon className={cn("ml-auto size-3.5", m.tone)} />
-                  </div>
-                  <p className="text-sm font-medium leading-snug group-hover:underline">
-                    {f.title}
-                  </p>
-                  <p className="line-clamp-2 text-xs text-muted-foreground">
-                    {f.guidance?.why ?? f.detail}
-                  </p>
-                  {f.count && f.count > 1 ? (
-                    <p className="mt-auto pt-1 text-[11px] text-muted-foreground">
-                      {f.count} affected
-                    </p>
-                  ) : null}
-                </Link>
-              );
-            })}
-          </div>
         </div>
       ) : null}
 
