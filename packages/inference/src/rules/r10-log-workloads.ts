@@ -38,7 +38,8 @@ export function normalizeWorkload(raw: string): string {
 /** A repo matches a workload when normalized forms are equal, or one contains the other
  *  (min 5 chars so "api" can't glue everything together). */
 // Generic tokens that appear in half the estate - shared alone they prove nothing.
-const GENERIC_TOKENS = new Set([
+// Exported so R11 (tag correlation) applies the same "generic value proves nothing" guard.
+export const GENERIC_TOKENS = new Set([
   "function",
   "functions",
   "lambda",

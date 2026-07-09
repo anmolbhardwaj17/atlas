@@ -18,6 +18,8 @@ interface RdsInstance {
   MultiAZ?: boolean;
   VpcSecurityGroups?: Array<{ VpcSecurityGroupId?: string }>;
   DBSubnetGroup?: { VpcId?: string };
+  /** DescribeDBInstances returns tags inline as `TagList` ({Key,Value}); feeds R11. */
+  TagList?: Array<{ Key?: string; Value?: string }>;
 }
 
 export const rdsModule: ServiceModule<RdsInstance> = {
@@ -39,6 +41,7 @@ export const rdsModule: ServiceModule<RdsInstance> = {
         endpointAddress: data.Endpoint?.Address,
         endpointPort: data.Endpoint?.Port,
         vpcId: data.DBSubnetGroup?.VpcId,
+        tags: tagsToObject(data.TagList),
       },
     };
   },

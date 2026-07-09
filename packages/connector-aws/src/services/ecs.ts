@@ -8,7 +8,7 @@
  */
 import { awsUrn } from "../urn";
 import type { ServiceModule } from "./module";
-import { observed, roleUrnFromArn, parseEcrImage } from "./helpers";
+import { observed, roleUrnFromArn, parseEcrImage, tagsToObject } from "./helpers";
 
 interface EcsCluster {
   clusterName: string;
@@ -51,6 +51,8 @@ interface EcsService {
     containerName?: string;
     containerPort?: number;
   }>;
+  /** From DescribeServices `include=TAGS` ({key,value} array); may be absent. Feeds R11. */
+  tags?: Array<{ key?: string; value?: string }>;
 }
 
 /** Cluster name is the last `/` segment of a cluster ARN (`…:cluster/<name>`). */
@@ -80,6 +82,7 @@ export const ecsServiceModule: ServiceModule<EcsService> = {
         cluster,
         taskDefinition: data.taskDefinition,
         desiredCount: data.desiredCount,
+        tags: tagsToObject(data.tags),
       },
     };
   },
@@ -119,6 +122,8 @@ interface EcsTaskDef {
     image?: string;
     environment?: Array<{ name?: string; value?: string }>;
   }>;
+  /** From DescribeTaskDefinition `include=TAGS` ({key,value} array); may be absent. Feeds R11. */
+  tags?: Array<{ key?: string; value?: string }>;
 }
 
 export const ecsTaskDefModule: ServiceModule<EcsTaskDef> = {
@@ -138,6 +143,7 @@ export const ecsTaskDefModule: ServiceModule<EcsTaskDef> = {
         taskRoleArn: data.taskRoleArn,
         executionRoleArn: data.executionRoleArn,
         images: (data.containerDefinitions ?? []).map((c) => c.image).filter(Boolean),
+        tags: tagsToObject(data.tags),
       },
     };
   },

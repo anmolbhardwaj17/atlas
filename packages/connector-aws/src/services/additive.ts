@@ -65,6 +65,8 @@ interface CacheCluster {
   SecurityGroups?: Array<{ SecurityGroupId?: string }>;
   ConfigurationEndpoint?: { Address?: string; Port?: number };
   CacheNodes?: Array<{ Endpoint?: { Address?: string; Port?: number } }>;
+  /** From ListTagsForResource ({Key,Value}); gated on `elasticache:ListTagsForResource`. Feeds R11. */
+  TagList?: Array<{ Key?: string; Value?: string }>;
 }
 
 function cacheEndpoint(data: CacheCluster): { host: string; port: number | undefined } | null {
@@ -93,6 +95,7 @@ export const elasticacheModule: ServiceModule<CacheCluster> = {
         nodeType: data.CacheNodeType,
         endpointAddress: ep?.host,
         endpointPort: ep?.port,
+        tags: tagsToObject(data.TagList),
       },
     };
   },

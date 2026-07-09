@@ -78,6 +78,8 @@ interface LambdaFunction {
   Role?: string;
   Environment?: { Variables?: Record<string, string> };
   VpcConfig?: { SubnetIds?: string[]; SecurityGroupIds?: string[] };
+  /** From ListTags (a separate call, gated on `lambda:ListTags`); may be absent. Feeds R11. */
+  Tags?: Record<string, string>;
 }
 
 export const lambdaModule: ServiceModule<LambdaFunction> = {
@@ -97,6 +99,9 @@ export const lambdaModule: ServiceModule<LambdaFunction> = {
         handler: data.Handler,
         role: data.Role,
         vpcConfig: data.VpcConfig ?? null,
+        // Lambda ListTags returns a flat record already (unlike the {Key,Value} array
+        // shape elsewhere); feeds R11 tag→repo correlation (docs/05).
+        tags: data.Tags ?? {},
       },
     };
   },

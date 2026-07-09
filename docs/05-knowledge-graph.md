@@ -268,13 +268,21 @@ Each rule below shows: trigger, evidence, output edge, confidence, and *why that
 - **Confidence:** `inferred-low` — IAM *permission* is weak evidence of *actual use* (roles are often over-permissioned). Explicitly low to avoid manufacturing dependencies from broad policies (P3).
 - **Why:** valuable as a hint, dangerous as a fact — exactly the case P3 exists for.
 
+**R11 — `tag_code_correlation` → `DEPLOYS_TO` (inferred-high / inferred-low)**
+- **Inputs:** compute-runtime nodes (`aws.lambda.function`, `aws.ecs.service`, `aws.ec2.instance`) carrying resource `tags` + crawled `bitbucket.repository`/`github.repository` nodes.
+- **Match:** a recognized code-identifying tag (`repository`, `repo`, `git_repository`, `service`, `application`, `app`, `project`, `component`, `aws:cloudformation:stack-name`, …) whose value — reduced to its repo segment and normalized (env-suffix + non-alphanum stripped, shared with R10) — is **exactly equal** to a repo slug.
+- **Confidence:** `inferred-high` when the value matches exactly one repo (a tag is a deliberate human label — stronger than a name guess); `inferred-low` per repo when the same normalized value matches several (ambiguous → many low, never one wrong high, BR-EDGE-4/5). Generic or <4-char values are skipped (shared `GENERIC_TOKENS`).
+- **Scope:** only compute runtimes are `DEPLOYS_TO` targets — a `service`/`team` tag on a *datastore* is ownership, not deployment (a future `OWNED_BY` extension), not a deploy edge.
+- **Why:** teams already label what-belongs-to-what; reading that label is higher-precision than inferring from names (R1/R10). Exact-equality + non-generic is the precision guarantee (P3).
+- **Evidence stored:** the tag key + value + matched repo slug + the tagged resource URN (P4). See `docs/plans/signal-enrichment.md`.
+
 > **Confidence calibration table** (the contract `10` relies on to phrase answers):
 
 | Tier | Meaning | Example rule | AI phrasing (10) |
 |---|---|---|---|
 | `observed` | Directly read from a source API | R5, R7, SG/ENI facts | stated as fact + source link |
-| `inferred-high` | Strong structural/config evidence | R1(ARN), R2, R3, R4, R6(single-svc) | "Atlas infers (high confidence)… based on <evidence>" |
-| `inferred-low` | Plausible but uncertain (heuristic/permission) | R1(name), R6(monorepo), R8 | "possibly… (low confidence); evidence is <X>; not certain" |
+| `inferred-high` | Strong structural/config evidence | R1(ARN), R2, R3, R4, R6(single-svc), R11(unique tag) | "Atlas infers (high confidence)… based on <evidence>" |
+| `inferred-low` | Plausible but uncertain (heuristic/permission) | R1(name), R6(monorepo), R8, R10, R11(ambiguous tag) | "possibly… (low confidence); evidence is <X>; not certain" |
 
 ### 6.5 Reconciliation & convergence (FR-4.6)
 After each sync's infer stage:
