@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronDown, Map as MapIcon, ExternalLink } from "lucide-react";
+import { ChevronDown, Clock, Map as MapIcon, ExternalLink } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
 import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
@@ -8,8 +8,7 @@ import { NodeConnections } from "@/components/explore/node-connections";
 import { NodeRisks } from "@/components/explore/node-risks";
 import { CopyButton } from "@/components/explore/copy-button";
 import { kindIcon, kindStyle, KIND_LOGO } from "@/lib/kind-visual";
-import { PROVIDER_META, ENV_STYLE } from "@/lib/taxonomy";
-import { ENV_LABEL } from "@/lib/map-types";
+import { PROVIDER_META } from "@/lib/taxonomy";
 import { keyFacts, cloudwatchLink } from "@/lib/node-facts";
 import { cn } from "@/lib/cn";
 import type { NodeDetail, EdgeDto, NodeEvent, TraversalResult } from "@/lib/graph-types";
@@ -60,7 +59,6 @@ export function NodeDetailView({
     reason?: string;
   } | null;
   const unhealthy = !!health?.state && health.state !== "healthy";
-  const env = node.environment && node.environment !== "unknown" ? node.environment : null;
   const facts = keyFacts(node.kind, node.attributes);
   const metricsUrl = cloudwatchLink(node.kind, node.region, node.attributes);
   // "Since" for the health banner: the newest health transition we recorded.
@@ -86,32 +84,28 @@ export function NodeDetailView({
                 )}
               </span>
               <h1 className="text-2xl font-semibold tracking-tight">{node.name ?? "unnamed"}</h1>
-              {env ? (
-                <span
-                  className={cn(
-                    "rounded-full px-2 py-0.5 text-[11px] font-medium capitalize",
-                    ENV_STYLE[env]?.chip ?? "bg-muted text-muted-foreground",
-                  )}
-                >
-                  {ENV_LABEL[env] ?? env}
-                </span>
-              ) : null}
               <ConfidenceBadge tier={node.confidence} />
               <FreshnessTag status={node.status} />
             </div>
-            <p className="mt-1.5 text-sm text-muted-foreground">
-              {node.kind} · {node.provider}
-              {node.region ? ` · ${node.region}` : ""} · seen{" "}
-              {new Date(node.lastSeen).toLocaleString()}
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+              <span>
+                {node.kind} · {node.provider}
+                {node.region ? ` · ${node.region}` : ""}
+              </span>
+              <span className="inline-flex items-center gap-1" title="Last seen">
+                <Clock className="size-3.5" />
+                {new Date(node.lastSeen).toLocaleString()}
+              </span>
             </p>
           </div>
-          {/* Primary CTA: Diagnose (urgent, unhealthy) or Ask (always available). */}
+          {/* Primary CTA: a general "ask about this resource". Urgent diagnosis lives in the health
+              hero (below), so we don't duplicate a Diagnose button up here. */}
           <Link
-            href={askHref(node, unhealthy)}
+            href={askHref(node, false)}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background transition-opacity hover:opacity-90"
           >
             <AtlasAiMark size={14} className="size-3.5" />
-            {unhealthy ? "Diagnose with AI" : "Ask about this"}
+            Ask about this
           </Link>
         </div>
 
@@ -221,29 +215,43 @@ export function NodeDetailView({
           </CardHeader>
           <CardBody>
             {/* What changed, when, by whom (Phase C): CloudTrail config changes, health
-                transitions, deploys, merged PRs - newest first, the incident-story view. */}
-            <ol className="space-y-2 text-sm">
-              {events.slice(0, 12).map((e) => (
-                <li key={e.id} className="flex items-start gap-2.5">
-                  <span
-                    className={`mt-1.5 size-1.5 shrink-0 rounded-full ${
-                      e.kind === "health_transition"
-                        ? "bg-danger"
-                        : e.kind === "config_change"
-                          ? "bg-warning"
-                          : "bg-muted-foreground"
-                    }`}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate" title={e.title}>
-                      {e.title}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(e.occurredAt).toLocaleString()} · {e.source}
-                    </p>
-                  </div>
-                </li>
-              ))}
+                transitions, deploys, merged PRs - newest first, the incident-story view. Rendered
+                as a vertical timeline — dots threaded on a rail — so the sequence reads at a glance. */}
+            <ol className="relative">
+              {events.slice(0, 12).map((e, i, arr) => {
+                const dot =
+                  e.kind === "health_transition"
+                    ? "bg-danger"
+                    : e.kind === "config_change"
+                      ? "bg-warning"
+                      : "bg-muted-foreground";
+                const last = i === arr.length - 1;
+                return (
+                  <li key={e.id} className="relative flex gap-3 pb-5 last:pb-0">
+                    {/* the rail connecting this dot to the next (ring-card on dots masks overlap) */}
+                    {!last ? (
+                      <span
+                        aria-hidden
+                        className="absolute left-[5px] top-4 h-full w-px bg-border"
+                      />
+                    ) : null}
+                    <span
+                      className={cn(
+                        "relative z-10 mt-1 size-2.5 shrink-0 rounded-full ring-4 ring-card",
+                        dot,
+                      )}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm" title={e.title}>
+                        {e.title}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {new Date(e.occurredAt).toLocaleString()} · {e.source}
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
             </ol>
           </CardBody>
         </Card>
