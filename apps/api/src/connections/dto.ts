@@ -4,7 +4,7 @@ import type { ConnectionStatus, ConnectionProvider } from "@atlas/db";
 /** Request schemas (docs/08 §8). `.strict()` rejects unknown fields (P8). */
 export const CreateConnectionSchema = z
   .object({
-    provider: z.enum(["aws", "github", "azure", "gcp", "bitbucket", "gitlab", "datadog"]),
+    provider: z.enum(["aws", "github", "azure", "gcp", "bitbucket", "gitlab", "datadog", "jenkins"]),
     displayName: z.string().trim().min(1).max(120),
     config: z.record(z.unknown()).optional(),
   })
