@@ -1,6 +1,6 @@
 # Plan — Advisor (architecture redesign you can see and argue with)
 
-> **Status:** 🔵 In progress — architecture-proposal first slice building now.
+> **Status:** ⏸️ **Deferred (honest call, 2026-07-10).** The backend engine is built (pattern library + `GET /advisor/proposals`), but the standalone frontend surface was **removed** — on the current estate it only fired 2 Multi-AZ proposals, which duplicate an Insights finding, and without cost data it isn't yet "optimization," just Well-Architected reliability = Insights. So the surface is **folded/deferred**: recommendations live in Insights for now; the Advisor **graduates to its own page when it's substantial** — i.e. when (1) Cost Explorer/CloudWatch give real $/right-sizing numbers and (2) a real pattern library makes the before/after graph earn its place. The pattern engine + endpoint are kept as the ready foundation.
 > **The vision (product owner):** Atlas proposes **structural changes to the infra** — "move this off **EC2 → ECS**", "put a **load balancer** in front", "make this **Multi-AZ**", "use a **managed DB**" — and shows them as a **proposed architecture graph next to the current one** (before / after), which you can **discuss / argue** with Atlas.
 > **NOT** a findings list (that's Insights). This is architecture redesign, visualized.
 > **Cross-refs:** `docs/05` (graph), `docs/09` (map/React-Flow render), `docs/10` (AI, fact/advice trust model), `docs/plans/operational-intelligence.md`, `docs/plans/atlas-suite-vision.md`.

@@ -8,7 +8,6 @@ import {
   Boxes,
   Waypoints,
   Lightbulb,
-  Sparkles,
   Plug,
   Settings,
   Loader2,
@@ -64,12 +63,6 @@ const WORKSPACE_NAV: NavItem[] = [
     label: "Insights",
     icon: Lightbulb,
     match: (p: string) => p.startsWith("/insights"),
-  },
-  {
-    href: "/advisor",
-    label: "Advisor",
-    icon: Sparkles,
-    match: (p: string) => p.startsWith("/advisor"),
   },
 ];
 
