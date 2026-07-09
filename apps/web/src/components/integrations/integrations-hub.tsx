@@ -580,7 +580,9 @@ function ProviderRow({
       freshTone = days > 14 ? "text-danger" : days > 7 ? "text-warning" : "text-success";
       resourcesLabel = `${only.lastSync.resources} resources`;
     } else if (only) {
-      freshLabel = "Connected · not synced yet";
+      // Just the sync state (the "Connected" badge already says it's connected) — matches
+      // "Synced Xago" / "Syncing…" on the other rows.
+      freshLabel = "Not synced yet";
     } else {
       freshLabel = `${connections.length} connections`;
     }
