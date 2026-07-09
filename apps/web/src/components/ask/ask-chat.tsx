@@ -5,6 +5,12 @@ import Link from "next/link";
 import { Send, Check, Square } from "lucide-react";
 import dynamic from "next/dynamic";
 import { AtlasAiMark } from "@/components/brand";
+import { CitationPeek } from "@/components/ask/citation-peek";
+import { CopyButton } from "@/components/explore/copy-button";
+import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
+import { kindIcon, kindShort, KIND_LOGO } from "@/lib/kind-visual";
+import { PROVIDER_META } from "@/lib/taxonomy";
+import { getNode } from "@/lib/browser-api";
 
 // LiquidMetal is a WebGL shader - client-only (no SSR), lazy-loaded so it never blocks paint.
 const LiquidMetal = dynamic(
@@ -12,6 +18,20 @@ const LiquidMetal = dynamic(
   { ssr: false },
 );
 import { createConversation, getConversation, streamAskWS, type AskEvent } from "@/lib/browser-api";
+
+/** A cited resource's brand/kind glyph for the sources rail. */
+function CitedGlyph({ kind }: { kind: string }) {
+  const svc = KIND_LOGO[kind];
+  const logo =
+    svc && hasCloudIcon(svc)
+      ? svc
+      : hasCloudIcon(PROVIDER_META[kind.split(".")[0] ?? ""]?.logo ?? "")
+        ? PROVIDER_META[kind.split(".")[0] ?? ""]?.logo
+        : null;
+  if (logo) return <CloudIcon name={logo} className="size-3 shrink-0" />;
+  const Icon = kindIcon(kind);
+  return <Icon className="size-3 shrink-0" />;
+}
 
 interface Citation {
   number: number;
@@ -99,6 +119,8 @@ export function AskChat({
   const convoRef = useRef<string | null>(conversationId ?? null);
   const autoAsked = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
+  // The cited node being previewed in the side drawer (null = closed).
+  const [peekId, setPeekId] = useState<string | null>(null);
 
   const stop = () => abortRef.current?.abort();
 
@@ -237,11 +259,13 @@ export function AskChat({
             m.role === "user" ? (
               <UserBubble key={i} text={m.text} />
             ) : (
-              <AssistantBubble key={i} message={m} />
+              <AssistantBubble key={i} message={m} orgId={orgId} onPeek={setPeekId} />
             ),
           )
         )}
       </div>
+
+      <CitationPeek orgId={orgId} nodeId={peekId} onClose={() => setPeekId(null)} />
 
       <form
         onSubmit={(e) => {
@@ -335,10 +359,40 @@ function UserBubble({ text }: { text: string }) {
   );
 }
 
-function AssistantBubble({ message }: { message: ChatMessage }) {
+function AssistantBubble({
+  message,
+  orgId,
+  onPeek,
+}: {
+  message: ChatMessage;
+  orgId: string;
+  onPeek: (id: string) => void;
+}) {
   const honest = message.confidence === "insufficient";
   const thinking = message.streaming && message.text.length === 0;
   const citeByMarker = new Map(message.citations.map((c) => [c.marker, c]));
+  // Distinct cited resources (nodes) for the Sources rail.
+  const nodeCites = (() => {
+    const seen = new Set<string>();
+    return message.citations.filter((c) => c.kind === "node" && !seen.has(c.id) && seen.add(c.id));
+  })();
+  // Resolve friendly names for the rail chips (cached client-side); fall back to the kind.
+  const [names, setNames] = useState<Record<string, string>>({});
+  const showExtras = !message.streaming && message.text.length > 0;
+  const citeIds = nodeCites.map((c) => c.id).join(",");
+  useEffect(() => {
+    if (!showExtras || citeIds.length === 0) return;
+    let live = true;
+    for (const id of citeIds.split(",")) {
+      void getNode(orgId, id).then((n) => {
+        const nm = n?.name;
+        if (live && nm) setNames((prev) => (prev[id] ? prev : { ...prev, [id]: nm }));
+      });
+    }
+    return () => {
+      live = false;
+    };
+  }, [showExtras, orgId, citeIds]);
   return (
     <div className="flex gap-3">
       <AtlasAiMark
@@ -381,6 +435,7 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
               live={message.live}
               streaming={message.streaming}
               cites={citeByMarker}
+              onPeek={onPeek}
             />
           </p>
         )}
@@ -395,8 +450,36 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
           </ul>
         )}
 
-        {message.confidence && !message.streaming ? (
-          <TrustHint tier={message.confidence} sources={message.citations.length} />
+        {/* Sources rail — the cited resources, click to peek without leaving the chat. */}
+        {showExtras && nodeCites.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Sources
+            </span>
+            {nodeCites.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => onPeek(c.id)}
+                title="Preview this resource"
+                className="inline-flex max-w-[12rem] items-center gap-1 rounded-md border border-border bg-card px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+              >
+                <CitedGlyph kind={c.kind} />
+                <span className="truncate">{names[c.id] ?? kindShort(c.kind)}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {showExtras && (message.confidence || message.text) ? (
+          <div className="flex items-center justify-between gap-3 pt-0.5">
+            {message.confidence ? (
+              <TrustHint tier={message.confidence} sources={message.citations.length} />
+            ) : (
+              <span />
+            )}
+            <CopyButton value={message.text} label="Copy" className="border-0 px-1.5" />
+          </div>
         ) : null}
       </div>
     </div>
@@ -409,9 +492,15 @@ function AssistantBubble({ message }: { message: ChatMessage }) {
  * Perplexity). Incomplete markers mid-stream stay literal; a marker with no resolved citation yet
  * (citations arrive after the tokens) is hidden until it resolves.
  */
-function renderRich(text: string, cites: Map<string, Citation>): ReactNode[] {
+function renderRich(
+  text: string,
+  cites: Map<string, Citation>,
+  onPeek: (id: string) => void,
+): ReactNode[] {
   const out: ReactNode[] = [];
   const re = /\*\*(.+?)\*\*|`([^`]+)`|\[([NEA]\d+)\]/g;
+  const sup =
+    "mx-px inline-flex h-3.5 min-w-3.5 items-center justify-center rounded bg-muted px-0.5 align-super text-[10px] font-medium text-muted-foreground transition-colors hover:bg-foreground hover:text-background";
   let last = 0;
   let m: RegExpExecArray | null;
   let key = 0;
@@ -427,13 +516,26 @@ function renderRich(text: string, cites: Map<string, Citation>): ReactNode[] {
       );
     } else {
       const c = cites.get(m[3] as string);
-      if (c) {
+      if (c && c.kind === "node") {
+        // Node citations peek in a side drawer — don't navigate away from the conversation.
+        out.push(
+          <button
+            key={key++}
+            type="button"
+            onClick={() => onPeek(c.id)}
+            title={`Source ${c.number} · preview`}
+            className={sup}
+          >
+            {c.number}
+          </button>,
+        );
+      } else if (c) {
         out.push(
           <Link
             key={key++}
             href={citationHref(c)}
             title={`Source ${c.number}${c.confidence ? ` · ${c.confidence}` : ""}`}
-            className="mx-px inline-flex h-3.5 min-w-3.5 items-center justify-center rounded bg-muted px-0.5 align-super text-[10px] font-medium text-muted-foreground transition-colors hover:bg-foreground hover:text-background"
+            className={sup}
           >
             {c.number}
           </Link>,
@@ -457,11 +559,13 @@ function TypewriterText({
   live,
   streaming,
   cites,
+  onPeek,
 }: {
   text: string;
   live: boolean;
   streaming: boolean;
   cites: Map<string, Citation>;
+  onPeek: (id: string) => void;
 }) {
   const [shown, setShown] = useState(() => (live ? 0 : text.length));
   useEffect(() => {
@@ -478,7 +582,7 @@ function TypewriterText({
   const caret = streaming || shown < text.length;
   return (
     <>
-      {renderRich(text.slice(0, shown), cites)}
+      {renderRich(text.slice(0, shown), cites, onPeek)}
       {caret && <span className="ml-0.5 animate-pulse">▌</span>}
     </>
   );

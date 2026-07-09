@@ -1,6 +1,23 @@
 import { createClient } from "@/lib/supabase/client";
 import { apiUrl } from "@/lib/env";
-import type { EdgeDetail } from "@/lib/graph-types";
+import type { EdgeDetail, NodeDetail } from "@/lib/graph-types";
+
+/** Fetch one node's detail (for the Ask citation peek). Cached per id so a chat that cites the
+ *  same node repeatedly hits the network once. */
+const nodeCache = new Map<string, NodeDetail | null>();
+export async function getNode(orgId: string, id: string): Promise<NodeDetail | null> {
+  if (nodeCache.has(id)) return nodeCache.get(id) ?? null;
+  const token = await getClientToken();
+  if (!token) return null;
+  const res = await fetch(`${apiUrl()}/nodes/${id}`, {
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) return null;
+  const body = (await res.json().catch(() => null)) as { data?: NodeDetail } | null;
+  const node = body?.data ?? null;
+  nodeCache.set(id, node);
+  return node;
+}
 
 /**
  * Client-side Atlas API access for the interactive surfaces (Ask AI SSE stream, ⌘K search).
