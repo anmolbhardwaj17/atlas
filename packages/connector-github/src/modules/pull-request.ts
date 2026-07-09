@@ -17,6 +17,10 @@ export interface PullRequestPayload {
     mergedAt?: string | null;
     baseRef?: string;
     headRef?: string;
+    /** Merge + head commit SHAs (GitHub `merge_commit_sha` / `head.sha`) — feed R12 image→SHA
+     *  provenance (docs/05). Populated by the crawl; absent until GitHub is live. */
+    mergeCommitSha?: string | null;
+    headSha?: string | null;
     changedFiles?: string[];
     additions?: number;
     deletions?: number;
@@ -41,6 +45,7 @@ export const pullRequestModule: GithubModule<PullRequestPayload> = {
         baseRef: data.baseRef,
         headRef: data.headRef,
         changedFiles: data.changedFiles ?? [],
+        commitShas: [data.mergeCommitSha, data.headSha].filter((s): s is string => Boolean(s)),
       },
     };
   },

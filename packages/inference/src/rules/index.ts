@@ -9,6 +9,7 @@ import type { Rule } from "../types";
 import { repoDeploysToRuntimeRule } from "./r1-deploys";
 import { logWorkloadCorrelationRule } from "./r10-log-workloads";
 import { tagCodeCorrelationRule } from "./r11-tags";
+import { imageCommitProvenanceRule } from "./r12-images";
 import { serviceDerivationRule } from "./r4-service";
 import { ownershipPropagationRule } from "./r5-ownership";
 import { prChangesServiceRule } from "./r6-changed";
@@ -23,11 +24,12 @@ export const ALL_RULES: readonly Rule[] = [
   configRefConnectsRule,
   iamAccessConnectsRule,
   crossBoundaryConnectsRule,
-  // Deploy → service chain (dependency-ordered). R1/R10/R11 all emit DEPLOYS_TO(repo→runtime)
+  // Deploy → service chain (dependency-ordered). R1/R10/R11/R12 all emit DEPLOYS_TO(repo→runtime)
   // and must run before R4 (service derivation reads high-confidence DEPLOYS_TO).
   repoDeploysToRuntimeRule,
   logWorkloadCorrelationRule,
   tagCodeCorrelationRule,
+  imageCommitProvenanceRule,
   serviceDerivationRule,
   ownershipPropagationRule,
   prChangesServiceRule,
@@ -36,6 +38,7 @@ export const ALL_RULES: readonly Rule[] = [
 export { repoDeploysToRuntimeRule } from "./r1-deploys";
 export { logWorkloadCorrelationRule } from "./r10-log-workloads";
 export { tagCodeCorrelationRule } from "./r11-tags";
+export { imageCommitProvenanceRule } from "./r12-images";
 export { serviceDerivationRule } from "./r4-service";
 export { ownershipPropagationRule } from "./r5-ownership";
 export { prChangesServiceRule } from "./r6-changed";

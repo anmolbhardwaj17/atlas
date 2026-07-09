@@ -90,6 +90,24 @@ describe("pull request module", () => {
       origin: "observed",
     });
   });
+
+  it("captures merge + source commit SHAs for R12 image→commit provenance", () => {
+    const withShas = withContext(
+      {
+        id: 231,
+        title: "offline mode",
+        merge_commit: { hash: "a1b2c3d4e5f6a7b8c9d0" },
+        source: { branch: { name: "feat" }, commit: { hash: "f9e8d7c6b5a4" } },
+      },
+      { workspace: "acme", repoSlug: "mobile-app" },
+    );
+    const node = pr().normalize(withShas);
+    expect(node.attributes.commitShas).toEqual(["a1b2c3d4e5f6a7b8c9d0", "f9e8d7c6b5a4"]);
+  });
+
+  it("omits commit SHAs cleanly when the payload has none", () => {
+    expect(pr().normalize(payload).attributes.commitShas as string[]).toEqual([]);
+  });
 });
 
 describe("project + user leaf modules", () => {

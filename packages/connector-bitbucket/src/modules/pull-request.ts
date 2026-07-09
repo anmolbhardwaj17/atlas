@@ -19,6 +19,12 @@ export function pullRequestNode(payload: unknown): NodeUpsert {
   const repo = repoSlug ?? "";
   const id = prId(payload);
   const title = str(payload, "title") ?? `PR #${id}`;
+  // The merge + source-head commit hashes: the artifact deployed to infra was built from one
+  // of these, so they let R12 match a running image's SHA back to this repo (docs/05, P4).
+  const commitShas = [
+    str(obj(payload, "merge_commit"), "hash"),
+    str(obj(obj(payload, "source"), "commit"), "hash"),
+  ].filter((s): s is string => Boolean(s));
   return {
     urn: pullRequestUrn(workspace, repo, id),
     kind: "bitbucket.pullrequest",
@@ -30,6 +36,7 @@ export function pullRequestNode(payload: unknown): NodeUpsert {
       destinationBranch: str(obj(obj(payload, "destination"), "branch"), "name"),
       createdOn: str(payload, "created_on"),
       updatedOn: str(payload, "updated_on"),
+      commitShas,
     },
   };
 }

@@ -276,12 +276,19 @@ Each rule below shows: trigger, evidence, output edge, confidence, and *why that
 - **Why:** teams already label what-belongs-to-what; reading that label is higher-precision than inferring from names (R1/R10). Exact-equality + non-generic is the precision guarantee (P3).
 - **Evidence stored:** the tag key + value + matched repo slug + the tagged resource URN (P4). See `docs/plans/signal-enrichment.md`.
 
+**R12 — `image_commit_provenance` → `DEPLOYS_TO` (inferred-high / inferred-low)**
+- **Inputs:** ECS task-definition `images` (the ECR image URIs it runs) + PR nodes carrying `commitShas` (the merge/head commit hashes, captured from the crawled PR payload — Bitbucket live; GitHub wired for parity).
+- **Match:** extract a git-SHA-looking token (7–40 hex, containing at least one `a–f` letter so pure-numeric dates are excluded) from an image *tag*, and match it by **prefix** against a crawled PR's commit SHA (image tags carry the 7-char short SHA; commits store the full 40). A hit means *this running image was built from that commit* → its repo `DEPLOYS_TO` the ECS service running the image.
+- **Confidence:** `inferred-high` — a git-SHA match is near-certain provenance (the strongest code↔infra link short of a real CI deploy record). Ambiguous (a token matching commits in several repos) → `inferred-low` each (P3). **Not `observed`:** an inference rule *correlates* two observed facts (the image tag and the PR SHA); a *directly-read* deploy record (the CI/CD connector, `docs/07c`) is what earns `observed`.
+- **Why:** the highest-precision of the code→infra matchers — it doesn't guess from names/tags, it matches the artifact's actual build commit. A tag with no SHA-shaped token (e.g. `latest`, `v1.2.3`) yields nothing (P3).
+- **Evidence stored:** the image URI, the extracted image SHA, the matched commit SHA, and the ECS service URN (P4). See `docs/plans/signal-enrichment.md` (slice 2).
+
 > **Confidence calibration table** (the contract `10` relies on to phrase answers):
 
 | Tier | Meaning | Example rule | AI phrasing (10) |
 |---|---|---|---|
 | `observed` | Directly read from a source API | R5, R7, SG/ENI facts | stated as fact + source link |
-| `inferred-high` | Strong structural/config evidence | R1(ARN), R2, R3, R4, R6(single-svc), R11(unique tag) | "Atlas infers (high confidence)… based on <evidence>" |
+| `inferred-high` | Strong structural/config evidence | R1(ARN), R2, R3, R4, R6(single-svc), R11(unique tag), R12(SHA match) | "Atlas infers (high confidence)… based on <evidence>" |
 | `inferred-low` | Plausible but uncertain (heuristic/permission) | R1(name), R6(monorepo), R8, R10, R11(ambiguous tag) | "possibly… (low confidence); evidence is <X>; not certain" |
 
 ### 6.5 Reconciliation & convergence (FR-4.6)
