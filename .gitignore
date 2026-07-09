@@ -33,3 +33,6 @@ tmp/
 
 # One-off debug/diagnostic scripts (never committed)
 *.tmp.js
+
+# Local, per-developer Claude Code settings
+.claude/settings.local.json

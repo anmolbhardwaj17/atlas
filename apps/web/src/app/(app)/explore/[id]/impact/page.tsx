@@ -35,7 +35,9 @@ export default async function ImpactPage({ params }: { params: Promise<{ id: str
       {node ? (
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Impact · {node.name ?? node.urn}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Impact · {node.name ?? node.urn}
+            </h1>
             <p className="text-sm text-muted-foreground">
               What changes if this resource does - and what it depends on. Every path shows its
               weakest-link confidence and the evidence behind each hop.
