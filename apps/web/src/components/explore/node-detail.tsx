@@ -1,11 +1,15 @@
 import Link from "next/link";
+import { ChevronDown, Map as MapIcon, ExternalLink } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
 import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
 import { AtlasAiMark } from "@/components/brand";
 import { NodeConnections } from "@/components/explore/node-connections";
+import { CopyButton } from "@/components/explore/copy-button";
 import { kindIcon, kindStyle, KIND_LOGO } from "@/lib/kind-visual";
-import { PROVIDER_META } from "@/lib/taxonomy";
+import { PROVIDER_META, ENV_STYLE } from "@/lib/taxonomy";
+import { ENV_LABEL } from "@/lib/map-types";
+import { keyFacts, cloudwatchLink } from "@/lib/node-facts";
 import { cn } from "@/lib/cn";
 import type { NodeDetail, EdgeDto, NodeEvent, TraversalResult } from "@/lib/graph-types";
 
@@ -18,8 +22,21 @@ function nodeLogo(kind: string): string | null {
   return brand && hasCloudIcon(brand) ? brand : null;
 }
 
-/** Node detail (docs/09 §5.3): header + attributes + provenance + the unified connections/impact
- *  graph (neighborhood map + blast-radius/dependencies tabs). */
+/** A pre-filled Ask Atlas question about this resource (grounded, cited answer). */
+function askHref(node: NodeDetail, unhealthy: boolean): string {
+  const label = node.name ?? node.kind;
+  const q = unhealthy
+    ? `Why is ${label} unhealthy right now? Diagnose the likely cause, what changed recently, and what depends on it.`
+    : `Tell me about ${label} — what it is, what it connects to, what depends on it, and anything I should know.`;
+  return `/ask?q=${encodeURIComponent(q)}`;
+}
+
+/**
+ * Node detail (docs/09 §5.3) — answer-first: lead with what this IS and whether it's OK (health
+ * hero + curated key facts + actions), then what changed (timeline) and what it touches
+ * (connections). Raw attributes + provenance are demoted behind disclosure — trust plumbing on
+ * demand, not the headline (P4 is still one click away).
+ */
 export function NodeDetailView({
   orgId,
   node,
@@ -37,47 +54,162 @@ export function NodeDetailView({
 }) {
   const logo = nodeLogo(node.kind);
   const KindIcon = kindIcon(node.kind);
+  const health = (node.attributes?.health ?? null) as {
+    state?: string;
+    reason?: string;
+  } | null;
+  const unhealthy = !!health?.state && health.state !== "healthy";
+  const env = node.environment && node.environment !== "unknown" ? node.environment : null;
+  const facts = keyFacts(node.kind, node.attributes);
+  const metricsUrl = cloudwatchLink(node.kind, node.region, node.attributes);
+  // "Since" for the health banner: the newest health transition we recorded.
+  const healthSince = events.find((e) => e.kind === "health_transition")?.occurredAt ?? null;
 
   return (
     <div className="space-y-6">
+      {/* ── Header ─────────────────────────────────────────────── */}
       <div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={cn(
-              "grid size-8 shrink-0 place-items-center rounded-md",
-              logo ? "bg-muted/60" : kindStyle(node.kind),
-            )}
-          >
-            {logo ? (
-              <CloudIcon name={logo} className="size-5" />
-            ) : (
-              <KindIcon className="size-[18px]" />
-            )}
-          </span>
-          <h1 className="text-2xl font-semibold tracking-tight">{node.name ?? "unnamed"}</h1>
-          <ConfidenceBadge tier={node.confidence} />
-          <FreshnessTag status={node.status} />
-          {(() => {
-            const h = node.attributes?.health as { state?: string } | undefined;
-            if (!h || h.state === "healthy" || !h.state) return null;
-            const q = `Why is ${node.name ?? node.kind} unhealthy right now? Diagnose the likely cause, what changed recently, and what depends on it.`;
-            return (
-              <Link
-                href={`/ask?q=${encodeURIComponent(q)}`}
-                className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background transition-opacity hover:opacity-90"
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={cn(
+                  "grid size-8 shrink-0 place-items-center rounded-md",
+                  logo ? "bg-muted/60" : kindStyle(node.kind),
+                )}
               >
-                <AtlasAiMark size={14} className="size-3.5" /> Diagnose with AI
-              </Link>
-            );
-          })()}
+                {logo ? (
+                  <CloudIcon name={logo} className="size-5" />
+                ) : (
+                  <KindIcon className="size-[18px]" />
+                )}
+              </span>
+              <h1 className="text-2xl font-semibold tracking-tight">{node.name ?? "unnamed"}</h1>
+              {env ? (
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[11px] font-medium capitalize",
+                    ENV_STYLE[env]?.chip ?? "bg-muted text-muted-foreground",
+                  )}
+                >
+                  {ENV_LABEL[env] ?? env}
+                </span>
+              ) : null}
+              <ConfidenceBadge tier={node.confidence} />
+              <FreshnessTag status={node.status} />
+            </div>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              {node.kind} · {node.provider}
+              {node.region ? ` · ${node.region}` : ""} · seen{" "}
+              {new Date(node.lastSeen).toLocaleString()}
+            </p>
+          </div>
+          {/* Primary CTA: Diagnose (urgent, unhealthy) or Ask (always available). */}
+          <Link
+            href={askHref(node, unhealthy)}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background transition-opacity hover:opacity-90"
+          >
+            <AtlasAiMark size={14} className="size-3.5" />
+            {unhealthy ? "Diagnose with AI" : "Ask about this"}
+          </Link>
         </div>
-        <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{node.urn}</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {node.kind} · {node.provider}
-          {node.region ? ` · ${node.region}` : ""} · seen {new Date(node.lastSeen).toLocaleString()}
-        </p>
+
+        {/* Action row + the URN as a quiet, copyable identifier (demoted from the headline). */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Link
+            href={`/map?node=${node.id}`}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+          >
+            <MapIcon className="size-3.5" />
+            View on map
+          </Link>
+          {metricsUrl ? (
+            <a
+              href={metricsUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+            >
+              <ExternalLink className="size-3.5" />
+              View metrics
+            </a>
+          ) : null}
+          <CopyButton value={node.urn} label="Copy URN" />
+          <code
+            className="max-w-full truncate rounded bg-muted px-2 py-1 font-mono text-[11px] text-muted-foreground"
+            title={node.urn}
+          >
+            {node.urn}
+          </code>
+        </div>
       </div>
 
+      {/* ── Health hero (only when not healthy) ────────────────── */}
+      {unhealthy ? (
+        <div
+          className={cn(
+            "flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border p-4",
+            health?.state === "degraded"
+              ? "border-warning/30 bg-warning/10"
+              : "border-danger/30 bg-danger/10",
+          )}
+        >
+          <span
+            className={cn(
+              "size-2.5 shrink-0 rounded-full",
+              health?.state === "degraded" ? "bg-warning" : "bg-danger",
+            )}
+          />
+          <div className="min-w-0 flex-1">
+            <p
+              className={cn(
+                "text-sm font-semibold capitalize",
+                health?.state === "degraded" ? "text-warning" : "text-danger",
+              )}
+            >
+              {health?.state}
+              {health?.reason ? (
+                <span className="font-normal text-foreground"> — {health.reason}</span>
+              ) : null}
+            </p>
+            {healthSince ? (
+              <p className="text-xs text-muted-foreground">
+                Since {new Date(healthSince).toLocaleString()}
+              </p>
+            ) : null}
+          </div>
+          <Link
+            href={askHref(node, true)}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background transition-opacity hover:opacity-90"
+          >
+            <AtlasAiMark size={14} className="size-3.5" /> Diagnose with AI
+          </Link>
+        </div>
+      ) : null}
+
+      {/* ── Key facts (curated) ────────────────────────────────── */}
+      {facts.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Key facts</CardTitle>
+          </CardHeader>
+          <CardBody>
+            <dl className="grid gap-x-8 gap-y-2.5 sm:grid-cols-2">
+              {facts.map(([label, value]) => (
+                <div
+                  key={label}
+                  className="grid grid-cols-[minmax(0,130px)_1fr] items-baseline gap-x-4"
+                >
+                  <dt className="truncate text-sm text-muted-foreground">{label}</dt>
+                  <dd className="min-w-0 break-all text-sm">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {/* ── Timeline (what changed) ────────────────────────────── */}
       {events.length > 0 ? (
         <Card>
           <CardHeader>
@@ -113,49 +245,53 @@ export function NodeDetailView({
         </Card>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Attributes</CardTitle>
-          </CardHeader>
-          <CardBody>
-            <KeyValues data={node.attributes} empty="No attributes." />
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Provenance</CardTitle>
-          </CardHeader>
-          <CardBody>
-            {node.provenance ? (
-              <dl className="divide-y divide-border text-sm">
-                <Row label="Source" value={node.provenance.source ?? "-"} />
-                <Row
-                  label="Observed"
-                  value={
-                    node.provenance.observedAt
-                      ? new Date(node.provenance.observedAt).toLocaleString()
-                      : "-"
-                  }
-                />
-                <Row label="Confidence" value={node.provenance.confidence ?? node.confidence} />
-                <Row label="Sync run" value={node.provenance.syncRunId ?? "-"} mono />
-                {node.provenance.rawSnapshotRef && (
-                  <Row label="Raw snapshot" value={node.provenance.rawSnapshotRef} mono subtle />
-                )}
-              </dl>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No provenance recorded - this node was derived, not directly observed.
-              </p>
-            )}
-          </CardBody>
-        </Card>
+      {/* ── Details on demand: all attributes + evidence/provenance ── */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Disclosure title="All attributes">
+          <KeyValues data={node.attributes} empty="No attributes." />
+        </Disclosure>
+        <Disclosure title="Evidence & provenance">
+          {node.provenance ? (
+            <dl className="divide-y divide-border text-sm">
+              <Row label="Source" value={node.provenance.source ?? "-"} />
+              <Row
+                label="Observed"
+                value={
+                  node.provenance.observedAt
+                    ? new Date(node.provenance.observedAt).toLocaleString()
+                    : "-"
+                }
+              />
+              <Row label="Confidence" value={node.provenance.confidence ?? node.confidence} />
+              <Row label="Sync run" value={node.provenance.syncRunId ?? "-"} mono />
+              {node.provenance.rawSnapshotRef ? (
+                <Row label="Raw snapshot" value={node.provenance.rawSnapshotRef} mono subtle />
+              ) : null}
+            </dl>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No provenance recorded - this node was derived, not directly observed.
+            </p>
+          )}
+        </Disclosure>
       </div>
 
       <NodeConnections orgId={orgId} node={node} edges={edges} blast={blast} deps={deps} />
     </div>
+  );
+}
+
+/** A collapsible section (native <details>) for secondary content that shouldn't compete with the
+ *  primary read but must stay one click away. */
+function Disclosure({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <details className="group rounded-lg border border-border bg-card">
+      <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-medium">
+        {title}
+        <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="border-t border-border px-4 py-3">{children}</div>
+    </details>
   );
 }
 
@@ -217,7 +353,7 @@ function Row({
   subtle?: boolean;
 }) {
   return (
-    <div className="grid grid-cols-[minmax(0,130px)_1fr] items-baseline gap-x-4">
+    <div className="grid grid-cols-[minmax(0,130px)_1fr] items-baseline gap-x-4 py-2 first:pt-0 last:pb-0">
       <dt className="text-muted-foreground">{label}</dt>
       <dd
         className={cn(

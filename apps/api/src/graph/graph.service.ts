@@ -1391,7 +1391,10 @@ export class GraphService {
     });
   }
 
-  async getNode(orgId: string, id: string): Promise<NodeDto & { provenance: unknown }> {
+  async getNode(
+    orgId: string,
+    id: string,
+  ): Promise<NodeDto & { provenance: unknown; environment: string }> {
     return withOrgScope(this.db, orgId, async (c) => {
       const node = await this.loadNode(c, id);
       // Latest raw snapshot + its provenance (click-through to raw, P4).
@@ -1414,6 +1417,12 @@ export class GraphService {
       const pr = prov.rows[0];
       return {
         ...toNodeDto(node),
+        environment: inferEnvironment({
+          name: node.name,
+          urn: node.urn,
+          tags: node.tags,
+          attributes: node.attributes,
+        }),
         provenance: pr
           ? {
               source: pr.source,

@@ -33,7 +33,11 @@ export interface NodeProvenance {
   rawSnapshotRef: string | null;
 }
 
-export type NodeDetail = NodeDto & { provenance: NodeProvenance | null };
+export type NodeDetail = NodeDto & {
+  provenance: NodeProvenance | null;
+  /** Inferred environment (prod/staging/dev/…) — server-derived, same as the map. */
+  environment?: string;
+};
 
 export interface EdgeEndpoint {
   id: string;

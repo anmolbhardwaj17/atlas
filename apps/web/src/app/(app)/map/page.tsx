@@ -11,8 +11,14 @@ export const dynamic = "force-dynamic";
  * Infrastructure map (docs/09 §5.4). Server-fetches the bounded graph (secrets stay
  * server-side) and hands it to the client canvas. Empty graph → the onboarding CTA.
  */
-export default async function MapPage() {
+export default async function MapPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const shell = await requireShell();
+  const focusRaw = (await searchParams).node;
+  const focusId = (Array.isArray(focusRaw) ? focusRaw[0] : focusRaw) || undefined;
   const data =
     (await apiGet<ApiOk<MapData>>("/graph?limit=400", { token: shell.token, orgId: shell.orgId }))
       .body?.data ?? null;
@@ -36,5 +42,5 @@ export default async function MapPage() {
     );
   }
 
-  return <InfraMap data={data} orgId={shell.orgId} />;
+  return <InfraMap data={data} orgId={shell.orgId} {...(focusId ? { focusId } : {})} />;
 }

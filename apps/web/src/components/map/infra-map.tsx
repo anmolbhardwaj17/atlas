@@ -73,7 +73,16 @@ const segCls = (active: boolean) =>
 // Repositories are kept: the ones that deploy join the flow, the rest go to a code shelf.
 const NON_MAP_KIND = /\.(project|pipeline|workflow|user|team|pullrequest|pull_request)$/;
 
-export function InfraMap({ data: rawData, orgId }: { data: MapData; orgId: string }) {
+export function InfraMap({
+  data: rawData,
+  orgId,
+  focusId,
+}: {
+  data: MapData;
+  orgId: string;
+  /** A node to open focused (from "View on map" — /map?node=<id>): selected + centred on load. */
+  focusId?: string;
+}) {
   // Drop only the granular code activity (projects/pipelines/PRs/users) - a project fanning
   // out to its PRs is what buried the flow. EVERY repository stays: a repo that deploys joins
   // the infra flow beside its compute; a repo with no infra link lands in a compact code
@@ -86,7 +95,7 @@ export function InfraMap({ data: rawData, orgId }: { data: MapData; orgId: strin
     return { ...rawData, nodes, edges };
   }, [rawData]);
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(focusId ?? null);
   // Security overlay: OFF = the clean traffic flow (protection as shield chips only);
   // ON = security groups return to the canvas with their PROTECTS edges drawn, for the
   // boundary-audit view. Default off - flow first, boundaries on demand.
@@ -347,6 +356,7 @@ export function InfraMap({ data: rawData, orgId }: { data: MapData; orgId: strin
           <Flow
             data={data}
             orgId={orgId}
+            {...(focusId ? { focusId } : {})}
             canvasEdges={canvasEdges}
             protectedBy={protectedBy}
             selectedId={selectedId}
@@ -397,6 +407,7 @@ function decorateEdges(edges: Edge[], activeId: string | null, litSet: Set<strin
 function Flow({
   data,
   orgId,
+  focusId,
   canvasEdges,
   protectedBy,
   selectedId,
@@ -412,6 +423,7 @@ function Flow({
 }: {
   data: MapData;
   orgId: string;
+  focusId?: string;
   canvasEdges: MapData["edges"];
   protectedBy: Map<string, string[]>;
   selectedId: string | null;
@@ -684,22 +696,34 @@ function Flow({
   // security groups + PROTECTS edges without re-framing the canvas (re-fitting made it feel like a
   // brand-new map you had to re-read). So we skip the fit when only `showSecurity` flipped.
   const prevSecurity = useRef(showSecurity);
+  const firstFit = useRef(true);
   useEffect(() => {
     setNodes(layout.nodes);
     const securityToggled = prevSecurity.current !== showSecurity;
     prevSecurity.current = showSecurity;
     if (securityToggled) return;
+    // On the very first paint, if we arrived via "View on map" (?node=), centre on that node
+    // instead of the whole flow. Otherwise frame the flow as usual.
+    const focusFirst = firstFit.current && !!focusId;
+    firstFit.current = false;
     // Fit AFTER the store has the new nodes and painted them (double rAF) - fitting in the same
     // tick reads the stale store and zooms to the wrong box (the blank first paint).
     let raf2 = 0;
     const raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => void fitView({ ...fitOpts, duration: 250 }));
+      raf2 = requestAnimationFrame(
+        () =>
+          void fitView(
+            focusFirst
+              ? { nodes: [{ id: focusId }], duration: 500, maxZoom: 1.3, padding: 0.5 }
+              : { ...fitOpts, duration: 250 },
+          ),
+      );
     });
     return () => {
       cancelAnimationFrame(raf1);
       if (raf2) cancelAnimationFrame(raf2);
     };
-  }, [layout, setNodes, fitView, fitOpts, showSecurity]);
+  }, [layout, setNodes, fitView, fitOpts, showSecurity, focusId]);
 
   // Edges re-decorate on hover/selection/lens WITHOUT refitting the viewport.
   useEffect(() => {
