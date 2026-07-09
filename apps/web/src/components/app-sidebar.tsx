@@ -13,7 +13,6 @@ import {
   Loader2,
 } from "lucide-react";
 import { AtlasLogo, AtlasAiMark } from "@/components/brand";
-import { OrgSwitcher } from "@/components/org-switcher";
 // import { CloudIcon } from "@/components/cloud-icon"; // used by ConnectAppsCard (disabled for now)
 // import { Button } from "@/components/ui/button";
 import {
@@ -164,7 +163,6 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        <OrgSwitcher />
       </SidebarHeader>
 
       <SidebarContent>

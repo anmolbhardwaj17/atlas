@@ -4,6 +4,7 @@ import { CommandPalette } from "@/components/command-palette";
 import { CommandTrigger } from "@/components/command-trigger";
 import { NotificationBell } from "@/components/notification-bell";
 import { HeaderUserMenu } from "@/components/header-user-menu";
+import { OrgSwitcher } from "@/components/org-switcher";
 import { BreadcrumbProvider } from "@/components/breadcrumb-context";
 import { HeaderBreadcrumbs } from "@/components/header-breadcrumbs";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -36,6 +37,9 @@ export function AppShell({
         <BreadcrumbProvider>
           <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
             <SidebarTrigger className="-ml-1" />
+            {/* Org switcher (multi-org) lives top-left, next to the toggle — the standard spot. */}
+            {orgId && <OrgSwitcher />}
+            <Separator orientation="vertical" className="mx-0.5 h-4" />
             {/* Page breadcrumb (published per-page); falls back to an optional title. The app name
                 already lives in the sidebar brand, so we don't repeat "Atlas" here. */}
             <HeaderBreadcrumbs />

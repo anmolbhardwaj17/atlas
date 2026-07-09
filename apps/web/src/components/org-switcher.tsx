@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Building2, Check, ChevronsUpDown, Plus } from "lucide-react";
 import { getMyOrgs, type MyOrg } from "@/lib/browser-api";
 import { ACTIVE_ORG_COOKIE } from "@/lib/active-org";
-import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { cn } from "@/lib/cn";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,9 +21,9 @@ function readCookie(name: string): string | null {
 }
 
 /**
- * Org switcher (shadcn team-switcher pattern) — a user can belong to multiple orgs; this picks the
- * active one. Selection is stored in the `atlas_active_org` cookie that `requireShell` reads
- * server-side, so the whole app (server + client) re-renders scoped to the chosen org on refresh.
+ * Org switcher — a user can belong to multiple orgs; this picks the active one. Lives in the top
+ * bar (top-left, next to the sidebar toggle). Selection is stored in the `atlas_active_org` cookie
+ * that `requireShell` reads server-side, so the whole app re-renders scoped to the chosen org.
  */
 export function OrgSwitcher() {
   const router = useRouter();
@@ -55,55 +55,42 @@ export function OrgSwitcher() {
   }
 
   return (
-    <SidebarMenu>
-      <SidebarMenuItem>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <SidebarMenuButton
-              size="lg"
-              className="data-[state=open]:bg-sidebar-accent"
-              tooltip={current.orgName}
-            >
-              <span className="grid size-7 shrink-0 place-items-center rounded-md border border-border bg-background">
-                <Building2 className="size-4" />
-              </span>
-              <div className="grid min-w-0 flex-1 text-left leading-tight">
-                <span className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">
-                  Organization
-                </span>
-                <span className="truncate text-sm font-semibold">{current.orgName}</span>
-              </div>
-              <ChevronsUpDown className="ml-auto size-4 shrink-0 opacity-60" />
-            </SidebarMenuButton>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" side="right" className="w-56">
-            <DropdownMenuLabel className="text-xs text-muted-foreground">
-              Organizations
-            </DropdownMenuLabel>
-            {orgs.map((o) => (
-              <DropdownMenuItem key={o.orgId} onClick={() => switchTo(o.orgId)} className="gap-2">
-                <span className="grid size-6 shrink-0 place-items-center rounded border border-border bg-background">
-                  <Building2 className="size-3.5" />
-                </span>
-                <span className="min-w-0 flex-1 truncate">{o.orgName}</span>
-                {o.orgId === currentId ? (
-                  <Check className="size-4 shrink-0 text-foreground" />
-                ) : null}
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => router.push("/")}
-              className="gap-2 text-muted-foreground"
-            >
-              <span className="grid size-6 shrink-0 place-items-center">
-                <Plus className="size-4" />
-              </span>
-              Create organization
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarMenuItem>
-    </SidebarMenu>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <span className="grid size-5 shrink-0 place-items-center rounded border border-border bg-background">
+            <Building2 className="size-3" />
+          </span>
+          <span className="max-w-[160px] truncate">{current.orgName}</span>
+          <ChevronsUpDown className="size-3.5 shrink-0 opacity-50" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56">
+        <DropdownMenuLabel className="text-xs text-muted-foreground">
+          Organizations
+        </DropdownMenuLabel>
+        {orgs.map((o) => (
+          <DropdownMenuItem key={o.orgId} onClick={() => switchTo(o.orgId)} className="gap-2">
+            <span className="grid size-6 shrink-0 place-items-center rounded border border-border bg-background">
+              <Building2 className="size-3.5" />
+            </span>
+            <span className="min-w-0 flex-1 truncate">{o.orgName}</span>
+            <Check
+              className={cn("size-4 shrink-0", o.orgId === currentId ? "opacity-100" : "opacity-0")}
+            />
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => router.push("/")} className="gap-2 text-muted-foreground">
+          <span className="grid size-6 shrink-0 place-items-center">
+            <Plus className="size-4" />
+          </span>
+          Create organization
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

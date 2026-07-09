@@ -50,7 +50,7 @@ export async function AuditLog({ orgId, token }: { orgId: string; token: string 
             description="Security-relevant actions - organization, member, and connection changes - will appear here."
           />
         ) : (
-          <ul className="divide-y divide-border">
+          <ul className="-mr-2 max-h-96 divide-y divide-border overflow-y-auto pr-2">
             {events.map((e) => (
               <li key={e.id} className="flex items-baseline justify-between gap-4 py-2.5 text-sm">
                 <div className="min-w-0">
