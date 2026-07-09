@@ -46,9 +46,15 @@ export default function LoginPage() {
     setBusy(true);
     setError(null);
     const supabase = createClient();
+    // Carry a `?next=` (e.g. an /invite/<token> deep link) through OAuth so the user lands back
+    // where they started once signed in. The callback route honors `next`.
+    const next = new URLSearchParams(window.location.search).get("next");
+    const redirectTo = `${window.location.origin}/auth/callback${
+      next ? `?next=${encodeURIComponent(next)}` : ""
+    }`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo },
     });
     if (error) {
       setError(error.message);

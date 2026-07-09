@@ -120,8 +120,17 @@ export function OrgPanel({
     if (res.ok) {
       setEmail("");
       setNote(`Invited ${body.data.email} as ${body.data.role}.`);
+      const url: string | undefined = body.data.acceptUrl;
       toast.success(`Invitation sent to ${body.data.email}`, {
         description: `They'll join as ${body.data.role} once they accept.`,
+        ...(url
+          ? {
+              action: {
+                label: "Copy link",
+                onClick: () => void navigator.clipboard?.writeText(url),
+              },
+            }
+          : {}),
       });
       void load();
     } else {

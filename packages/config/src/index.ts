@@ -65,6 +65,17 @@ export const EnvSchema = z.object({
   // Browser origin allowed to call the API (CORS). The web app calls the API
   // client-side (Bearer token), so this must list the web origin. Default = local web.
   WEB_ORIGIN: z.string().url().default("http://localhost:4291"),
+
+  // Transactional email (invitations). Resend API key (resend.com). Optional: when unset, invite
+  // emails aren't sent — the accept link is logged + surfaced as a copyable link instead, so the
+  // flow still works. Send failures are non-fatal (the copy-link is always the fallback).
+  RESEND_API_KEY: optionalString,
+  // Sender identity for invite emails. Use a verified domain in prod (e.g. "Atlas <team@yourco>");
+  // Resend's onboarding sender works out of the box for testing.
+  EMAIL_FROM: z.preprocess(
+    blankToUndefined,
+    z.string().min(1).default("Atlas <onboarding@resend.dev>"),
+  ),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

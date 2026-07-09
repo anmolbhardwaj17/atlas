@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RoleBadge } from "@/components/tags";
 import { CopyButton } from "@/components/explore/copy-button";
-import { cn } from "@/lib/cn";
 import { renameOrg } from "@/lib/browser-api";
 
 /**
@@ -113,7 +112,8 @@ export function OrgCard({
           )}
         </div>
 
-        <dl className="grid grid-cols-2 gap-4 border-t border-border pt-4 text-sm">
+        {/* Members · Your role · Organization ID — one row. */}
+        <dl className="grid gap-4 border-t border-border pt-4 text-sm sm:grid-cols-3 sm:items-start">
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Members
@@ -128,24 +128,21 @@ export function OrgCard({
               <RoleBadge role={role} />
             </dd>
           </div>
-        </dl>
-
-        <div className="border-t border-border pt-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Organization ID
-          </p>
-          <div className="mt-1.5 flex items-center gap-2">
-            <code
-              className={cn(
-                "min-w-0 truncate rounded bg-muted px-2 py-1 font-mono text-[11px] text-muted-foreground",
-              )}
-              title={orgId}
-            >
-              {orgId}
-            </code>
-            <CopyButton value={orgId} label="Copy" className="shrink-0" />
+          <div className="min-w-0">
+            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Organization ID
+            </dt>
+            <dd className="mt-1.5 flex items-center gap-2">
+              <code
+                className="min-w-0 truncate rounded bg-muted px-2 py-1 font-mono text-[11px] text-muted-foreground"
+                title={orgId}
+              >
+                {orgId}
+              </code>
+              <CopyButton value={orgId} label="Copy" className="shrink-0" />
+            </dd>
           </div>
-        </div>
+        </dl>
       </CardContent>
     </Card>
   );

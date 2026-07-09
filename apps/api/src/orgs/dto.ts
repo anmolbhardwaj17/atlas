@@ -53,4 +53,7 @@ export interface InvitationDto {
   status: string;
   expiresAt: string;
   createdAt: string;
+  /** The accept link — returned ONLY when the invite is first created, so the inviter can copy it
+   *  (email delivery is the primary path). Never returned by `list` (the token isn't recoverable). */
+  acceptUrl?: string;
 }

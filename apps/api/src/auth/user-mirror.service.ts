@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import type { Db } from "@atlas/db";
 import { PG_POOL } from "../core/tokens";
+import { EmailService } from "../core/email.service";
 import type { AuthClaims } from "./auth.types";
 
 export interface MirroredUser {
@@ -18,7 +19,10 @@ export interface MirroredUser {
  */
 @Injectable()
 export class UserMirrorService {
-  constructor(@Inject(PG_POOL) private readonly db: Db) {}
+  constructor(
+    @Inject(PG_POOL) private readonly db: Db,
+    private readonly email: EmailService,
+  ) {}
 
   async ensureUser(claims: AuthClaims): Promise<MirroredUser> {
     const { rows } = await this.db.query<{
@@ -26,6 +30,7 @@ export class UserMirrorService {
       email: string;
       name: string | null;
       avatar_url: string | null;
+      inserted: boolean;
     }>(
       `INSERT INTO users (id, email, name, avatar_url)
        VALUES ($1, $2, $3, $4)
@@ -37,7 +42,8 @@ export class UserMirrorService {
              -- from the provider the first time, so a picked name/avatar survives re-login.
              name = COALESCE(users.name, EXCLUDED.name),
              avatar_url = COALESCE(users.avatar_url, EXCLUDED.avatar_url)
-       RETURNING id, email, name, avatar_url`,
+       -- xmax = 0 ⇒ this was a fresh INSERT (not a conflict-update) = the user's FIRST login.
+       RETURNING id, email, name, avatar_url, (xmax = 0) AS inserted`,
       [claims.userId, claims.email, claims.name, claims.avatarUrl],
     );
     await this.db.query(
@@ -50,6 +56,8 @@ export class UserMirrorService {
 
     const row = rows[0];
     if (!row) throw new Error("user upsert returned no row");
+    // First login → a warm welcome (non-fatal; never blocks or breaks /me).
+    if (row.inserted) await this.email.sendWelcome({ to: row.email, name: row.name });
     return { id: row.id, email: row.email, name: row.name, avatarUrl: row.avatar_url };
   }
 

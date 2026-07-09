@@ -854,3 +854,27 @@ export async function getActiveFindingIds(orgId: string): Promise<string[]> {
   } | null;
   return (body?.data?.findings ?? []).map((f) => f.id);
 }
+
+/**
+ * Accept an invitation by token (POST /invitations/:token/accept). Returns the joined org, or
+ * `null` when not signed in (the caller should prompt sign-in). Throws with the API's message on a
+ * real failure — expired, already accepted, or the invite was sent to a different email.
+ */
+export async function acceptInvitation(
+  token: string,
+): Promise<{ orgId: string; orgName: string } | null> {
+  const t = await getClientToken();
+  if (!t) return null;
+  const res = await fetch(`${apiUrl()}/invitations/${token}/accept`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
+  });
+  const body = (await res.json().catch(() => null)) as {
+    data?: { org: { id: string; name: string } };
+    error?: { message?: string };
+  } | null;
+  if (!res.ok || !body?.data) {
+    throw new Error(body?.error?.message ?? "Couldn't accept the invitation.");
+  }
+  return { orgId: body.data.org.id, orgName: body.data.org.name };
+}

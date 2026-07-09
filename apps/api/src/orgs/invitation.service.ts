@@ -1,7 +1,9 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { createHash, randomBytes } from "node:crypto";
 import { withOrgScope, type Db, type Role } from "@atlas/db";
-import { PG_POOL } from "../core/tokens";
+import type { Env } from "@atlas/config";
+import { ENV, PG_POOL } from "../core/tokens";
+import { EmailService } from "../core/email.service";
 import { UserMirrorService } from "../auth/user-mirror.service";
 import { ApiException } from "../common/errors";
 import type { AuthClaims } from "../auth/auth.types";
@@ -37,7 +39,9 @@ export class InvitationService {
 
   constructor(
     @Inject(PG_POOL) private readonly db: Db,
+    @Inject(ENV) private readonly env: Env,
     private readonly users: UserMirrorService,
+    private readonly email: EmailService,
   ) {}
 
   async create(
@@ -48,18 +52,25 @@ export class InvitationService {
     const token = randomBytes(32).toString("base64url");
     const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
     try {
-      const dto = await withOrgScope(this.db, orgId, async (c) => {
+      const { dto, orgName } = await withOrgScope(this.db, orgId, async (c) => {
         const { rows } = await c.query<InviteRow>(
           `INSERT INTO invitations (org_id, email, role, token_hash, invited_by, expires_at)
            VALUES ($1, $2, $3, $4, $5, $6)
            RETURNING id, email, role, status, expires_at, created_at`,
           [orgId, body.email, body.role, hashToken(token), inviterUserId, expiresAt],
         );
-        return toInviteDto(rows[0]);
+        const { rows: orgRows } = await c.query<{ name: string }>(
+          `SELECT name FROM organizations WHERE id = $1`,
+          [orgId],
+        );
+        return { dto: toInviteDto(rows[0]), orgName: orgRows[0]?.name ?? "your team" };
       });
-      // No email infra yet (F-later): surface the accept link server-side for dev only.
-      this.logger.log(`Invitation ${dto.id} for ${dto.email}: accept token=${token}`);
-      return dto;
+      // Deliver the accept link by email (Resend), and also return it so the UI can offer a
+      // copyable link — the link works even if email delivery is unavailable.
+      const acceptUrl = `${this.env.WEB_ORIGIN}/invite/${token}`;
+      await this.email.sendInvite({ to: dto.email, orgName, role: dto.role, acceptUrl });
+      this.logger.log(`Invitation ${dto.id} for ${dto.email} created.`);
+      return { ...dto, acceptUrl };
     } catch (e) {
       if (isPgUnique(e)) {
         throw ApiException.alreadyExists("A pending invitation already exists for this email.");

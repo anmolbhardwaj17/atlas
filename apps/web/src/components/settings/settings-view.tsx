@@ -63,9 +63,8 @@ export function SettingsView({
         <p className="text-sm text-muted-foreground">Manage your organization, team, and access.</p>
       </div>
 
-      {/* Profile + Organization sit side by side on wider screens. `items-start` so each card sizes
-          to its own content — the Org card is taller, and stretching would leave Profile half-empty. */}
-      <div className="grid gap-6 md:grid-cols-2 md:items-start">
+      {/* Profile then Organization, stacked in their own rows (full width each). */}
+      <div className="space-y-6">
         <ProfileCard name={name} email={email} avatarUrl={avatarUrl} />
         <OrgCard
           orgId={orgId}
