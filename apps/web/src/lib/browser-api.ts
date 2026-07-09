@@ -47,6 +47,8 @@ export async function getClientToken(): Promise<string | null> {
 export async function updateMyProfile(patch: {
   name?: string;
   avatarUrl?: string;
+  /** A newly-picked photo as a base64 `data:` URL — the API uploads it and returns its URL. */
+  avatar?: string;
 }): Promise<{ name: string | null; avatarUrl: string | null }> {
   const token = await getClientToken();
   if (!token) throw new Error("You're not signed in.");

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, Loader2, Pencil, UserRound, X } from "lucide-react";
+import { Check, Loader2, Pencil, Plus, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/cn";
 import { createClient } from "@/lib/supabase/client";
 import { updateMyProfile } from "@/lib/browser-api";
+import { fileToLogoDataUrl } from "@/lib/read-image";
 
 // The default avatar is your initials; "avv:shape:<seed>" is a generated geometric shape.
 const DEFAULT_AVATAR = "avv:character";
@@ -35,6 +36,8 @@ export function ProfileCard({
   const [draftName, setDraftName] = React.useState(name ?? "");
   const [pickedAvatar, setPickedAvatar] = React.useState(currentAvatar);
   const [busy, setBusy] = React.useState(false);
+  const [photoBusy, setPhotoBusy] = React.useState(false);
+  const photoRef = React.useRef<HTMLInputElement>(null);
   // Your live Google photo, read straight from the session (the stored avatar may have been
   // changed to a generated one, so we always offer the real photo here).
   const [googlePhoto, setGooglePhoto] = React.useState<string | null>(null);
@@ -74,6 +77,30 @@ export function ProfileCard({
     setDraftName(currentName ?? "");
     setPickedAvatar(currentAvatar);
     setEditing(false);
+  }
+
+  // Upload a photo from the user's computer. Applies immediately (like a real avatar change) and
+  // becomes the selected option; the URL persists so it survives the next login.
+  async function onPickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setPhotoBusy(true);
+    try {
+      const dataUrl = await fileToLogoDataUrl(file);
+      const saved = await updateMyProfile({ avatar: dataUrl });
+      if (saved.avatarUrl) {
+        setCurrentAvatar(saved.avatarUrl);
+        setPickedAvatar(saved.avatarUrl);
+      }
+      toast.success("Photo updated");
+    } catch (err) {
+      toast.error("Couldn't upload the photo", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setPhotoBusy(false);
+    }
   }
 
   async function save() {
@@ -173,7 +200,7 @@ export function ProfileCard({
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Choose an avatar
             </p>
-            <div className="flex flex-wrap gap-2.5">
+            <div className="flex flex-wrap items-center gap-2.5">
               {options.map((opt) => (
                 <button
                   key={opt.value}
@@ -192,6 +219,28 @@ export function ProfileCard({
                   <UserAvatar value={opt.value} name={currentName} email={email} size={40} />
                 </button>
               ))}
+              {/* Upload a photo from your computer — same 40px footprint, outlined. */}
+              <input
+                ref={photoRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
+                onChange={(e) => void onPickPhoto(e)}
+              />
+              <button
+                type="button"
+                onClick={() => photoRef.current?.click()}
+                disabled={photoBusy}
+                title="Upload a photo"
+                aria-label="Upload a photo"
+                className="grid size-10 shrink-0 place-items-center rounded-full border border-dashed border-border text-muted-foreground transition hover:border-foreground/40 hover:text-foreground disabled:opacity-70"
+              >
+                {photoBusy ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Plus className="size-4" />
+                )}
+              </button>
             </div>
           </div>
         ) : null}

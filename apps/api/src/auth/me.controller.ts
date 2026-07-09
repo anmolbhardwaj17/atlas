@@ -4,18 +4,24 @@ import type { Role } from "@atlas/db";
 import { AuthGuard } from "./auth.guard";
 import { UserMirrorService } from "./user-mirror.service";
 import { MembershipService } from "./membership.service";
+import { ImageUploadService } from "../core/image-upload.service";
 import { parseBody } from "../common/validation";
 import type { AuthedRequest } from "./auth.types";
 import type { MirroredUser } from "./user-mirror.service";
+
+/** Uploaded avatars live in the public `avatars` bucket, keyed by user id. */
+const AVATAR_BUCKET = "avatars";
 
 const UpdateMeSchema = z
   .object({
     name: z.string().trim().min(1).max(80).optional(),
     // A photo URL OR an avvvatars descriptor ("avv:character" / "avv:shape:<seed>").
     avatarUrl: z.string().trim().min(1).max(500).optional(),
+    // A newly-uploaded photo as a base64 `data:` URL — uploaded to storage, then stored as avatarUrl.
+    avatar: z.string().trim().min(1).max(3_000_000).optional(),
   })
   .strict()
-  .refine((v) => v.name !== undefined || v.avatarUrl !== undefined, {
+  .refine((v) => v.name !== undefined || v.avatarUrl !== undefined || v.avatar !== undefined, {
     message: "Nothing to update.",
   });
 
@@ -48,6 +54,7 @@ export class MeController {
   constructor(
     private readonly users: UserMirrorService,
     private readonly memberships: MembershipService,
+    private readonly images: ImageUploadService,
   ) {}
 
   @Get()
@@ -65,7 +72,14 @@ export class MeController {
     if (!claims) throw new Error("auth context missing (guard should have set it)");
     await this.users.ensureUser(claims); // make sure the row exists
     const patch = parseBody(UpdateMeSchema, body);
-    const user = await this.users.updateProfile(claims.userId, patch);
+    // A newly-uploaded photo (data URL) is stored first; its public URL becomes the avatar.
+    const avatarUrl = patch.avatar
+      ? await this.images.upload(AVATAR_BUCKET, claims.userId, patch.avatar)
+      : patch.avatarUrl;
+    const profilePatch: { name?: string; avatarUrl?: string } = {};
+    if (patch.name !== undefined) profilePatch.name = patch.name;
+    if (avatarUrl !== undefined) profilePatch.avatarUrl = avatarUrl;
+    const user = await this.users.updateProfile(claims.userId, profilePatch);
     return this.build(user, claims.emailVerified);
   }
 
