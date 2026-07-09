@@ -23,7 +23,7 @@ function rfEdge(
   id: string,
   source: string,
   target: string,
-  type: string,
+  _type: string,
   confidence: string,
   marker: "start" | "end",
 ): Edge {
@@ -38,11 +38,9 @@ function rfEdge(
     id,
     source,
     target,
-    label: type,
-    labelBgPadding: [4, 2],
-    labelBgBorderRadius: 3,
-    labelStyle: { fontSize: 10, fill: "hsl(var(--muted-foreground))" },
-    labelBgStyle: { fill: "hsl(var(--background))" },
+    // Orthogonal "flow" routing like the main map — not curvy beziers. The edge type is shown in
+    // the accessible list below, so we keep the canvas clean (no repeated on-line captions).
+    type: "smoothstep",
     style: {
       strokeWidth: 1.5,
       stroke: "hsl(var(--muted-foreground) / 0.6)",
@@ -114,7 +112,13 @@ function traversalModel(
       id: result.root.id,
       type: "atlas",
       position: { x: 0, y: 0 },
-      data: { label: label(result.root), kind: result.root.kind, isCenter: true },
+      data: {
+        label: label(result.root),
+        kind: result.root.kind,
+        isCenter: true,
+        // Blast radius radiates outward from the root — pulse to show the reach.
+        ...(dir === "blast" ? { pulse: true } : {}),
+      },
     },
   ];
   const rfEdges: Edge[] = [];

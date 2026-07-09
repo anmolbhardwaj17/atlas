@@ -184,6 +184,22 @@
   animation: ai-pulse 1.1s ease-in-out infinite;
 }
 
+/* Blast-radius radar: rings emanate from the focal node outward to the impacted ones, so the
+   "if this fails, it reaches these" story reads visually. */
+@keyframes blast-pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0.35);
+    opacity: 0.55;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(13);
+    opacity: 0;
+  }
+}
+.animate-blast-pulse {
+  animation: blast-pulse 2.4s ease-out infinite;
+}
+
 /* Chart entrance animations (for the hand-built SVG charts: health gauge, posture radar, tick
    meter). `both` holds the pre-animation state, so with reduced motion they simply appear. */
 @keyframes chart-fade-in {

@@ -29,42 +29,57 @@ export interface GraphNodeData {
   label: string;
   kind: string;
   isCenter?: boolean;
+  /** Focal node of a blast-radius view → emit radar pulse rings. */
+  pulse?: boolean;
   [key: string]: unknown;
 }
 
-/** A node in the neighborhood/impact graph: kind icon + name, the focal node inverted. */
+/** A node in the neighborhood/impact graph: kind icon + name, the focal node inverted. When it's
+ *  the blast-radius focal node, radar rings pulse outward from behind it toward the impacted nodes. */
 function AtlasGraphNode({ data }: NodeProps) {
   const d = data as GraphNodeData;
   const logo = nodeLogo(d.kind);
   const Icon = kindIcon(d.kind);
   return (
-    <div
-      className={cn(
-        "flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs shadow-sm",
-        d.isCenter
-          ? "border-foreground bg-foreground text-background"
-          : "border-border bg-card text-foreground",
-      )}
-    >
-      <Handle
-        type="target"
-        position={Position.Left}
-        className="!size-1 !border-0 !bg-transparent"
-      />
-      <span
+    <div className="relative">
+      {d.isCenter && d.pulse
+        ? [0, 1, 2].map((i) => (
+            <span
+              key={i}
+              aria-hidden
+              className="animate-blast-pulse pointer-events-none absolute left-1/2 top-1/2 size-8 rounded-full border border-danger/60"
+              style={{ animationDelay: `${i * 0.8}s` }}
+            />
+          ))
+        : null}
+      <div
         className={cn(
-          "grid size-5 shrink-0 place-items-center rounded",
-          d.isCenter ? "bg-background/20" : logo ? "bg-muted/60" : kindStyle(d.kind),
+          "relative flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs shadow-sm",
+          d.isCenter
+            ? "border-foreground bg-foreground text-background"
+            : "border-border bg-card text-foreground",
         )}
       >
-        {logo ? <CloudIcon name={logo} className="size-3.5" /> : <Icon className="size-3.5" />}
-      </span>
-      <span className="max-w-[150px] truncate font-medium">{d.label}</span>
-      <Handle
-        type="source"
-        position={Position.Right}
-        className="!size-1 !border-0 !bg-transparent"
-      />
+        <Handle
+          type="target"
+          position={Position.Left}
+          className="!size-1 !border-0 !bg-transparent"
+        />
+        <span
+          className={cn(
+            "grid size-5 shrink-0 place-items-center rounded",
+            d.isCenter ? "bg-background/20" : logo ? "bg-muted/60" : kindStyle(d.kind),
+          )}
+        >
+          {logo ? <CloudIcon name={logo} className="size-3.5" /> : <Icon className="size-3.5" />}
+        </span>
+        <span className="max-w-[150px] truncate font-medium">{d.label}</span>
+        <Handle
+          type="source"
+          position={Position.Right}
+          className="!size-1 !border-0 !bg-transparent"
+        />
+      </div>
     </div>
   );
 }

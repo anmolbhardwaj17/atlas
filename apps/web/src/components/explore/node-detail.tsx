@@ -193,14 +193,14 @@ export function NodeDetailView({
               <CardTitle>Key facts</CardTitle>
             </CardHeader>
             <CardBody>
-              <dl className="grid gap-x-8 gap-y-2.5 sm:grid-cols-2">
+              <dl className="divide-y divide-border text-sm">
                 {facts.map(([label, value]) => (
                   <div
                     key={label}
-                    className="grid grid-cols-[minmax(0,130px)_1fr] items-baseline gap-x-4"
+                    className="grid grid-cols-[minmax(0,140px)_1fr] items-baseline gap-x-4 py-2 first:pt-0 last:pb-0"
                   >
-                    <dt className="truncate text-sm text-muted-foreground">{label}</dt>
-                    <dd className="min-w-0 break-all text-sm">{value}</dd>
+                    <dt className="truncate text-muted-foreground">{label}</dt>
+                    <dd className="min-w-0 break-words text-right font-medium">{value}</dd>
                   </div>
                 ))}
               </dl>
