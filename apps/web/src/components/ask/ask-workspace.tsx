@@ -79,13 +79,10 @@ export function AskWorkspace({
         )}
       >
         {fromMap ? (
-          <span
-            className="inline-flex shrink-0 items-center gap-1 rounded border border-border px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+          <Waypoints
+            className="size-3.5 shrink-0 text-muted-foreground"
             aria-label="Started from the map"
-          >
-            <Waypoints className="size-2.5" />
-            Map
-          </span>
+          />
         ) : null}
         <span className="truncate">{label}</span>
       </button>
