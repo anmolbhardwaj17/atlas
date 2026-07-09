@@ -19,9 +19,16 @@ const SERIES: Array<{
 
 const W = 320;
 const H = 150;
-const PAD = { t: 10, r: 10, b: 8, l: 18 };
+const PAD = { t: 10, r: 10, b: 20, l: 18 };
 const IW = W - PAD.l - PAD.r;
 const IH = H - PAD.t - PAD.b;
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** Deterministic "Jul 5" (UTC, matching the day buckets) — no locale, so no SSR hydration drift. */
+function fmtDay(t: number): string {
+  const d = new Date(t);
+  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+}
 
 /**
  * Severity trend — how the open High / Medium / Low counts have moved over the window, so you see
@@ -87,6 +94,25 @@ export function SeverityTrend({ data }: { data: TrendPoint[] }) {
             </g>
           );
         })}
+        {/* Date axis — first date … today (right end). */}
+        {(n <= 2 ? [0, n - 1] : [0, Math.floor((n - 1) / 2), n - 1])
+          .filter((i, idx, a) => a.indexOf(i) === idx)
+          .map((i) => {
+            const p = data[i];
+            if (!p) return null;
+            const anchor = i === 0 ? "start" : i === n - 1 ? "end" : "middle";
+            return (
+              <text
+                key={i}
+                x={x(i)}
+                y={H - 5}
+                textAnchor={anchor}
+                className="fill-muted-foreground text-[9px]"
+              >
+                {i === n - 1 ? "Today" : fmtDay(p.t)}
+              </text>
+            );
+          })}
       </svg>
       <div className="mt-1 flex items-center justify-center gap-3">
         {SERIES.map((s) => (

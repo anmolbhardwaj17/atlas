@@ -126,26 +126,34 @@ export function InsightsView({
     return c;
   }, [active]);
 
-  // Severity trend: reconstruct the open High/Medium/Low counts per day over the window, from each
-  // finding's open (firstSeenAt) → close (resolvedAt) lifecycle, so the chart shows movement.
+  // Severity trend: the open High/Medium/Low counts per day, from each finding's open (firstSeenAt)
+  // → close (resolvedAt) lifecycle. The x-axis runs from just before the FIRST finding (a 0 baseline
+  // so the line rises from zero) up to today — so it only spans the history we actually have, and
+  // grows to the right as new syncs add days (capped so it stays readable).
   const trendSeries = React.useMemo<TrendPoint[]>(() => {
     const DAY = 86_400_000;
-    const DAYS = 14;
-    const today = Math.floor(Date.now() / DAY) * DAY; // start of today (UTC)
+    const MAX_DAYS = 30;
     const lived = [...active, ...resolved]; // active = still open; resolved = closed
+    const opens = lived
+      .map((f) => (f.firstSeenAt ? new Date(f.firstSeenAt).getTime() : null))
+      .filter((v): v is number => v !== null);
+    if (opens.length === 0) return [];
+    const today = Math.floor(Date.now() / DAY) * DAY; // start of today (UTC)
+    const firstDay = Math.floor(Math.min(...opens) / DAY) * DAY;
+    // One day before the first finding = the "0" baseline; cap the whole window to MAX_DAYS.
+    const start = Math.max(firstDay - DAY, today - MAX_DAYS * DAY);
     const out: TrendPoint[] = [];
-    for (let d = DAYS - 1; d >= 0; d--) {
-      const start = today - d * DAY;
-      const end = start + DAY;
+    for (let t = start; t <= today; t += DAY) {
+      const end = t + DAY;
       const c = { high: 0, medium: 0, low: 0 };
       for (const f of lived) {
         const open = f.firstSeenAt ? new Date(f.firstSeenAt).getTime() : null;
         if (open === null || open >= end) continue; // not opened by this day
         const closed = f.resolvedAt ? new Date(f.resolvedAt).getTime() : null;
-        if (closed !== null && closed < start) continue; // already closed before this day
+        if (closed !== null && closed < t) continue; // already closed before this day
         c[f.severity] += 1;
       }
-      out.push({ t: start, ...c });
+      out.push({ t, ...c });
     }
     return out;
   }, [active, resolved]);
