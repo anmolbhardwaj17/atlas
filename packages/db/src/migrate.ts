@@ -31,6 +31,7 @@ import { up as up0029 } from "./migrations/0029_notification_node_kind";
 import { up as up0030 } from "./migrations/0030_muted_findings";
 import { up as up0031 } from "./migrations/0031_finding_state";
 import { up as up0032 } from "./migrations/0032_jenkins";
+import { up as up0033 } from "./migrations/0033_ai_conversation_origin";
 
 /**
  * Forward-only SQL migration runner (docs/04 §9). Plain `pg`, no ORM. Each
@@ -73,6 +74,7 @@ const MIGRATIONS: ReadonlyArray<{ version: string; statements: string[] }> = [
   { version: "0030_muted_findings", statements: up0030 },
   { version: "0031_finding_state", statements: up0031 },
   { version: "0032_jenkins", statements: up0032 },
+  { version: "0033_ai_conversation_origin", statements: up0033 },
 ];
 
 async function main(): Promise<void> {

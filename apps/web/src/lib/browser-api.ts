@@ -330,8 +330,14 @@ export type AskEvent =
   | { type: "done"; grounded: boolean; citations: number }
   | { type: "error"; message: string };
 
-/** Create a conversation (optionally titled by the first question), returning its id or null. */
-export async function createConversation(orgId: string, title?: string): Promise<string | null> {
+/** Create a conversation (optionally titled by the first question), returning its id or null.
+ *  `origin` marks where it began — "map" tags chats started from the map's docked chat so the
+ *  Ask Atlas history can badge them; omit (default "ask") for the Ask page. */
+export async function createConversation(
+  orgId: string,
+  title?: string,
+  origin?: "ask" | "map",
+): Promise<string | null> {
   const token = await getClientToken();
   if (!token) return null;
   const res = await fetch(`${apiUrl()}/ai/conversations`, {
@@ -341,7 +347,10 @@ export async function createConversation(orgId: string, title?: string): Promise
       "X-Atlas-Org": orgId,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(title ? { title: title.slice(0, 200) } : {}),
+    body: JSON.stringify({
+      ...(title ? { title: title.slice(0, 200) } : {}),
+      ...(origin ? { origin } : {}),
+    }),
   });
   if (!res.ok) return null;
   const body = (await res.json()) as { data: { id: string } };
@@ -351,6 +360,8 @@ export async function createConversation(orgId: string, title?: string): Promise
 export interface ConversationSummary {
   id: string;
   title: string | null;
+  /** Where the chat began — "map" for the map's docked chat, else "ask". */
+  origin?: string;
   createdAt: string;
 }
 

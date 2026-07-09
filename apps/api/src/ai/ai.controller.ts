@@ -74,8 +74,8 @@ export class AiController {
   @Post("conversations")
   @Roles("Member")
   async create(@Req() req: AuthedRequest, @Body() body: unknown): Promise<unknown> {
-    const { title } = parseBody(CreateConversationSchema, body);
-    return this.ai.createConversation(org(req).id, req.auth?.userId ?? null, title);
+    const { title, origin } = parseBody(CreateConversationSchema, body);
+    return this.ai.createConversation(org(req).id, req.auth?.userId ?? null, title, origin);
   }
 
   @Get("conversations")

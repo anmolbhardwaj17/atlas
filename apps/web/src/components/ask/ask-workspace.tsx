@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Plus, PanelLeftClose, PanelLeftOpen, Trash2 } from "lucide-react";
+import { Plus, PanelLeftClose, PanelLeftOpen, Trash2, Waypoints } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { AskChat } from "@/components/ask/ask-chat";
 import { deleteConversation, type ConversationSummary } from "@/lib/browser-api";
@@ -56,27 +56,41 @@ export function AskWorkspace({
   }
 
   // Conversation row - highlighted in place when it's the one you're viewing (not pinned to top).
-  // Right-click opens a small menu with Delete.
-  const row = (c: ConversationSummary) => (
-    <button
-      key={c.id}
-      type="button"
-      onClick={() => openConversation(c.id)}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        setMenu({ id: c.id, x: e.clientX, y: e.clientY });
-      }}
-      title={c.title ?? "Untitled"}
-      className={cn(
-        "flex w-full items-center px-2.5 py-2 text-left text-sm transition-colors",
-        highlightId === c.id
-          ? "font-medium text-foreground"
-          : "text-muted-foreground hover:text-foreground",
-      )}
-    >
-      <span className="truncate">{c.title ?? "Untitled"}</span>
-    </button>
-  );
+  // Right-click opens a small menu with Delete. Chats begun on the map get a "Map" badge (origin);
+  // legacy map chats were titled "Map · …", so strip that prefix for a clean label.
+  const row = (c: ConversationSummary) => {
+    const fromMap = c.origin === "map";
+    const label = (c.title ?? "Untitled").replace(/^Map · /, "");
+    return (
+      <button
+        key={c.id}
+        type="button"
+        onClick={() => openConversation(c.id)}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setMenu({ id: c.id, x: e.clientX, y: e.clientY });
+        }}
+        title={fromMap ? `${label} · from the map` : label}
+        className={cn(
+          "flex w-full items-center gap-1.5 px-2.5 py-2 text-left text-sm transition-colors",
+          highlightId === c.id
+            ? "font-medium text-foreground"
+            : "text-muted-foreground hover:text-foreground",
+        )}
+      >
+        {fromMap ? (
+          <span
+            className="inline-flex shrink-0 items-center gap-1 rounded border border-border px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+            aria-label="Started from the map"
+          >
+            <Waypoints className="size-2.5" />
+            Map
+          </span>
+        ) : null}
+        <span className="truncate">{label}</span>
+      </button>
+    );
+  };
 
   function newChat() {
     setConversationId(undefined);

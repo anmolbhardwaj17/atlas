@@ -202,11 +202,12 @@ export class AiService {
     orgId: string,
     createdBy: string | null,
     title?: string,
+    origin: "ask" | "map" = "ask",
   ): Promise<{ id: string }> {
     return withOrgScope(this.db, orgId, async (c) => {
       const { rows } = await c.query<{ id: string }>(
-        `INSERT INTO ai_conversations (org_id, created_by, title) VALUES ($1,$2,$3) RETURNING id`,
-        [orgId, createdBy, title ?? null],
+        `INSERT INTO ai_conversations (org_id, created_by, title, origin) VALUES ($1,$2,$3,$4) RETURNING id`,
+        [orgId, createdBy, title ?? null, origin],
       );
       const id = rows[0]?.id;
       if (!id) throw new Error("conversation insert returned no id");
@@ -226,16 +227,22 @@ export class AiService {
 
   async listConversations(
     orgId: string,
-  ): Promise<Array<{ id: string; title: string | null; createdAt: string }>> {
+  ): Promise<Array<{ id: string; title: string | null; origin: string; createdAt: string }>> {
     return withOrgScope(this.db, orgId, async (c) => {
-      const { rows } = await c.query<{ id: string; title: string | null; created_at: Date }>(
-        `SELECT id, title, created_at FROM ai_conversations
+      const { rows } = await c.query<{
+        id: string;
+        title: string | null;
+        origin: string;
+        created_at: Date;
+      }>(
+        `SELECT id, title, origin, created_at FROM ai_conversations
           WHERE org_id = $1 ORDER BY created_at DESC LIMIT 50`,
         [orgId],
       );
       return rows.map((r) => ({
         id: r.id,
         title: r.title,
+        origin: r.origin,
         createdAt: r.created_at.toISOString(),
       }));
     });

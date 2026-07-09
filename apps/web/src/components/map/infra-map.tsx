@@ -800,7 +800,7 @@ function Flow({
         setMessages((ms) => ms.map((m, i) => (i === ms.length - 1 ? fn(m) : m)));
       const cited = new Set<string>();
       try {
-        if (!convoRef.current) convoRef.current = await createConversation(orgId, `Map · ${q}`);
+        if (!convoRef.current) convoRef.current = await createConversation(orgId, q, "map");
         const convId = convoRef.current;
         if (!convId) {
           patch((m) => ({ ...m, phase: "error", error: "Couldn’t start a conversation." }));

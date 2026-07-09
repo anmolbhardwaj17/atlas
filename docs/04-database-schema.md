@@ -541,6 +541,28 @@ REVOKE UPDATE, DELETE ON audit_events FROM atlas_app;     -- see 13 for role mod
 
 ---
 
+### 5.6 AI: ai_conversations, ai_messages *(added 0013; `origin` added 0033)*
+
+The Ask Atlas interface (`10`) persists conversations and their turns so history survives reload.
+Org-scoped by RLS like every other table (R8). A conversation can be started from the Ask page or
+from the map's docked chat — `origin` records which, so the history can badge map-started chats.
+
+```sql
+-- AI_CONVERSATIONS — one chat thread (10 §*). Title = first question (or a clean map question).
+CREATE TABLE ai_conversations (
+    id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id     uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    created_by uuid REFERENCES users(id) ON DELETE SET NULL,
+    title      text,
+    origin     text NOT NULL DEFAULT 'ask'                 -- 'ask' | 'map' (where the chat began)
+                    CHECK (origin IN ('ask','map')),
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+-- AI_MESSAGES — turns within a conversation (role, content, citations, confidence).
+```
+
+---
+
 ## 6. Indexing Strategy
 
 > Every index is **org-prefixed** (SP-9). Targets NFR-1 (graph p95 < 1.5s) and the dominant query shapes from `01`/`05`.

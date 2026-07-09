@@ -1,7 +1,12 @@
 import { z } from "zod";
 
 export const CreateConversationSchema = z
-  .object({ title: z.string().min(1).max(200).optional() })
+  .object({
+    title: z.string().min(1).max(200).optional(),
+    // Where the chat began — 'map' when started from the map's docked chat, else 'ask' (default).
+    // Drives the "Map" badge in the Ask Atlas history (docs/04 §ai_conversations).
+    origin: z.enum(["ask", "map"]).optional(),
+  })
   .strict();
 
 export const AskSchema = z.object({ message: z.string().min(1).max(2000) }).strict();
