@@ -1,26 +1,19 @@
 import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
-import { AdvisorView } from "@/components/advisor/advisor-view";
-import type { Finding } from "@/components/insights/insights-view";
+import { AdvisorView, type Proposal } from "@/components/advisor/advisor-view";
 
 export const dynamic = "force-dynamic";
 
-interface AdvisorData {
-  findings: Finding[];
-  lastSyncedAt: string | null;
-}
-
 /**
- * Advisor (docs/plans/optimization.md) — grounded, ranked recommendations for a better estate,
- * each debatable via Ask Atlas. Reuses the /insights payload (findings + guidance), so it stays in
- * lockstep with the graph's live findings; the ranking + debate framing are the Advisor's own.
+ * Advisor (docs/plans/optimization.md) — grounded architecture-improvement proposals, each shown as
+ * a current-vs-proposed graph and debatable via Ask Atlas. The pattern engine runs server-side over
+ * the live graph; the proposed graph is a recommendation the UI clearly labels, never truth.
  */
 export default async function AdvisorPage() {
   const shell = await requireShell();
-  const res = await apiGet<ApiOk<AdvisorData>>("/insights", {
+  const res = await apiGet<ApiOk<{ proposals: Proposal[] }>>("/advisor/proposals", {
     token: shell.token,
     orgId: shell.orgId,
   });
-  const data = res.body?.data;
-  return <AdvisorView findings={data?.findings ?? []} lastSyncedAt={data?.lastSyncedAt ?? null} />;
+  return <AdvisorView proposals={res.body?.data?.proposals ?? []} />;
 }

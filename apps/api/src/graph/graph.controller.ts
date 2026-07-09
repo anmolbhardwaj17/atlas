@@ -42,6 +42,16 @@ export class GraphController {
   }
 
   /**
+   * Advisor (docs/plans/optimization.md): grounded architecture-improvement proposals, each with a
+   * before/after subgraph and honest tradeoff. The proposed graph is a recommendation, not truth.
+   */
+  @Get("advisor/proposals")
+  @Roles("Member")
+  async advisorProposals(@Req() req: AuthedRequest): Promise<unknown> {
+    return { proposals: await this.graph.architectureProposals(org(req).id) };
+  }
+
+  /**
    * Insights (Atlas Knowledge Engine P4 slice): the graph's grounded findings enriched with the
    * advisory knowledge pack's guidance (why it matters / how to fix). Proactive, personalized —
    * every card is a fact Atlas proves + best-practice guidance, and links into an Ask Atlas thread.

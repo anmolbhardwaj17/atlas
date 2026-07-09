@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { withOrgScope, type Db } from "@atlas/db";
+import { architectureProposals as runArchPatterns, type Proposal } from "./architecture-patterns";
 import type { PoolClient } from "pg";
 import { guidanceFor } from "@atlas/ai";
 import { PG_POOL } from "../core/tokens";
@@ -1489,6 +1490,47 @@ export class GraphService {
    *  (env/health, so prod/unhealthy sort first) + a bounded blast-radius impact ("what depends on
    *  the affected resources"). Reuses summary() so it never drifts from Insights; returns null when
    *  the finding has cleared since the list was drawn (the page then shows the auto-resolved state). */
+  /**
+   * Architecture Advisor (docs/plans/optimization.md): grounded structural-improvement proposals,
+   * each with a before/after subgraph. Reads the compute / datastore / load-balancer nodes + their
+   * edges once and runs the pure pattern library. Read-only — the proposed graph is a
+   * recommendation the UI clearly labels, never asserted as observed truth (P3/P4).
+   */
+  async architectureProposals(orgId: string): Promise<Proposal[]> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      const nodeRows = (
+        await c.query<{
+          id: string;
+          urn: string;
+          kind: string;
+          name: string;
+          attributes: Record<string, unknown>;
+        }>(
+          `SELECT id, urn, kind, name, attributes FROM nodes
+             WHERE status <> 'deleted' AND kind = ANY($1::text[])`,
+          [["aws.rds.instance", "aws.ec2.instance", "aws.elb"]],
+        )
+      ).rows;
+      if (nodeRows.length === 0) return [];
+      const ids = nodeRows.map((r) => r.id);
+      const edges = (
+        await c.query<{ from_node_id: string; to_node_id: string; type: string }>(
+          `SELECT from_node_id, to_node_id, type FROM edges
+             WHERE status = 'active'
+               AND (from_node_id = ANY($1::uuid[]) OR to_node_id = ANY($1::uuid[]))`,
+          [ids],
+        )
+      ).rows.map((e) => ({ from: e.from_node_id, to: e.to_node_id, type: e.type }));
+      // Dependents = inbound dependency-bearing edges (who points AT this node).
+      const DEP_TYPES = new Set(["CONNECTS_TO", "STORES_IN", "DEPENDS_ON", "ROUTES_TO"]);
+      const depCount = new Map<string, number>();
+      for (const e of edges) {
+        if (DEP_TYPES.has(e.type)) depCount.set(e.to, (depCount.get(e.to) ?? 0) + 1);
+      }
+      return runArchPatterns(nodeRows, edges, (id) => depCount.get(id) ?? 0);
+    });
+  }
+
   async findingDetail(orgId: string, id: string): Promise<FindingDetail | null> {
     const s = await this.summary(orgId);
     const finding = s.findings.find((f) => f.id === id);
