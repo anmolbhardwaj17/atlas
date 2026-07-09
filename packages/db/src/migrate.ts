@@ -35,6 +35,7 @@ import { up as up0033 } from "./migrations/0033_ai_conversation_origin";
 import { up as up0034 } from "./migrations/0034_tag_correlation_seed";
 import { up as up0035 } from "./migrations/0035_image_provenance_seed";
 import { up as up0036 } from "./migrations/0036_service_env_seed";
+import { up as up0037 } from "./migrations/0037_sync_run_updated_at";
 
 /**
  * Forward-only SQL migration runner (docs/04 §9). Plain `pg`, no ORM. Each
@@ -81,6 +82,7 @@ const MIGRATIONS: ReadonlyArray<{ version: string; statements: string[] }> = [
   { version: "0034_tag_correlation_seed", statements: up0034 },
   { version: "0035_image_provenance_seed", statements: up0035 },
   { version: "0036_service_env_seed", statements: up0036 },
+  { version: "0037_sync_run_updated_at", statements: up0037 },
 ];
 
 async function main(): Promise<void> {

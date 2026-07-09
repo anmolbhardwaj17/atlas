@@ -76,18 +76,21 @@ export class ConnectionService {
     if (dtos.length === 0) return dtos;
     const ids = dtos.map((d) => d.id);
 
-    // Reap orphaned in-flight runs first (self-healing). The dev worker is in-process and
-    // the queue in-memory, so an API restart can strand a run in queued/running forever -
-    // which would both render "Syncing…" as a permanent lie and block new runs via
-    // uq_sync_inflight (BR-SYNC-1). A run queued 15+ min without starting, or running for
-    // 60+ min (a full sync takes minutes), is dead: finalize it as failed, honestly.
+    // Reap orphaned in-flight runs first (self-healing). The dev worker is in-process and the
+    // queue in-memory, so an API restart strands a run in queued/running forever - which both
+    // renders "Syncing…" as a permanent lie and blocks new runs via uq_sync_inflight (BR-SYNC-1).
+    // Detection is STALENESS-based: the staged runner bumps `updated_at` after every scope
+    // (checkpoint write), so a live-but-slow sync stays fresh while an orphaned one goes stale.
+    // Queued 15+ min without starting, or running with no progress for 15+ min, is dead - finalize
+    // it as failed, honestly. (updated_at, not started_at, so a legitimately long sync isn't reaped
+    // mid-flight.)
     const reaped = await c.query<{ id: string }>(
       `UPDATE sync_runs
          SET status = 'failed', finished_at = now(),
              scope_result = scope_result || '{"reaped": "in-flight run orphaned (worker lost or restarted)"}'::jsonb
          WHERE connection_id = ANY($1::uuid[])
            AND ((status = 'queued' AND created_at < now() - interval '15 minutes')
-             OR (status = 'running' AND started_at < now() - interval '60 minutes'))
+             OR (status = 'running' AND updated_at < now() - interval '15 minutes'))
          RETURNING id`,
       [ids],
     );
