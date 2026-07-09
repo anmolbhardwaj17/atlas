@@ -878,3 +878,25 @@ export async function acceptInvitation(
   }
   return { orgId: body.data.org.id, orgName: body.data.org.name };
 }
+
+export interface MyOrg {
+  orgId: string;
+  orgName: string;
+  orgSlug: string;
+  role: string;
+}
+
+/** The current user's org memberships + their default org (for the org switcher). */
+export async function getMyOrgs(): Promise<{ memberships: MyOrg[]; defaultOrgId: string | null }> {
+  const t = await getClientToken();
+  if (!t) return { memberships: [], defaultOrgId: null };
+  const res = await fetch(`${apiUrl()}/me`, { headers: { Authorization: `Bearer ${t}` } });
+  if (!res.ok) return { memberships: [], defaultOrgId: null };
+  const body = (await res.json().catch(() => null)) as {
+    data?: { memberships?: MyOrg[]; defaultOrgId?: string | null };
+  } | null;
+  return {
+    memberships: body?.data?.memberships ?? [],
+    defaultOrgId: body?.data?.defaultOrgId ?? null,
+  };
+}

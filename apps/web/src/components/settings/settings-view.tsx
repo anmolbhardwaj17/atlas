@@ -63,16 +63,10 @@ export function SettingsView({
         <p className="text-sm text-muted-foreground">Manage your organization, team, and access.</p>
       </div>
 
-      {/* Profile then Organization, stacked in their own rows (full width each). */}
-      <div className="space-y-6">
+      {/* Profile + Organization side by side; `items-start` so each sizes to its own content. */}
+      <div className="grid gap-6 md:grid-cols-2 md:items-start">
         <ProfileCard name={name} email={email} avatarUrl={avatarUrl} />
-        <OrgCard
-          orgId={orgId}
-          orgName={orgName}
-          role={role}
-          memberCount={members.length}
-          canEdit={isAdmin}
-        />
+        <OrgCard orgId={orgId} orgName={orgName} canEdit={isAdmin} />
       </div>
 
       {isAdmin ? <LlmSettingsCard orgId={orgId} initial={llm} /> : null}

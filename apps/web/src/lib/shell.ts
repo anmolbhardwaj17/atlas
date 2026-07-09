@@ -1,6 +1,8 @@
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSession, apiGet, type ApiOk } from "@/lib/api";
+import { ACTIVE_ORG_COOKIE } from "@/lib/active-org";
 
 /**
  * Server-side guard for authenticated, org-scoped pages (Explore, Ask, Settings).
@@ -40,7 +42,12 @@ export const requireShell = cache(async (): Promise<Shell> => {
   if (!session) redirect("/login");
 
   const me = (await apiGet<ApiOk<MeResponse>>("/me", { token: session.token })).body?.data;
-  const active = me?.memberships.find((m) => m.orgId === me.defaultOrgId) ?? me?.memberships[0];
+  // Active org = the switcher's cookie (if it's a real membership) → the user's default → first.
+  const picked = (await cookies()).get(ACTIVE_ORG_COOKIE)?.value;
+  const active =
+    me?.memberships.find((m) => m.orgId === picked) ??
+    me?.memberships.find((m) => m.orgId === me.defaultOrgId) ??
+    me?.memberships[0];
   if (!me || !active) redirect("/");
 
   return {
