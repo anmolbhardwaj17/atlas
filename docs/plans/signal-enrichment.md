@@ -1,6 +1,6 @@
 # Plan — Signal Enrichment (densifying the code↔infra graph)
 
-> **Status:** 🔵 In progress — Slice 1 (tags / R11) ✅ + Slice 2 (image→SHA / R12) ✅ shipped; S3–S6 queued.
+> **Status:** 🔵 In progress — S1 tags/R11 ✅ · S2 image→SHA/R12 ✅ · S4 service-name env/R13 ✅ shipped; S3 (IaC), S5 (log-content), S6 (semantic+confirm) queued.
 > **Note on "observed":** an inference rule can only emit `inferred-high`/`inferred-low` — `observed` is reserved for facts a *connector* reads directly. So R12's SHA match (a correlation of two observed facts) is `inferred-high` (near-observed); the genuinely-observed deploy edge is the CI/CD connector's job (`docs/07c`).
 > **Owner-goal:** the map has many resources but few edges; connect more of it *without* lowering precision (P3).
 > **Governing principle:** the graph is the product (P1); **prefer a missing edge to a wrong one** (P3); every edge is cited (P4).
@@ -36,7 +36,7 @@ The disconnection is **~20% matcher, ~80% signal** — three layers, only one of
 | **S1** | **Resource tags (R11)** | AWS tags naming the owning code (`repository`/`service`/`application`/CFN stack) | `DEPLOYS_TO` repo→compute | exact normalized equality to one repo → high; ambiguous → low each; generic/short → skip | tag capture in normalize (+ live tag-fetch for Lambda/ECS/ElastiCache) | 🔵 **building** |
 | **S2** | Image tag → git SHA (R12) | ECR image tag carrying the commit SHA, matched to a crawled PR's commit | `DEPLOYS_TO` repo→ECS at **inferred-high** (near-observed) | SHA-prefix match to a real commit is near-certain provenance | PR commit-SHA capture (Bitbucket live; GitHub parity) + ECS image SHA extraction | ✅ **built** |
 | **S3** | IaC parsing | Terraform/CFN/serverless/CDK resource declarations in repos | declared repo→resource | the repo literally defines the resource | repo-side IaC parser (extends GitHub/Bitbucket connectors) | 📋 |
-| **S4** | Observability service names | `OTEL_SERVICE_NAME` / `DD_SERVICE` env values | repo↔service | canonical self-reported name; small extension of R3's env read | none new (already read env values) | 📋 |
+| **S4** | Observability service names (R13) | `OTEL_SERVICE_NAME` / `DD_SERVICE` / `SERVICE_NAME` / OTEL resource attrs env values | `DEPLOYS_TO` repo→runtime | exact normalized equality to a repo slug; unique→high, ambiguous→low, generic skipped | none new (reuses `aws.lambda.env`/`aws.ecs.env` signals) | ✅ **built** |
 | **S5** | Log-content mining | self-reported identity + downstream hosts in log *content* / stream names | repo match + runtime `CONNECTS_TO` config can't see | free-text → candidate-confirm only; stream names are safe metadata | `logs:GetLogEvents`/`FilterLogEvents` IAM + redaction | 📋 Phase 2 |
 | **S6** | Semantic + human confirm | embedding similarity of names/descriptions | any (via confirm) | candidate-only; confirmed → observed (human-attested) | confirm UI + a candidate store | 📋 |
 

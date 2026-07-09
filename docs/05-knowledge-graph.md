@@ -283,12 +283,19 @@ Each rule below shows: trigger, evidence, output edge, confidence, and *why that
 - **Why:** the highest-precision of the code→infra matchers — it doesn't guess from names/tags, it matches the artifact's actual build commit. A tag with no SHA-shaped token (e.g. `latest`, `v1.2.3`) yields nothing (P3).
 - **Evidence stored:** the image URI, the extracted image SHA, the matched commit SHA, and the ECS service URN (P4). See `docs/plans/signal-enrichment.md` (slice 2).
 
+**R13 — `service_name_env_correlation` → `DEPLOYS_TO` (inferred-high / inferred-low)**
+- **Inputs:** the `aws.lambda.env` / `aws.ecs.env` signals (already extracted by the AWS connector) + repo nodes. Recognized keys are the canonical service-name env vars the org sets at runtime: `OTEL_SERVICE_NAME`, `DD_SERVICE`, `SERVICE_NAME`, `APP_NAME`, `NEW_RELIC_APP_NAME`, … and `service.name=` inside `OTEL_RESOURCE_ATTRIBUTES`.
+- **Match:** the env *value* (the self-reported service name), normalized (shared with R10/R11), matched by **exact equality** to a repo slug. The target runtime is the signal's subject — the Lambda directly, or (for a task-definition env) the ECS service(s) running that family.
+- **Confidence:** `inferred-high` for a unique match (a runtime self-reporting its service name is strong intent); several repos with the same normalized name → `inferred-low` each (P3). Generic/short values skipped (shared `GENERIC_TOKENS`).
+- **Why:** the observability service name is the *canonical* identifier engineers use for a service — a high-signal, near-observed link that costs nothing extra (the env vars are already crawled for R3). Distinct from R3, which matches env values against *datastore endpoints*, not service names.
+- **Evidence stored:** the env key + value + matched repo slug + the runtime URN (P4). See `docs/plans/signal-enrichment.md` (slice 3).
+
 > **Confidence calibration table** (the contract `10` relies on to phrase answers):
 
 | Tier | Meaning | Example rule | AI phrasing (10) |
 |---|---|---|---|
 | `observed` | Directly read from a source API | R5, R7, SG/ENI facts | stated as fact + source link |
-| `inferred-high` | Strong structural/config evidence | R1(ARN), R2, R3, R4, R6(single-svc), R11(unique tag), R12(SHA match) | "Atlas infers (high confidence)… based on <evidence>" |
+| `inferred-high` | Strong structural/config evidence | R1(ARN), R2, R3, R4, R6(single-svc), R11(unique tag), R12(SHA match), R13(service-name env) | "Atlas infers (high confidence)… based on <evidence>" |
 | `inferred-low` | Plausible but uncertain (heuristic/permission) | R1(name), R6(monorepo), R8, R10, R11(ambiguous tag) | "possibly… (low confidence); evidence is <X>; not certain" |
 
 ### 6.5 Reconciliation & convergence (FR-4.6)
