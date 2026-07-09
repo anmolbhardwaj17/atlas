@@ -168,7 +168,10 @@ export function JenkinsSetup() {
         </Step>
         <Step title="Give Atlas the server URL, username + token">
           Atlas reaches your Jenkins over HTTPS with the username + API token (read-only — it never
-          triggers builds). Self-hosted Jenkins must be reachable from Atlas.
+          triggers builds). <strong>If Jenkins is private</strong> — behind a VPN, firewall, or a
+          load-balancer IP allowlist — allowlist Atlas&apos;s outbound IP so it can reach the
+          server. You can still <strong>save the connection now</strong> and re-verify once
+          that&apos;s done — your token stays stored.
         </Step>
         <Step title="Atlas links deploys to infrastructure">
           From each job's pipeline Atlas reads its deploy targets (ECR pushes,{" "}

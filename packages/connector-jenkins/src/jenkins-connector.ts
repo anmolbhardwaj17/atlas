@@ -84,13 +84,32 @@ export class JenkinsConnector implements Connector {
       await run.client.json("/api/json?tree=jobs[name]{0,1}");
       return { status: "connected" };
     } catch (err) {
-      if (err instanceof JenkinsHttpError && (err.status === 401 || err.status === 403)) {
+      // Distinguish an auth/HTTP failure (the server DID respond) from a reachability failure
+      // (no response at all — DNS/timeout/refused/TLS). The latter is almost always a private
+      // network / firewall, so the fix is to allowlist Atlas's IP, not to touch the token.
+      if (err instanceof JenkinsHttpError) {
+        if (err.status === 401 || err.status === 403) {
+          return {
+            status: "error",
+            message:
+              "Jenkins rejected the credentials — check the username and API token (the user needs Overall/Read + Job/Read).",
+          };
+        }
+        if (err.status === 404) {
+          return {
+            status: "error",
+            message: `Reached a server, but Jenkins' API returned 404 — double-check the server URL (${run.baseUrl}).`,
+          };
+        }
         return {
           status: "error",
-          message: "Jenkins rejected the credentials — check the username and API token.",
+          message: `Jenkins responded with HTTP ${err.status} — it may be temporarily unavailable. Try re-verifying.`,
         };
       }
-      return { status: "error", message: `Jenkins probe failed: ${(err as Error).message}` };
+      return {
+        status: "error",
+        message: `Couldn't reach Jenkins at ${run.baseUrl}. If it's on a private network, allowlist Atlas's outbound IP on its firewall (or the load balancer's security group), then re-verify. Your credentials are saved — no need to re-enter them.`,
+      };
     }
   }
 

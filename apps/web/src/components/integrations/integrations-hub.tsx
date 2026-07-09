@@ -793,6 +793,24 @@ function ConnectionBlock({
     }
   }
 
+  // Re-run verify on a saved-but-unverified connection (e.g. after allowlisting Atlas's IP).
+  // Empty credentials → the broker reuses the token stored at connect time, so nothing to re-enter.
+  async function reVerify() {
+    setTriggering(true);
+    setNote(null);
+    try {
+      await verifyConnection(orgId, conn.id, {});
+      toast.success(`${conn.displayName} verified`, { description: "Atlas is starting a sync." });
+      router.refresh();
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Still couldn't verify.";
+      setNote(message);
+      toast.error("Still couldn't verify", { description: message });
+    } finally {
+      setTriggering(false);
+    }
+  }
+
   return (
     <div className="rounded-lg border border-border p-3.5 text-sm">
       {/* Header — name + live status. */}
@@ -883,6 +901,17 @@ function ConnectionBlock({
       {/* Actions. */}
       {canManage ? (
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+          {(conn.status === "error" || conn.status === "pending") && !conn.demo ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void reVerify()}
+              disabled={triggering}
+            >
+              <RefreshCw className={cn("size-3.5", triggering && "animate-spin")} />
+              {triggering ? "Verifying…" : "Re-verify"}
+            </Button>
+          ) : null}
           {canSync ? (
             <Button
               size="sm"
@@ -1075,8 +1104,12 @@ function ConnectSheet({
       onClose();
       router.refresh();
     } catch (e) {
+      // The connection + credentials are saved even when verify fails (e.g. a private Jenkins we
+      // can't reach yet), so refresh the list — it now shows the saved source with a Re-verify
+      // action. The inline error explains what to fix (allowlist our IP, check the token, …).
       setError(e instanceof Error ? e.message : "Something went wrong.");
       setBusy(false);
+      router.refresh();
     }
   }
 
