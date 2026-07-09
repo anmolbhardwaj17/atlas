@@ -70,6 +70,12 @@ export function ProfileCard({
     setEditing(true);
   }
 
+  function cancelEdit() {
+    setDraftName(currentName ?? "");
+    setPickedAvatar(currentAvatar);
+    setEditing(false);
+  }
+
   async function save() {
     const nextName = draftName.trim();
     if (!nextName) return;
@@ -97,46 +103,62 @@ export function ProfileCard({
   }
 
   return (
-    <Card>
+    <Card className="relative">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <UserRound className="size-4" /> Your profile
         </CardTitle>
       </CardHeader>
+      {/* One Edit control, floated top-right — same pattern as the Organization card. */}
+      <div className="absolute right-6 top-5">
+        {editing ? (
+          <div className="flex items-center gap-1.5">
+            <Button size="sm" onClick={() => void save()} disabled={busy || !draftName.trim()}>
+              {busy ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Check className="size-3.5" />
+              )}
+              Save
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={cancelEdit}
+              disabled={busy}
+              aria-label="Cancel"
+            >
+              <X className="size-4" />
+            </Button>
+          </div>
+        ) : (
+          <Button size="sm" variant="ghost" onClick={startEdit}>
+            <Pencil className="size-3.5" /> Edit
+          </Button>
+        )}
+      </div>
       <CardContent className="space-y-4">
         <div className="flex items-center gap-4">
           <UserAvatar value={currentAvatar} name={currentName} email={email} size={56} />
 
           <div className="min-w-0 flex-1">
             {editing ? (
-              <div className="flex items-center gap-2">
-                <Input
-                  value={draftName}
-                  onChange={(e) => setDraftName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void save();
-                    if (e.key === "Escape") setEditing(false);
-                  }}
-                  placeholder="Your name"
-                  className="h-9 max-w-xs"
-                  autoFocus
-                  aria-label="Your name"
-                />
-              </div>
+              <Input
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void save();
+                  if (e.key === "Escape") cancelEdit();
+                }}
+                placeholder="Your name"
+                className="h-9 max-w-xs"
+                autoFocus
+                aria-label="Your name"
+              />
             ) : (
-              <div className="flex items-center gap-2">
-                <span className="truncate text-base font-medium">
-                  {currentName ?? "Add your name"}
-                </span>
-                <button
-                  type="button"
-                  onClick={startEdit}
-                  aria-label="Edit your profile"
-                  className="text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <Pencil className="size-3.5" />
-                </button>
-              </div>
+              <span className="block truncate text-lg font-medium">
+                {currentName ?? "Add your name"}
+              </span>
             )}
             <p
               className={cn("truncate text-sm text-muted-foreground", editing ? "mt-2" : "mt-0.5")}
@@ -170,19 +192,6 @@ export function ProfileCard({
                   <UserAvatar value={opt.value} name={currentName} email={email} size={40} />
                 </button>
               ))}
-            </div>
-            <div className="flex items-center gap-2">
-              <Button size="sm" onClick={() => void save()} disabled={busy || !draftName.trim()}>
-                {busy ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <Check className="size-3.5" />
-                )}
-                Save
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={busy}>
-                <X className="size-3.5" /> Cancel
-              </Button>
             </div>
           </div>
         ) : null}

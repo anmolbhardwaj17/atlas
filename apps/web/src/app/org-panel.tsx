@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { Check, Loader2, MoreHorizontal, Users, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Check, Copy, Loader2, MoreHorizontal, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { apiUrl } from "@/lib/env";
@@ -80,6 +80,15 @@ export function OrgPanel({
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"Member" | "Admin">("Member");
   const [note, setNote] = useState<string | null>(null);
+  const [inviting, setInviting] = useState(false);
+  // The last invite we created + its accept link, kept visible so the inviter can copy/share it —
+  // the primary way to bring in a teammate while email delivery isn't configured yet.
+  const [lastInvite, setLastInvite] = useState<{
+    email: string;
+    role: string;
+    url?: string;
+  } | null>(null);
+  const [copied, setCopied] = useState(false);
   const [busyUser, setBusyUser] = useState<string | null>(null);
   const [busyInvite, setBusyInvite] = useState<string | null>(null);
   const [pendingRemoval, setPendingRemoval] = useState<Member | null>(null);
@@ -108,35 +117,53 @@ export function OrgPanel({
     if (i.data) setInvites(i.data as Invitation[]);
   }, [orgId, authHeaders]);
 
+  // The "Invited X" confirmation is transient — clear it after 4s (the copy-link box persists).
+  useEffect(() => {
+    if (!note) return;
+    const t = window.setTimeout(() => setNote(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [note]);
+
   async function invite(e: React.FormEvent): Promise<void> {
     e.preventDefault();
     setNote(null);
-    const res = await fetch(`${apiUrl()}/orgs/${orgId}/invitations`, {
-      method: "POST",
-      headers: await authHeaders(),
-      body: JSON.stringify({ email: email.trim(), role }),
-    });
-    const body = await res.json();
-    if (res.ok) {
-      setEmail("");
-      setNote(`Invited ${body.data.email} as ${body.data.role}.`);
-      const url: string | undefined = body.data.acceptUrl;
-      toast.success(`Invitation sent to ${body.data.email}`, {
-        description: `They'll join as ${body.data.role} once they accept.`,
-        ...(url
-          ? {
-              action: {
-                label: "Copy link",
-                onClick: () => void navigator.clipboard?.writeText(url),
-              },
-            }
-          : {}),
+    setInviting(true);
+    try {
+      const res = await fetch(`${apiUrl()}/orgs/${orgId}/invitations`, {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify({ email: email.trim(), role }),
       });
-      void load();
-    } else {
-      const message = body.error?.message ?? `Failed (${res.status})`;
-      setNote(message);
-      toast.error("Couldn't send the invitation", { description: message });
+      const body = await res.json();
+      if (res.ok) {
+        const invitedEmail = body.data.email as string;
+        const invitedRole = body.data.role as string;
+        const url = body.data.acceptUrl as string | undefined;
+        setEmail("");
+        setNote(`Invited ${invitedEmail} as ${invitedRole}.`);
+        setLastInvite({ email: invitedEmail, role: invitedRole, ...(url ? { url } : {}) });
+        setCopied(false);
+        toast.success(`Invitation created for ${invitedEmail}`, {
+          description: `They'll join as ${invitedRole} once they accept.`,
+        });
+        void load();
+      } else {
+        const message = body.error?.message ?? `Failed (${res.status})`;
+        setNote(message);
+        toast.error("Couldn't send the invitation", { description: message });
+      }
+    } finally {
+      setInviting(false);
+    }
+  }
+
+  async function copyLink(url: string): Promise<void> {
+    try {
+      await navigator.clipboard?.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Couldn't copy — select the link and copy it manually.");
     }
   }
 
@@ -349,9 +376,53 @@ export function OrgPanel({
                   <SelectItem value="Admin">Admin</SelectItem>
                 </SelectContent>
               </Select>
-              <Button type="submit">Invite</Button>
+              <Button type="submit" disabled={inviting}>
+                {inviting ? <Loader2 className="size-4 animate-spin" /> : null}
+                Invite
+              </Button>
             </div>
             {note ? <p className="text-sm text-muted-foreground">{note}</p> : null}
+            {/* Persistent copy-link box — the primary way to bring in a teammate while automatic
+                email delivery isn't configured. Stays until dismissed or the next invite. */}
+            {lastInvite?.url ? (
+              <div className="space-y-2 rounded-md border bg-muted/40 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    Can&rsquo;t email yet? Send this link to{" "}
+                    <span className="font-medium text-foreground">{lastInvite.email}</span> so they
+                    can join:
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setLastInvite(null)}
+                    aria-label="Dismiss"
+                    className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    readOnly
+                    value={lastInvite.url}
+                    onFocus={(e) => e.currentTarget.select()}
+                    className="h-9 flex-1 font-mono text-xs"
+                    aria-label="Invite link"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      const u = lastInvite.url;
+                      if (u) void copyLink(u);
+                    }}
+                  >
+                    {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                    {copied ? "Copied" : "Copy link"}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
           </form>
         ) : null}
       </CardContent>

@@ -65,8 +65,8 @@ export function SettingsView({
         <p className="text-sm text-muted-foreground">Manage your organization, team, and access.</p>
       </div>
 
-      {/* Profile + Organization side by side; `items-start` so each sizes to its own content. */}
-      <div className="grid gap-6 md:grid-cols-2 md:items-start">
+      {/* Profile + Organization side by side; cards stretch to equal height (default `stretch`). */}
+      <div className="grid gap-6 md:grid-cols-2">
         <ProfileCard name={name} email={email} avatarUrl={avatarUrl} />
         <OrgCard orgId={orgId} orgName={orgName} orgLogoUrl={orgLogoUrl} canEdit={isAdmin} />
       </div>

@@ -94,17 +94,53 @@ export function OrgCard({
     }
   }
 
+  function cancelEdit() {
+    setDraft(name);
+    setEditing(false);
+  }
+
   return (
-    <Card>
+    <Card className="relative">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Building2 className="size-4" /> Organization
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-5">
-        {/* Logo — the tile itself is the control: a corner badge shows + (add) or ✎ (replace) and
-            opens the picker; when a logo is set, a hover ✕ removes it. No labels needed. */}
-        <div>
+      {/* One Edit control, floated top-right so the header (and its title) stays identical to the
+          profile card's — toggles editing both the logo and the name together. */}
+      {canEdit ? (
+        <div className="absolute right-6 top-5">
+          {editing ? (
+            <div className="flex items-center gap-1.5">
+              <Button size="sm" onClick={() => void save()} disabled={busy || !draft.trim()}>
+                {busy ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Check className="size-3.5" />
+                )}
+                Save
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={cancelEdit}
+                disabled={busy}
+                aria-label="Cancel"
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
+          ) : (
+            <Button size="sm" variant="ghost" onClick={startEdit}>
+              <Pencil className="size-3.5" /> Edit
+            </Button>
+          )}
+        </div>
+      ) : null}
+      <CardContent>
+        {/* Logo left, name right. In edit mode the logo tile becomes a control (corner + / ✎ badge
+            opens the picker; a ✕ removes it) and the name becomes an input. */}
+        <div className="flex items-center gap-4">
           <input
             ref={fileRef}
             type="file"
@@ -112,14 +148,14 @@ export function OrgCard({
             className="hidden"
             onChange={(e) => void onPickLogo(e)}
           />
-          {canEdit ? (
-            <div className="group relative w-fit">
+          {editing ? (
+            <div className="group relative w-fit shrink-0">
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={logoBusy}
                 aria-label={logoUrl ? "Replace logo" : "Upload logo"}
-                className="relative block shrink-0 rounded-lg outline-none ring-ring transition focus-visible:ring-2 disabled:opacity-70"
+                className="relative block rounded-lg outline-none ring-ring transition focus-visible:ring-2 disabled:opacity-70"
               >
                 <OrgLogo
                   name={name}
@@ -149,52 +185,23 @@ export function OrgCard({
               ) : null}
             </div>
           ) : (
-            <OrgLogo name={name} logoUrl={logoUrl} size={56} className="rounded-lg" />
+            <OrgLogo name={name} logoUrl={logoUrl} size={56} className="shrink-0 rounded-lg" />
           )}
-        </div>
 
-        {/* Name — the org's identity, editable in place. */}
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Name</p>
           {editing ? (
-            <div className="mt-1.5 flex items-center gap-2">
-              <Input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void save();
-                  if (e.key === "Escape") setEditing(false);
-                }}
-                className="h-9 max-w-xs"
-                autoFocus
-                aria-label="Organization name"
-              />
-              <Button size="sm" onClick={() => void save()} disabled={busy || !draft.trim()}>
-                {busy ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <Check className="size-3.5" />
-                )}
-                Save
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={busy}>
-                <X className="size-3.5" />
-              </Button>
-            </div>
+            <Input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void save();
+                if (e.key === "Escape") cancelEdit();
+              }}
+              className="h-9 max-w-xs"
+              autoFocus
+              aria-label="Organization name"
+            />
           ) : (
-            <div className="mt-1 flex items-center gap-2">
-              <span className="text-base font-medium">{name}</span>
-              {canEdit ? (
-                <button
-                  type="button"
-                  onClick={startEdit}
-                  aria-label="Rename organization"
-                  className="text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <Pencil className="size-3.5" />
-                </button>
-              ) : null}
-            </div>
+            <span className="truncate text-lg font-medium">{name}</span>
           )}
         </div>
       </CardContent>
