@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Inject,
+  Logger,
   Param,
   Post,
   Put,
@@ -42,6 +43,8 @@ interface SseReply {
 @Controller("ai")
 @UseGuards(AuthGuard, TenantScopeGuard, RolesGuard)
 export class AiController {
+  private readonly log = new Logger(AiController.name);
+
   constructor(
     private readonly ai: AiService,
     @Inject(ENV) private readonly env: Env,
@@ -135,11 +138,17 @@ export class AiController {
         reply.raw.write(`event: ${ev.type}\ndata: ${JSON.stringify(ev)}\n\n`);
       }
     } catch (err) {
-      // Surface the real reason (model 429/404, bad key, etc.) — include `type` so the client
-      // renders it instead of silently swallowing an untyped event.
-      const message = err instanceof ApiException ? err.message : (err as Error).message;
+      // Only our own ApiException messages are safe to surface (rate-limit, bad key, honest states).
+      // Any other error (DB/provider/driver) is logged server-side and shown as a generic line, so a
+      // raw internal string never reaches the browser (security sweep M3, mirrors the global filter).
+      let clientMessage = "The AI request failed. Please try again.";
+      if (err instanceof ApiException) {
+        clientMessage = err.message;
+      } else {
+        this.log.error(`AI ask stream failed: ${(err as Error).message}`);
+      }
       reply.raw.write(
-        `event: error\ndata: ${JSON.stringify({ type: "error", message: message || "The AI request failed." })}\n\n`,
+        `event: error\ndata: ${JSON.stringify({ type: "error", message: clientMessage })}\n\n`,
       );
     } finally {
       clearInterval(heartbeat);

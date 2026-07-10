@@ -5,6 +5,7 @@ import { ENV, PG_POOL } from "./tokens";
 import { AuditService } from "./audit.service";
 import { EmailService } from "./email.service";
 import { ImageUploadService } from "./image-upload.service";
+import { RateLimitService } from "./rate-limit.service";
 
 /**
  * App-wide singletons (docs/02 §3, docs/17 §6): the parsed env (fail-fast at boot)
@@ -30,8 +31,15 @@ const poolProvider: Provider = {
 
 @Global()
 @Module({
-  providers: [envProvider, poolProvider, AuditService, EmailService, ImageUploadService],
-  exports: [ENV, PG_POOL, AuditService, EmailService, ImageUploadService],
+  providers: [
+    envProvider,
+    poolProvider,
+    AuditService,
+    EmailService,
+    ImageUploadService,
+    RateLimitService,
+  ],
+  exports: [ENV, PG_POOL, AuditService, EmailService, ImageUploadService, RateLimitService],
 })
 export class CoreModule implements OnApplicationShutdown {
   constructor(@Inject(PG_POOL) private readonly pool: Db) {}

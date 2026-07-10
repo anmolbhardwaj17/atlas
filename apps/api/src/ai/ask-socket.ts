@@ -11,14 +11,18 @@
  * Security: same as the SSE guards — verify the Supabase JWT (first frame, NOT the URL, so no token
  * leaks to logs/proxies) then confirm org membership (R8). Origin is pinned to WEB_ORIGIN.
  */
+import { Logger } from "@nestjs/common";
 import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 import fastifyWebsocket from "@fastify/websocket";
 import type { Env } from "@atlas/config";
 import { SupabaseJwtVerifier } from "../auth/supabase-jwt.verifier";
 import { MembershipService } from "../auth/membership.service";
 import { parseAuthClaims } from "../auth/claims";
+import { ApiException } from "../common/errors";
 import { ENV } from "../core/tokens";
 import { AiService } from "./ai.service";
+
+const logger = new Logger("AskSocket");
 
 /** The subset of the `ws` WebSocket we use (avoids a hard `ws` type dependency). */
 interface WsSocket {
@@ -155,7 +159,15 @@ export async function registerAskSocket(app: NestFastifyApplication): Promise<vo
             }
           } catch (err) {
             if (!ac.signal.aborted) {
-              send({ type: "error", message: (err as Error).message || "the AI request failed" });
+              // Only surface our own ApiException messages (rate-limit, bad key, honest states);
+              // anything else is logged and shown generically so no raw internal error leaks (M3).
+              let clientMessage = "The AI request failed. Please try again.";
+              if (err instanceof ApiException) {
+                clientMessage = err.message;
+              } else {
+                logger.error(`AI ask (ws) failed: ${(err as Error).message}`);
+              }
+              send({ type: "error", message: clientMessage });
             }
           } finally {
             if (current === ac) current = null;

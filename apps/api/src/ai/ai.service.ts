@@ -15,6 +15,7 @@ import type { Env } from "@atlas/config";
 import { ENV, PG_POOL } from "../core/tokens";
 import { SECRET_BROKER } from "../connections/tokens";
 import { ApiException } from "../common/errors";
+import { RateLimitService } from "../core/rate-limit.service";
 import { GraphRetrievalPort } from "./graph-retrieval.port";
 import { LLM_PROVIDER } from "./tokens";
 
@@ -64,6 +65,14 @@ export interface ConversationDto {
  * transcript stays cited/tiered. Within-session memory = the persisted history (cross-turn
  * pronoun resolution is a follow-up).
  */
+/** Abuse limits on AI (security sweep H2). Burst kills a tight request loop; the shared-key DAILY
+ *  budget bounds spend on Atlas's own Anthropic key for an org with no BYO-LLM — a BYO org pays for
+ *  its own usage and isn't daily-capped. Generous enough that real interactive use never trips them. */
+const AI_BURST_LIMIT = 20; // asks per org …
+const AI_BURST_WINDOW_S = 60; // … per 60s
+const AI_SHARED_DAILY_LIMIT = 100; // asks per org per day on Atlas's shared key
+const DAY_SECONDS = 24 * 60 * 60;
+
 @Injectable()
 export class AiService {
   constructor(
@@ -72,6 +81,7 @@ export class AiService {
     @Inject(LLM_PROVIDER) private readonly llm: LLMProvider,
     @Inject(SECRET_BROKER) private readonly secrets: SecretBroker,
     @Inject(ENV) private readonly env: Env,
+    private readonly rateLimit: RateLimitService,
   ) {}
 
   /** The org's LLM config for the settings UI — never the key (BR-CONN-1). */
@@ -150,8 +160,9 @@ export class AiService {
   }
 
   /** Pick the narrator: the org's BYO-LLM (OpenRouter) if configured + key resolves, else the
-   *  env default (Claude when ANTHROPIC_API_KEY is set, otherwise the dev mock). */
-  private async resolveProvider(orgId: string): Promise<LLMProvider> {
+   *  env default (Claude when ANTHROPIC_API_KEY is set, otherwise the dev mock). `shared` is true
+   *  when we fell back to Atlas's own key — the caller then applies the shared-key budget (H2). */
+  private async resolveProvider(orgId: string): Promise<{ llm: LLMProvider; shared: boolean }> {
     const cfg = await withOrgScope(this.db, orgId, async (c) => {
       const { rows } = await c.query<{ provider: string; model: string; secret_ref: string }>(
         `SELECT provider, model, secret_ref FROM org_llm_config WHERE org_id = $1`,
@@ -166,10 +177,13 @@ export class AiService {
     ) {
       const material = await this.secrets.get(cfg.secret_ref);
       if (material.apiKey) {
-        return buildProvider(cfg.provider, cfg.model, material.apiKey, this.env.WEB_ORIGIN);
+        return {
+          llm: buildProvider(cfg.provider, cfg.model, material.apiKey, this.env.WEB_ORIGIN),
+          shared: false,
+        };
       }
     }
-    return this.llm;
+    return { llm: this.llm, shared: true };
   }
 
   /**
@@ -181,7 +195,9 @@ export class AiService {
    * and advises, never acts.
    */
   async autoDiagnose(orgId: string, subject: string): Promise<string | null> {
-    const llm = await this.resolveProvider(orgId);
+    // Atlas-initiated (proactive) — not user-driven, so it is NOT rate-limited/budget-checked here;
+    // it's already bounded by the notification dispatcher's own per-alert cap.
+    const { llm } = await this.resolveProvider(orgId);
     if (llm.name === "mock") return null; // the loop needs a real tool-calling model
     try {
       const answer = await answerQuestion(
@@ -284,6 +300,15 @@ export class AiService {
     message: string,
     signal?: AbortSignal,
   ): AsyncIterable<AnswerEvent> {
+    // Abuse guard (H2), enforced here so BOTH transports (SSE controller + WS socket) are covered.
+    // Burst first — cheap, kills a tight loop before any DB/LLM work.
+    await this.rateLimit.enforce(
+      orgId,
+      "ai_ask",
+      AI_BURST_LIMIT,
+      AI_BURST_WINDOW_S,
+      "You're sending AI requests too quickly. Give it a moment and try again.",
+    );
     await withOrgScope(this.db, orgId, (c) => this.loadConversation(c, conversationId));
     // Load prior turns BEFORE inserting the new one - cross-turn memory (docs/10 §9), so a
     // follow-up ("explain that simpler", "why?") continues the thread instead of restarting.
@@ -298,11 +323,22 @@ export class AiService {
         .filter((r) => r.role === "user" || r.role === "assistant")
         .map((r) => ({ role: r.role as "user" | "assistant", content: r.content }));
     });
+    const { llm, shared } = await this.resolveProvider(orgId);
+    // When using Atlas's shared key (no BYO-LLM) and it's a real model, count this ask against the
+    // org's daily budget — the hard bound on cost-DoS. mock (dev) is free; BYO orgs pay their own way.
+    if (shared && llm.name !== "mock") {
+      await this.rateLimit.enforce(
+        orgId,
+        "ai_shared",
+        AI_SHARED_DAILY_LIMIT,
+        DAY_SECONDS,
+        "This organization has reached today's limit on Atlas's shared AI. Add your own API key in Settings → AI for unlimited use.",
+      );
+    }
     await withOrgScope(this.db, orgId, (c) =>
       this.insertMessage(c, orgId, conversationId, "user", message, [], null),
     );
 
-    const llm = await this.resolveProvider(orgId);
     let text = "";
     const citations: AnswerCitation[] = [];
     let confidence: string | null = null;

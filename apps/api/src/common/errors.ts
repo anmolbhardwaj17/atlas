@@ -56,4 +56,7 @@ export class ApiException extends HttpException {
   static invalidState(message: string): ApiException {
     return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "invalid_state_transition", message);
   }
+  static tooManyRequests(message = "Too many requests. Please slow down."): ApiException {
+    return new ApiException(HttpStatus.TOO_MANY_REQUESTS, "rate_limited", message);
+  }
 }

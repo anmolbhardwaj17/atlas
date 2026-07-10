@@ -9,6 +9,7 @@ import { GraphService } from "../graph/graph.service";
 import { PostgresSearchProvider } from "../search/postgres-search.provider";
 import { GraphRetrievalPort } from "./graph-retrieval.port";
 import { AiService } from "./ai.service";
+import { RateLimitService } from "../core/rate-limit.service";
 
 /**
  * G3.5 AI service: create conversation → ask → SSE-shaped stream + persisted transcript,
@@ -50,6 +51,7 @@ suite("G3.5 AiService", () => {
       new MockLLMProvider(narration),
       new InMemorySecretBroker(),
       loadEnv({}),
+      new RateLimitService(app),
     );
   };
 

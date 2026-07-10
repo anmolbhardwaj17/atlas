@@ -4,12 +4,18 @@ import { withOrgScope, type Db, type Role } from "@atlas/db";
 import type { Env } from "@atlas/config";
 import { ENV, PG_POOL } from "../core/tokens";
 import { EmailService } from "../core/email.service";
+import { RateLimitService } from "../core/rate-limit.service";
 import { UserMirrorService } from "../auth/user-mirror.service";
 import { ApiException } from "../common/errors";
 import type { AuthClaims } from "../auth/auth.types";
 import type { CreateInviteBody, InvitationDto, OrgDto } from "./dto";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// Abuse limits on invite creation (security sweep M4): each invite sends a Resend email from our
+// domain, so an unthrottled admin could spam arbitrary addresses → quota burn + reputation damage.
+const INVITE_RATE_LIMIT = 20; // new invites per org per hour
+const INVITE_RATE_WINDOW_S = 60 * 60;
+const MAX_PENDING_INVITES = 100; // hard ceiling on outstanding pending invites per org
 const UNIQUE_VIOLATION = "23505";
 function isPgUnique(e: unknown): boolean {
   return typeof e === "object" && e !== null && (e as { code?: string }).code === UNIQUE_VIOLATION;
@@ -42,6 +48,7 @@ export class InvitationService {
     @Inject(ENV) private readonly env: Env,
     private readonly users: UserMirrorService,
     private readonly email: EmailService,
+    private readonly rateLimit: RateLimitService,
   ) {}
 
   async create(
@@ -49,10 +56,27 @@ export class InvitationService {
     inviterUserId: string,
     body: CreateInviteBody,
   ): Promise<InvitationDto> {
+    // Rate-limit invite creation (M4) — bounds email volume from our sending domain per org/hour.
+    await this.rateLimit.enforce(
+      orgId,
+      "invite",
+      INVITE_RATE_LIMIT,
+      INVITE_RATE_WINDOW_S,
+      "Too many invitations sent recently. Please wait a bit before inviting more people.",
+    );
     const token = randomBytes(32).toString("base64url");
     const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
     try {
       const { dto, orgName } = await withOrgScope(this.db, orgId, async (c) => {
+        // Cap outstanding pending invites so the rate limit can't be walked around by never accepting.
+        const { rows: pending } = await c.query<{ n: number }>(
+          `SELECT count(*)::int AS n FROM invitations WHERE status = 'pending'`,
+        );
+        if ((pending[0]?.n ?? 0) >= MAX_PENDING_INVITES) {
+          throw ApiException.tooManyRequests(
+            "This organization has too many pending invitations. Revoke some before sending more.",
+          );
+        }
         const { rows } = await c.query<InviteRow>(
           `INSERT INTO invitations (org_id, email, role, token_hash, invited_by, expires_at)
            VALUES ($1, $2, $3, $4, $5, $6)
