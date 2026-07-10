@@ -10,14 +10,14 @@ import { Button } from "@/components/ui/button";
  */
 export default function SiftPage() {
   return (
-    <div className="mx-auto flex min-h-[65vh] max-w-2xl flex-col items-center justify-center text-center">
+    <div className="mx-auto flex min-h-[calc(100dvh-7rem)] max-w-2xl flex-col items-center justify-center text-center">
       <SetBreadcrumbs items={[{ label: "Sift" }]} />
 
       {/* The pairing mark — Sift × Atlas (the Atlas globe rotates). */}
       <div className="flex items-center gap-3">
         <SiftMark className="size-10" />
         <span className="text-xl text-muted-foreground">×</span>
-        <AtlasLogo size={44} spin className="size-11 dark:invert" />
+        <AtlasLogo size={44} spin className="size-14 dark:invert" />
       </div>
 
       <h1 className="mt-8 text-2xl font-semibold tracking-tight text-balance">

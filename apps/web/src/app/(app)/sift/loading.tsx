@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function SiftLoading() {
   return (
-    <div className="mx-auto flex min-h-[65vh] max-w-2xl flex-col items-center justify-center gap-4">
+    <div className="mx-auto flex min-h-[calc(100dvh-7rem)] max-w-2xl flex-col items-center justify-center gap-4">
       <Skeleton className="size-11 rounded-lg" />
       <Skeleton className="mt-4 h-7 w-72" />
       <div className="w-full space-y-2">
