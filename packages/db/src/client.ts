@@ -31,10 +31,39 @@ export function createPool(connectionString: string): Pool {
     max: 16,
   });
   pool.on("error", (err) => {
-    // eslint-disable-next-line no-console
     console.error(`[db] idle client error (recovered, not fatal): ${err.message}`);
   });
   return pool;
+}
+
+/**
+ * Fail-closed boot assertion (security sweep — operational caveat): the ENTIRE tenant-isolation
+ * model assumes the app connects as the restricted `atlas_app` role (NOBYPASSRLS, non-superuser),
+ * because RLS is simply NOT ENFORCED for a superuser or a BYPASSRLS role. A single fat-fingered
+ * `DATABASE_URL` pointing at Supabase's `postgres`/owner would silently disable every org-scope
+ * policy at request time with no error — the worst possible failure (R8). So we verify the connected
+ * role's attributes at startup and refuse to boot if it can bypass RLS. Migrations/setup scripts use
+ * a separate owner URL and don't call this.
+ */
+export async function assertRestrictedRole(pool: Pool): Promise<void> {
+  const { rows } = await pool.query<{
+    current_user: string;
+    rolsuper: boolean;
+    rolbypassrls: boolean;
+  }>(`SELECT current_user, rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user`);
+  const r = rows[0];
+  if (!r) {
+    throw new Error(
+      "DB role assertion failed: could not read the connected role's attributes from pg_roles.",
+    );
+  }
+  if (r.rolsuper || r.rolbypassrls) {
+    throw new Error(
+      `Refusing to start: connected to Postgres as "${r.current_user}", which is ` +
+        `${r.rolsuper ? "a SUPERUSER" : "BYPASSRLS"} — this DISABLES all tenant RLS (R8). ` +
+        `Point DATABASE_URL at the restricted atlas_app role (see migration 0002 / setup:app-role).`,
+    );
+  }
 }
 
 /**

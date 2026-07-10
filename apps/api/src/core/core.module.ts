@@ -1,6 +1,14 @@
-import { Global, Module, type OnApplicationShutdown, type Provider, Inject } from "@nestjs/common";
+import {
+  Global,
+  Logger,
+  Module,
+  type OnApplicationBootstrap,
+  type OnApplicationShutdown,
+  type Provider,
+  Inject,
+} from "@nestjs/common";
 import { loadEnv, type Env } from "@atlas/config";
-import { createPool, type Db } from "@atlas/db";
+import { assertRestrictedRole, createPool, type Db } from "@atlas/db";
 import { ENV, PG_POOL } from "./tokens";
 import { AuditService } from "./audit.service";
 import { EmailService } from "./email.service";
@@ -41,8 +49,17 @@ const poolProvider: Provider = {
   ],
   exports: [ENV, PG_POOL, AuditService, EmailService, ImageUploadService, RateLimitService],
 })
-export class CoreModule implements OnApplicationShutdown {
+export class CoreModule implements OnApplicationBootstrap, OnApplicationShutdown {
+  private readonly logger = new Logger(CoreModule.name);
+
   constructor(@Inject(PG_POOL) private readonly pool: Db) {}
+
+  /** Fail-closed at boot if the DB pool can bypass RLS (superuser/BYPASSRLS) — that would silently
+   *  disable all tenant isolation (R8). Refuse to start rather than serve cross-tenant data. */
+  async onApplicationBootstrap(): Promise<void> {
+    await assertRestrictedRole(this.pool);
+    this.logger.log("DB role check passed: connected as a restricted, RLS-enforced role.");
+  }
 
   async onApplicationShutdown(): Promise<void> {
     await this.pool.end();
