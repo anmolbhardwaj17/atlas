@@ -113,10 +113,10 @@ export function Onboarding({ orgId, canSeed }: { orgId: string; canSeed: boolean
       {/* Big liquid-metal Atlas mark, bleeding a little off the top-right corner (the left-aligned
           content leaves this space open). Decorative; sits behind the content, clipped by the
           section's overflow-hidden so it never adds page-width. A soft glow gives it contrast. */}
-      <div className="pointer-events-none absolute -right-24 -top-20 z-0 hidden md:block">
+      <div className="pointer-events-none absolute -right-32 -top-36 z-0 hidden md:block">
         <div className="relative">
-          <div className="absolute inset-14 rounded-full bg-foreground/5 blur-3xl" />
-          <LiquidAtlasMark size={400} />
+          <div className="absolute inset-16 rounded-full bg-foreground/5 blur-3xl" />
+          <LiquidAtlasMark size={440} />
         </div>
       </div>
 
