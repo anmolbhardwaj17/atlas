@@ -201,6 +201,11 @@ export function AppSidebar() {
                           <AtlasAiMark size={20} className="size-5 shrink-0" />
                         )}
                         <span>{item.label}</span>
+                        {item.href === "/sift" ? (
+                          <span className="ml-auto shrink-0 text-[9px] font-medium uppercase tracking-wide text-muted-foreground/70 group-data-[collapsible=icon]:hidden">
+                            Coming Soon
+                          </span>
+                        ) : null}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
