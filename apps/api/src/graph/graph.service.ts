@@ -475,17 +475,22 @@ export class GraphService {
    */
   async summary(orgId: string): Promise<DashboardSummary> {
     const impact = [...IMPACT_EDGE_TYPES];
+    const now = Date.now();
     // PR insight window: PRs *raised* in the last 30 days (created_on). Captures recent
     // contribution + repo activity (open or merged); a PR opened long ago doesn't count as
     // recent activity. ISO strings sort chronologically → a lexicographic >= is a correct filter.
-    const prSince = new Date(Date.now() - 30 * 86400 * 1000).toISOString();
-    // Fan the dashboard's independent aggregates across three org-scoped connections. A single
+    const prSince = new Date(now - 30 * 86400 * 1000).toISOString();
+    // The human recent-activity window (PR-centric feed) — fetched as a 4th parallel scope below.
+    const activitySince = new Date(now - 30 * 24 * 60 * 60 * 1000);
+    // Fan the dashboard's independent aggregates across four org-scoped connections. A single
     // pooled client runs queries one-at-a-time (node-postgres serialises on a connection), so ~15
-    // sequential round-trips to a remote DB cost seconds; three parallel scopes cut wall-time ~3x.
+    // sequential round-trips to a remote DB cost seconds; parallel scopes (separate connections)
+    // cut wall-time. recentActivity() opens its own scope too, so running it here — instead of
+    // sequentially after the fan-out — folds an extra round-trip wave into the same parallel batch.
     // Each scope sets its own atlas.current_org GUC — RLS still enforces isolation (R8).
     const scope = <T>(fn: (c: PoolClient) => Promise<T>): Promise<T> =>
       withOrgScope(this.db, orgId, fn);
-    const [grpInventory, grpTopology, grpPeopleVulns] = await Promise.all([
+    const [grpInventory, grpTopology, grpPeopleVulns, activity] = await Promise.all([
       scope(async (c) => {
         const [cats, meta, edgeCount, codeCounts, stale] = await Promise.all([
           c.query<{ category: string; n: number }>(
@@ -738,6 +743,8 @@ export class GraphService {
         );
         return { contributors, mostActiveRepos, vulnSeverity, topVulnPkg, sprawl };
       }),
+      // 4th parallel scope: the human PR-centric activity feed (was a sequential round-trip).
+      this.recentActivity(orgId, activitySince, 6),
     ]);
 
     const { cats, meta, edgeCount, codeCounts, stale } = grpInventory;
@@ -912,7 +919,6 @@ export class GraphService {
       });
     }
     const STALE_MS = 7 * 24 * 60 * 60 * 1000;
-    const now = Date.now();
     for (const conn of base.conns) {
       if (conn.status === "error") {
         findings.push({
@@ -1085,10 +1091,7 @@ export class GraphService {
       }
     }
 
-    // ── Recent activity (human, PR-centric - not raw graph edges) ──────────────
-    const since = new Date(now - 30 * 24 * 60 * 60 * 1000);
-    const activity = await this.recentActivity(orgId, since, 6);
-
+    // Recent activity (human, PR-centric) was fetched in the parallel fan-out above (`activity`).
     const lastSyncAt = base.conns
       .map((c) => c.last_synced_at)
       .filter((d): d is Date => d != null)
@@ -1429,26 +1432,39 @@ export class GraphService {
     orgId: string,
     id: string,
   ): Promise<NodeDto & { provenance: unknown; environment: string }> {
+    if (!UUID_RE.test(id)) throw ApiException.notFound();
     return withOrgScope(this.db, orgId, async (c) => {
-      const node = await this.loadNode(c, id);
-      // Latest raw snapshot + its provenance (click-through to raw, P4).
-      const prov = await c.query<{
-        source: string | null;
-        sync_run_id: string | null;
-        observed_at: Date | null;
-        confidence: string | null;
-        raw_snapshot_id: string | null;
-        storage_ref: string | null;
-      }>(
-        `SELECT p.source, p.sync_run_id, p.observed_at, p.confidence,
-                rs.id AS raw_snapshot_id, rs.storage_ref
-           FROM raw_snapshots rs
-           LEFT JOIN provenance p ON p.raw_snapshot_id = rs.id
-          WHERE rs.node_id = $1
-          ORDER BY rs.captured_at DESC LIMIT 1`,
+      // The node + its latest raw snapshot/provenance in ONE round-trip (was two sequential
+      // queries on the same connection). A LEFT JOIN LATERAL picks the freshest snapshot per node;
+      // the provenance confidence is aliased so it can't collide with the node's own `confidence`.
+      const { rows } = await c.query<
+        NodeRowish & {
+          source: string | null;
+          sync_run_id: string | null;
+          observed_at: Date | null;
+          prov_confidence: string | null;
+          raw_snapshot_id: string | null;
+          storage_ref: string | null;
+        }
+      >(
+        `SELECT ${NODE_COLS},
+                pr.source, pr.sync_run_id, pr.observed_at, pr.prov_confidence,
+                pr.raw_snapshot_id, pr.storage_ref
+           FROM nodes
+           LEFT JOIN LATERAL (
+             SELECT p.source, p.sync_run_id, p.observed_at, p.confidence AS prov_confidence,
+                    rs.id AS raw_snapshot_id, rs.storage_ref
+               FROM raw_snapshots rs
+               LEFT JOIN provenance p ON p.raw_snapshot_id = rs.id
+              WHERE rs.node_id = nodes.id
+              ORDER BY rs.captured_at DESC LIMIT 1
+           ) pr ON true
+          WHERE nodes.id = $1`,
         [id],
       );
-      const pr = prov.rows[0];
+      const node = rows[0];
+      if (!node) throw ApiException.notFound();
+      const hasProv = node.raw_snapshot_id != null || node.source != null;
       return {
         ...toNodeDto(node),
         environment: inferEnvironment({
@@ -1457,14 +1473,14 @@ export class GraphService {
           tags: node.tags,
           attributes: node.attributes,
         }),
-        provenance: pr
+        provenance: hasProv
           ? {
-              source: pr.source,
-              syncRunId: pr.sync_run_id,
-              observedAt: pr.observed_at?.toISOString() ?? null,
-              confidence: pr.confidence,
-              rawSnapshotId: pr.raw_snapshot_id,
-              rawSnapshotRef: pr.storage_ref,
+              source: node.source,
+              syncRunId: node.sync_run_id,
+              observedAt: node.observed_at?.toISOString() ?? null,
+              confidence: node.prov_confidence,
+              rawSnapshotId: node.raw_snapshot_id,
+              rawSnapshotRef: node.storage_ref,
             }
           : null,
       };
@@ -1540,50 +1556,59 @@ export class GraphService {
     const evidenceIds = (finding.evidence ?? []).map((e) => e.id).filter((x) => UUID_RE.test(x));
     if (evidenceIds.length === 0) return { finding, affected: [], impact: null, lastSyncedAt };
 
-    // Enrich the affected nodes with environment + runtime health (one batched lookup).
-    const affected = await withOrgScope(this.db, orgId, async (c) => {
-      const { rows } = await c.query<NodeRowish>(
-        `SELECT ${NODE_COLS} FROM nodes WHERE id = ANY($1::uuid[])`,
-        [evidenceIds],
-      );
-      const byId = new Map(rows.map((r) => [r.id, r]));
-      // Preserve the finding's evidence order, then float prod + unhealthy to the top.
-      const list = evidenceIds
-        .map((nid): AffectedResource | null => {
-          const r = byId.get(nid);
-          if (!r) return null;
-          return {
-            id: r.id,
-            label: r.name ?? r.urn ?? r.id,
-            kind: r.kind,
-            environment: inferEnvironment({
-              name: r.name,
-              urn: r.urn,
-              tags: r.tags,
-              attributes: r.attributes,
-            }),
-            health: healthFrom(r.attributes),
-          };
-        })
-        .filter((x): x is AffectedResource => x !== null);
-      const healthRank = (h: NodeHealthDto | null): number =>
-        h?.state === "unhealthy" ? 0 : h?.state === "degraded" ? 1 : 2;
-      return list.sort(
-        (a, b) =>
-          (a.environment === "prod" ? 0 : 1) - (b.environment === "prod" ? 0 : 1) ||
-          healthRank(a.health) - healthRank(b.health),
-      );
-    });
-
-    // Impact — union the inbound blast-radius of the affected roots ("what breaks if these fail").
-    // Bounded (a few roots, shallow, small budget) so the detail page stays fast. P3: if nothing
-    // depends on them, we show no impact band rather than an invented one.
+    // The affected-node enrichment and the per-root blast-radius traversals are all independent and
+    // each open their own scope (separate pooled connection). Run them as ONE concurrent wave rather
+    // than sequentially — this endpoint previously opened up to 7 scopes back-to-back (1 affected + 6
+    // blast-radius), each a full round-trip cluster to a remote DB. Bounded roots keep pool use sane.
     const IMPACT_ROOTS = 6;
+    const roots = evidenceIds.slice(0, IMPACT_ROOTS);
+    const [affected, blasts] = await Promise.all([
+      // Enrich the affected nodes with environment + runtime health (one batched lookup).
+      withOrgScope(this.db, orgId, async (c) => {
+        const { rows } = await c.query<NodeRowish>(
+          `SELECT ${NODE_COLS} FROM nodes WHERE id = ANY($1::uuid[])`,
+          [evidenceIds],
+        );
+        const byId = new Map(rows.map((r) => [r.id, r]));
+        // Preserve the finding's evidence order, then float prod + unhealthy to the top.
+        const list = evidenceIds
+          .map((nid): AffectedResource | null => {
+            const r = byId.get(nid);
+            if (!r) return null;
+            return {
+              id: r.id,
+              label: r.name ?? r.urn ?? r.id,
+              kind: r.kind,
+              environment: inferEnvironment({
+                name: r.name,
+                urn: r.urn,
+                tags: r.tags,
+                attributes: r.attributes,
+              }),
+              health: healthFrom(r.attributes),
+            };
+          })
+          .filter((x): x is AffectedResource => x !== null);
+        const healthRank = (h: NodeHealthDto | null): number =>
+          h?.state === "unhealthy" ? 0 : h?.state === "degraded" ? 1 : 2;
+        return list.sort(
+          (a, b) =>
+            (a.environment === "prod" ? 0 : 1) - (b.environment === "prod" ? 0 : 1) ||
+            healthRank(a.health) - healthRank(b.health),
+        );
+      }),
+      // Impact — the inbound blast-radius of each affected root ("what breaks if these fail").
+      // Bounded (a few roots, shallow, small budget) so the detail page stays fast.
+      Promise.all(
+        roots.map((rootId) => this.blastRadius(orgId, rootId, { depth: 3, nodeBudget: 100 })),
+      ),
+    ]);
+
+    // Union the per-root traversals. P3: if nothing depends on them, we show no impact band.
     const rootSet = new Set(evidenceIds);
     const impacted = new Map<string, FindingImpact["sample"][number]>();
     let truncated = false;
-    for (const rootId of evidenceIds.slice(0, IMPACT_ROOTS)) {
-      const t = await this.blastRadius(orgId, rootId, { depth: 3, nodeBudget: 100 });
+    for (const t of blasts) {
       truncated = truncated || t.truncated;
       for (const im of t.impacted) {
         if (rootSet.has(im.node.id) || impacted.has(im.node.id)) continue;

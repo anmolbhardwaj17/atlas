@@ -61,8 +61,15 @@ export class MeController {
   async me(@Req() req: AuthedRequest): Promise<MeResponse> {
     const claims = req.auth;
     if (!claims) throw new Error("auth context missing (guard should have set it)");
-    const user = await this.users.ensureUser(claims);
-    return this.build(user, claims.emailVerified);
+    // The user-mirror upsert and the membership read are independent — the membership function is
+    // keyed by the auth uid (= the mirrored user's id), not by anything ensureUser returns — so run
+    // them concurrently. This is the landing call after login and on every shell mount; collapsing
+    // its 2 sequential round-trips into 1 wave is the biggest per-navigation server win here.
+    const [user, orgs] = await Promise.all([
+      this.users.ensureUser(claims),
+      this.memberships.listForUser(claims.userId),
+    ]);
+    return this.render(user, orgs, claims.emailVerified);
   }
 
   /** Update the signed-in user's own profile (currently just their display name). */
@@ -79,12 +86,20 @@ export class MeController {
     const profilePatch: { name?: string; avatarUrl?: string } = {};
     if (patch.name !== undefined) profilePatch.name = patch.name;
     if (avatarUrl !== undefined) profilePatch.avatarUrl = avatarUrl;
-    const user = await this.users.updateProfile(claims.userId, profilePatch);
-    return this.build(user, claims.emailVerified);
+    // The profile write and the membership read are independent — updating the user's name/avatar
+    // doesn't touch memberships — so run them concurrently.
+    const [user, orgs] = await Promise.all([
+      this.users.updateProfile(claims.userId, profilePatch),
+      this.memberships.listForUser(claims.userId),
+    ]);
+    return this.render(user, orgs, claims.emailVerified);
   }
 
-  private async build(user: MirroredUser, emailVerified: boolean): Promise<MeResponse> {
-    const orgs = await this.memberships.listForUser(user.id);
+  private render(
+    user: MirroredUser,
+    orgs: Awaited<ReturnType<MembershipService["listForUser"]>>,
+    emailVerified: boolean,
+  ): MeResponse {
     return {
       id: user.id,
       email: user.email,

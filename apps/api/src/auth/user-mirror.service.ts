@@ -25,34 +25,39 @@ export class UserMirrorService {
   ) {}
 
   async ensureUser(claims: AuthClaims): Promise<MirroredUser> {
-    const { rows } = await this.db.query<{
-      id: string;
-      email: string;
-      name: string | null;
-      avatar_url: string | null;
-      inserted: boolean;
-    }>(
-      `INSERT INTO users (id, email, name, avatar_url)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (id) DO UPDATE
-         SET email = EXCLUDED.email,
-             -- Keep the stored name (which the user may have edited); only seed from the
-             -- provider when we don't have one yet. Avatar stays fresh from the provider.
-             -- Keep whatever the user has (name and avatar may both be user-chosen); only seed
-             -- from the provider the first time, so a picked name/avatar survives re-login.
-             name = COALESCE(users.name, EXCLUDED.name),
-             avatar_url = COALESCE(users.avatar_url, EXCLUDED.avatar_url)
-       -- xmax = 0 ⇒ this was a fresh INSERT (not a conflict-update) = the user's FIRST login.
-       RETURNING id, email, name, avatar_url, (xmax = 0) AS inserted`,
-      [claims.userId, claims.email, claims.name, claims.avatarUrl],
-    );
-    await this.db.query(
-      `INSERT INTO auth_identities (user_id, provider, provider_subject, email_domain)
-       VALUES ($1, 'google', $2, $3)
-       ON CONFLICT (provider, provider_subject) DO UPDATE
-         SET email_domain = EXCLUDED.email_domain`,
-      [claims.userId, claims.googleSubject, claims.emailDomain],
-    );
+    // The users-mirror upsert and the auth_identities upsert are independent (both keyed only by
+    // claims), so run them on two pooled connections concurrently instead of back-to-back — this is
+    // the post-login /me hot path, so shaving a round-trip here is felt on every navigation.
+    const [{ rows }] = await Promise.all([
+      this.db.query<{
+        id: string;
+        email: string;
+        name: string | null;
+        avatar_url: string | null;
+        inserted: boolean;
+      }>(
+        `INSERT INTO users (id, email, name, avatar_url)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (id) DO UPDATE
+           SET email = EXCLUDED.email,
+               -- Keep the stored name (which the user may have edited); only seed from the
+               -- provider when we don't have one yet. Avatar stays fresh from the provider.
+               -- Keep whatever the user has (name and avatar may both be user-chosen); only seed
+               -- from the provider the first time, so a picked name/avatar survives re-login.
+               name = COALESCE(users.name, EXCLUDED.name),
+               avatar_url = COALESCE(users.avatar_url, EXCLUDED.avatar_url)
+         -- xmax = 0 ⇒ this was a fresh INSERT (not a conflict-update) = the user's FIRST login.
+         RETURNING id, email, name, avatar_url, (xmax = 0) AS inserted`,
+        [claims.userId, claims.email, claims.name, claims.avatarUrl],
+      ),
+      this.db.query(
+        `INSERT INTO auth_identities (user_id, provider, provider_subject, email_domain)
+         VALUES ($1, 'google', $2, $3)
+         ON CONFLICT (provider, provider_subject) DO UPDATE
+           SET email_domain = EXCLUDED.email_domain`,
+        [claims.userId, claims.googleSubject, claims.emailDomain],
+      ),
+    ]);
 
     const row = rows[0];
     if (!row) throw new Error("user upsert returned no row");

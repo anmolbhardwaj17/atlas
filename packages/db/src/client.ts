@@ -23,6 +23,12 @@ export function createPool(connectionString: string): Pool {
     keepAlive: true, // fewer idle drops by the pooler
     connectionTimeoutMillis: 10_000,
     idleTimeoutMillis: 30_000,
+    // Atlas deliberately fans a request's independent reads across several org-scoped
+    // connections (separate scopes run in parallel; a single connection serialises queries).
+    // A dashboard `summary()` opens 4 at once and `findingDetail()` up to ~7, before you count
+    // concurrent requests — pg's default max of 10 would queue those and erase the parallelism.
+    // Sits comfortably under Supabase's session-pooler per-client limit.
+    max: 16,
   });
   pool.on("error", (err) => {
     // eslint-disable-next-line no-console

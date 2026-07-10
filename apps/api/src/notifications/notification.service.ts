@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
+import type { PoolClient } from "pg";
 import { withOrgScope, type Db } from "@atlas/db";
 import type { Env } from "@atlas/config";
 import { PG_POOL, ENV } from "../core/tokens";
@@ -120,15 +121,18 @@ export class NotificationService {
     orgId: string,
     limit = 30,
   ): Promise<{ items: NotificationItem[]; unread: number }> {
-    await this.syncFeed(orgId);
+    // The bell loads on every page, so this was the app's most-repeated 2-scope call: syncFeed
+    // opened a transaction to materialise rows, then a *second* transaction read them back. Fold
+    // both into ONE scope (one BEGIN/COMMIT) — the INSERT runs first, so the read still sees the
+    // fresh rows — and pull the unread count into the items query via an uncorrelated scalar
+    // subquery (evaluated once by Postgres), so it's one round-trip instead of two.
     return withOrgScope(this.db, orgId, async (c) => {
-      const { rows } = await c.query<NotificationRow>(
-        `SELECT id, kind, severity, title, body, href, node_kind, read_at, created_at
+      await this.syncFeedTx(c);
+      const { rows } = await c.query<NotificationRow & { unread: number }>(
+        `SELECT id, kind, severity, title, body, href, node_kind, read_at, created_at,
+                (SELECT count(*)::int FROM notifications WHERE read_at IS NULL) AS unread
            FROM notifications ORDER BY created_at DESC LIMIT $1`,
         [limit],
-      );
-      const { rows: cnt } = await c.query<{ n: number }>(
-        `SELECT count(*)::int AS n FROM notifications WHERE read_at IS NULL`,
       );
       return {
         items: rows.map((r) => ({
@@ -142,7 +146,8 @@ export class NotificationService {
           readAt: r.read_at ? r.read_at.toISOString() : null,
           createdAt: r.created_at.toISOString(),
         })),
-        unread: cnt[0]?.n ?? 0,
+        // No rows ⇒ nothing to be unread; the scalar subquery only rides along on returned rows.
+        unread: rows[0]?.unread ?? 0,
       };
     });
   }
@@ -165,34 +170,38 @@ export class NotificationService {
    * Health transitions are the "something happened" signal worth surfacing in the bell.
    */
   private async syncFeed(orgId: string): Promise<void> {
-    await withOrgScope(this.db, orgId, (c) =>
-      c.query(
-        `INSERT INTO notifications
-                (org_id, kind, severity, title, body, href, node_kind, dedupe_key, created_at)
-         SELECT e.org_id,
-                'health',
+    await withOrgScope(this.db, orgId, (c) => this.syncFeedTx(c));
+  }
+
+  /** The idempotent materialise INSERT, run on a caller-supplied scoped client so it can share the
+   *  read's transaction (listFeed) instead of opening a second scope. */
+  private async syncFeedTx(c: PoolClient): Promise<void> {
+    await c.query(
+      `INSERT INTO notifications
+              (org_id, kind, severity, title, body, href, node_kind, dedupe_key, created_at)
+       SELECT e.org_id,
+              'health',
+              CASE e.evidence->>'to'
+                WHEN 'healthy'   THEN 'success'
+                WHEN 'unhealthy' THEN 'danger'
+                ELSE 'warning'
+              END,
+              COALESCE(n.name, e.node_id::text) ||
                 CASE e.evidence->>'to'
-                  WHEN 'healthy'   THEN 'success'
-                  WHEN 'unhealthy' THEN 'danger'
-                  ELSE 'warning'
+                  WHEN 'healthy'   THEN ' recovered'
+                  WHEN 'unhealthy' THEN ' went down'
+                  ELSE ' is degraded'
                 END,
-                COALESCE(n.name, e.node_id::text) ||
-                  CASE e.evidence->>'to'
-                    WHEN 'healthy'   THEN ' recovered'
-                    WHEN 'unhealthy' THEN ' went down'
-                    ELSE ' is degraded'
-                  END,
-                e.title,
-                '/map',
-                n.kind,
-                'health:' || e.id,
-                e.occurred_at
-           FROM node_events e
-           JOIN nodes n ON n.id = e.node_id
-          WHERE e.kind = 'health_transition'
-            AND e.occurred_at > now() - interval '30 days'
-         ON CONFLICT (org_id, dedupe_key) DO NOTHING`,
-      ),
+              e.title,
+              '/map',
+              n.kind,
+              'health:' || e.id,
+              e.occurred_at
+         FROM node_events e
+         JOIN nodes n ON n.id = e.node_id
+        WHERE e.kind = 'health_transition'
+          AND e.occurred_at > now() - interval '30 days'
+       ON CONFLICT (org_id, dedupe_key) DO NOTHING`,
     );
   }
 

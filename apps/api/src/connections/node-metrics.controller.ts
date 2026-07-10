@@ -55,32 +55,55 @@ export class NodeMetricsController {
   ): Promise<{ supported: boolean; series: MetricSeries[] }> {
     const orgId = org(req).id;
     const found = await withOrgScope(this.db, orgId, async (c) => {
+      // Node + its provider's live connection in ONE round-trip (was two sequential queries where
+      // the second only depended on the node's `provider`). A LATERAL join picks the oldest usable
+      // connection for that provider; the node still 404s if absent (no row ⇒ null below).
       const { rows } = await c.query<{
         kind: string;
         region: string | null;
         attributes: Record<string, unknown>;
         provider: string;
+        conn_id: string | null;
+        conn_org_id: string | null;
+        conn_provider: string | null;
+        conn_display_name: string | null;
+        conn_config: Record<string, unknown> | null;
+        conn_secret_ref: string | null;
       }>(
-        `SELECT kind, region, attributes, provider FROM nodes
-          WHERE id = $1 AND deleted_at IS NULL`,
+        `SELECT n.kind, n.region, n.attributes, n.provider,
+                cn.id AS conn_id, cn.org_id AS conn_org_id, cn.provider AS conn_provider,
+                cn.display_name AS conn_display_name, cn.config AS conn_config,
+                cn.secret_ref AS conn_secret_ref
+           FROM nodes n
+           LEFT JOIN LATERAL (
+             SELECT id, org_id, provider, display_name, config, secret_ref
+               FROM connections
+              WHERE provider = n.provider AND deleted_at IS NULL
+                AND status IN ('connected', 'degraded') AND secret_ref IS NOT NULL
+              ORDER BY created_at LIMIT 1
+           ) cn ON true
+          WHERE n.id = $1 AND n.deleted_at IS NULL`,
         [id],
       );
-      if (!rows[0]) return null;
-      const conn = await c.query<{
-        id: string;
-        org_id: string;
-        provider: string;
-        display_name: string;
-        config: Record<string, unknown>;
-        secret_ref: string | null;
-      }>(
-        `SELECT id, org_id, provider, display_name, config, secret_ref FROM connections
-          WHERE provider = $1 AND deleted_at IS NULL
-            AND status IN ('connected', 'degraded') AND secret_ref IS NOT NULL
-          ORDER BY created_at LIMIT 1`,
-        [rows[0].provider],
-      );
-      return { node: rows[0], conn: conn.rows[0] ?? null };
+      const r = rows[0];
+      if (!r) return null;
+      const node = {
+        kind: r.kind,
+        region: r.region,
+        attributes: r.attributes,
+        provider: r.provider,
+      };
+      const conn = r.conn_id
+        ? {
+            id: r.conn_id,
+            org_id: r.conn_org_id as string,
+            provider: r.conn_provider as string,
+            display_name: r.conn_display_name as string,
+            config: r.conn_config as Record<string, unknown>,
+            secret_ref: r.conn_secret_ref,
+          }
+        : null;
+      return { node, conn };
     });
     if (!found) throw new ApiException(404, "not_found", "No such resource.");
 
