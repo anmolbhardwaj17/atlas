@@ -17,6 +17,7 @@ import {
   ArrowRight,
   type LucideIcon,
 } from "lucide-react";
+import { AtlasLogo } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import { PROVIDERS, ProviderLogo } from "@/components/integrations/providers";
 import { seedDemo } from "@/lib/browser-api";
@@ -84,12 +85,13 @@ export function Onboarding({ orgId, canSeed }: { orgId: string; canSeed: boolean
   return (
     <div className="relative isolate -m-4 overflow-hidden px-4 py-10 md:-m-6 md:px-6 md:py-14">
       <GraphBackdrop />
-      {/* TODO: the big liquid-metal-shader Atlas mark goes here — top-right, bleeding a little off
-          the edge. The layout is left-aligned to leave it room. */}
 
-      <div className="max-w-4xl space-y-12 duration-700 animate-in fade-in slide-in-from-bottom-2">
-        {/* ── Hero (left-aligned) ── */}
-        <header className="space-y-5">
+      <div className="mx-auto max-w-4xl space-y-12 duration-700 animate-in fade-in slide-in-from-bottom-2">
+        {/* ── Hero ── */}
+        <header className="space-y-5 text-center">
+          <div className="mx-auto grid size-14 place-items-center rounded-2xl border border-border bg-background shadow-sm">
+            <AtlasLogo size={30} spin className="size-[30px] dark:invert" />
+          </div>
           <div className="space-y-3">
             <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
               Welcome to Atlas
@@ -97,13 +99,13 @@ export function Onboarding({ orgId, canSeed }: { orgId: string; canSeed: boolean
             <h1 className="text-pretty text-3xl font-semibold tracking-tight md:text-4xl">
               Build your knowledge graph
             </h1>
-            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground md:text-base">
+            <p className="mx-auto max-w-2xl text-balance text-sm leading-relaxed text-muted-foreground md:text-base">
               Atlas turns your cloud and code into one live, cited graph — map it, surface the
               risks, ask it anything, and get alerted the moment something breaks. Start exploring
               in one click, or connect a real source.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1">
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-1">
             {TRUST.map((t) => (
               <span
                 key={t.label}
