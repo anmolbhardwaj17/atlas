@@ -138,6 +138,14 @@ export class FetchBitbucketClient implements BitbucketClient {
       );
       for (const item of res.data.values ?? []) yield item;
       next = res.data.next;
+      // The body's `next` is a server-supplied absolute URL. Bitbucket keeps pagination on the same
+      // host we authenticated to; refuse to follow it off-origin so the auth token can't be sent to a
+      // different host (L8 defence-in-depth — token-egress guard against a tampered response).
+      if (next && new URL(next).origin !== new URL(this.baseUrl).origin) {
+        throw new Error(
+          `Bitbucket pagination tried to leave ${new URL(this.baseUrl).origin}; refused.`,
+        );
+      }
     }
   }
 

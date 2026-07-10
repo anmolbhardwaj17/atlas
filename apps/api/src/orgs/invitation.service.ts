@@ -34,10 +34,12 @@ interface InviteRow {
 }
 
 /**
- * Invitations (docs/12 §6.2, docs/08 §7). The raw token is single-use and only its
- * SHA-256 hash is stored; the token is NEVER returned by the API (BR-INV-1, docs/13)
- * - it is delivered out of band (email). Accept is capability-based: the bearer of
- * the token, signed in as the invited email, atomically gains an active membership.
+ * Invitations (docs/12 §6.2, docs/08 §7). The raw token is single-use and only its SHA-256 hash is
+ * stored. It is delivered out of band (email), and additionally returned ONCE in the `create`
+ * response — to the creating Admin only — as a copyable accept link, so an invite still works when
+ * email delivery is unavailable (BR-INV-1, docs/13: "returned once, to the creator; never surfaced
+ * to anyone else, never re-fetchable"). Accept is capability-based: the bearer of the token, signed
+ * in as the invited email, atomically gains an active membership.
  */
 @Injectable()
 export class InvitationService {
@@ -156,13 +158,22 @@ export class InvitationService {
 
     await this.users.ensureUser(claims); // FK target for the membership
     return withOrgScope(this.db, invite.org_id, async (c) => {
+      // Atomically CLAIM the invite first (L3): the `status = 'pending'` guard means only one accept
+      // can ever flip it, so single-use rests on the DB, not on app ordering. The status check above
+      // is off-transaction (best-effort UX); this is the real gate — 0 rows ⇒ already consumed/raced.
+      const claim = await c.query(
+        `UPDATE invitations SET status = 'accepted' WHERE id = $1 AND status = 'pending'`,
+        [invite.id],
+      );
+      if (!claim.rowCount) {
+        throw ApiException.invalidState("This invitation has already been used.");
+      }
       await c.query(
         `INSERT INTO memberships (org_id, user_id, role, status)
          VALUES ($1, $2, $3, 'active')
          ON CONFLICT (org_id, user_id) DO UPDATE SET status = 'active'`,
         [invite.org_id, claims.userId, invite.role],
       );
-      await c.query(`UPDATE invitations SET status = 'accepted' WHERE id = $1`, [invite.id]);
       const { rows: orgRows } = await c.query<{
         id: string;
         slug: string;

@@ -176,7 +176,7 @@ stateDiagram-v2
     pending --> revoked: Admin revokes
     accepted --> [*]
 ```
-- Invite by email + role (Admin/Member — never Owner via invite). A **single-use, expiring, hashed token** (`04` `invitations.token_hash`, BR-INV-1) is emailed; the **token is never returned by the API** (`08` §7, `13`).
+- Invite by email + role (Admin/Member — never Owner via invite). A **single-use, expiring, hashed token** (`04` `invitations.token_hash`, BR-INV-1) is emailed; the **token is returned once, in the `create` response, to the creating Admin only** — a copyable accept link so the invite works even when email delivery is down. It is never surfaced to anyone else and never re-fetchable (`08` §7, `13`).
 - Accept: invitee authenticates with Google; if the invited email matches their verified Google email, accepting **atomically creates the User (if new) + Membership** (BR-INV-2). Mismatch → must accept with the invited address.
 - Only Admin+ invite (FR-7.3); enforced by guard.
 

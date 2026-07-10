@@ -86,6 +86,15 @@ export class FetchGithubClient implements GithubClient {
         : (res.data as T[]);
       for (const item of items ?? []) yield item;
       url = nextLink(res.headers.get("link"));
+      // The `Link: rel="next"` URL is server-supplied. GitHub keeps pagination on the same host we
+      // authenticated to; refuse to follow it off-origin so the auth token can never be sent to a
+      // different host (L8 defence-in-depth — closes an SSRF/token-egress path if a response is
+      // tampered with).
+      if (url && new URL(url).origin !== new URL(this.baseUrl).origin) {
+        throw new Error(
+          `GitHub pagination tried to leave ${new URL(this.baseUrl).origin}; refused.`,
+        );
+      }
     }
   }
 

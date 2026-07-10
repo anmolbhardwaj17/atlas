@@ -204,8 +204,10 @@ GET /api/v1/nodes?kind=aws.lambda.function&region=us-east-1&status=active
 { "email": "eng@acme.com", "role": "Member" }
 // 201 Response
 { "data": { "id":"inv_1a...","email":"eng@acme.com","role":"Member",
-            "status":"pending","expiresAt":"2026-07-07T00:00:00Z" } }
-// note: token is emailed, NEVER returned in the API response (13, BR-INV-1)
+            "status":"pending","expiresAt":"2026-07-07T00:00:00Z",
+            "acceptUrl":"https://app/invite/<token>" } }
+// note: token is emailed AND returned once here (acceptUrl) to the creating Admin only — a copyable
+// fallback link when email is unavailable. Never surfaced to anyone else, never re-fetchable (13, BR-INV-1)
 ```
 
 ---
