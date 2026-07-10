@@ -1,7 +1,6 @@
 import { SiftMark } from "@/components/sift-mark";
 import { AtlasLogo } from "@/components/brand";
 import { SetBreadcrumbs } from "@/components/breadcrumb-context";
-import { Button } from "@/components/ui/button";
 
 /**
  * Sift — AI code review under the Atlas umbrella. Onboarding isn't wired yet, so the page is a
@@ -24,17 +23,16 @@ export default function SiftPage() {
         Sift and Atlas — better together
       </h1>
 
-      <p className="mt-4 text-sm leading-relaxed text-muted-foreground text-pretty">
-        Atlas maps your infrastructure, code, and deployments into one continuously-updated graph.
-        Sift adds a review of every change flowing through it. Connected, they close the loop that
-        matters most: when an alarm fires, Atlas can walk from the failing service → the deploy that
-        shipped it → the pull request → and the exact issues Sift flagged on it — a cited path from
-        symptom to cause, not a guess.
+      <p className="mt-4 text-[15px] leading-relaxed text-muted-foreground text-pretty">
+        Sift reviews every pull request; Atlas maps where that code runs. Together, a production
+        incident traces straight back to the change that caused it — and the exact issues Sift
+        flagged on it.
       </p>
 
-      <Button disabled className="mt-8">
+      <div className="mt-8 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <span aria-hidden className="size-1.5 rounded-full bg-muted-foreground/60" />
         Coming soon
-      </Button>
+      </div>
     </div>
   );
 }
