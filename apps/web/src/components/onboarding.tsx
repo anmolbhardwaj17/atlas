@@ -110,10 +110,10 @@ export function Onboarding({ orgId, canSeed }: { orgId: string; canSeed: boolean
     <div className="relative isolate -m-4 overflow-hidden px-4 py-10 md:-m-6 md:px-6 md:py-14">
       <GraphBackdrop />
 
-      <div className="mx-auto max-w-4xl space-y-12 duration-700 animate-in fade-in slide-in-from-bottom-2">
-        {/* ── Hero ── */}
-        <header className="space-y-5 text-center">
-          <div className="mx-auto w-fit">
+      <div className="max-w-4xl space-y-12 duration-700 animate-in fade-in slide-in-from-bottom-2">
+        {/* ── Hero (left-aligned; the right stays open for breathing room) ── */}
+        <header className="space-y-5">
+          <div className="w-fit">
             <LiquidAtlasMark size={112} />
           </div>
           <div className="space-y-3">
@@ -123,13 +123,13 @@ export function Onboarding({ orgId, canSeed }: { orgId: string; canSeed: boolean
             <h1 className="text-pretty text-3xl font-semibold tracking-tight md:text-4xl">
               Build your knowledge graph
             </h1>
-            <p className="mx-auto max-w-2xl text-balance text-sm leading-relaxed text-muted-foreground md:text-base">
+            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground md:text-base">
               Atlas turns your cloud and code into one live, cited graph — map it, surface the
               risks, ask it anything, and get alerted the moment something breaks. Start exploring
               in one click, or connect a real source.
             </p>
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-1">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1">
             {TRUST.map((t) => (
               <span
                 key={t.label}
@@ -158,14 +158,7 @@ export function Onboarding({ orgId, canSeed }: { orgId: string; canSeed: boolean
                   )}
                 </div>
                 <div className="p-4">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={cn("grid size-6 shrink-0 place-items-center rounded-md", c.tint)}
-                    >
-                      <c.icon className="size-3.5" />
-                    </span>
-                    <p className="text-sm font-medium">{c.title}</p>
-                  </div>
+                  <p className="text-sm font-medium">{c.title}</p>
                   <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{c.body}</p>
                 </div>
               </div>

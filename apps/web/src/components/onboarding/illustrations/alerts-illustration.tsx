@@ -10,7 +10,7 @@ import { CloudIcon } from "@/components/cloud-icon";
  */
 export function AlertsIllustration() {
   return (
-    <div className="absolute inset-0 p-3">
+    <div className="absolute inset-0 p-4">
       <div className="flex size-full flex-col justify-center gap-2">
         {/* The alert as it lands in Slack. */}
         <div className="illo-float rounded-xl border border-border bg-background p-2.5 shadow-md">

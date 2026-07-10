@@ -42,32 +42,30 @@ function ScoreRing({ value }: { value: number }) {
 
 export function InsightsIllustration() {
   return (
-    <div className="absolute inset-0 p-3">
-      <div className="flex size-full flex-col overflow-hidden rounded-xl border border-border bg-background/80 shadow-sm">
-        <div className="flex items-center justify-between px-3 pt-2">
-          <span className="text-[10px] font-medium text-muted-foreground">
-            Insights &amp; posture
-          </span>
-          <ScoreRing value={82} />
-        </div>
-        <div className="flex flex-col gap-1.5 px-2.5 pb-2.5">
-          {ROWS.map((r, i) => (
-            <div
-              key={i}
-              className={cn(
-                "flex items-center gap-2 rounded-md px-2 py-1.5",
-                r.hot ? "bg-amber-500/10" : "bg-muted/40",
-              )}
-            >
-              <span className={cn("size-2 shrink-0 rounded-full", r.sev, r.hot && "illo-pulse")} />
-              <span className="shrink-0 rounded bg-background px-1.5 py-0.5 text-[8px] font-medium text-muted-foreground ring-1 ring-border">
-                {r.cat}
-              </span>
-              <span className={cn("h-1.5 rounded-full bg-muted-foreground/25", r.barW)} />
-              {r.hot ? <Sparkles className="ml-auto size-3 shrink-0 text-amber-500" /> : null}
-            </div>
-          ))}
-        </div>
+    <div className="absolute inset-0 flex flex-col justify-center gap-2 p-4">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-medium text-muted-foreground">
+          Insights &amp; posture
+        </span>
+        <ScoreRing value={82} />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {ROWS.map((r, i) => (
+          <div
+            key={i}
+            className={cn(
+              "flex items-center gap-2 rounded-md px-2 py-1.5",
+              r.hot ? "bg-amber-500/10" : "bg-muted/50",
+            )}
+          >
+            <span className={cn("size-2 shrink-0 rounded-full", r.sev, r.hot && "illo-pulse")} />
+            <span className="shrink-0 rounded bg-background px-1.5 py-0.5 text-[8px] font-medium text-muted-foreground ring-1 ring-border">
+              {r.cat}
+            </span>
+            <span className={cn("h-1.5 rounded-full bg-muted-foreground/25", r.barW)} />
+            {r.hot ? <Sparkles className="ml-auto size-3 shrink-0 text-amber-500" /> : null}
+          </div>
+        ))}
       </div>
     </div>
   );
