@@ -37,7 +37,10 @@ export function AppShell({
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      {/* min-w-0: this is a flex item; without it, a page with intrinsically-wide content (e.g. the
+          onboarding carousel's marquee row) forces <main> to grow to its content width and spills a
+          page-wide horizontal scroll. min-w-0 lets it shrink so children's overflow-hidden clips. */}
+      <SidebarInset className="min-w-0">
         <BreadcrumbProvider>
           <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
             <SidebarTrigger className="-ml-1" />
