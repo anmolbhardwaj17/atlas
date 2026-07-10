@@ -27,6 +27,36 @@ export interface LayoutResult {
   edges: Edge[];
 }
 
+/**
+ * The containment tree used for drill-down collapse — but ONLY over pure containment leaves. A
+ * child that also participates in the FLOW (any non-containment edge: a repo DEPLOYS_TO it, it USES
+ * a task-def, it CONNECTS_TO a datastore) is a first-class map node and is deliberately NOT listed
+ * as collapsible: folding the container that merely CONTAINS it must never hide it, or its
+ * cross-links vanish and its partners drop to the shelf. This is what stranded ECS — an ECS cluster
+ * CONTAINS its services, so default-collapse hid them, yet repos DEPLOY_TO those services and
+ * task-defs are USED by them; hiding the service severed every one of those links.
+ */
+export function containmentChildren(
+  edges: ReadonlyArray<Pick<MapEdge, "from" | "to" | "type">>,
+): Map<string, string[]> {
+  const flowParticipant = new Set<string>();
+  for (const e of edges) {
+    if (e.type !== "CONTAINS" && e.type !== "OWNED_BY") {
+      flowParticipant.add(e.from);
+      flowParticipant.add(e.to);
+    }
+  }
+  const children = new Map<string, string[]>();
+  for (const e of edges) {
+    if ((e.type === "CONTAINS" || e.type === "OWNED_BY") && !flowParticipant.has(e.to)) {
+      const arr = children.get(e.from);
+      if (arr) arr.push(e.to);
+      else children.set(e.from, [e.to]);
+    }
+  }
+  return children;
+}
+
 export function buildLayout(
   mapNodes: MapNode[],
   mapEdges: MapEdge[],

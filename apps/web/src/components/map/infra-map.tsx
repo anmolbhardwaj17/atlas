@@ -42,7 +42,7 @@ import {
   Stethoscope,
   X,
 } from "lucide-react";
-import { buildLayout } from "@/lib/map-layout";
+import { buildLayout, containmentChildren } from "@/lib/map-layout";
 import { kindShort, kindIcon, KIND_LOGO } from "@/lib/kind-visual";
 import {
   edgeCrossing,
@@ -168,22 +168,16 @@ export function InfraMap({
     return m;
   }, [data]);
 
-  // Containment hierarchy for drill-down collapse: a node "contains" the nodes it points to
-  // via structural edges (project→repo→pipeline/PR; PR→author). `connectedIds` = nodes with
-  // any canvas edge - so isolated nodes are dropped from the map entirely.
+  // Containment hierarchy for drill-down collapse (pure containment leaves only — flow
+  // participants stay visible; see containmentChildren). `connectedIds` = nodes with any canvas
+  // edge, so isolated nodes are dropped from the map entirely.
   const { childrenOf, connectedIds } = useMemo(() => {
-    const children = new Map<string, string[]>();
     const connected = new Set<string>();
     for (const e of canvasEdges) {
       connected.add(e.from);
       connected.add(e.to);
-      if (e.type === "CONTAINS" || e.type === "OWNED_BY") {
-        const arr = children.get(e.from);
-        if (arr) arr.push(e.to);
-        else children.set(e.from, [e.to]);
-      }
     }
-    return { childrenOf: children, connectedIds: connected };
+    return { childrenOf: containmentChildren(canvasEdges), connectedIds: connected };
   }, [canvasEdges]);
 
   // Default = collapsed to top-level containers. Until the user toggles, the effective set is
