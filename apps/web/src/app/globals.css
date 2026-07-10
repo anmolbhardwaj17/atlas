@@ -233,6 +233,18 @@
   }
 }
 
+/* Sift backdrop — flowing dashes along the infra-map edges (dash cycle = 12 user units). */
+@keyframes sift-dash {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sift-edge {
+    animation: sift-dash 0.9s linear infinite;
+  }
+}
+
 /* React Flow (infrastructure map) — its built-in UI (minimap, controls, edge labels) defaults to
    light; theme it for dark mode so nothing glows white on the dark canvas. */
 .dark .react-flow__minimap {
