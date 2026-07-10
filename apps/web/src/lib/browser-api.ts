@@ -245,6 +245,27 @@ export async function seedDemo(orgId: string): Promise<DemoSeedResult> {
   return body.data;
 }
 
+/**
+ * Clear the sample data from the current org (the inverse of `seedDemo`). Admin-only; only ever
+ * removes the seeded demo connections + their graph server-side. Throws with a human message.
+ */
+export async function clearDemo(orgId: string): Promise<{ connectionsCleared: number }> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/demo`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  const body = (await res.json().catch(() => null)) as {
+    data?: { connectionsCleared: number };
+    error?: { message?: string };
+  } | null;
+  if (!res.ok || !body?.data) {
+    throw new Error(body?.error?.message ?? `Couldn't clear sample data (${res.status}).`);
+  }
+  return body.data;
+}
+
 /** Outcome of the most recent finished sync run (`partial` = some scopes skipped). */
 export interface LastSyncSummary {
   status: "succeeded" | "partial" | "failed" | "cancelled";

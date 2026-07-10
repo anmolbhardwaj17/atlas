@@ -19,17 +19,8 @@ import {
 } from "lucide-react";
 import { AtlasLogo } from "@/components/brand";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CloudIcon } from "@/components/cloud-icon";
-import {
-  AwsSetup,
-  GithubSetup,
-  AzureSetup,
-  GcpSetup,
-  BitbucketSetup,
-} from "@/components/integrations/provider-setup";
 import { seedDemo } from "@/lib/browser-api";
-import { cn } from "@/lib/cn";
 
 /**
  * Onboarding / first-run empty state (P1.2, docs/09 §8). The graph is empty, so this is the org's
@@ -276,41 +267,31 @@ const PROVIDERS: Array<{ value: string; label: string; icon: string }> = [
   { value: "gcp", label: "GCP", icon: "google-cloud" },
 ];
 
+/** A provider picker — each tile jumps to the Integrations page with that provider's guided setup
+ *  already open (`?connect=<id>`). The onboarding no longer shows setup steps inline (there was no
+ *  way to actually *connect* from here), so this is the real "get started" hand-off. */
 function ConnectSource() {
+  const router = useRouter();
   return (
     <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
-      <Tabs defaultValue="aws">
-        <TabsList className="grid h-auto w-full grid-cols-3 gap-1 bg-muted/60 p-1 sm:grid-cols-5">
-          {PROVIDERS.map((p) => (
-            <TabsTrigger key={p.value} value={p.value} className={cn("gap-1.5 py-1.5")}>
-              <CloudIcon name={p.icon} className="size-4" /> {p.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
-        <TabsContent value="aws" className="pt-5">
-          <AwsSetup />
-        </TabsContent>
-        <TabsContent value="github" className="pt-5">
-          <GithubSetup />
-        </TabsContent>
-        <TabsContent value="bitbucket" className="pt-5">
-          <BitbucketSetup />
-        </TabsContent>
-        <TabsContent value="azure" className="pt-5">
-          <AzureSetup />
-        </TabsContent>
-        <TabsContent value="gcp" className="pt-5">
-          <GcpSetup />
-        </TabsContent>
-      </Tabs>
-      <p className="mt-5 flex items-center gap-1.5 text-xs text-muted-foreground">
-        <ArrowRight className="size-3.5" />
-        Live verification needs real credentials. Just evaluating? Load the sample data above — full
-        setup also lives on the <span className="font-medium text-foreground">
-          Integrations
-        </span>{" "}
-        page.
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+        {PROVIDERS.map((p) => (
+          <button
+            key={p.value}
+            type="button"
+            onClick={() => router.push(`/integrations?connect=${p.value}`)}
+            className="group flex items-center gap-2.5 rounded-xl border border-border bg-background px-3 py-3 text-left transition-all hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <CloudIcon name={p.icon} className="size-5 shrink-0" />
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">{p.label}</span>
+            <ArrowRight className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+          </button>
+        ))}
+      </div>
+      <p className="mt-4 text-xs text-muted-foreground">
+        Choose a source — we&apos;ll open its guided setup on the{" "}
+        <span className="font-medium text-foreground">Integrations</span> page. Read-only access,
+        always.
       </p>
     </div>
   );

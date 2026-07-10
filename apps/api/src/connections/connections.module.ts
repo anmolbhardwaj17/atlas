@@ -77,7 +77,8 @@ const connectorRegistryProvider: Provider = {
     SyncSchedulerBootstrap,
     HealthPollerBootstrap,
   ],
-  // Exported so the AI module can resolve per-org BYO-LLM keys through the same broker.
-  exports: [SECRET_BROKER],
+  // SECRET_BROKER: so the AI module can resolve per-org BYO-LLM keys through the same broker.
+  // ConnectionService: so the demo module can reuse disconnect()'s graph purge to clear sample data.
+  exports: [SECRET_BROKER, ConnectionService],
 })
 export class ConnectionsModule {}

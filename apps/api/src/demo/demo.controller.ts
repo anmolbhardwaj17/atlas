@@ -1,4 +1,4 @@
-import { Controller, Post, Req, UseGuards } from "@nestjs/common";
+import { Controller, Delete, Post, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "../auth/auth.guard";
 import { TenantScopeGuard } from "../auth/tenant-scope.guard";
 import { RolesGuard } from "../auth/roles.guard";
@@ -30,6 +30,20 @@ export class DemoController {
       targetType: "org",
       targetId: org(req).id,
       metadata: { nodeCount: result.nodeCount },
+    });
+    return result;
+  }
+
+  /** Clear the sample data (the inverse of seed) — Admin-only, only removes demo connections. */
+  @Delete()
+  @Roles("Admin")
+  async clear(@Req() req: AuthedRequest): Promise<unknown> {
+    const result = await this.demo.clear(org(req).id);
+    await this.audit.fromRequest(req, {
+      action: "demo.clear",
+      targetType: "org",
+      targetId: org(req).id,
+      metadata: { connectionsCleared: result.connectionsCleared },
     });
     return result;
   }

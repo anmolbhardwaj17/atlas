@@ -4,6 +4,7 @@ import type { ConnectorLogger } from "@atlas/connector-sdk";
 import { seedDemoData, DEMO_CONNECTION_NAME, type DemoSeedResult } from "@atlas/ingest";
 import { PG_POOL } from "../core/tokens";
 import { ApiException } from "../common/errors";
+import { ConnectionService } from "../connections/connection.service";
 
 /**
  * Demo data (P1.2, docs/09 §8). Backs the onboarding "Load sample data" button so a new
@@ -20,7 +21,10 @@ import { ApiException } from "../common/errors";
 export class DemoService {
   private readonly logger = new Logger(DemoService.name);
 
-  constructor(@Inject(PG_POOL) private readonly db: Db) {}
+  constructor(
+    @Inject(PG_POOL) private readonly db: Db,
+    private readonly connections: ConnectionService,
+  ) {}
 
   async seed(orgId: string): Promise<DemoSeedResult> {
     // Guard: refuse if a real (non-demo) source is connected - sample data is for empty orgs.
@@ -46,6 +50,29 @@ export class DemoService {
         `${result.observedEdges}+${result.inferredEdges} edges (${result.status}).`,
     );
     return result;
+  }
+
+  /**
+   * Clear the sample data — the counterpart to `seed`, so a user who loaded it can get back to a
+   * clean slate in one click. Only ever touches DEMO connections (the seeded per-provider "… (demo)"
+   * sources, or the legacy single name), so it can never delete a real connected source. Reuses
+   * ConnectionService.disconnect() per demo connection, which purges that source's graph (nodes,
+   * edges, signals, snapshots + orphaned derived nodes) — the exact inverse of the seed.
+   */
+  async clear(orgId: string): Promise<{ connectionsCleared: number }> {
+    const demoIds = await withOrgScope(this.db, orgId, async (c) => {
+      const { rows } = await c.query<{ id: string }>(
+        `SELECT id FROM connections
+          WHERE deleted_at IS NULL AND (display_name = $1 OR display_name LIKE '%(demo)')`,
+        [DEMO_CONNECTION_NAME],
+      );
+      return rows.map((r) => r.id);
+    });
+    for (const id of demoIds) {
+      await this.connections.disconnect(orgId, id);
+    }
+    this.logger.log(`Cleared sample data for org ${orgId}: ${demoIds.length} demo connection(s).`);
+    return { connectionsCleared: demoIds.length };
   }
 
   /** Bridge the connector-SDK logger onto the Nest logger for sync/inference visibility. */

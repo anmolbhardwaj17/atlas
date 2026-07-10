@@ -114,6 +114,20 @@ export function IntegrationsHub({
   const [tab, setTab] = React.useState<(typeof TABS)[number]>("All");
   const [query, setQuery] = React.useState("");
 
+  // Deep-link from onboarding: `/integrations?connect=<providerId>` opens that provider's guided
+  // setup straight away, so "pick AWS on the front door" lands the user in the AWS connect flow.
+  // Read once on mount and strip the param so a refresh/back doesn't reopen the sheet.
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const want = params.get("connect");
+    if (!want) return;
+    const provider = PROVIDERS.find((p) => p.id === want && p.category !== "Alerts");
+    if (provider && canManage) setConnectProvider(provider);
+    params.delete("connect");
+    const qs = params.toString();
+    window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
+  }, [canManage]);
+
   const byProvider = new Map<string, ConnectionSummary[]>();
   for (const c of connections) {
     const arr = byProvider.get(c.provider) ?? [];

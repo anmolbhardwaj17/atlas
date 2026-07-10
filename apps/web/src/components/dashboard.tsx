@@ -26,6 +26,7 @@ import { cn } from "@/lib/cn";
 import { Onboarding } from "@/components/onboarding";
 import { AskLauncher } from "@/components/dashboard/ask-launcher";
 import { RefreshLatest } from "@/components/dashboard/refresh-latest";
+import { SampleDataBanner } from "@/components/dashboard/sample-data-banner";
 import { ContributorsDonut } from "@/components/dashboard/contributors-donut";
 import { FindingsDonut } from "@/components/dashboard/findings-donut";
 import { CountUp } from "@/components/dashboard/count-up";
@@ -131,7 +132,10 @@ export async function Dashboard({
   const inventoryCols = 1 + (hasInfra ? 1 : 0) + (hasCode ? 1 : 0);
 
   // Real (non-demo) connections drive both the connected-source logos and the Sources card.
-  const connections = (connRes.body?.data ?? []).filter((c) => !c.demo);
+  const allConnections = connRes.body?.data ?? [];
+  const connections = allConnections.filter((c) => !c.demo);
+  // The estate is "sample data" when it's backed only by seeded demo connections — offer a way out.
+  const isSampleData = allConnections.some((c) => c.demo) && connections.length === 0;
   const providers = connections.map((c) => c.provider);
   const isStr = (x: string | undefined): x is string => Boolean(x);
   const uniq = (xs: string[]) => [...new Set(xs)];
@@ -140,6 +144,8 @@ export async function Dashboard({
 
   return (
     <div className="space-y-6">
+      {isSampleData && canManage ? <SampleDataBanner orgId={orgId} /> : null}
+
       {/* Hero band — a greeting with personality + the estate pulse, the way in. */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
