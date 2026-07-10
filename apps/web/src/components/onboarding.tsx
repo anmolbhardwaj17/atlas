@@ -21,6 +21,8 @@ import { LiquidAtlasMark } from "@/components/liquid-atlas-mark";
 import { Button } from "@/components/ui/button";
 import { PROVIDERS, ProviderLogo } from "@/components/integrations/providers";
 import { MapIllustration } from "@/components/onboarding/illustrations/map-illustration";
+import { InsightsIllustration } from "@/components/onboarding/illustrations/insights-illustration";
+import { SecurityIllustration } from "@/components/onboarding/illustrations/security-illustration";
 import { seedDemo } from "@/lib/browser-api";
 import { cn } from "@/lib/cn";
 
@@ -62,12 +64,14 @@ const CAPABILITIES: Capability[] = [
     title: "Insights & posture",
     body: "Prioritized findings across the Well-Architected pillars — not a wall of alerts.",
     tint: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    Illustration: InsightsIllustration,
   },
   {
     icon: ShieldCheck,
     title: "Security & vulnerabilities",
     body: "Known CVEs in your dependencies, ranked by real blast radius across repos.",
     tint: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+    Illustration: SecurityIllustration,
   },
   {
     icon: Activity,
