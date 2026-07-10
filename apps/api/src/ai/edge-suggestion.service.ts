@@ -79,7 +79,7 @@ export class EdgeSuggestionService {
         urn: r.urn,
         kind: r.kind,
         name: r.name ?? r.urn.split("/").pop() ?? r.urn,
-        facts: factsFromTags(r.tags),
+        facts: factsFor(r.kind, r.tags, r.attributes),
       }));
       const repos: RepoCandidate[] = repoRows.map((r) => ({
         urn: r.urn,
@@ -141,10 +141,30 @@ export class EdgeSuggestionService {
   }
 }
 
-function factsFromTags(tags: Record<string, unknown>): Record<string, string> {
+/** Build the compact fact bag the model reasons over. Tags live in `attributes.tags` (the top-level
+ *  `tags` column is often empty for AWS nodes), so read there first. For ECS, the task-def family +
+ *  container image are strong repo signals — surface them. Noisy operational tags are dropped. */
+function factsFor(
+  kind: string,
+  tagsCol: Record<string, unknown>,
+  attributes: Record<string, unknown>,
+): Record<string, string> {
+  const attrTags = (attributes?.tags as Record<string, unknown> | undefined) ?? {};
+  const tags = { ...attrTags, ...(tagsCol ?? {}) };
   const out: Record<string, string> = {};
-  for (const [k, v] of Object.entries(tags ?? {})) {
+  for (const [k, v] of Object.entries(tags)) {
+    // Skip operational/patch-management noise that never names code.
+    if (/^(qsconfigname|aws:|patch|backup|schedule)/i.test(k)) continue;
     if (typeof v === "string" && v && Object.keys(out).length < 6) out[k] = v.slice(0, 60);
+  }
+  if (kind === "aws.ecs.service") {
+    const td = attributes?.taskDefinition;
+    if (typeof td === "string") {
+      const fam = /task-definition\/([^:/]+)/.exec(td)?.[1];
+      if (fam) out.taskFamily = fam;
+    }
+    const img = attributes?.image ?? attributes?.containerImage;
+    if (typeof img === "string") out.image = img.slice(0, 80);
   }
   return out;
 }
