@@ -63,8 +63,10 @@ export function WelcomeOverlay({
         style={{ WebkitMaskImage: CENTER_FADE, maskImage: CENTER_FADE }}
       />
 
-      {/* 2) Two organic green blobs orbiting the center as the wrapper rotates - fade in after the
-             blur, and heavily blurred so they read as a soft living light. */}
+      {/* 2) A "living light" that traces the Atlas AI sphere's own gradient — a warm cream-lit
+             highlight on the upper-right, easing through spring-green into a deep teal-green shadow
+             on the lower-left — orbiting as the wrapper rotates. Three heavily-blurred, layered
+             tones (not one flat green) give it the sphere's depth; fades in after the blur. */}
       <div
         aria-hidden
         className={cn(
@@ -72,11 +74,44 @@ export function WelcomeOverlay({
           contentIn ? "opacity-100" : "opacity-0",
         )}
       >
-        <div className="absolute inset-0 m-auto size-[700px] motion-safe:animate-[spin_13s_linear_infinite]">
-          {/* Greens from the Atlas AI logo gradient (its brighter spring-green range). */}
-          <div className="absolute left-1/2 top-1/2 size-[440px] -translate-x-[64%] -translate-y-[58%] rounded-[46%_54%_63%_37%/52%_44%_56%_48%] bg-[#6cc487] blur-[80px]" />
-          <div className="absolute left-1/2 top-1/2 size-[440px] -translate-x-[36%] -translate-y-[42%] rounded-[58%_42%_45%_55%/48%_57%_43%_52%] bg-[#49aa72] blur-[80px]" />
+        {/* Orbiting logo-gradient tones (behind). Translucent (rgba, not solid hex) so they read as
+            coloured LIGHT rather than paint — the middle stays airy instead of a dense green fill. */}
+        <div className="absolute inset-0 m-auto size-[780px] motion-safe:animate-[spin_18s_linear_infinite]">
+          {/* Lit side: warm yellow-cream highlight melting into spring green (the sphere's top-right). */}
+          <div
+            className="absolute left-1/2 top-1/2 size-[440px] -translate-x-[28%] -translate-y-[66%] rounded-[46%_54%_63%_37%/52%_44%_56%_48%] blur-[92px]"
+            style={{
+              background:
+                "radial-gradient(circle at 50% 46%, rgba(245,230,140,0.80) 0%, rgba(150,213,158,0.48) 54%, transparent 100%)",
+            }}
+          />
+          {/* Spring-green mid — the core tone of the mark, held below full opacity. */}
+          <div
+            className="absolute left-1/2 top-1/2 size-[450px] -translate-x-[58%] -translate-y-[40%] rounded-[58%_42%_45%_55%/48%_57%_43%_52%] blur-[92px]"
+            style={{
+              background:
+                "radial-gradient(circle, rgba(79,182,132,0.62) 0%, rgba(79,182,132,0.30) 60%, transparent 100%)",
+            }}
+          />
+          {/* Shadow side: deep teal-green (the sphere's lower-left) — weight, and holds colour on a
+              light background instead of washing out. */}
+          <div
+            className="absolute left-1/2 top-1/2 size-[430px] -translate-x-[72%] -translate-y-[26%] rounded-[52%_48%_57%_43%/55%_49%_51%_45%] blur-[96px]"
+            style={{
+              background: "radial-gradient(circle, rgba(36,138,98,0.55) 0%, transparent 72%)",
+            }}
+          />
         </div>
+        {/* Luminous warm centre (front) — a bright, translucent yellow-cream core so the middle
+            GLOWS and stays see-through instead of a solid green fill, and carries the mark's yellow
+            hint. Kept gentle so the white logo + greeting keep their contrast in both themes. */}
+        <div
+          className="absolute inset-0 m-auto size-[560px] blur-[66px]"
+          style={{
+            background:
+              "radial-gradient(circle at 50% 48%, rgba(255,248,214,0.45) 0%, rgba(226,226,150,0.28) 27%, rgba(126,203,156,0.14) 54%, transparent 78%)",
+          }}
+        />
       </div>
 
       {/* 3) The greeting - fades in with the blob, out with everything else. */}
