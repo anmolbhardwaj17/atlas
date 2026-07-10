@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ImagePlus, Loader2, X, ArrowRight } from "lucide-react";
+import { ImagePlus, Loader2, X, ArrowRight, ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { apiUrl } from "@/lib/env";
 import { fileToLogoDataUrl } from "@/lib/read-image";
@@ -15,10 +15,11 @@ import { cn } from "@/lib/cn";
 
 /**
  * Two-step org onboarding (docs/12 §6.1, §6.3):
- *   1. Name + logo → creates the org (you become Owner) and switches you into it.
- *   2. A few optional questions (role, team size, goals, stack) → saved to the org profile for
- *      personalization + product analytics. Fully skippable. NB: connecting a real source is NOT
- *      here — that lives in the dashboard onboarding, so signup stays light.
+ *   1. Name + logo.
+ *   2. A few optional questions (role, team size, goals, stack) — personalization + analytics.
+ * The org is created at the END (on Finish or Skip), together with the profile, so a workspace is
+ * only ever created once the user commits — never a half-made org stranded after step 1. Connecting
+ * a real source is NOT here; it lives in the dashboard onboarding, so signup stays light.
  */
 
 // Stable keys (not labels) so analytics survives copy changes; must match dto.ts ORG_PROFILE_*.
@@ -62,7 +63,6 @@ const REFERRALS = ["Search", "Colleague", "Social", "Event", "Blog / article", "
 export function CreateOrgForm() {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
-  const [orgId, setOrgId] = useState<string | null>(null);
 
   // Step 1
   const [name, setName] = useState("");
@@ -103,10 +103,23 @@ export function CreateOrgForm() {
     set(list.includes(key) ? list.filter((k) => k !== key) : [...list, key]);
   }
 
-  // Step 1 → create the org, become Owner, switch into it, then advance to the questions.
-  async function createOrg(e: React.FormEvent): Promise<void> {
+  // Step 1 → just advance to the questions. Nothing is created yet.
+  function toQuestions(e: React.FormEvent): void {
     e.preventDefault();
     if (!name.trim()) return;
+    setError(null);
+    setStep(2);
+  }
+
+  // End of the flow → create the org (name + logo), then save the profile unless skipped, then go
+  // to the dashboard. Creation only happens here, so there's no orphaned org from a half-finished
+  // signup. A creation failure (e.g. slug taken) drops back to step 1 with the message.
+  async function submit(skip: boolean): Promise<void> {
+    if (!name.trim()) {
+      setStep(1);
+      setError("Please name your workspace.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -125,224 +138,232 @@ export function CreateOrgForm() {
             ? (body as { error: { message?: string } }).error.message
             : `Request failed (${res.status})`;
         setError(message ?? `Request failed (${res.status})`);
+        setStep(1);
         return;
       }
       const created = (await res.json().catch(() => null)) as { data?: { id?: string } } | null;
       const id = created?.data?.id ?? null;
       if (id) {
-        setOrgId(id);
         document.cookie = `${ACTIVE_ORG_COOKIE}=${id}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
       }
-      setStep(2);
+
+      // Profile is best-effort — a failed save must never trap the user out of their new workspace.
+      if (!skip && id) {
+        const profile: Record<string, unknown> = {};
+        if (role) profile.role = role;
+        if (teamSize) profile.teamSize = teamSize;
+        if (useCases.length) profile.useCases = useCases;
+        if (stack.length) profile.stack = stack;
+        if (industry) profile.industry = industry;
+        if (referral) profile.referralSource = referral;
+        if (Object.keys(profile).length > 0) {
+          try {
+            await fetch(`${apiUrl()}/orgs/${id}/profile`, {
+              method: "PUT",
+              headers: {
+                "content-type": "application/json",
+                Authorization: `Bearer ${await accessToken()}`,
+              },
+              body: JSON.stringify(profile),
+            });
+          } catch {
+            /* swallow — org is created; entering the app matters more than the profile write */
+          }
+        }
+      }
+
+      router.push("/dashboard");
+      router.refresh();
     } catch {
       setError("Something went wrong. Please try again.");
+      setStep(1);
     } finally {
       setBusy(false);
     }
   }
 
-  // Step 2 → save the profile (best-effort — never block entering the app), then go to the dashboard.
-  async function finish(skip: boolean): Promise<void> {
-    setBusy(true);
-    if (!skip && orgId) {
-      const profile: Record<string, unknown> = {};
-      if (role) profile.role = role;
-      if (teamSize) profile.teamSize = teamSize;
-      if (useCases.length) profile.useCases = useCases;
-      if (stack.length) profile.stack = stack;
-      if (industry) profile.industry = industry;
-      if (referral) profile.referralSource = referral;
-      try {
-        await fetch(`${apiUrl()}/orgs/${orgId}/profile`, {
-          method: "PUT",
-          headers: {
-            "content-type": "application/json",
-            Authorization: `Bearer ${await accessToken()}`,
-          },
-          body: JSON.stringify(profile),
-        });
-      } catch {
-        /* best-effort: a failed profile save must not trap the user out of their new workspace */
-      }
-    }
-    router.push("/dashboard");
-    router.refresh();
-  }
-
-  if (step === 1) {
-    return (
-      <div className="w-full">
-        <StepEyebrow n={1} />
-        <h2 className="mt-3 text-2xl font-semibold tracking-tight">Name your workspace</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          This is where your team&apos;s graph lives. You can change it later.
-        </p>
-        <form onSubmit={(e) => void createOrg(e)} className="mt-5 space-y-3">
-          <div className="flex items-center gap-3">
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
-              className="hidden"
-              onChange={(e) => void onPickLogo(e)}
-            />
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              disabled={busy}
-              aria-label="Add a logo"
-              className="grid size-11 shrink-0 place-items-center rounded-lg border border-dashed border-border text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
-            >
-              {logo ? (
-                <OrgLogo name={name} logoUrl={logo} size={44} className="rounded-lg border-solid" />
-              ) : (
-                <ImagePlus className="size-4" />
-              )}
-            </button>
-            {logo ? (
-              <button
-                type="button"
-                onClick={() => setLogo(null)}
-                disabled={busy}
-                className="text-muted-foreground transition-colors hover:text-foreground"
-                aria-label="Remove logo"
-              >
-                <X className="size-4" />
-              </button>
-            ) : null}
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Organization name"
-              disabled={busy}
-              aria-label="Organization name"
-              autoFocus
-            />
-          </div>
-          {error ? <p className="text-sm text-danger">{error}</p> : null}
-          <div className="flex justify-end pt-1">
-            <Button type="submit" disabled={busy || !name.trim()}>
-              {busy ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <>
-                  Continue <ArrowRight className="size-4" />
-                </>
-              )}
-            </Button>
-          </div>
-        </form>
-      </div>
-    );
-  }
-
   return (
     <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
-      <StepEyebrow n={2} />
-      <h2 className="mt-2 text-lg font-semibold">Tell us about your team</h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Optional — it helps us tailor Atlas to how you work. Skip anytime.
-      </p>
+      <StepEyebrow n={step} />
 
-      <div className="mt-6 space-y-6">
-        <Field label="What's your role?">
-          <div className="flex flex-wrap gap-2">
-            {ROLES.map((o) => (
-              <Chip
-                key={o.key}
-                on={role === o.key}
-                onClick={() => setRole(role === o.key ? null : o.key)}
+      {step === 1 ? (
+        <>
+          <h2 className="mt-3 text-2xl font-semibold tracking-tight">Name your workspace</h2>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            This is where your team&apos;s graph lives. You can change it later.
+          </p>
+          <form onSubmit={toQuestions} className="mt-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
+                onChange={(e) => void onPickLogo(e)}
+              />
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                aria-label="Add a logo"
+                className="grid size-11 shrink-0 place-items-center rounded-lg border border-dashed border-border text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
               >
-                {o.label}
-              </Chip>
-            ))}
-          </div>
-        </Field>
+                {logo ? (
+                  <OrgLogo
+                    name={name}
+                    logoUrl={logo}
+                    size={44}
+                    className="rounded-lg border-solid"
+                  />
+                ) : (
+                  <ImagePlus className="size-4" />
+                )}
+              </button>
+              {logo ? (
+                <button
+                  type="button"
+                  onClick={() => setLogo(null)}
+                  className="text-muted-foreground transition-colors hover:text-foreground"
+                  aria-label="Remove logo"
+                >
+                  <X className="size-4" />
+                </button>
+              ) : null}
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Organization name"
+                aria-label="Organization name"
+                autoFocus
+              />
+            </div>
+            {error ? <p className="text-sm text-danger">{error}</p> : null}
+            <div className="flex justify-end pt-1">
+              <Button type="submit" disabled={!name.trim()}>
+                Continue <ArrowRight className="size-4" />
+              </Button>
+            </div>
+          </form>
+        </>
+      ) : (
+        <>
+          <h2 className="mt-3 text-2xl font-semibold tracking-tight">Tell us about your team</h2>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Optional — it helps us tailor Atlas to how you work. Skip anytime.
+          </p>
 
-        <Field label="How big is your engineering team?">
-          <div className="flex flex-wrap gap-2">
-            {TEAM_SIZES.map((o) => (
-              <Chip
-                key={o.key}
-                on={teamSize === o.key}
-                onClick={() => setTeamSize(teamSize === o.key ? null : o.key)}
+          <div className="mt-6 space-y-6">
+            <Field label="What's your role?">
+              <div className="flex flex-wrap gap-2">
+                {ROLES.map((o) => (
+                  <Chip
+                    key={o.key}
+                    on={role === o.key}
+                    onClick={() => setRole(role === o.key ? null : o.key)}
+                  >
+                    {o.label}
+                  </Chip>
+                ))}
+              </div>
+            </Field>
+
+            <Field label="How big is your engineering team?">
+              <div className="flex flex-wrap gap-2">
+                {TEAM_SIZES.map((o) => (
+                  <Chip
+                    key={o.key}
+                    on={teamSize === o.key}
+                    onClick={() => setTeamSize(teamSize === o.key ? null : o.key)}
+                  >
+                    {o.label}
+                  </Chip>
+                ))}
+              </div>
+            </Field>
+
+            <Field label="What do you want to do with Atlas?" hint="Pick any">
+              <div className="flex flex-wrap gap-2">
+                {USE_CASES.map((o) => (
+                  <Chip
+                    key={o.key}
+                    on={useCases.includes(o.key)}
+                    onClick={() => toggle(useCases, setUseCases, o.key)}
+                  >
+                    {o.label}
+                  </Chip>
+                ))}
+              </div>
+            </Field>
+
+            <Field label="What's in your stack?" hint="Pick any">
+              <div className="flex flex-wrap gap-2">
+                {PROVIDERS.map((p) => (
+                  <Chip
+                    key={p.id}
+                    on={stack.includes(p.id)}
+                    onClick={() => toggle(stack, setStack, p.id)}
+                  >
+                    <ProviderLogo provider={p} className="size-4 shrink-0" />
+                    {p.name.replace(/^Amazon Web Services$/, "AWS").replace(/^Microsoft /, "")}
+                  </Chip>
+                ))}
+              </div>
+            </Field>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Industry">
+                <Select
+                  value={industry}
+                  onChange={setIndustry}
+                  placeholder="Select…"
+                  options={INDUSTRIES}
+                />
+              </Field>
+              <Field label="How did you hear about us?">
+                <Select
+                  value={referral}
+                  onChange={setReferral}
+                  placeholder="Select…"
+                  options={REFERRALS}
+                />
+              </Field>
+            </div>
+          </div>
+
+          {error ? <p className="mt-4 text-sm text-danger">{error}</p> : null}
+
+          <div className="mt-8 flex items-center justify-between">
+            <Button type="button" variant="ghost" onClick={() => setStep(1)} disabled={busy}>
+              <ArrowLeft className="size-4" /> Back
+            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => void submit(true)}
+                disabled={busy}
               >
-                {o.label}
-              </Chip>
-            ))}
+                Skip
+              </Button>
+              <Button type="button" onClick={() => void submit(false)} disabled={busy}>
+                {busy ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <>
+                    Create workspace <ArrowRight className="size-4" />
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
-        </Field>
-
-        <Field label="What do you want to do with Atlas?" hint="Pick any">
-          <div className="flex flex-wrap gap-2">
-            {USE_CASES.map((o) => (
-              <Chip
-                key={o.key}
-                on={useCases.includes(o.key)}
-                onClick={() => toggle(useCases, setUseCases, o.key)}
-              >
-                {o.label}
-              </Chip>
-            ))}
-          </div>
-        </Field>
-
-        <Field label="What's in your stack?" hint="Pick any">
-          <div className="flex flex-wrap gap-2">
-            {PROVIDERS.map((p) => (
-              <Chip
-                key={p.id}
-                on={stack.includes(p.id)}
-                onClick={() => toggle(stack, setStack, p.id)}
-              >
-                <ProviderLogo provider={p} className="size-4 shrink-0" />
-                {p.name.replace(/^Amazon Web Services$/, "AWS").replace(/^Microsoft /, "")}
-              </Chip>
-            ))}
-          </div>
-        </Field>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Industry">
-            <Select
-              value={industry}
-              onChange={setIndustry}
-              placeholder="Select…"
-              options={INDUSTRIES}
-            />
-          </Field>
-          <Field label="How did you hear about us?">
-            <Select
-              value={referral}
-              onChange={setReferral}
-              placeholder="Select…"
-              options={REFERRALS}
-            />
-          </Field>
-        </div>
-      </div>
-
-      <div className="mt-8 flex items-center justify-between">
-        <Button type="button" variant="ghost" onClick={() => void finish(true)} disabled={busy}>
-          Skip
-        </Button>
-        <Button type="button" onClick={() => void finish(false)} disabled={busy}>
-          {busy ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <>
-              Finish <ArrowRight className="size-4" />
-            </>
-          )}
-        </Button>
-      </div>
+        </>
+      )}
     </div>
   );
 }
 
 function StepEyebrow({ n }: { n: 1 | 2 }) {
   return (
-    <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+    <div className="flex items-center gap-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
       <span>Step {n} of 2</span>
       <span className="flex gap-1">
         <span className={cn("h-1 w-6 rounded-full", n >= 1 ? "bg-foreground" : "bg-border")} />
