@@ -307,6 +307,13 @@
     transform: scale(1.35);
   }
 }
+/* Infinite horizontal carousel for "What you'll get". The row holds two copies of the cards, so
+   translating by -50% loops seamlessly. Disabled under reduced motion via motion-reduce:animate-none. */
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
 @media (prefers-reduced-motion: no-preference) {
   .illo-float {
     animation: illo-float 4s ease-in-out infinite;

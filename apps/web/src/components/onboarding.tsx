@@ -110,9 +110,9 @@ export function Onboarding({ orgId, canSeed }: { orgId: string; canSeed: boolean
     <div className="relative isolate -m-4 overflow-hidden px-4 py-10 md:-m-6 md:px-6 md:py-14">
       <GraphBackdrop />
 
-      <div className="max-w-4xl space-y-12 duration-700 animate-in fade-in slide-in-from-bottom-2">
+      <div className="space-y-12 duration-700 animate-in fade-in slide-in-from-bottom-2">
         {/* ── Hero (left-aligned; the right stays open for breathing room) ── */}
-        <header className="space-y-5">
+        <header className="max-w-4xl space-y-5">
           <div className="w-fit">
             <LiquidAtlasMark size={112} />
           </div>
@@ -141,33 +141,16 @@ export function Onboarding({ orgId, canSeed }: { orgId: string; canSeed: boolean
           </div>
         </header>
 
-        {/* ── What you'll get ── each card = a bespoke animated illustration + title + blurb ── */}
+        {/* ── What you'll get ── a full-bleed, infinite horizontal carousel of capability cards ── */}
         <section className="space-y-4">
-          <SectionLabel>What you'll get</SectionLabel>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {CAPABILITIES.map((c) => (
-              <div
-                key={c.title}
-                className="group overflow-hidden rounded-2xl border border-border bg-card/40 transition-all hover:border-foreground/20 hover:shadow-sm"
-              >
-                <div className="relative aspect-[2/1] overflow-hidden border-b border-border/60 bg-gradient-to-b from-muted/30 to-transparent">
-                  {c.Illustration ? (
-                    <c.Illustration />
-                  ) : (
-                    <FallbackIllustration icon={c.icon} tint={c.tint} />
-                  )}
-                </div>
-                <div className="p-4">
-                  <p className="text-sm font-medium">{c.title}</p>
-                  <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{c.body}</p>
-                </div>
-              </div>
-            ))}
+          <div className="max-w-4xl">
+            <SectionLabel>What you'll get</SectionLabel>
           </div>
+          <CapabilityMarquee />
         </section>
 
         {/* ── Get started ── real source first (the destination), sample data as the instant try ── */}
-        <section className="space-y-4">
+        <section className="max-w-4xl space-y-4">
           <SectionLabel>Get started</SectionLabel>
           <ConnectSource />
 
@@ -188,6 +171,50 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     <h2 className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
       {children}
     </h2>
+  );
+}
+
+/** One capability card: the illustration in a padded, rounded panel (so it isn't edge-to-edge) plus
+ *  the title + blurb. Fixed width so it tiles cleanly in the carousel. */
+function CapabilityCard({ c }: { c: Capability }) {
+  return (
+    <div className="mr-4 w-[300px] shrink-0 overflow-hidden rounded-2xl border border-border bg-card/40">
+      <div className="p-2.5">
+        <div className="relative aspect-[2/1] overflow-hidden rounded-xl bg-muted/20">
+          {c.Illustration ? (
+            <c.Illustration />
+          ) : (
+            <FallbackIllustration icon={c.icon} tint={c.tint} />
+          )}
+        </div>
+      </div>
+      <div className="px-4 pb-4 pt-1">
+        <p className="text-sm font-medium">{c.title}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{c.body}</p>
+      </div>
+    </div>
+  );
+}
+
+/** The capability cards as a full-bleed, infinitely scrolling carousel. Two copies of the list are
+ *  laid end to end and the row translates by -50%, so it loops seamlessly; it pauses on hover and
+ *  holds still under reduced-motion. Edges fade via a horizontal mask. */
+function CapabilityMarquee() {
+  const items = [...CAPABILITIES, ...CAPABILITIES];
+  return (
+    <div
+      className="group relative overflow-hidden"
+      style={{
+        maskImage: "linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent)",
+        WebkitMaskImage: "linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent)",
+      }}
+    >
+      <div className="flex w-max animate-[marquee_50s_linear_infinite] group-hover:[animation-play-state:paused] motion-reduce:animate-none">
+        {items.map((c, i) => (
+          <CapabilityCard key={`${c.title}-${i}`} c={c} />
+        ))}
+      </div>
+    </div>
   );
 }
 
