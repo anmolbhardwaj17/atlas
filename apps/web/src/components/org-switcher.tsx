@@ -26,10 +26,18 @@ function readCookie(name: string): string | null {
  * bar (top-left, next to the sidebar toggle). Selection is stored in the `atlas_active_org` cookie
  * that `requireShell` reads server-side, so the whole app re-renders scoped to the chosen org.
  */
-export function OrgSwitcher() {
+export function OrgSwitcher({
+  initialOrgs,
+  initialCurrentId,
+}: {
+  /** Memberships from the server render (requireShell) — seed state so we skip the mount /me fetch.
+   *  initialCurrentId is the already-resolved active org (cookie → default → first, server-side). */
+  initialOrgs?: MyOrg[] | undefined;
+  initialCurrentId?: string | null | undefined;
+} = {}) {
   const router = useRouter();
-  const [orgs, setOrgs] = React.useState<MyOrg[]>([]);
-  const [currentId, setCurrentId] = React.useState<string | null>(null);
+  const [orgs, setOrgs] = React.useState<MyOrg[]>(initialOrgs ?? []);
+  const [currentId, setCurrentId] = React.useState<string | null>(initialCurrentId ?? null);
 
   const load = React.useCallback(async () => {
     const { memberships, defaultOrgId } = await getMyOrgs();
@@ -43,12 +51,15 @@ export function OrgSwitcher() {
   }, []);
 
   React.useEffect(() => {
-    void load();
-    // Re-pull when an org's name/logo changes (settings) so the switcher never shows a stale mark.
+    // The server already handed us the memberships (initialOrgs), so we DON'T fetch /me on mount —
+    // that duplicate round-trip was the P2a target. Only re-pull when an org's name/logo actually
+    // changes (settings), where staleness would otherwise show a wrong mark. If we somehow mounted
+    // without server data (defensive), fall back to a one-time load.
+    if (!initialOrgs || initialOrgs.length === 0) void load();
     const onUpdate = () => void load();
     window.addEventListener(ORG_UPDATED_EVENT, onUpdate);
     return () => window.removeEventListener(ORG_UPDATED_EVENT, onUpdate);
-  }, [load]);
+  }, [load, initialOrgs]);
 
   const current = orgs.find((o) => o.orgId === currentId);
   if (!current) return null;

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
 import {
@@ -6,6 +7,7 @@ import {
   type InsightsSummary,
   type Mute,
 } from "@/components/insights/insights-view";
+import InsightsLoading from "./loading";
 
 export const dynamic = "force-dynamic";
 
@@ -17,16 +19,10 @@ interface InsightsData {
   lastSyncedAt: string | null;
 }
 
-/**
- * Insights (Atlas Knowledge Engine) - the ADVISORY / action layer. Server-fetches the live
- * findings + posture summary and hands them to InsightsView for the scannable, filterable UI.
- */
-export default async function InsightsPage() {
-  const shell = await requireShell();
-  const res = await apiGet<ApiOk<InsightsData>>("/insights", {
-    token: shell.token,
-    orgId: shell.orgId,
-  });
+/** The data-bound part: the live `/insights` fetch + the view. Split out so it can stream behind a
+ *  <Suspense> boundary while the shell paints immediately (perf P3). */
+async function InsightsContent({ token, orgId }: { token: string; orgId: string }) {
+  const res = await apiGet<ApiOk<InsightsData>>("/insights", { token, orgId });
   const data = res.body?.data;
   return (
     <InsightsView
@@ -36,5 +32,19 @@ export default async function InsightsPage() {
       mutes={data?.mutes ?? []}
       lastSyncedAt={data?.lastSyncedAt ?? null}
     />
+  );
+}
+
+/**
+ * Insights (Atlas Knowledge Engine) - the ADVISORY / action layer. Server-fetches the live
+ * findings + posture summary and hands them to InsightsView for the scannable, filterable UI.
+ * The heavy `/insights` fetch streams behind <Suspense> so the page commits on auth, not on data.
+ */
+export default async function InsightsPage() {
+  const shell = await requireShell();
+  return (
+    <Suspense fallback={<InsightsLoading />}>
+      <InsightsContent token={shell.token} orgId={shell.orgId} />
+    </Suspense>
   );
 }

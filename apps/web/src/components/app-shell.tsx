@@ -5,6 +5,7 @@ import { CommandTrigger } from "@/components/command-trigger";
 import { NotificationBell } from "@/components/notification-bell";
 import { HeaderUserMenu } from "@/components/header-user-menu";
 import { OrgSwitcher } from "@/components/org-switcher";
+import type { MyOrg } from "@/lib/browser-api";
 import { BreadcrumbProvider } from "@/components/breadcrumb-context";
 import { HeaderBreadcrumbs } from "@/components/header-breadcrumbs";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -21,6 +22,7 @@ export function AppShell({
   title,
   name,
   avatarUrl,
+  orgs,
   children,
 }: {
   email: string;
@@ -28,6 +30,8 @@ export function AppShell({
   title?: string;
   name?: string | null;
   avatarUrl?: string | null;
+  /** The user's memberships from the server render — seeds OrgSwitcher without a client /me fetch. */
+  orgs?: MyOrg[];
   children: ReactNode;
 }) {
   return (
@@ -38,7 +42,7 @@ export function AppShell({
           <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
             <SidebarTrigger className="-ml-1" />
             {/* Org switcher (multi-org) lives top-left, next to the toggle — the standard spot. */}
-            {orgId && <OrgSwitcher />}
+            {orgId && <OrgSwitcher initialOrgs={orgs} initialCurrentId={orgId} />}
             {/* Page breadcrumb (published per-page); falls back to an optional title. It renders its
                 own leading divider when present, so we don't add one here (avoids a double rule). */}
             <HeaderBreadcrumbs />

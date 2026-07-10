@@ -1,27 +1,27 @@
+import { Suspense } from "react";
 import { Waypoints } from "lucide-react";
 import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
-import { InfraMap } from "@/components/map/infra-map";
+import { InfraMapLazy } from "@/components/map/infra-map-lazy";
 import { EmptyState } from "@/components/patterns/empty-state";
 import type { MapData } from "@/lib/map-types";
+import MapLoading from "./loading";
 
 export const dynamic = "force-dynamic";
 
-/**
- * Infrastructure map (docs/09 §5.4). Server-fetches the bounded graph (secrets stay
- * server-side) and hands it to the client canvas. Empty graph → the onboarding CTA.
- */
-export default async function MapPage({
-  searchParams,
+/** The data-bound part: the bounded `/graph` fetch + the empty-state/canvas branch. Split out so the
+ *  heaviest fetch in the app streams behind <Suspense> instead of blocking the RSC flush (perf P3). */
+async function MapContent({
+  token,
+  orgId,
+  focusId,
 }: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+  token: string;
+  orgId: string;
+  focusId?: string;
 }) {
-  const shell = await requireShell();
-  const focusRaw = (await searchParams).node;
-  const focusId = (Array.isArray(focusRaw) ? focusRaw[0] : focusRaw) || undefined;
   const data =
-    (await apiGet<ApiOk<MapData>>("/graph?limit=400", { token: shell.token, orgId: shell.orgId }))
-      .body?.data ?? null;
+    (await apiGet<ApiOk<MapData>>("/graph?limit=400", { token, orgId })).body?.data ?? null;
 
   if (!data || data.nodes.length === 0) {
     return (
@@ -42,5 +42,25 @@ export default async function MapPage({
     );
   }
 
-  return <InfraMap data={data} orgId={shell.orgId} {...(focusId ? { focusId } : {})} />;
+  return <InfraMapLazy data={data} orgId={orgId} {...(focusId ? { focusId } : {})} />;
+}
+
+/**
+ * Infrastructure map (docs/09 §5.4). Server-fetches the bounded graph (secrets stay
+ * server-side) and hands it to the client canvas. Empty graph → the onboarding CTA.
+ */
+export default async function MapPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const shell = await requireShell();
+  const focusRaw = (await searchParams).node;
+  const focusId = (Array.isArray(focusRaw) ? focusRaw[0] : focusRaw) || undefined;
+
+  return (
+    <Suspense fallback={<MapLoading />}>
+      <MapContent token={shell.token} orgId={shell.orgId} {...(focusId ? { focusId } : {})} />
+    </Suspense>
+  );
 }

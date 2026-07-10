@@ -18,9 +18,13 @@ export interface Shell {
   email: string;
   name: string | null;
   avatarUrl: string | null;
+  /** All of the user's memberships + their default — carried through so the client OrgSwitcher can
+   *  hydrate from this render instead of firing its own duplicate `/me` fetch on mount (perf P2a). */
+  memberships: Membership[];
+  defaultOrgId: string | null;
 }
 
-interface Membership {
+export interface Membership {
   orgId: string;
   orgName: string;
   orgSlug: string;
@@ -61,5 +65,7 @@ export const requireShell = cache(async (): Promise<Shell> => {
     email: me.email ?? session.email,
     name: me.name,
     avatarUrl: me.avatarUrl,
+    memberships: me.memberships,
+    defaultOrgId: me.defaultOrgId,
   };
 });
