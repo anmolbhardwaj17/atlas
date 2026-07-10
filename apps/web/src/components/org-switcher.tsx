@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronsUpDown, Plus, Loader2 } from "lucide-react";
+import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import { getMyOrgs, type MyOrg } from "@/lib/browser-api";
 import { ACTIVE_ORG_COOKIE, ORG_UPDATED_EVENT } from "@/lib/active-org";
 import { OrgLogo } from "@/components/org-logo";
@@ -82,12 +82,25 @@ export function OrgSwitcher({
   return (
     <>
       {isSwitching ? (
-        <div className="fixed inset-0 z-[100] grid place-items-center bg-background/70 backdrop-blur-sm">
-          <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-lg">
-            <Loader2 className="size-4 animate-spin text-muted-foreground" />
-            <span className="text-sm font-medium">
-              Switching to <span className="text-foreground">{current.orgName}</span>…
-            </span>
+        <div className="fixed inset-0 z-[100] grid place-items-center bg-background/80 backdrop-blur-sm duration-200 animate-in fade-in">
+          <div className="flex flex-col items-center gap-5">
+            {/* The destination org's logo, centered and large, with a spinning accent ring around it
+                so the switch reads as "loading <this workspace>", not a generic spinner. */}
+            <div className="relative grid size-20 place-items-center">
+              <div className="absolute inset-0 animate-spin rounded-full border-2 border-border border-t-foreground [animation-duration:0.9s]" />
+              <OrgLogo
+                name={current.orgName}
+                logoUrl={current.orgLogoUrl}
+                size={52}
+                className="rounded-xl"
+              />
+            </div>
+            <div className="space-y-1 text-center">
+              <p className="text-sm font-medium">Switching workspace</p>
+              <p className="text-sm text-muted-foreground">
+                Loading <span className="text-foreground">{current.orgName}</span>…
+              </p>
+            </div>
           </div>
         </div>
       ) : null}
@@ -107,7 +120,14 @@ export function OrgSwitcher({
             <ChevronsUpDown className="size-3.5 shrink-0 opacity-50" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-56">
+        <DropdownMenuContent
+          align="start"
+          className="w-56"
+          // Don't return focus to the trigger on close — otherwise closing by clicking outside
+          // restores focus programmatically, which the browser treats as :focus-visible and leaves
+          // a focus ring stuck on the button. Keyboard Tab-focus still shows the ring normally.
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
           <DropdownMenuLabel className="text-xs text-muted-foreground">
             Organizations
           </DropdownMenuLabel>
