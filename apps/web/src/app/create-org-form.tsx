@@ -11,6 +11,13 @@ import { OrgLogo } from "@/components/org-logo";
 import { PROVIDERS, ProviderLogo } from "@/components/integrations/providers";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/cn";
 
 /**
@@ -311,7 +318,7 @@ export function CreateOrgForm() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Industry">
-                <Select
+                <SelectField
                   value={industry}
                   onChange={setIndustry}
                   placeholder="Select…"
@@ -319,7 +326,7 @@ export function CreateOrgForm() {
                 />
               </Field>
               <Field label="How did you hear about us?">
-                <Select
+                <SelectField
                   value={referral}
                   onChange={setReferral}
                   placeholder="Select…"
@@ -419,7 +426,7 @@ function Chip({
   );
 }
 
-function Select({
+function SelectField({
   value,
   onChange,
   options,
@@ -431,17 +438,17 @@ function Select({
   placeholder: string;
 }) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="h-9 w-full rounded-md border border-border bg-background px-2.5 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      <option value="">{placeholder}</option>
-      {options.map((o) => (
-        <option key={o} value={o}>
-          {o}
-        </option>
-      ))}
-    </select>
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className="h-9">
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((o) => (
+          <SelectItem key={o} value={o}>
+            {o}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

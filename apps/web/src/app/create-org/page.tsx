@@ -46,18 +46,16 @@ export default async function CreateOrgPage() {
       ) : null}
 
       {/* Brand — top, centered. */}
-      <div className="relative flex justify-center pt-12">
+      <div className="relative flex justify-center pt-14">
         <div className="flex items-center gap-2.5">
           <AtlasLogo size={30} className="size-[30px] dark:invert" />
           <span className="text-lg font-semibold tracking-tight">Atlas</span>
         </div>
       </div>
 
-      {/* Wizard — vertically centered in the remaining space. */}
-      <div className="relative flex flex-1 items-center justify-center px-6 pb-16">
-        <div className="w-full max-w-lg">
-          <CreateOrgForm />
-        </div>
+      {/* Wizard — wider (fewer chip rows → less scroll), with clear space below the brand. */}
+      <div className="relative mx-auto w-full max-w-2xl px-6 pb-20 pt-14">
+        <CreateOrgForm />
       </div>
     </main>
   );
