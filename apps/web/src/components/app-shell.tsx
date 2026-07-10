@@ -5,6 +5,7 @@ import { CommandTrigger } from "@/components/command-trigger";
 import { NotificationBell } from "@/components/notification-bell";
 import { HeaderUserMenu } from "@/components/header-user-menu";
 import { OrgSwitcher } from "@/components/org-switcher";
+import { WelcomePreviewButton } from "@/components/welcome-preview-button";
 import type { MyOrg } from "@/lib/browser-api";
 import { BreadcrumbProvider } from "@/components/breadcrumb-context";
 import { HeaderBreadcrumbs } from "@/components/header-breadcrumbs";
@@ -56,6 +57,8 @@ export function AppShell({
               </>
             ) : null}
             <div className="ml-auto flex items-center gap-2.5">
+              {/* TEST: replays the first-time WelcomeOverlay glow on click so we can iterate on it. */}
+              <WelcomePreviewButton name={name} />
               {orgId && <CommandTrigger />}
               {orgId && <NotificationBell orgId={orgId} />}
               <HeaderUserMenu email={email} name={name} avatarUrl={avatarUrl} />
