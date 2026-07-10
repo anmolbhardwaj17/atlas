@@ -17,9 +17,8 @@ import {
   ArrowRight,
   type LucideIcon,
 } from "lucide-react";
-import { AtlasLogo } from "@/components/brand";
 import { Button } from "@/components/ui/button";
-import { CloudIcon } from "@/components/cloud-icon";
+import { PROVIDERS, ProviderLogo } from "@/components/integrations/providers";
 import { seedDemo } from "@/lib/browser-api";
 
 /**
@@ -85,13 +84,12 @@ export function Onboarding({ orgId, canSeed }: { orgId: string; canSeed: boolean
   return (
     <div className="relative isolate -m-4 overflow-hidden px-4 py-10 md:-m-6 md:px-6 md:py-14">
       <GraphBackdrop />
+      {/* TODO: the big liquid-metal-shader Atlas mark goes here — top-right, bleeding a little off
+          the edge. The layout is left-aligned to leave it room. */}
 
-      <div className="mx-auto max-w-4xl space-y-12 duration-700 animate-in fade-in slide-in-from-bottom-2">
-        {/* ── Hero ── */}
-        <header className="space-y-5 text-center">
-          <div className="mx-auto grid size-14 place-items-center rounded-2xl border border-border bg-background shadow-sm">
-            <AtlasLogo size={30} spin className="size-[30px] dark:invert" />
-          </div>
+      <div className="max-w-4xl space-y-12 duration-700 animate-in fade-in slide-in-from-bottom-2">
+        {/* ── Hero (left-aligned) ── */}
+        <header className="space-y-5">
           <div className="space-y-3">
             <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
               Welcome to Atlas
@@ -99,13 +97,13 @@ export function Onboarding({ orgId, canSeed }: { orgId: string; canSeed: boolean
             <h1 className="text-pretty text-3xl font-semibold tracking-tight md:text-4xl">
               Build your knowledge graph
             </h1>
-            <p className="mx-auto max-w-2xl text-balance text-sm leading-relaxed text-muted-foreground md:text-base">
+            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground md:text-base">
               Atlas turns your cloud and code into one live, cited graph — map it, surface the
               risks, ask it anything, and get alerted the moment something breaks. Start exploring
               in one click, or connect a real source.
             </p>
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-1">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1">
             {TRUST.map((t) => (
               <span
                 key={t.label}
@@ -259,39 +257,72 @@ function SampleDataCard({ orgId, canSeed }: { orgId: string; canSeed: boolean })
   );
 }
 
-const PROVIDERS: Array<{ value: string; label: string; icon: string }> = [
-  { value: "aws", label: "AWS", icon: "aws" },
-  { value: "github", label: "GitHub", icon: "github-icon" },
-  { value: "bitbucket", label: "Bitbucket", icon: "bitbucket" },
-  { value: "azure", label: "Azure", icon: "microsoft-azure" },
-  { value: "gcp", label: "GCP", icon: "google-cloud" },
-];
+// Sourced from the real integration catalog so this never drifts from what Integrations offers.
+// Short brand labels for the compact tiles (the catalog carries the full legal names).
+const SHORT_LABEL: Record<string, string> = {
+  aws: "AWS",
+  azure: "Azure",
+  gcp: "GCP",
+  github: "GitHub",
+  bitbucket: "Bitbucket",
+  jenkins: "Jenkins",
+};
+/** The sources you can connect right now (available graph sources — not the outbound alert
+ *  channels, which are set up from Integrations/Settings). Everything else (coming-soon +
+ *  observability + alerts) lives behind the "more" tile so the breadth is discoverable. */
+const CONNECTABLE = PROVIDERS.filter((p) => p.status === "available" && p.category !== "Alerts");
+const MORE_COUNT = PROVIDERS.length - CONNECTABLE.length;
+// A few logos to peek on the "more" tile so it reads as "lots more", not just a link.
+const MORE_PREVIEW = ["gitlab", "datadog", "slack"]
+  .map((id) => PROVIDERS.find((p) => p.id === id))
+  .filter((p): p is (typeof PROVIDERS)[number] => Boolean(p));
 
 /** A provider picker — each tile jumps to the Integrations page with that provider's guided setup
- *  already open (`?connect=<id>`). The onboarding no longer shows setup steps inline (there was no
- *  way to actually *connect* from here), so this is the real "get started" hand-off. */
+ *  already open (`?connect=<id>`). A final "more" tile opens the full catalog, so a new user sees
+ *  that Atlas connects far more than the handful shown here. */
 function ConnectSource() {
   const router = useRouter();
   return (
     <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
-        {PROVIDERS.map((p) => (
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+        {CONNECTABLE.map((p) => (
           <button
-            key={p.value}
+            key={p.id}
             type="button"
-            onClick={() => router.push(`/integrations?connect=${p.value}`)}
+            onClick={() => router.push(`/integrations?connect=${p.id}`)}
             className="group flex items-center gap-2.5 rounded-xl border border-border bg-background px-3 py-3 text-left transition-all hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <CloudIcon name={p.icon} className="size-5 shrink-0" />
-            <span className="min-w-0 flex-1 truncate text-sm font-medium">{p.label}</span>
+            <ProviderLogo provider={p} className="size-5 shrink-0" />
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">
+              {SHORT_LABEL[p.id] ?? p.name}
+            </span>
             <ArrowRight className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
           </button>
         ))}
+        {/* Full-catalog tile — dashed to read as "more", with a few logos peeking. */}
+        <button
+          type="button"
+          onClick={() => router.push("/integrations")}
+          className="group flex items-center gap-2.5 rounded-xl border border-dashed border-border bg-background px-3 py-3 text-left transition-all hover:-translate-y-0.5 hover:border-foreground/30 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <span className="flex -space-x-1.5">
+            {MORE_PREVIEW.map((p) => (
+              <span
+                key={p.id}
+                className="grid size-5 place-items-center rounded-full bg-muted ring-2 ring-background"
+              >
+                <ProviderLogo provider={p} className="size-3" />
+              </span>
+            ))}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-sm font-medium">+{MORE_COUNT} more</span>
+          <ArrowRight className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+        </button>
       </div>
       <p className="mt-4 text-xs text-muted-foreground">
-        Choose a source — we&apos;ll open its guided setup on the{" "}
-        <span className="font-medium text-foreground">Integrations</span> page. Read-only access,
-        always.
+        Cloud, code, CI/CD, observability, and alerts — pick one to open its guided setup, or browse
+        the full catalog on <span className="font-medium text-foreground">Integrations</span>.
+        Read-only access, always.
       </p>
     </div>
   );
