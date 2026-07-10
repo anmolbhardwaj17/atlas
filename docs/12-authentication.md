@@ -191,6 +191,12 @@ These answers do double duty: **personalization** (tailor the first "aha" — SR
 
 **Activation funnel** — the flow emits `analytics_events` (`04` §5.7): `org.created` (step 1) → `onboarding.completed` (step 2) → (later) `source.connected` → first cited answer — instrumenting the `<30-min TTFI` north-star (`00` §7.1, `18` §7). Stable keys, not display labels, so analytics survives copy changes. Field allow-lists live in `apps/api/src/orgs/dto.ts` (`ORG_PROFILE_*`).
 
+### 6.4 Deleting an organization *(added 0040)*
+
+`DELETE /orgs/:orgId` — **Owner-only** (the most destructive action in the app; `@Roles("Owner")`). Permanently deletes the org and **all** of its data in one scoped `DELETE FROM organizations`: because every org-scoped table declares `org_id … ON DELETE CASCADE` (`04`), the FK cascade sweeps the entire tenant — the knowledge graph (nodes/edges/provenance/snapshots/signals), connections + their encrypted secrets, findings/notifications/alerts, members/invitations, AI history, the onboarding profile, and analytics. RLS scopes the delete to the active org; the cascade runs with the referenced table's owner rights, so it reaches even the **append-only** tables (`audit_events`/`analytics_events`) whose `UPDATE/DELETE` is revoked from `atlas_app`.
+
+**Irreversible** — the UI requires a **two-step confirmation**: (1) a disclaimer of exactly what is erased, then (2) type-the-org-name to confirm. Because the org's own `audit_events` are cascaded away with it, the deletion is recorded to the **server log** (not the org audit log). The org's logo object in Storage is left orphaned (public, now-unreferenced — harmless). After deletion the client clears the active-org cookie and re-resolves to a remaining org (or `/create-org`).
+
 ---
 
 ## 7. Domain-Based Membership / Auto-Join (PHASE 1 — designed now, built later)

@@ -4,6 +4,7 @@ import { type ReactNode } from "react";
 import { OrgPanel } from "@/app/org-panel";
 import { ProfileCard } from "@/components/settings/profile-card";
 import { OrgCard } from "@/components/settings/org-card";
+import { DangerZoneCard } from "@/components/settings/danger-zone-card";
 import { LlmSettingsCard } from "@/components/settings/llm-settings";
 import type { LlmSettings } from "@/lib/browser-api";
 
@@ -57,6 +58,7 @@ export function SettingsView({
   securitySlot: ReactNode;
 }) {
   const isAdmin = role === "Owner" || role === "Admin";
+  const isOwner = role === "Owner";
 
   return (
     <div className="space-y-6">
@@ -82,6 +84,9 @@ export function SettingsView({
       />
 
       {isAdmin ? securitySlot : null}
+
+      {/* Deleting the org is Owner-only — the most destructive action, kept at the very bottom. */}
+      {isOwner ? <DangerZoneCard orgId={orgId} orgName={orgName} /> : null}
     </div>
   );
 }

@@ -142,6 +142,18 @@ export async function removeMember(orgId: string, userId: string): Promise<void>
   if (!res.ok) throw new Error(await errorMessage(res, `Couldn't remove member (${res.status}).`));
 }
 
+/** Permanently delete an org and all its data (Owner-only). 204 → no body. Irreversible. */
+export async function deleteOrg(orgId: string): Promise<void> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/orgs/${orgId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok)
+    throw new Error(await errorMessage(res, `Couldn't delete the organization (${res.status}).`));
+}
+
 /** Revoke a pending invitation (Admin+). 204 → no body. */
 export async function revokeInvitation(orgId: string, invitationId: string): Promise<void> {
   const token = await getClientToken();

@@ -117,6 +117,19 @@ export class OrgService {
     });
   }
 
+  /** Hard-delete an org and ALL of its data (docs/12 §6.4). Every org-scoped table declares
+   *  `org_id ... ON DELETE CASCADE`, so a single scoped DELETE sweeps the entire tenant — graph
+   *  (nodes/edges/provenance/snapshots/signals), connections + their encrypted secrets, findings,
+   *  notifications, members, invitations, AI history, the onboarding profile, and analytics. RLS
+   *  scopes the DELETE to the active org; the FK cascade runs with the table owner's rights, so it
+   *  reaches even the append-only tables (audit/analytics). **Irreversible.** The org's logo object
+   *  in Storage is left orphaned (a public, now-unreferenced image — harmless). */
+  async deleteOrg(orgId: string): Promise<void> {
+    await withOrgScope(this.db, orgId, (c) =>
+      c.query(`DELETE FROM organizations WHERE id = $1`, [orgId]),
+    );
+  }
+
   async get(orgId: string): Promise<OrgDto> {
     return withOrgScope(this.db, orgId, async (c) => {
       const { rows } = await c.query<OrgRow>(

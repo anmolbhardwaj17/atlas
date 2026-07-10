@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  Logger,
   Param,
   Patch,
   Post,
@@ -41,6 +42,8 @@ import {
  */
 @Controller("orgs")
 export class OrgController {
+  private readonly logger = new Logger(OrgController.name);
+
   constructor(
     private readonly orgs: OrgService,
     private readonly invitations: InvitationService,
@@ -105,6 +108,19 @@ export class OrgController {
   @Roles("Admin")
   async update(@Req() req: AuthedRequest, @Body() body: unknown): Promise<OrgDto> {
     return this.orgs.update(org(req).id, parseBody(UpdateOrgSchema, body));
+  }
+
+  /** Permanently delete the org and everything in it (docs/12 §6.4). **Owner-only** — the most
+   *  destructive action in the app. Logged server-side (the audit row would be cascaded away with
+   *  the org, so it can't live in the org's own audit log). */
+  @Delete(":orgId")
+  @HttpCode(204)
+  @UseGuards(AuthGuard, TenantScopeGuard, RolesGuard)
+  @Roles("Owner")
+  async remove(@Req() req: AuthedRequest): Promise<void> {
+    const orgId = org(req).id;
+    await this.orgs.deleteOrg(orgId);
+    this.logger.warn(`org.delete: org ${orgId} permanently deleted by user ${claims(req).userId}`);
   }
 
   @Get(":orgId/members")
