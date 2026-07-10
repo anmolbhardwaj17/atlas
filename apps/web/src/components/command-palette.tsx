@@ -12,6 +12,7 @@ import {
   Lightbulb,
   Plug,
   Settings,
+  ShieldCheck,
   CornerDownLeft,
   type LucideIcon,
 } from "lucide-react";
@@ -19,6 +20,7 @@ import { searchNodes, type SearchHit } from "@/lib/browser-api";
 import { kindIcon, kindStyle, kindShort, KIND_LOGO } from "@/lib/kind-visual";
 import { CloudIcon } from "@/components/cloud-icon";
 import { AtlasAiMark } from "@/components/brand";
+import { SiftMark } from "@/components/sift-mark";
 import { cn } from "@/lib/cn";
 
 /** Support-data kinds are not navigable estate - they live in Insights/Explore-by-kind, not
@@ -55,6 +57,9 @@ const NAV: Array<{ label: string; href: string; icon: LucideIcon; keywords: stri
   { label: "Map", href: "/map", icon: Waypoints, keywords: "infrastructure graph flow" },
   { label: "Explore", href: "/explore", icon: Boxes, keywords: "browse resources repos" },
   { label: "Insights", href: "/insights", icon: Lightbulb, keywords: "findings recommendations" },
+  // Sift carries its own brand glyph (the shield "S"), rendered specially like Ask Atlas — the
+  // `icon` here is just a fallback the render never actually reaches (see href === "/sift" below).
+  { label: "Sift", href: "/sift", icon: ShieldCheck, keywords: "security posture compliance soon" },
   { label: "Integrations", href: "/integrations", icon: Plug, keywords: "connect aws bitbucket" },
   { label: "Settings", href: "/settings", icon: Settings, keywords: "config alerts llm members" },
 ];
@@ -313,6 +318,10 @@ export function CommandPalette({ orgId }: { orgId: string }) {
                       <span className="grid size-6 shrink-0 place-items-center">
                         <AtlasAiMark size={18} />
                       </span>
+                    ) : item.type === "nav" && item.href === "/sift" ? (
+                      <span className="grid size-6 shrink-0 place-items-center rounded-md border border-border bg-background">
+                        <SiftMark size={12} className="text-muted-foreground" />
+                      </span>
                     ) : item.type === "nav" ? (
                       <span className="grid size-6 shrink-0 place-items-center rounded-md border border-border bg-background">
                         <item.icon size={14} className="text-muted-foreground" />
@@ -323,6 +332,11 @@ export function CommandPalette({ orgId }: { orgId: string }) {
                     <span className="min-w-0 flex-1 truncate text-foreground">{item.label}</span>
                     {item.type === "resource" ? (
                       <span className="shrink-0 text-xs text-muted-foreground">{item.sub}</span>
+                    ) : null}
+                    {item.type === "nav" && item.href === "/sift" ? (
+                      <span className="shrink-0 text-[9px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                        Soon
+                      </span>
                     ) : null}
                     {i === active ? (
                       item.type === "ask" ? (
