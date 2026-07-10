@@ -52,7 +52,24 @@ interface InFrame {
 
 export async function registerAskSocket(app: NestFastifyApplication): Promise<void> {
   const fastify = app.getHttpAdapter().getInstance() as unknown as WsCapableFastify;
-  await fastify.register(fastifyWebsocket);
+  // NOTE: `await fastify.register(...)` triggers Fastify's ready() (the instance is thenable), which
+  // is what lets the `{ websocket: true }` route below be recognized — so this MUST run after
+  // app.init(), not before (before init would boot Fastify ahead of Nest's own route mapping).
+  //
+  // In dev, Node's --watch can SIGTERM the previous process mid-boot (files still settling during
+  // the concurrent monorepo build). enableShutdownHooks() then boots the root as it tears down, so
+  // this register() lands on an already-booted root and throws AVV_ERR_ROOT_PLG_BOOTED. That process
+  // is being replaced anyway — swallow this one specific error (a benign hot-reload race) instead of
+  // crashing with a stack trace. Any other failure is real and rethrown.
+  try {
+    await fastify.register(fastifyWebsocket);
+  } catch (err) {
+    if ((err as { code?: string }).code === "AVV_ERR_ROOT_PLG_BOOTED") {
+      logger.warn("Ask WebSocket setup skipped: server already booted (dev hot-reload race).");
+      return;
+    }
+    throw err;
+  }
 
   const verifier = app.get(SupabaseJwtVerifier, { strict: false });
   const memberships = app.get(MembershipService, { strict: false });
