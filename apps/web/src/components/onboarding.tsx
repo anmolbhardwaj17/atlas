@@ -24,6 +24,8 @@ import { MapIllustration } from "@/components/onboarding/illustrations/map-illus
 import { InsightsIllustration } from "@/components/onboarding/illustrations/insights-illustration";
 import { SecurityIllustration } from "@/components/onboarding/illustrations/security-illustration";
 import { OperationalIllustration } from "@/components/onboarding/illustrations/operational-illustration";
+import { AskIllustration } from "@/components/onboarding/illustrations/ask-illustration";
+import { AlertsIllustration } from "@/components/onboarding/illustrations/alerts-illustration";
 import { seedDemo } from "@/lib/browser-api";
 import { cn } from "@/lib/cn";
 
@@ -86,12 +88,14 @@ const CAPABILITIES: Capability[] = [
     title: "Ask Atlas",
     body: "Cited, confidence-tiered answers over your own graph — never a guess.",
     tint: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+    Illustration: AskIllustration,
   },
   {
     icon: Bell,
     title: "Proactive alerts",
     body: "A heads-up in Slack, Discord, or Teams the moment something changes.",
     tint: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    Illustration: AlertsIllustration,
   },
 ];
 
