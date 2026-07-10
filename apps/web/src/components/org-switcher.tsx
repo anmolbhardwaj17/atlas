@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import { getMyOrgs, type MyOrg } from "@/lib/browser-api";
-import { ACTIVE_ORG_COOKIE } from "@/lib/active-org";
+import { ACTIVE_ORG_COOKIE, ORG_UPDATED_EVENT } from "@/lib/active-org";
 import { OrgLogo } from "@/components/org-logo";
 import { cn } from "@/lib/cn";
 import {
@@ -31,18 +31,24 @@ export function OrgSwitcher() {
   const [orgs, setOrgs] = React.useState<MyOrg[]>([]);
   const [currentId, setCurrentId] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
-    void (async () => {
-      const { memberships, defaultOrgId } = await getMyOrgs();
-      setOrgs(memberships);
-      const cookie = readCookie(ACTIVE_ORG_COOKIE);
-      const current =
-        memberships.find((m) => m.orgId === cookie) ??
-        memberships.find((m) => m.orgId === defaultOrgId) ??
-        memberships[0];
-      setCurrentId(current?.orgId ?? null);
-    })();
+  const load = React.useCallback(async () => {
+    const { memberships, defaultOrgId } = await getMyOrgs();
+    setOrgs(memberships);
+    const cookie = readCookie(ACTIVE_ORG_COOKIE);
+    const current =
+      memberships.find((m) => m.orgId === cookie) ??
+      memberships.find((m) => m.orgId === defaultOrgId) ??
+      memberships[0];
+    setCurrentId(current?.orgId ?? null);
   }, []);
+
+  React.useEffect(() => {
+    void load();
+    // Re-pull when an org's name/logo changes (settings) so the switcher never shows a stale mark.
+    const onUpdate = () => void load();
+    window.addEventListener(ORG_UPDATED_EVENT, onUpdate);
+    return () => window.removeEventListener(ORG_UPDATED_EVENT, onUpdate);
+  }, [load]);
 
   const current = orgs.find((o) => o.orgId === currentId);
   if (!current) return null;

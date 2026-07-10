@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { Check, Loader2, Pencil, Plus, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,6 +39,7 @@ export function ProfileCard({
   const [busy, setBusy] = React.useState(false);
   const [photoBusy, setPhotoBusy] = React.useState(false);
   const photoRef = React.useRef<HTMLInputElement>(null);
+  const router = useRouter();
   // Your live Google photo, read straight from the session (the stored avatar may have been
   // changed to a generated one, so we always offer the real photo here).
   const [googlePhoto, setGooglePhoto] = React.useState<string | null>(null);
@@ -93,6 +95,7 @@ export function ProfileCard({
         setCurrentAvatar(saved.avatarUrl);
         setPickedAvatar(saved.avatarUrl);
       }
+      router.refresh(); // refresh the header avatar (server-rendered from the shell)
       toast.success("Photo updated");
     } catch (err) {
       toast.error("Couldn't upload the photo", {
@@ -119,6 +122,7 @@ export function ProfileCard({
       setCurrentName(saved.name);
       if (saved.avatarUrl) setCurrentAvatar(saved.avatarUrl);
       setEditing(false);
+      router.refresh(); // refresh the header avatar/name (server-rendered from the shell)
       toast.success("Profile updated");
     } catch (e) {
       toast.error("Couldn't update your profile", {

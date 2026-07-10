@@ -9,6 +9,12 @@ import { Input } from "@/components/ui/input";
 import { OrgLogo } from "@/components/org-logo";
 import { updateOrg } from "@/lib/browser-api";
 import { fileToLogoDataUrl } from "@/lib/read-image";
+import { ORG_UPDATED_EVENT } from "@/lib/active-org";
+
+/** Tell the org switcher (which self-fetches) to re-pull after a name/logo change. */
+function notifyOrgUpdated() {
+  window.dispatchEvent(new Event(ORG_UPDATED_EVENT));
+}
 
 /**
  * Organization identity — the org's logo + name, both editable by an admin. The logo uploads to
@@ -50,6 +56,7 @@ export function OrgCard({
       const saved = await updateOrg(orgId, { name: next });
       setName(saved.name || next);
       setEditing(false);
+      notifyOrgUpdated();
       toast.success("Organization renamed");
     } catch (e) {
       toast.error("Couldn't rename the organization", {
@@ -69,6 +76,7 @@ export function OrgCard({
       const dataUrl = await fileToLogoDataUrl(file);
       const saved = await updateOrg(orgId, { logo: dataUrl });
       setLogoUrl(saved.logoUrl);
+      notifyOrgUpdated();
       toast.success("Logo updated");
     } catch (err) {
       toast.error("Couldn't update the logo", {
@@ -84,6 +92,7 @@ export function OrgCard({
     try {
       await updateOrg(orgId, { logo: null });
       setLogoUrl(null);
+      notifyOrgUpdated();
       toast.success("Logo removed");
     } catch (err) {
       toast.error("Couldn't remove the logo", {

@@ -8,9 +8,9 @@ import {
   MessagesSquare,
   ServerOff,
   ShieldCheck,
-  Waypoints,
 } from "lucide-react";
 import { SiftMark } from "@/components/sift-mark";
+import { AtlasLogo } from "@/components/brand";
 import { SetBreadcrumbs } from "@/components/breadcrumb-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -148,7 +148,7 @@ export default function SiftPage() {
             <div className="flex items-center gap-2 text-foreground">
               <SiftMark className="size-6" />
               <span className="text-muted-foreground">×</span>
-              <Waypoints className="size-6" />
+              <AtlasLogo size={32} spin className="size-8 dark:invert" />
             </div>
             <div className="space-y-3">
               <h2 className="text-lg font-semibold tracking-tight">

@@ -39,9 +39,8 @@ export function AppShell({
             <SidebarTrigger className="-ml-1" />
             {/* Org switcher (multi-org) lives top-left, next to the toggle — the standard spot. */}
             {orgId && <OrgSwitcher />}
-            <Separator orientation="vertical" className="mx-0.5 h-4" />
-            {/* Page breadcrumb (published per-page); falls back to an optional title. The app name
-                already lives in the sidebar brand, so we don't repeat "Atlas" here. */}
+            {/* Page breadcrumb (published per-page); falls back to an optional title. It renders its
+                own leading divider when present, so we don't add one here (avoids a double rule). */}
             <HeaderBreadcrumbs />
             {title ? (
               <>
