@@ -6,7 +6,26 @@
 > **No critical cross-tenant data leak was found** — the isolation model is solid. The real work is a
 > cluster of **Highs around abuse/SSRF/headers** and **hollow test coverage** on auth-critical code.
 >
-> How to read: severity = real-world risk. `status: OPEN`. Fix order at the bottom.
+> How to read: severity = real-world risk. Fix order at the bottom.
+
+> ## ✅ Remediation status (2026-07-10 — all fixed except a few Lows/ops)
+> **FIXED & shipped:** H1 (Jenkins SSRF guard), H2 (AI rate-limit + shared-key daily budget),
+> H3 (web security headers), H4 (25 new auth/tenant/invite/upload tests), M1 (SVG dropped),
+> M2 (JWT fallback hardened: pinned algs + ≥32-byte secret + key-only fallback), M3 (SSE/WS error
+> sanitize), M4 (invite rate-limit + pending cap), L1 (Fastify bodyLimit), L2 (upload magic-byte
+> check), L3 (atomic invite-accept), L4 (invite-token doc drift), L8 (off-host pagination guard),
+> and the **startup role assertion** (fail-closed if the DB role can bypass RLS). New durable
+> org-scoped rate limiter (`rate_limits`, migration 0039, applied live).
+>
+> **STILL OPEN (deliberately deferred — lower risk / bigger lift):**
+> - **L5** — per-tenant GitHub webhook secret (today one global `GITHUB_WEBHOOK_SECRET`; no data
+>   crosses, needs an unguessable connection UUID). Needs a schema + rotation story.
+> - **L6** — assert `id = claims.userId` inside the SECURITY DEFINER membership/identity reads (safe
+>   today; all call sites pass the auth uid). In-DB binding is a larger change.
+> - **L7** — bump `postcss` (1 moderate, build-time only) + add a `pnpm audit --prod` CI job.
+> - **Ops** — compile-time allowlist of permitted AWS `*Command` classes (make P2 read-only
+>   unrepresentable in code); a Docker-Postgres `check:integration` so the local gate exercises RLS.
+>   These are build/CI tooling, not request-path risks.
 
 ---
 
@@ -66,12 +85,12 @@
 
 ---
 
-## Suggested fix order (by blast radius / effort)
-1. **H1 Jenkins SSRF** — real exploit path; guard private IPs before shipping Jenkins broadly.
-2. **M1 SVG XSS** — one-line win: drop `image/svg+xml` from the upload allowlist.
-3. **H2 + M4 rate limiting** — add `@nestjs/throttler`; protect AI ask/WS (+ shared-key budget) and invite email.
-4. **H3 web security headers** — add `headers()` (CSP/HSTS/X-Frame/nosniff/referrer).
-5. **H4 tests** — JWT verifier, invite `accept()`, TenantScopeGuard, ImageUploadService (no DB needed).
-6. **M2 JWT fallback** — flag-gate HS256 + pin algorithms + secret length.
-7. **M3 SSE error sanitize**, **L1 body limit**, **operational caveats** (role assertion, `check:integration`, `pnpm audit` in CI).
-8. **L3–L8** hardening as capacity allows.
+## Suggested fix order (by blast radius / effort) — ✅ 1–7 DONE
+1. ✅ **H1 Jenkins SSRF** — private-IP guard (parse + post-DNS re-check), absolute-URL passthrough dropped, 16 tests.
+2. ✅ **M1 SVG XSS** — `image/svg+xml` dropped from the allowlist (client + server + `<input accept>`); + L2 magic-byte check.
+3. ✅ **H2 + M4 rate limiting** — durable org-scoped limiter (not throttler: covers WS + survives restarts). AI burst + shared-key daily budget; invite rate + pending cap.
+4. ✅ **H3 web security headers** — `headers()` with frame-ancestors/HSTS/X-Frame/nosniff/referrer/permissions.
+5. ✅ **H4 tests** — JWT verifier, invite `accept()`, TenantScopeGuard (404-vs-403), ImageUploadService. 25 tests, no DB.
+6. ✅ **M2 JWT fallback** — pinned algorithms, ≥32-byte secret floor, fallback only on key/alg errors (not expiry/network).
+7. ✅ **M3 SSE error sanitize**, ✅ **L1 body limit**, ✅ **role assertion** (fail-closed on BYPASSRLS/superuser). `check:integration` + `pnpm audit` CI still TODO.
+8. ✅ **L2/L3/L4/L8** done. ⏳ **L5** (per-tenant webhook secret), **L6** (SECURITY DEFINER arg binding), **L7** (postcss bump + audit CI), **Ops** AWS `*Command` allowlist — deferred (lower risk / CI-tooling).
