@@ -138,6 +138,7 @@ All segments are lowercased except case-significant natural keys (e.g. GitHub re
 | `RUNS` | runtime → atlas.service | Runtime (ECS svc/Lambda) executes a logical service | inferred |
 | `ROUTES_TO` | ingress → target | Traffic routing (ALB→target group→service, Route53→ALB, APIGW→Lambda) | observed |
 | `PROTECTS` | securitygroup → resource | SG governs a resource's network access | observed |
+| `USES` | ecs.service → ecs.taskdef | Service runs this task definition (connects the task-def into the graph) | observed |
 | `USES_IMAGE` | ecs.taskdef → ecr.repository | Task definition references a container image | observed |
 | `OWNED_BY` | resource/repo → team/user | Ownership (from CODEOWNERS, AWS tags) | observed |
 | `DEPENDS_ON_PKG` | repo → external package | Dependency manifest edge (repo→library) | observed |

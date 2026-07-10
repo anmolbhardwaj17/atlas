@@ -61,6 +61,13 @@ function clusterNameFromArn(arn: string | undefined): string | null {
   return arn.split("/").pop() ?? null;
 }
 
+/** Task-def family from a task-def ARN (`…:task-definition/<family>:<revision>`), revision dropped —
+ *  it's the natural key of the aws.ecs.taskdef node, so a service can link to its definition. */
+function taskDefFamilyFromArn(arn: string | undefined): string | null {
+  if (!arn) return null;
+  return /task-definition\/([^:/]+)/.exec(arn)?.[1] ?? null;
+}
+
 export const ecsServiceModule: ServiceModule<EcsService> = {
   kind: "aws.ecs.service",
   service: "ecs-service",
@@ -87,15 +94,25 @@ export const ecsServiceModule: ServiceModule<EcsService> = {
     };
   },
   observedEdges({ account, region, data }) {
-    const cluster = clusterNameFromArn(data.clusterArn);
-    if (!cluster) return [];
-    const clusterUrn = awsUrn("aws.ecs.cluster", { account, region, naturalKey: cluster });
+    const cluster = clusterNameFromArn(data.clusterArn) ?? "unknown";
     const self = awsUrn("aws.ecs.service", {
       account,
       region,
       naturalKey: `${cluster}/${data.serviceName}`,
     });
-    return [observed("CONTAINS", clusterUrn, self)];
+    const edges = [];
+    if (cluster !== "unknown") {
+      const clusterUrn = awsUrn("aws.ecs.cluster", { account, region, naturalKey: cluster });
+      edges.push(observed("CONTAINS", clusterUrn, self));
+    }
+    // Connect the service to the task-definition it runs (else the task-def floats — its only other
+    // edge is ASSUMES_ROLE to an IAM role, which the map hides). docs/05 §4.1.
+    const family = taskDefFamilyFromArn(data.taskDefinition);
+    if (family) {
+      const taskDefUrn = awsUrn("aws.ecs.taskdef", { account, region, naturalKey: family });
+      edges.push(observed("USES", self, taskDefUrn));
+    }
+    return edges;
   },
   extractSignals({ account, region, data }) {
     const cluster = clusterNameFromArn(data.clusterArn) ?? "unknown";
