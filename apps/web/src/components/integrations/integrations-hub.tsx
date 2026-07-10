@@ -2,7 +2,17 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Loader2, Trash2, RefreshCw, ShieldAlert, Search, Check, Send } from "lucide-react";
+import {
+  Plus,
+  Loader2,
+  Trash2,
+  RefreshCw,
+  ShieldAlert,
+  Search,
+  Check,
+  Send,
+  Sparkles,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +53,7 @@ import {
   deleteConnection,
   triggerSync,
   reindexGraph,
+  suggestAiEdges,
   setChannel,
   testChannel,
   removeChannel,
@@ -115,6 +126,33 @@ export function IntegrationsHub({
   const [tab, setTab] = React.useState<(typeof TABS)[number]>("All");
   const [query, setQuery] = React.useState("");
   const [rebuilding, setRebuilding] = React.useState(false);
+  const [findingLinks, setFindingLinks] = React.useState(false);
+
+  // Ask the AI to propose repo→runtime links deterministic matching can't catch. They appear in
+  // the graph badged "AI-suggested" for the user to confirm or reject.
+  async function findAiLinks(): Promise<void> {
+    setFindingLinks(true);
+    try {
+      const r = await suggestAiEdges(orgId);
+      toast.success(
+        r.suggested > 0
+          ? `${r.suggested} AI link${r.suggested === 1 ? "" : "s"} suggested`
+          : "No new links found",
+        {
+          description:
+            r.suggested > 0
+              ? "Review them in the graph — confirm the good ones, reject the rest."
+              : `Checked ${r.scannedRuntimes} unlinked runtime${r.scannedRuntimes === 1 ? "" : "s"}.`,
+        },
+      );
+    } catch (e) {
+      toast.error("Couldn't generate AI links", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setFindingLinks(false);
+    }
+  }
 
   // Re-run inference over the current graph (no re-crawl) — recovers cross-source links (e.g.
   // repo→runtime) that got dropped after a disconnect/reconnect, when their signals are present.
@@ -187,12 +225,12 @@ export function IntegrationsHub({
             graph across everything you connect.
           </p>
           {canManage ? (
-            <div className="pt-1">
+            <div className="flex flex-wrap items-center gap-2 pt-1">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => void rebuildLinks()}
-                disabled={rebuilding}
+                disabled={rebuilding || findingLinks}
               >
                 {rebuilding ? (
                   <Loader2 className="size-3.5 animate-spin" />
@@ -201,8 +239,21 @@ export function IntegrationsHub({
                 )}
                 Rebuild links
               </Button>
-              <span className="ml-2 align-middle text-xs text-muted-foreground">
-                Re-derive cross-source links (e.g. repo → service) without re-syncing.
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void findAiLinks()}
+                disabled={findingLinks || rebuilding}
+              >
+                {findingLinks ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="size-3.5 text-primary" />
+                )}
+                Find AI links
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Re-derive links, or let AI propose ones matching can&rsquo;t catch.
               </span>
             </div>
           ) : null}

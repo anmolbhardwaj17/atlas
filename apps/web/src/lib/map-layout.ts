@@ -1,6 +1,12 @@
 import dagre from "@dagrejs/dagre";
 import type { Edge, Node } from "@xyflow/react";
-import { edgeCrossing, CROSS_COLOR, type MapEdge, type MapNode } from "./map-types";
+import {
+  edgeCrossing,
+  CROSS_COLOR,
+  AI_SUGGESTED_COLOR,
+  type MapEdge,
+  type MapNode,
+} from "./map-types";
 
 /**
  * Pure layout for the infra map: ONE left-to-right dagre flow over the whole visible graph,
@@ -154,8 +160,14 @@ export function buildLayout(
   }
 
   const edges: Edge[] = [...byPair.values()].map((group) => {
-    const primary = group.find((g) => g.origin === "observed") ?? (group[0] as MapEdge);
-    const inferred = group.every((g) => g.origin !== "observed");
+    const primary =
+      group.find((g) => g.origin === "observed" || g.origin === "confirmed") ??
+      (group[0] as MapEdge);
+    // Trust tiers → line style. Observed/confirmed = solid; inferred = dashed; AI-suggested (awaiting
+    // the user's confirm/reject) = violet + dotted, visibly the most tentative (P3, "trust is visible").
+    const solid = group.some((g) => g.origin === "observed" || g.origin === "confirmed");
+    const aiSuggested = !solid && group.every((g) => g.origin === "ai_suggested");
+    const inferred = !solid && !aiSuggested;
     const cross = edgeCrossing(byId.get(primary.from), byId.get(primary.to));
     const boundary = cross.crossCloud || cross.crossAccount;
     const types = [...new Set(group.map((g) => g.type.toLowerCase().replace(/_/g, " ")))].join(
@@ -179,12 +191,14 @@ export function buildLayout(
       style: {
         stroke: boundary
           ? CROSS_COLOR
-          : inferred
-            ? "hsl(var(--muted-foreground))"
-            : "hsl(var(--foreground))",
+          : aiSuggested
+            ? AI_SUGGESTED_COLOR
+            : inferred
+              ? "hsl(var(--muted-foreground))"
+              : "hsl(var(--foreground))",
         strokeWidth: boundary ? 2.25 : 1.5,
-        strokeDasharray: inferred && !boundary ? "5 4" : undefined,
-        opacity: boundary ? 1 : inferred ? 0.7 : 0.9,
+        strokeDasharray: boundary ? undefined : aiSuggested ? "2 4" : inferred ? "5 4" : undefined,
+        opacity: boundary ? 1 : aiSuggested ? 0.85 : inferred ? 0.7 : 0.9,
       },
     };
   });

@@ -75,6 +75,8 @@ export function edgeCrossing(
 
 /** Violet accent for cross-boundary edges (the one accent that earns its place on the map). */
 export const CROSS_COLOR = "#8b5cf6";
+/** AI-suggested edges (awaiting confirm/reject) — cyan, distinct from the violet cross-boundary. */
+export const AI_SUGGESTED_COLOR = "#06b6d4";
 
 // ── Environments ─────────────────────────────────────────────────────────────
 export const ENV_ORDER = ["prod", "staging", "dev", "test", "unknown"] as const;

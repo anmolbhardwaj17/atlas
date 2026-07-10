@@ -241,6 +241,65 @@ export async function getEdgeDetail(orgId: string, edgeId: string): Promise<Edge
   return body.data ?? null;
 }
 
+// ── AI-suggested edges (docs/05 §6, docs/10) ─────────────────────────────────
+export interface SuggestedEdge {
+  id: string;
+  type: string;
+  from: { id: string; urn: string; kind: string; name: string | null };
+  to: { id: string; urn: string; kind: string; name: string | null };
+  reasoning: string | null;
+  modelConfidence: string | null;
+  createdAt: string;
+}
+
+/** Generate AI-suggested repo→runtime links (Admin+). Returns how many were written. */
+export async function suggestAiEdges(
+  orgId: string,
+): Promise<{ suggested: number; scannedRuntimes: number; overCap: number }> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/ai/suggest-edges`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok)
+    throw new Error(await errorMessage(res, `Couldn't generate AI links (${res.status}).`));
+  return (await res.json()).data;
+}
+
+/** Pending AI-suggested edges awaiting confirm/reject. */
+export async function getSuggestedEdges(orgId: string): Promise<SuggestedEdge[]> {
+  const token = await getClientToken();
+  if (!token) return [];
+  const res = await fetch(`${apiUrl()}/edges/suggested`, {
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) return [];
+  return ((await res.json()) as { data: SuggestedEdge[] }).data ?? [];
+}
+
+/** Confirm an AI-suggested edge → a real edge. */
+export async function confirmSuggestedEdge(orgId: string, edgeId: string): Promise<void> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/edges/${edgeId}/confirm`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Couldn't confirm (${res.status}).`));
+}
+
+/** Reject an AI-suggested edge → deleted + never re-proposed. */
+export async function rejectSuggestedEdge(orgId: string, edgeId: string): Promise<void> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/edges/${edgeId}/reject`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Couldn't reject (${res.status}).`));
+}
+
 export interface DemoSeedResult {
   status: string;
   nodeCount: number;

@@ -41,7 +41,13 @@ import {
 } from "lucide-react";
 import { buildLayout } from "@/lib/map-layout";
 import { kindShort, kindIcon, KIND_LOGO } from "@/lib/kind-visual";
-import { edgeCrossing, CROSS_COLOR, type MapData, type MapNode } from "@/lib/map-types";
+import {
+  edgeCrossing,
+  CROSS_COLOR,
+  AI_SUGGESTED_COLOR,
+  type MapData,
+  type MapNode,
+} from "@/lib/map-types";
 import { createConversation, streamAskWS } from "@/lib/browser-api";
 import { CloudIcon } from "@/components/cloud-icon";
 import { AtlasAiMark } from "@/components/brand";
@@ -1682,6 +1688,13 @@ function Legend() {
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-px w-4 border-t border-dashed border-muted-foreground" /> inferred
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span
+            className="h-0 w-4 border-t border-dotted"
+            style={{ borderColor: AI_SUGGESTED_COLOR }}
+          />
+          AI-suggested
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-0.5 w-4 rounded" style={{ backgroundColor: CROSS_COLOR }} />

@@ -242,6 +242,32 @@ export interface EdgeDetail {
   firstSeen: string;
   lastSeen: string;
 }
+
+/** A pending AI-suggested edge for the review UI (with the model's reasoning). */
+export interface SuggestedEdgeDto {
+  id: string;
+  type: string;
+  from: NodeSummary;
+  to: NodeSummary;
+  reasoning: string | null;
+  modelConfidence: string | null;
+  createdAt: string;
+}
+interface SuggestedEdgeRow {
+  id: string;
+  type: string;
+  created_at: Date;
+  from_id: string;
+  from_urn: string;
+  from_kind: string;
+  from_name: string | null;
+  to_id: string;
+  to_urn: string;
+  to_kind: string;
+  to_name: string | null;
+  evidence: unknown;
+}
+
 interface EdgeDetailRow {
   id: string;
   type: string;
@@ -1744,6 +1770,78 @@ export class GraphService {
         firstSeen: r.first_seen.toISOString(),
         lastSeen: r.last_seen.toISOString(),
       };
+    });
+  }
+
+  // ── AI-suggested edges (docs/05 §6, docs/10) ──────────────────────────────
+  /** Pending AI edge suggestions for review, newest first, with the model's reasoning (P4). */
+  async listSuggestedEdges(orgId: string): Promise<SuggestedEdgeDto[]> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      const { rows } = await c.query<SuggestedEdgeRow>(
+        `SELECT e.id, e.type, e.created_at,
+                nf.id AS from_id, nf.urn AS from_urn, nf.kind AS from_kind, nf.name AS from_name,
+                nt.id AS to_id, nt.urn AS to_urn, nt.kind AS to_kind, nt.name AS to_name,
+                p.evidence
+           FROM edges e
+           JOIN nodes nf ON nf.id = e.from_node_id
+           JOIN nodes nt ON nt.id = e.to_node_id
+           LEFT JOIN provenance p ON p.id = e.provenance_id
+          WHERE e.origin = 'ai_suggested' AND e.status = 'active'
+          ORDER BY e.created_at DESC`,
+      );
+      return rows.map((r) => {
+        const ev = (r.evidence ?? {}) as { reasoning?: unknown; modelConfidence?: unknown };
+        return {
+          id: r.id,
+          type: r.type,
+          from: { id: r.from_id, urn: r.from_urn, kind: r.from_kind, name: r.from_name },
+          to: { id: r.to_id, urn: r.to_urn, kind: r.to_kind, name: r.to_name },
+          reasoning: typeof ev.reasoning === "string" ? ev.reasoning : null,
+          modelConfidence: typeof ev.modelConfidence === "string" ? ev.modelConfidence : null,
+          createdAt: r.created_at.toISOString(),
+        };
+      });
+    });
+  }
+
+  /** Confirm an AI-suggested edge → `origin='confirmed'` (human-vouched, protected from the
+   *  inference retire pass, promoted to inferred-high). 404 if not a live ai_suggested edge. */
+  async confirmSuggestedEdge(orgId: string, id: string): Promise<{ ok: true }> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      if (!UUID_RE.test(id)) throw ApiException.notFound();
+      const { rowCount } = await c.query(
+        `UPDATE edges SET origin = 'confirmed', confidence = 'inferred-high', updated_at = now()
+          WHERE id = $1 AND origin = 'ai_suggested' AND status = 'active'`,
+        [id],
+      );
+      if (!rowCount) throw ApiException.notFound();
+      return { ok: true };
+    });
+  }
+
+  /** Reject an AI-suggested edge → delete it AND remember the pair so it's never re-proposed. */
+  async rejectSuggestedEdge(
+    orgId: string,
+    id: string,
+    userId: string | null,
+  ): Promise<{ ok: true }> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      if (!UUID_RE.test(id)) throw ApiException.notFound();
+      const { rows } = await c.query<{ from_node_id: string; to_node_id: string; type: string }>(
+        `SELECT from_node_id, to_node_id, type FROM edges
+          WHERE id = $1 AND origin = 'ai_suggested' AND status = 'active'`,
+        [id],
+      );
+      const e = rows[0];
+      if (!e) throw ApiException.notFound();
+      await c.query(
+        `INSERT INTO edge_suggestion_rejections (org_id, from_node_id, to_node_id, type, rejected_by)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (org_id, from_node_id, to_node_id, type) DO NOTHING`,
+        [orgId, e.from_node_id, e.to_node_id, e.type, userId],
+      );
+      await c.query(`DELETE FROM edges WHERE id = $1`, [id]);
+      return { ok: true };
     });
   }
 

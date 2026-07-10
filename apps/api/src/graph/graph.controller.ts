@@ -252,6 +252,27 @@ export class GraphController {
     return this.graph.dependencies(org(req).id, id, parseBody(TraversalQuerySchema, query));
   }
 
+  /** Pending AI-suggested edges for review. (Static path — before `edges/:id`.) */
+  @Get("edges/suggested")
+  @Roles("Member")
+  async suggestedEdges(@Req() req: AuthedRequest): Promise<unknown> {
+    return this.graph.listSuggestedEdges(org(req).id);
+  }
+
+  /** Confirm an AI-suggested edge → a real, human-vouched edge. */
+  @Post("edges/:id/confirm")
+  @Roles("Member")
+  async confirmEdge(@Req() req: AuthedRequest, @Param("id") id: string): Promise<{ ok: true }> {
+    return this.graph.confirmSuggestedEdge(org(req).id, id);
+  }
+
+  /** Reject an AI-suggested edge → delete it + remember so it's not re-proposed. */
+  @Post("edges/:id/reject")
+  @Roles("Member")
+  async rejectEdge(@Req() req: AuthedRequest, @Param("id") id: string): Promise<{ ok: true }> {
+    return this.graph.rejectSuggestedEdge(org(req).id, id, req.auth?.userId ?? null);
+  }
+
   @Get("edges/:id")
   @Roles("Member")
   async getEdge(@Req() req: AuthedRequest, @Param("id") id: string): Promise<unknown> {

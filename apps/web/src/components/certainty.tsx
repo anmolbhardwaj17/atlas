@@ -28,6 +28,12 @@ const TIER: Record<string, TierStyle> = {
   },
   "inferred-high": { label: "inferred · high", variant: "secondary" },
   "inferred-low": { label: "inferred · low", variant: "outline" },
+  // AI-suggested = a model proposal awaiting the user's confirm/reject — the lowest trust (P3).
+  "ai-suggested": {
+    label: "AI-suggested",
+    variant: "outline",
+    className: "border-transparent bg-[#06b6d4]/15 text-[#06b6d4]",
+  },
   insufficient: TIER_FALLBACK,
   // Advisory = a recommendation grounded in cited facts, not an observed fact itself (P2).
   advisory: { label: "recommendation", variant: "outline", className: "text-primary" },

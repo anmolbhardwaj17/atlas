@@ -297,6 +297,9 @@ Each rule below shows: trigger, evidence, output edge, confidence, and *why that
 | `observed` | Directly read from a source API | R5, R7, SG/ENI facts | stated as fact + source link |
 | `inferred-high` | Strong structural/config evidence | R1(ARN), R2, R3, R4, R6(single-svc), R11(unique tag), R12(SHA match), R13(service-name env) | "Atlas infers (high confidence)… based on <evidence>" |
 | `inferred-low` | Plausible but uncertain (heuristic/permission) | R1(name), R6(monorepo), R8, R10, R11(ambiguous tag / Name tag) | "possibly… (low confidence); evidence is <X>; not certain" |
+| `ai-suggested` | An **AI proposal** awaiting the user's confirm/reject — the lowest trust, never asserted (P3) | the AI edge-matcher (`origin='ai_suggested'`) | "Atlas suggests… — confirm or reject" (styled distinctly in the graph) |
+
+**AI-suggested edges (docs/10) — the reasoning layer.** When deterministic rules can't link a repo to a runtime, the AI edge-matcher proposes edges from unmatched runtimes + candidate repos, each carrying the model's reasoning as provenance (P4). They are written with `origin='ai_suggested'` — a distinct origin **outside** the sync/inference lifecycle, so the retire pass (which keys on `origin='inferred'`) never touches them. The user **Confirms** (→ `origin='confirmed'`, human-vouched, promoted to `inferred-high`) or **Rejects** (→ the edge is deleted and the pair recorded in `edge_suggestion_rejections`, `04`, so it's never re-proposed). Generation is on-demand ("Find AI links", Admin) and needs a real model (BYO-LLM or the shared key); every proposal is validated against real node URNs so a hallucination can never become an edge.
 
 ### 6.5 Reconciliation & convergence (FR-4.6)
 After each sync's infer stage:
