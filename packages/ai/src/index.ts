@@ -33,6 +33,13 @@ export {
   honestAbsence,
 } from "./prompt";
 export { buildAdvisoryContext } from "./context";
+export { matchEdges } from "./edge-matcher";
+export type {
+  EdgeMatcherInput,
+  EdgeSuggestion,
+  RuntimeCandidate,
+  RepoCandidate,
+} from "./edge-matcher";
 export { guidanceFor, KNOWLEDGE_PACK_VERSION } from "./knowledge";
 export type { Guidance } from "./knowledge";
 export { TOOL_SPECS, TOOL_NAMES, runTool } from "./tools";
