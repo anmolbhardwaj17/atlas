@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronsUpDown, Plus } from "lucide-react";
+import { Check, ChevronsUpDown, Plus, Loader2 } from "lucide-react";
 import { getMyOrgs, type MyOrg } from "@/lib/browser-api";
 import { ACTIVE_ORG_COOKIE, ORG_UPDATED_EVENT } from "@/lib/active-org";
 import { OrgLogo } from "@/components/org-logo";
@@ -38,6 +38,10 @@ export function OrgSwitcher({
   const router = useRouter();
   const [orgs, setOrgs] = React.useState<MyOrg[]>(initialOrgs ?? []);
   const [currentId, setCurrentId] = React.useState<string | null>(initialCurrentId ?? null);
+  // The whole app re-renders server-side on an org switch (force-dynamic + router.refresh), which
+  // takes a beat. Without feedback the OLD org's page lingers and reads as broken. useTransition
+  // keeps isPending true until that re-render lands, so we can show a "Switching workspace…" overlay.
+  const [isSwitching, startSwitch] = React.useTransition();
 
   const load = React.useCallback(async () => {
     const { memberships, defaultOrgId } = await getMyOrgs();
@@ -68,43 +72,69 @@ export function OrgSwitcher({
     if (orgId === currentId) return;
     document.cookie = `${ACTIVE_ORG_COOKIE}=${orgId}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
     setCurrentId(orgId);
-    router.push("/dashboard");
-    router.refresh();
+    // Inside the transition so isSwitching stays true until the new org's server render commits.
+    startSwitch(() => {
+      router.push("/dashboard");
+      router.refresh();
+    });
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className="flex h-8 items-center gap-1.5 rounded-md border border-border px-1.5 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <OrgLogo name={current.orgName} logoUrl={current.orgLogoUrl} size={20} bordered={false} />
-          <span className="max-w-[160px] truncate">{current.orgName}</span>
-          <ChevronsUpDown className="size-3.5 shrink-0 opacity-50" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-56">
-        <DropdownMenuLabel className="text-xs text-muted-foreground">
-          Organizations
-        </DropdownMenuLabel>
-        {orgs.map((o) => (
-          <DropdownMenuItem key={o.orgId} onClick={() => switchTo(o.orgId)} className="gap-2">
-            <OrgLogo name={o.orgName} logoUrl={o.orgLogoUrl} size={24} />
-            <span className="min-w-0 flex-1 truncate">{o.orgName}</span>
-            <Check
-              className={cn("size-4 shrink-0", o.orgId === currentId ? "opacity-100" : "opacity-0")}
+    <>
+      {isSwitching ? (
+        <div className="fixed inset-0 z-[100] grid place-items-center bg-background/70 backdrop-blur-sm">
+          <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-lg">
+            <Loader2 className="size-4 animate-spin text-muted-foreground" />
+            <span className="text-sm font-medium">
+              Switching to <span className="text-foreground">{current.orgName}</span>…
+            </span>
+          </div>
+        </div>
+      ) : null}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="flex h-8 items-center gap-1.5 rounded-md border border-border px-1.5 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <OrgLogo
+              name={current.orgName}
+              logoUrl={current.orgLogoUrl}
+              size={20}
+              bordered={false}
             />
+            <span className="max-w-[160px] truncate">{current.orgName}</span>
+            <ChevronsUpDown className="size-3.5 shrink-0 opacity-50" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-56">
+          <DropdownMenuLabel className="text-xs text-muted-foreground">
+            Organizations
+          </DropdownMenuLabel>
+          {orgs.map((o) => (
+            <DropdownMenuItem key={o.orgId} onClick={() => switchTo(o.orgId)} className="gap-2">
+              <OrgLogo name={o.orgName} logoUrl={o.orgLogoUrl} size={24} />
+              <span className="min-w-0 flex-1 truncate">{o.orgName}</span>
+              <Check
+                className={cn(
+                  "size-4 shrink-0",
+                  o.orgId === currentId ? "opacity-100" : "opacity-0",
+                )}
+              />
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => router.push("/")}
+            className="gap-2 text-muted-foreground"
+          >
+            <span className="grid size-6 shrink-0 place-items-center">
+              <Plus className="size-4" />
+            </span>
+            Create organization
           </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push("/")} className="gap-2 text-muted-foreground">
-          <span className="grid size-6 shrink-0 place-items-center">
-            <Plus className="size-4" />
-          </span>
-          Create organization
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
   );
 }
