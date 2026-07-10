@@ -69,7 +69,7 @@ export class InvitationService {
     const token = randomBytes(32).toString("base64url");
     const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
     try {
-      const { dto, orgName } = await withOrgScope(this.db, orgId, async (c) => {
+      const { dto, orgName, inviter } = await withOrgScope(this.db, orgId, async (c) => {
         // Cap outstanding pending invites so the rate limit can't be walked around by never accepting.
         const { rows: pending } = await c.query<{ n: number }>(
           `SELECT count(*)::int AS n FROM invitations WHERE status = 'pending'`,
@@ -89,12 +89,30 @@ export class InvitationService {
           `SELECT name FROM organizations WHERE id = $1`,
           [orgId],
         );
-        return { dto: toInviteDto(rows[0]), orgName: orgRows[0]?.name ?? "your team" };
+        // Who sent it — surfaced in the email ("Anmol invited you…"). users is a global identity
+        // table atlas_app may read; a missing row just omits the attribution.
+        const { rows: inviterRows } = await c.query<{ name: string | null; email: string }>(
+          `SELECT name, email FROM users WHERE id = $1`,
+          [inviterUserId],
+        );
+        return {
+          dto: toInviteDto(rows[0]),
+          orgName: orgRows[0]?.name ?? "your team",
+          inviter: inviterRows[0] ?? null,
+        };
       });
       // Deliver the accept link by email (Resend), and also return it so the UI can offer a
       // copyable link — the link works even if email delivery is unavailable.
       const acceptUrl = `${this.env.WEB_ORIGIN}/invite/${token}`;
-      const emailed = await this.email.sendInvite({ to: dto.email, orgName, role: dto.role, acceptUrl });
+      const emailed = await this.email.sendInvite({
+        to: dto.email,
+        orgName,
+        role: dto.role,
+        acceptUrl,
+        inviterName: inviter?.name ?? null,
+        inviterEmail: inviter?.email ?? null,
+        expiresAt,
+      });
       this.logger.log(`Invitation ${dto.id} for ${dto.email} created (emailed: ${emailed}).`);
       return { ...dto, acceptUrl, emailed };
     } catch (e) {
