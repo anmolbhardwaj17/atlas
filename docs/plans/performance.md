@@ -47,11 +47,21 @@ so every hop is expensive and they stack.
 
 ## Plan (highest ROI first)
 
-### P0 — Co-locate the API with the DB region (prod) · biggest win, infra
-Deploy the ECS API/workers in **ap-southeast-2** (same region as Supabase), or move Supabase to the
-API's region. Turns every ~137 ms hop into ~1–3 ms. Also evaluate the Supabase **transaction pooler
-(6543)** vs session pooler for the worker pool. *No app code — deployment/config.* Until then, dev
-latency is inherent to laptop→Sydney and can't be fully "fixed" in code.
+### P0 — Co-locate the API with the DB region (prod) · biggest win, infra · ⏸️ DEFERRED (until deploy)
+Deploy the ECS API/workers in **ap-southeast-2** (same region as Supabase). Turns every ~137 ms hop
+into ~1–3 ms. Also evaluate the Supabase **transaction pooler (6543)** vs session pooler for the
+worker pool. *No app code — deployment/config.* Until then, dev latency is inherent to laptop→Sydney
+and can't be fully "fixed" in code.
+
+> **⚠️ Data-loss question (owner asked 2026-07-10): does this risk losing data? Only if done the
+> wrong way.** Two versions, pick the safe one:
+> - ✅ **Move the *compute* to the DB (recommended, ZERO data risk):** the DB already lives in Sydney;
+>   we deploy ECS in the *same* region. The database never moves → no migration, no data loss.
+> - ⚠️ **Move the *database* to another region (NOT needed):** that's a real data migration
+>   (snapshot→restore / logical replication → cutover) — the only path where data can be lost.
+>
+> So P0 = the safe compute-side option; nothing to migrate. Deferred purely because it's meaningless
+> in local dev (the laptop can't be co-located). Also saved to project memory (`project-perf-p0-db-colocation`).
 
 ### P1 — Cut sequential DB round-trips per request ✅ (shipped 2026-07-10)
 - ✅ **Fold BEGIN + set_config** in `withOrgScope` → −1 hop everywhere (`packages/db/src/client.ts`).
