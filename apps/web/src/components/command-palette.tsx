@@ -325,12 +325,31 @@ export function CommandPalette({ orgId }: { orgId: string }) {
                       <span className="shrink-0 text-xs text-muted-foreground">{item.sub}</span>
                     ) : null}
                     {i === active ? (
-                      // With Shift held, the primary action becomes "ask Atlas" — swap the ↵ glyph
-                      // for the AI mark on non-ask rows so the alternate action reads at a glance.
-                      shiftHeld && item.type !== "ask" ? (
-                        <AtlasAiMark size={15} className="shrink-0" />
-                      ) : (
+                      item.type === "ask" ? (
+                        // The ask row's primary action already IS ask — just the enter glyph.
                         <CornerDownLeft size={13} className="shrink-0 text-muted-foreground" />
+                      ) : (
+                        // Surface the Shift alternate action inline on the row (not just the footer),
+                        // so it's discoverable: a persistent "⇧ ask" chip that lights up — and swaps
+                        // the ↵ for the AI mark — while Shift is actually held.
+                        <span className="flex shrink-0 items-center gap-2">
+                          <span
+                            className={cn(
+                              "flex items-center gap-1 text-[11px] transition-colors",
+                              shiftHeld ? "text-foreground" : "text-muted-foreground/70",
+                            )}
+                          >
+                            <kbd className="rounded border border-border bg-muted px-1 py-0.5 font-mono text-[9px] leading-none">
+                              ⇧
+                            </kbd>
+                            ask
+                          </span>
+                          {shiftHeld ? (
+                            <AtlasAiMark size={15} />
+                          ) : (
+                            <CornerDownLeft size={13} className="text-muted-foreground" />
+                          )}
+                        </span>
                       )
                     ) : null}
                   </button>
