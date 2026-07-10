@@ -281,4 +281,46 @@ suite("G2.1 GraphService", () => {
     expect((await graph.graph(orgId, { limit: 400, environment: "prod" })).nodes.length).toBe(1);
     expect((await graph.graph(orgId, { limit: 400, environment: "dev" })).nodes.length).toBe(0);
   });
+
+  it("graph() keeps a repo linked to its runtime when the budget truncates between them", async () => {
+    // A repo that deploys to the lambda, but is older (last_seen) than the freshly-synced runtimes,
+    // so a small last_seen-ordered budget would cut it. The edge-aware frontier must pull it back in
+    // rather than strand it in the "no infra link" shelf (a false unlinked).
+    const repoId = await insertNode(
+      orgId,
+      connId,
+      "bitbucket:org:repository/api-svc",
+      "bitbucket.repository",
+      null,
+      "api-svc",
+    );
+    const prov = one(
+      (
+        await admin.query<{ id: string }>(
+          "INSERT INTO provenance (org_id, source, confidence) VALUES ($1,'edge','inferred') RETURNING id",
+          [orgId],
+        )
+      ).rows,
+    ).id;
+    await admin.query(
+      `INSERT INTO edges (org_id, from_node_id, to_node_id, type, origin, confidence, provenance_id)
+       VALUES ($1,$2,$3,'DEPLOYS_TO','inferred','inferred-high',$4)`,
+      [orgId, repoId, lambdaId, prov],
+    );
+    // Make the lambda the single newest node; repo + rds older so a budget of 1 excludes them.
+    await admin.query("UPDATE nodes SET last_seen = now() WHERE id = $1", [lambdaId]);
+    await admin.query("UPDATE nodes SET last_seen = now() - interval '1 hour' WHERE id = $1", [
+      rdsId,
+    ]);
+    await admin.query("UPDATE nodes SET last_seen = now() - interval '2 hours' WHERE id = $1", [
+      repoId,
+    ]);
+
+    const g = await graph.graph(orgId, { limit: 1 });
+    expect(g.truncated).toBe(true); // more nodes exist than the budget
+    // Budget = {lambda}; the frontier pulls in BOTH neighbours (rds via CONNECTS_TO, repo via
+    // DEPLOYS_TO) so neither edge is dropped and the repo is never falsely unlinked.
+    expect(new Set(g.nodes.map((n) => n.id))).toEqual(new Set([lambdaId, rdsId, repoId]));
+    expect(g.edges.map((e) => e.type).sort()).toEqual(["CONNECTS_TO", "DEPLOYS_TO"]);
+  });
 });

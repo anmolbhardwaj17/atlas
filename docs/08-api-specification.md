@@ -344,6 +344,8 @@ The heart of the read API. All responses carry **provenance + confidence** (AP-4
 
 **`GET /graph/subgraph?focus=service&serviceId=...&depth=2`** returns nodes+edges arrays for the viz canvas (`09`), node-budgeted, each edge with confidence/origin.
 
+> **Estate-map budget is edge-aware.** The full-estate map (`limit`-budgeted, most-recently-seen first) selects the primary budget by `last_seen`, then **pulls the missing endpoint of any touching edge back into view** (bounded by the over-fetch cap). A repo and its runtime are therefore never split by the budget — otherwise the older node (e.g. a repo not re-synced this cycle) would drop past the cut, its `DEPLOYS_TO` edge would be dropped, and the repo would be *falsely* reported as having no infrastructure link. `truncated` still means "more nodes exist than the budget"; the returned node count may slightly exceed `limit` by this frontier. (P3/P4: never hide a real, observed link for a display budget.)
+
 ---
 
 ## 10. Search, AI, Timeline, Audit (FA-5/FA-6/FA-7)

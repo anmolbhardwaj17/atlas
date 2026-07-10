@@ -7,10 +7,12 @@ import {
   useMemo,
   useRef,
   useState,
+  useTransition,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -33,6 +35,7 @@ import {
   CornerDownLeft,
   ListFilter,
   Map as MapIcon,
+  RotateCw,
   Search,
   Shield,
   Square,
@@ -100,6 +103,13 @@ export function InfraMap({
     const edges = rawData.edges.filter((e) => ids.has(e.from) && ids.has(e.to));
     return { ...rawData, nodes, edges };
   }, [rawData]);
+
+  // Refetch the live graph without a full reload. The map is server-rendered once (force-dynamic);
+  // after a sync / Rebuild links / Find AI links changes the graph, this snapshot goes stale until
+  // refreshed. `router.refresh()` re-runs the server component and reconciles new nodes/edges in
+  // place, so freshly-linked repos leave the "no infra link" shelf without losing pan/zoom.
+  const router = useRouter();
+  const [isRefreshing, startRefresh] = useTransition();
 
   const [selectedId, setSelectedId] = useState<string | null>(focusId ?? null);
   // Security overlay: OFF = the clean traffic flow (protection as shield chips only);
@@ -335,6 +345,19 @@ export function InfraMap({
               </div>
             ) : null}
           </span>
+          <button
+            type="button"
+            onClick={() => startRefresh(() => router.refresh())}
+            disabled={isRefreshing}
+            title="Refetch the live graph — pick up links added by a recent sync or Rebuild links"
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground",
+              isRefreshing && "opacity-70",
+            )}
+          >
+            <RotateCw className={cn("size-3.5", isRefreshing && "animate-spin")} />
+            {isRefreshing ? "Refreshing…" : "Refresh"}
+          </button>
           {cross.crossCloud + cross.crossAccount > 0 && (
             <span
               className="flex items-center gap-1.5 rounded-full border border-transparent px-2.5 py-1 font-medium"

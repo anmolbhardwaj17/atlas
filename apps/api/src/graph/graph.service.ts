@@ -1340,12 +1340,17 @@ export class GraphService {
       if (q.environment) mapped = mapped.filter((n) => n.environment === q.environment);
 
       const truncated = mapped.length > q.limit;
-      const nodes = mapped.slice(0, q.limit);
-      const ids = nodes.map((n) => n.id);
+      // Primary budget: the most-recently-seen nodes up to the limit.
+      const budget = mapped.slice(0, q.limit);
+      const budgetIds = budget.map((n) => n.id);
 
-      // Edges fully inside the visible node set (so the canvas never dangles an endpoint).
-      const edges =
-        ids.length === 0
+      // Edges touching the budget (AT LEAST one endpoint visible), not only edges fully inside it.
+      // The last_seen cut can strand a repo just past the budget while its runtime stays — an
+      // observed DEPLOYS_TO edge would then be dropped and the repo would fall into the "no infra
+      // link" shelf, a *false* unlinked. We pull the missing endpoint back into view (below) so a
+      // repo and its runtime are never split by a display budget (P3/P4: never hide a real link).
+      const touchingEdges =
+        budgetIds.length === 0
           ? []
           : (
               await c.query<{
@@ -1358,17 +1363,39 @@ export class GraphService {
               }>(
                 `SELECT id, from_node_id, to_node_id, type, origin, confidence FROM edges
                  WHERE status = 'active'
-                   AND from_node_id = ANY($1::uuid[]) AND to_node_id = ANY($1::uuid[])`,
-                [ids],
+                   AND (from_node_id = ANY($1::uuid[]) OR to_node_id = ANY($1::uuid[]))`,
+                [budgetIds],
               )
-            ).rows.map((e) => ({
-              id: e.id,
-              from: e.from_node_id,
-              to: e.to_node_id,
-              type: e.type,
-              origin: e.origin,
-              confidence: e.confidence,
-            }));
+            ).rows;
+
+      // Frontier: endpoints of touching edges that fell just outside the budget but are still in the
+      // over-fetched set. Bounded by hardCap so a hub node can't explode the canvas; endpoints
+      // beyond the over-fetch (or an excluded kind — packages/IAM/logs) aren't in `mapped`, so their
+      // edge is left to drop, preserving the "no dangling endpoint" guarantee.
+      const inView = new Set(budgetIds);
+      const byIdMapped = new Map(mapped.map((n) => [n.id, n] as const));
+      const frontier: GraphNodeDto[] = [];
+      for (const e of touchingEdges) {
+        for (const endpoint of [e.from_node_id, e.to_node_id]) {
+          if (inView.has(endpoint) || inView.size >= hardCap) continue;
+          const node = byIdMapped.get(endpoint);
+          if (!node) continue;
+          inView.add(endpoint);
+          frontier.push(node);
+        }
+      }
+
+      const nodes = frontier.length ? [...budget, ...frontier] : budget;
+      const edges = touchingEdges
+        .filter((e) => inView.has(e.from_node_id) && inView.has(e.to_node_id))
+        .map((e) => ({
+          id: e.id,
+          from: e.from_node_id,
+          to: e.to_node_id,
+          type: e.type,
+          origin: e.origin,
+          confidence: e.confidence,
+        }));
 
       return { nodes, edges, truncated };
     });
