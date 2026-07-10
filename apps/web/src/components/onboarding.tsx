@@ -111,9 +111,13 @@ export function Onboarding({ orgId, canSeed }: { orgId: string; canSeed: boolean
       <GraphBackdrop />
 
       {/* Big liquid-metal Atlas mark, bleeding a little off the top-right corner (the left-aligned
-          content leaves this space open). Decorative; the content sits above it. */}
-      <div className="pointer-events-none absolute -right-20 -top-24 z-0 hidden md:block">
-        <LiquidAtlasMark size={400} />
+          content leaves this space open). Decorative; sits behind the content. A soft glow gives the
+          metal contrast so it reads on the dark background. */}
+      <div className="pointer-events-none absolute -right-16 -top-16 z-0 hidden md:block">
+        <div className="relative">
+          <div className="absolute inset-12 rounded-full bg-foreground/5 blur-3xl" />
+          <LiquidAtlasMark size={440} />
+        </div>
       </div>
 
       <div className="relative z-10 space-y-12 duration-700 animate-in fade-in slide-in-from-bottom-2">
