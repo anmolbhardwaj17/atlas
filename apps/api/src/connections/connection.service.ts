@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import { withOrgScope, type Db, type ConnectionRow } from "@atlas/db";
 import type { Connection } from "@atlas/connector-sdk";
 import { enqueueSync, type SecretBroker, type JobQueue } from "@atlas/ingest";
+import { runInference, ALL_RULES, type InferenceStats } from "@atlas/inference";
 import { PG_POOL } from "../core/tokens";
 import { ApiException } from "../common/errors";
 import { ConnectorRegistry } from "./connector-registry";
@@ -34,6 +35,23 @@ export class ConnectionService {
     @Inject(JOB_QUEUE) private readonly queue: JobQueue,
     private readonly registry: ConnectorRegistry,
   ) {}
+
+  /**
+   * Re-run the full inference engine over the org's current graph (docs/05 §6.1) WITHOUT a
+   * re-crawl. Inference is global + idempotent, so this re-derives every cross-source edge
+   * (repo→runtime name-matching, SG/config/IAM correlation, …) from whatever nodes+signals exist
+   * right now. Recovery lever for when an edge was dropped (e.g. a source was disconnected +
+   * reconnected) but the deterministic signals are present again — no need to wait for the next
+   * sync's infer pass. Admin-gated at the controller.
+   */
+  async reindex(orgId: string): Promise<InferenceStats> {
+    const stats = await runInference({ db: this.db }, orgId, ALL_RULES);
+    this.logger.log(
+      `reindex ${orgId}: ${stats.candidates} candidates, ${stats.upserted} edges upserted, ` +
+        `${stats.retired} retired, ${stats.derivedNodes} derived nodes`,
+    );
+    return stats;
+  }
 
   async create(orgId: string, body: CreateConnectionBody): Promise<ConnectionDto> {
     return withOrgScope(this.db, orgId, async (c) => {

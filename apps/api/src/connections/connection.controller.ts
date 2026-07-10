@@ -6,6 +6,7 @@ import { Roles } from "../auth/roles.decorator";
 import { ApiException } from "../common/errors";
 import { parseBody } from "../common/validation";
 import { AuditService } from "../core/audit.service";
+import type { InferenceStats } from "@atlas/inference";
 import type { AuthedRequest } from "../auth/auth.types";
 import { ConnectionService } from "./connection.service";
 import {
@@ -66,6 +67,21 @@ export class ConnectionController {
       metadata: { provider: dto.provider, status: dto.status },
     });
     return dto;
+  }
+
+  /** Rebuild all inferred links over the current graph (no re-crawl). Admin-gated. Recovery lever
+   *  when an edge was dropped (e.g. a disconnect+reconnect) but its signals are present again. */
+  @Post("reindex")
+  @Roles("Admin")
+  async reindex(@Req() req: AuthedRequest): Promise<InferenceStats> {
+    const stats = await this.connections.reindex(org(req).id);
+    await this.audit.fromRequest(req, {
+      action: "graph.reindex",
+      targetType: "org",
+      targetId: org(req).id,
+      metadata: { upserted: stats.upserted, retired: stats.retired },
+    });
+    return stats;
   }
 
   @Post(":id/sync")

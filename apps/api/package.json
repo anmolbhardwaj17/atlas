@@ -19,6 +19,7 @@
     "@atlas/connector-jenkins": "workspace:*",
     "@atlas/connector-sdk": "workspace:*",
     "@atlas/db": "workspace:*",
+    "@atlas/inference": "workspace:*",
     "@atlas/ingest": "workspace:*",
     "@fastify/websocket": "^11.2.0",
     "@nestjs/common": "^11.0.1",

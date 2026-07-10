@@ -42,6 +42,7 @@ import {
   verifyConnection,
   deleteConnection,
   triggerSync,
+  reindexGraph,
   setChannel,
   testChannel,
   removeChannel,
@@ -113,6 +114,30 @@ export function IntegrationsHub({
   const [connectProvider, setConnectProvider] = React.useState<ProviderMeta | null>(null);
   const [tab, setTab] = React.useState<(typeof TABS)[number]>("All");
   const [query, setQuery] = React.useState("");
+  const [rebuilding, setRebuilding] = React.useState(false);
+
+  // Re-run inference over the current graph (no re-crawl) — recovers cross-source links (e.g.
+  // repo→runtime) that got dropped after a disconnect/reconnect, when their signals are present.
+  async function rebuildLinks(): Promise<void> {
+    setRebuilding(true);
+    try {
+      const s = await reindexGraph(orgId);
+      toast.success("Links rebuilt", {
+        description:
+          s.upserted > 0 || s.retired > 0
+            ? `${s.upserted} link${s.upserted === 1 ? "" : "s"} refreshed` +
+              (s.retired ? `, ${s.retired} stale removed` : "") +
+              "."
+            : "No changes — the graph was already up to date.",
+      });
+    } catch (e) {
+      toast.error("Couldn't rebuild links", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setRebuilding(false);
+    }
+  }
 
   // Deep-link from onboarding: `/integrations?connect=<providerId>` opens that provider's guided
   // setup straight away, so "pick AWS on the front door" lands the user in the AWS connect flow.
@@ -161,6 +186,26 @@ export function IntegrationsHub({
             Connect your cloud, code, CI/CD, and observability accounts. Atlas builds one cited
             graph across everything you connect.
           </p>
+          {canManage ? (
+            <div className="pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void rebuildLinks()}
+                disabled={rebuilding}
+              >
+                {rebuilding ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="size-3.5" />
+                )}
+                Rebuild links
+              </Button>
+              <span className="ml-2 align-middle text-xs text-muted-foreground">
+                Re-derive cross-source links (e.g. repo → service) without re-syncing.
+              </span>
+            </div>
+          ) : null}
         </div>
         <div className="hidden shrink-0 sm:block sm:max-w-[44%]">
           <LogoShowcase />

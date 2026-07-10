@@ -142,6 +142,24 @@ export async function removeMember(orgId: string, userId: string): Promise<void>
   if (!res.ok) throw new Error(await errorMessage(res, `Couldn't remove member (${res.status}).`));
 }
 
+/** Rebuild all inferred links over the current graph, no re-crawl (Admin+). Recovery lever when an
+ *  edge got dropped but its signals are present again. Returns how many edges changed. */
+export async function reindexGraph(
+  orgId: string,
+): Promise<{ candidates: number; upserted: number; retired: number; derivedNodes: number }> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/connections/reindex`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Couldn't rebuild links (${res.status}).`));
+  const body = (await res.json()) as {
+    data: { candidates: number; upserted: number; retired: number; derivedNodes: number };
+  };
+  return body.data;
+}
+
 /** Permanently delete an org and all its data (Owner-only). 204 → no body. Irreversible. */
 export async function deleteOrg(orgId: string): Promise<void> {
   const token = await getClientToken();
