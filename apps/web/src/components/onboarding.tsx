@@ -17,10 +17,11 @@ import {
   ArrowRight,
   type LucideIcon,
 } from "lucide-react";
-import { AtlasLogo } from "@/components/brand";
+import { LiquidAtlasMark } from "@/components/liquid-atlas-mark";
 import { Button } from "@/components/ui/button";
 import { PROVIDERS, ProviderLogo } from "@/components/integrations/providers";
 import { seedDemo } from "@/lib/browser-api";
+import { cn } from "@/lib/cn";
 
 /**
  * Onboarding / first-run empty state (P1.2, docs/09 §8). The graph is empty, so this is the org's
@@ -38,40 +39,48 @@ interface Capability {
   icon: LucideIcon;
   title: string;
   body: string;
+  /** Static (purge-safe) tint classes for the icon tile — one hue per capability. */
+  tint: string;
 }
 
 /** What a new org unlocks — kept in sync with what's actually shipped so the front door never
- *  undersells the product. */
+ *  undersells the product. Each gets its own hue so the grid reads as a colourful capability map. */
 const CAPABILITIES: Capability[] = [
   {
     icon: Waypoints,
     title: "Live infrastructure map",
     body: "Your cloud and code, wired together in one canvas you can trace end to end.",
+    tint: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
   },
   {
     icon: Lightbulb,
     title: "Insights & posture",
     body: "Prioritized findings across the Well-Architected pillars — not a wall of alerts.",
+    tint: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
   },
   {
     icon: ShieldCheck,
     title: "Security & vulnerabilities",
     body: "Known CVEs in your dependencies, ranked by real blast radius across repos.",
+    tint: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
   },
   {
     icon: Activity,
     title: "Operational intelligence",
     body: "See what's broken right now — with an AI root-cause, down to the PR.",
+    tint: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
   },
   {
     icon: MessagesSquare,
     title: "Ask Atlas",
     body: "Cited, confidence-tiered answers over your own graph — never a guess.",
+    tint: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
   },
   {
     icon: Bell,
     title: "Proactive alerts",
     body: "A heads-up in Slack, Discord, or Teams the moment something changes.",
+    tint: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
   },
 ];
 
@@ -89,8 +98,8 @@ export function Onboarding({ orgId, canSeed }: { orgId: string; canSeed: boolean
       <div className="mx-auto max-w-4xl space-y-12 duration-700 animate-in fade-in slide-in-from-bottom-2">
         {/* ── Hero ── */}
         <header className="space-y-5 text-center">
-          <div className="mx-auto grid size-14 place-items-center rounded-2xl border border-border bg-background shadow-sm">
-            <AtlasLogo size={30} spin className="size-[30px] dark:invert" />
+          <div className="mx-auto w-fit">
+            <LiquidAtlasMark size={64} />
           </div>
           <div className="space-y-3">
             <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
@@ -126,7 +135,12 @@ export function Onboarding({ orgId, canSeed }: { orgId: string; canSeed: boolean
                 key={c.title}
                 className="group rounded-xl border border-border bg-card/40 p-4 transition-all hover:-translate-y-0.5 hover:border-foreground/20 hover:bg-card hover:shadow-sm"
               >
-                <div className="grid size-9 place-items-center rounded-lg bg-muted text-foreground transition-colors group-hover:bg-foreground group-hover:text-background">
+                <div
+                  className={cn(
+                    "grid size-9 place-items-center rounded-lg transition-transform group-hover:scale-105",
+                    c.tint,
+                  )}
+                >
                   <c.icon className="size-[18px]" />
                 </div>
                 <p className="mt-3 text-sm font-medium">{c.title}</p>
