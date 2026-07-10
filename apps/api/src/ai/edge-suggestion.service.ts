@@ -3,9 +3,6 @@ import { withOrgScope, type Db } from "@atlas/db";
 import type { EdgeMatcherInput, EdgeSuggestion, RepoCandidate, RuntimeCandidate } from "@atlas/ai";
 import { PG_POOL } from "../core/tokens";
 
-/** Compute runtimes a repo can DEPLOYS_TO, and the repo kinds we match from. */
-const RUNTIME_KINDS = ["aws.lambda.function", "aws.ecs.service", "aws.ec2.instance"];
-const REPO_KINDS = ["bitbucket.repository", "github.repository"];
 // Bound the model prompt (cost + context). Enough for a real estate; excess is logged.
 const RUNTIME_CAP = 60;
 const REPO_CAP = 80;
@@ -45,6 +42,24 @@ export class EdgeSuggestionService {
   /** Runtimes with no active DEPLOYS_TO link + all repos + prior rejections. */
   async gather(orgId: string): Promise<GatheredContext> {
     return withOrgScope(this.db, orgId, async (c) => {
+      // Deploy TARGETS = every `compute` runtime kind, minus orchestration scaffolding (clusters,
+      // task-defs, container registries). Derived from node_kinds so it's cloud-agnostic + future-
+      // proof: a new AWS/Azure/GCP/EKS compute kind becomes a target automatically — we never assume
+      // "AWS Lambda" is where code runs. Deploy SOURCES = code-host repositories (not cloud registries).
+      const { rows: kindRows } = await c.query<{ kind: string; role: string }>(
+        `SELECT kind,
+                CASE WHEN category = 'compute'
+                       AND kind NOT LIKE '%.cluster' AND kind NOT LIKE '%.taskdef'
+                       AND kind NOT LIKE '%.ecr.repository' AND kind NOT LIKE '%.registry'
+                     THEN 'runtime'
+                     WHEN kind LIKE '%.repository' AND category <> 'compute'
+                     THEN 'repo'
+                     ELSE 'other' END AS role
+           FROM node_kinds`,
+      );
+      const runtimeKinds = kindRows.filter((r) => r.role === "runtime").map((r) => r.kind);
+      const repoKinds = kindRows.filter((r) => r.role === "repo").map((r) => r.kind);
+
       const { rows: runtimeRows } = await c.query<NodeRow>(
         `SELECT id, urn, kind, name, tags, attributes FROM nodes n
           WHERE kind = ANY($1) AND status = 'active'
@@ -54,7 +69,7 @@ export class EdgeSuggestionService {
             )
           ORDER BY name NULLS LAST
           LIMIT $2 + 1`,
-        [RUNTIME_KINDS, RUNTIME_CAP],
+        [runtimeKinds, RUNTIME_CAP],
       );
       const runtimesOverCap = Math.max(0, runtimeRows.length - RUNTIME_CAP);
       const runtimeCapped = runtimeRows.slice(0, RUNTIME_CAP);
@@ -62,7 +77,7 @@ export class EdgeSuggestionService {
       const { rows: repoRows } = await c.query<NodeRow>(
         `SELECT id, urn, kind, name, tags, attributes FROM nodes
           WHERE kind = ANY($1) AND status = 'active' ORDER BY name NULLS LAST LIMIT $2`,
-        [REPO_KINDS, REPO_CAP],
+        [repoKinds, REPO_CAP],
       );
 
       const { rows: rejRows } = await c.query<{
