@@ -260,6 +260,33 @@
   }
 }
 
+/* ── Onboarding "What you'll get" illustrations ─────────────────────────────────────────────
+   Small, self-contained motion primitives shared by the capability illustrations. All gated on
+   prefers-reduced-motion so the scenes hold still for users who ask for less motion. */
+@keyframes illo-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+@keyframes illo-dash {
+  to {
+    stroke-dashoffset: -14;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .illo-float {
+    animation: illo-float 4s ease-in-out infinite;
+  }
+  .illo-edge {
+    stroke-dasharray: 4 5;
+    animation: illo-dash 1.1s linear infinite;
+  }
+}
+
 /* React Flow (infrastructure map) — its built-in UI (minimap, controls, edge labels) defaults to
    light; theme it for dark mode so nothing glows white on the dark canvas. */
 .dark .react-flow__minimap {

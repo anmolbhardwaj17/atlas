@@ -20,6 +20,7 @@ import {
 import { LiquidAtlasMark } from "@/components/liquid-atlas-mark";
 import { Button } from "@/components/ui/button";
 import { PROVIDERS, ProviderLogo } from "@/components/integrations/providers";
+import { MapIllustration } from "@/components/onboarding/illustrations/map-illustration";
 import { seedDemo } from "@/lib/browser-api";
 import { cn } from "@/lib/cn";
 
@@ -41,6 +42,9 @@ interface Capability {
   body: string;
   /** Static (purge-safe) tint classes for the icon tile — one hue per capability. */
   tint: string;
+  /** Bespoke animated illustration for this capability. Built one at a time; until a capability
+   *  has its own, the card shows a clean fallback (its icon on a tinted wash). */
+  Illustration?: React.ComponentType;
 }
 
 /** What a new org unlocks — kept in sync with what's actually shipped so the front door never
@@ -51,6 +55,7 @@ const CAPABILITIES: Capability[] = [
     title: "Live infrastructure map",
     body: "Your cloud and code, wired together in one canvas you can trace end to end.",
     tint: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+    Illustration: MapIllustration,
   },
   {
     icon: Lightbulb,
@@ -126,25 +131,33 @@ export function Onboarding({ orgId, canSeed }: { orgId: string; canSeed: boolean
           </div>
         </header>
 
-        {/* ── What you'll get ── */}
+        {/* ── What you'll get ── each card = a bespoke animated illustration + title + blurb ── */}
         <section className="space-y-4">
           <SectionLabel>What you'll get</SectionLabel>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {CAPABILITIES.map((c) => (
               <div
                 key={c.title}
-                className="group rounded-xl border border-border bg-card/40 p-4 transition-all hover:-translate-y-0.5 hover:border-foreground/20 hover:bg-card hover:shadow-sm"
+                className="group overflow-hidden rounded-2xl border border-border bg-card/40 transition-all hover:border-foreground/20 hover:shadow-sm"
               >
-                <div
-                  className={cn(
-                    "grid size-9 place-items-center rounded-lg transition-transform group-hover:scale-105",
-                    c.tint,
+                <div className="relative aspect-[2/1] overflow-hidden border-b border-border/60 bg-gradient-to-b from-muted/30 to-transparent">
+                  {c.Illustration ? (
+                    <c.Illustration />
+                  ) : (
+                    <FallbackIllustration icon={c.icon} tint={c.tint} />
                   )}
-                >
-                  <c.icon className="size-[18px]" />
                 </div>
-                <p className="mt-3 text-sm font-medium">{c.title}</p>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{c.body}</p>
+                <div className="p-4">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn("grid size-6 shrink-0 place-items-center rounded-md", c.tint)}
+                    >
+                      <c.icon className="size-3.5" />
+                    </span>
+                    <p className="text-sm font-medium">{c.title}</p>
+                  </div>
+                  <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{c.body}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -172,6 +185,18 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     <h2 className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
       {children}
     </h2>
+  );
+}
+
+/** Placeholder illustration for capabilities whose bespoke scene isn't built yet — its icon on a
+ *  soft tinted wash, gently floating. Keeps the grid consistent while illustrations land one by one. */
+function FallbackIllustration({ icon: Icon, tint }: { icon: LucideIcon; tint: string }) {
+  return (
+    <div className="absolute inset-0 grid place-items-center">
+      <div className={cn("illo-float grid size-14 place-items-center rounded-2xl", tint)}>
+        <Icon className="size-7" />
+      </div>
+    </div>
   );
 }
 
