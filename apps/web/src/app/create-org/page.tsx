@@ -14,8 +14,8 @@ interface MeResponse {
 /**
  * The single "create an organization" surface (docs/12 §6.3) — reachable by a brand-new org-less
  * user (funneled from `/`) and by an existing user spinning up a second workspace (org switcher).
- * A clean, centered single-column flow: a small brand mark, then the 2-step wizard. No sign-in-style
- * hero here — this is setup, not marketing.
+ * A clean, centered, card-less flow: the Atlas mark up top, the wizard in the middle. No sign-in
+ * hero — this is setup, not marketing.
  */
 export default async function CreateOrgPage() {
   const session = await getSession();
@@ -25,7 +25,7 @@ export default async function CreateOrgPage() {
   const hasOrgs = (me?.memberships.length ?? 0) > 0;
 
   return (
-    <main className="relative min-h-dvh overflow-hidden bg-muted/30">
+    <main className="relative flex min-h-dvh flex-col bg-background">
       {/* A soft brand glow at the top — a hint of the Atlas AI green, tasteful, both themes. */}
       <div
         aria-hidden
@@ -45,12 +45,19 @@ export default async function CreateOrgPage() {
         </Link>
       ) : null}
 
-      <div className="relative mx-auto flex min-h-dvh w-full max-w-xl flex-col justify-center px-6 py-16">
-        <div className="mb-6 flex items-center gap-2.5">
+      {/* Brand — top, centered. */}
+      <div className="relative flex justify-center pt-12">
+        <div className="flex items-center gap-2.5">
           <AtlasLogo size={30} className="size-[30px] dark:invert" />
           <span className="text-lg font-semibold tracking-tight">Atlas</span>
         </div>
-        <CreateOrgForm />
+      </div>
+
+      {/* Wizard — vertically centered in the remaining space. */}
+      <div className="relative flex flex-1 items-center justify-center px-6 pb-16">
+        <div className="w-full max-w-lg">
+          <CreateOrgForm />
+        </div>
       </div>
     </main>
   );

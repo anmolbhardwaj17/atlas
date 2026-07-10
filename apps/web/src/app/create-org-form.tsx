@@ -183,7 +183,7 @@ export function CreateOrgForm() {
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+    <div className="w-full">
       <StepEyebrow n={step} />
 
       {step === 1 ? (
