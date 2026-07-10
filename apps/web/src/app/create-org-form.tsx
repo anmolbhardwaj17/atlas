@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ImagePlus, Loader2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { apiUrl } from "@/lib/env";
+import { ACTIVE_ORG_COOKIE } from "@/lib/active-org";
 import { fileToLogoDataUrl } from "@/lib/read-image";
 import { OrgLogo } from "@/components/org-logo";
 import { Input } from "@/components/ui/input";
@@ -51,8 +52,17 @@ export function CreateOrgForm() {
       body: JSON.stringify({ name: name.trim(), ...(logo ? { logo } : {}) }),
     });
     if (res.ok) {
+      // Land inside the org we just created — set it active, then go to its dashboard. Without this
+      // a refresh would drop us into whatever org is default/first, not the new one (and for an
+      // existing user, `/` would just bounce back to their current org).
+      const created = (await res.json().catch(() => null)) as { data?: { id?: string } } | null;
+      const newOrgId = created?.data?.id;
+      if (newOrgId) {
+        document.cookie = `${ACTIVE_ORG_COOKIE}=${newOrgId}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+      }
       setName("");
       setLogo(null);
+      router.push("/dashboard");
       router.refresh();
     } else {
       const body: unknown = await res.json().catch(() => null);

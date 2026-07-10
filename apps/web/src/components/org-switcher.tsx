@@ -145,7 +145,7 @@ export function OrgSwitcher({
           ))}
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            onClick={() => router.push("/")}
+            onClick={() => router.push("/create-org")}
             className="gap-2 text-muted-foreground"
           >
             <span className="grid size-6 shrink-0 place-items-center">
