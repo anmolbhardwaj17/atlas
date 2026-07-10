@@ -11,6 +11,10 @@ coverage/
 .turbo/
 *.tsbuildinfo
 
+# Mutation testing (Stryker) — temp sandbox + generated reports
+.stryker-tmp/
+reports/
+
 # Environment & secrets (NEVER commit — see docs/13)
 .env
 .env.*

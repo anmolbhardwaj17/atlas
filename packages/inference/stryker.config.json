@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "_comment": "Mutation testing for the inference critical core (docs/14 DD-4: 'mutation testing on the critical core — inference, isolation, crawler, confidence'). We mutate the PURE rule logic (r1-r13) + evaluate.ts and run the DB-free unit suites (the g12/g13/g14 + r* tests cover every rule without Postgres). engine.ts is excluded: its tests are live-PG (describe.skip'd without a DB), so mutating it here would report false 'survived' mutants. The full engine mutation run belongs in the nightly integration job where a Postgres is available.",
+  "packageManager": "pnpm",
+  "testRunner": "vitest",
+  "vitest": { "configFile": "vitest.config.ts" },
+  "_plugins_comment": "Declare the runner plugin by name — pnpm's symlinked node_modules defeats Stryker's default '@stryker-mutator/*' auto-glob, so it must be resolved explicitly (else: 'Cannot find TestRunner plugin vitest').",
+  "plugins": ["@stryker-mutator/vitest-runner"],
+  "coverageAnalysis": "perTest",
+  "mutate": [
+    "src/rules/*.ts",
+    "src/evaluate.ts",
+    "!src/rules/index.ts",
+    "!src/**/*.test.ts"
+  ],
+  "ignoreStatic": true,
+  "reporters": ["clear-text", "html", "progress"],
+  "htmlReporter": { "fileName": "reports/mutation/index.html" },
+  "_thresholds_comment": "break = the regression FLOOR (CI fails below it). Set to the current measured score (62%) so the suite can only ratchet UP: any new inference code without matching tests drops the score and fails. Raise this as we kill the known survivors (refs.ts 19%, r9 51%, r10 62%). high/low are report colors only.",
+  "thresholds": { "high": 85, "low": 75, "break": 62 },
+  "tempDirName": ".stryker-tmp",
+  "cleanTempDir": true
+}
