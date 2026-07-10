@@ -296,6 +296,17 @@
     opacity: 0;
   }
 }
+@keyframes illo-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.35);
+  }
+}
 @media (prefers-reduced-motion: no-preference) {
   .illo-float {
     animation: illo-float 4s ease-in-out infinite;
@@ -313,6 +324,9 @@
     transform-box: fill-box;
     transform-origin: center;
     animation: illo-ripple 3s ease-out infinite;
+  }
+  .illo-pulse {
+    animation: illo-pulse 1.8s ease-in-out infinite;
   }
 }
 /* Motion-only decorations (travelling pulses, radar pings) hide entirely under reduced motion. */

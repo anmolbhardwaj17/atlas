@@ -1,48 +1,61 @@
 "use client";
 
-import { Globe, Server, Cpu, Boxes, Database, type LucideIcon } from "lucide-react";
-import { cn } from "@/lib/cn";
+import { CloudIcon } from "@/components/cloud-icon";
 
 /**
- * "Live infrastructure map" illustration — a mini node graph that mirrors the real map: an entry
- * point flowing through compute into a datastore, with pulses travelling the edges to signal the
- * continuously-updated, live nature of the graph. SVG edges (in a 2:1 viewBox) + HTML node chips
- * positioned by percentage so the two layers stay aligned at any size.
+ * "Live infrastructure map" illustration — a realistic mini map: real cloud-service + code logos on
+ * card chips (GitHub → API Gateway → ECS/Lambda → RDS/S3), wired by edges with pulses travelling
+ * along them, over a dotted canvas with a "Live" freshness pill. Mirrors the real map's look with
+ * actual brand logos, per the reference direction.
  */
 
 const W = 300;
 const H = 150;
 
-interface GraphNode {
+interface MapNode {
   id: string;
   x: number;
   y: number;
-  icon: LucideIcon;
-  tint: string;
+  logo: string;
   delay: number;
 }
 
-const NODES: GraphNode[] = [
-  { id: "entry", x: 32, y: 75, icon: Globe, tint: "text-sky-500", delay: 0 },
-  { id: "api", x: 110, y: 75, icon: Server, tint: "text-sky-500", delay: 0.7 },
-  { id: "svcA", x: 194, y: 42, icon: Cpu, tint: "text-violet-500", delay: 1.2 },
-  { id: "svcB", x: 194, y: 108, icon: Boxes, tint: "text-violet-500", delay: 0.35 },
-  { id: "db", x: 270, y: 75, icon: Database, tint: "text-emerald-500", delay: 0.95 },
+const NODES: MapNode[] = [
+  { id: "repo", x: 34, y: 28, logo: "github-icon", delay: 0.2 },
+  { id: "api", x: 34, y: 96, logo: "aws-api-gateway", delay: 0.9 },
+  { id: "ecs", x: 122, y: 50, logo: "aws-ecs", delay: 1.3 },
+  { id: "lambda", x: 122, y: 112, logo: "aws-lambda", delay: 0.5 },
+  { id: "rds", x: 244, y: 50, logo: "aws-rds", delay: 1.0 },
+  { id: "s3", x: 244, y: 112, logo: "aws-s3", delay: 0.35 },
 ];
-const node = (id: string): GraphNode => NODES.find((n) => n.id === id) ?? NODES[0]!;
+const node = (id: string): MapNode => NODES.find((n) => n.id === id) ?? NODES[0]!;
 
-/** [from, to, pulse-start-delay(s)] */
+/** [from, to, pulse-delay(s), flowing?] */
 const EDGES: Array<[string, string, number]> = [
-  ["entry", "api", 0],
-  ["api", "svcA", 0.5],
-  ["api", "svcB", 0.9],
-  ["svcA", "db", 1.3],
-  ["svcB", "db", 1.7],
+  ["repo", "ecs", 0.2],
+  ["api", "ecs", 0.6],
+  ["api", "lambda", 1.0],
+  ["ecs", "rds", 1.4],
+  ["lambda", "s3", 1.8],
 ];
+
+const pct = (v: number, total: number): string => `${(v / total) * 100}%`;
 
 export function MapIllustration() {
   return (
     <div className="absolute inset-0">
+      {/* Dotted canvas, like the real map. */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle, hsl(var(--muted-foreground) / 0.22) 1px, transparent 1px)",
+          backgroundSize: "13px 13px",
+          maskImage: "radial-gradient(ellipse 90% 90% at 50% 50%, black, transparent 92%)",
+          WebkitMaskImage: "radial-gradient(ellipse 90% 90% at 50% 50%, black, transparent 92%)",
+        }}
+      />
+
       <svg
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="xMidYMid meet"
@@ -60,13 +73,13 @@ export function MapIllustration() {
                 fill="none"
                 className="illo-edge"
                 stroke="hsl(var(--muted-foreground))"
-                strokeOpacity={0.35}
+                strokeOpacity={0.34}
                 strokeWidth={1.25}
                 strokeLinecap="round"
                 vectorEffect="non-scaling-stroke"
               />
               <circle
-                r={2.4}
+                r={2.2}
                 className="illo-flow-dot fill-sky-500 [filter:drop-shadow(0_0_3px_rgb(14_165_233/0.7))]"
               >
                 <animateMotion dur="2.6s" begin={`${delay}s`} repeatCount="indefinite">
@@ -78,27 +91,29 @@ export function MapIllustration() {
         })}
       </svg>
 
-      {NODES.map((n) => {
-        const Icon = n.icon;
-        return (
+      {NODES.map((n) => (
+        <div
+          key={n.id}
+          className="absolute"
+          style={{ left: pct(n.x, W), top: pct(n.y, H), transform: "translate(-50%, -50%)" }}
+        >
           <div
-            key={n.id}
-            className="absolute"
-            style={{
-              left: `${(n.x / W) * 100}%`,
-              top: `${(n.y / H) * 100}%`,
-              transform: "translate(-50%, -50%)",
-            }}
+            className="illo-float grid size-9 place-items-center rounded-lg border border-border bg-background shadow-sm"
+            style={{ animationDelay: `${n.delay}s` }}
           >
-            <div
-              className="illo-float grid size-8 place-items-center rounded-lg border border-border bg-background shadow-sm"
-              style={{ animationDelay: `${n.delay}s` }}
-            >
-              <Icon className={cn("size-4", n.tint)} />
-            </div>
+            <CloudIcon name={n.logo} className="size-5" />
           </div>
-        );
-      })}
+        </div>
+      ))}
+
+      {/* Live freshness pill. */}
+      <div className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full border border-border bg-background/90 px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground shadow-sm">
+        <span className="relative flex size-1.5">
+          <span className="illo-ripple absolute inline-flex size-full rounded-full bg-emerald-500/60" />
+          <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+        </span>
+        Live
+      </div>
     </div>
   );
 }
