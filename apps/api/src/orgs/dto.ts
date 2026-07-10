@@ -118,4 +118,7 @@ export interface InvitationDto {
   /** The accept link — returned ONLY when the invite is first created, so the inviter can copy it
    *  (email delivery is the primary path). Never returned by `list` (the token isn't recoverable). */
   acceptUrl?: string;
+  /** Whether the invite email actually delivered (Resend accepted it). Returned only on `create`,
+   *  so the UI can confirm "emailed ✓" vs. fall back to the copy-link when it truly didn't send. */
+  emailed?: boolean;
 }

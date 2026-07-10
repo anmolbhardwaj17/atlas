@@ -94,9 +94,9 @@ export class InvitationService {
       // Deliver the accept link by email (Resend), and also return it so the UI can offer a
       // copyable link — the link works even if email delivery is unavailable.
       const acceptUrl = `${this.env.WEB_ORIGIN}/invite/${token}`;
-      await this.email.sendInvite({ to: dto.email, orgName, role: dto.role, acceptUrl });
-      this.logger.log(`Invitation ${dto.id} for ${dto.email} created.`);
-      return { ...dto, acceptUrl };
+      const emailed = await this.email.sendInvite({ to: dto.email, orgName, role: dto.role, acceptUrl });
+      this.logger.log(`Invitation ${dto.id} for ${dto.email} created (emailed: ${emailed}).`);
+      return { ...dto, acceptUrl, emailed };
     } catch (e) {
       if (isPgUnique(e)) {
         throw ApiException.alreadyExists("A pending invitation already exists for this email.");

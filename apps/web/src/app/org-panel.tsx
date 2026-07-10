@@ -87,6 +87,7 @@ export function OrgPanel({
     email: string;
     role: string;
     url?: string;
+    emailed: boolean;
   } | null>(null);
   const [copied, setCopied] = useState(false);
   const [busyUser, setBusyUser] = useState<string | null>(null);
@@ -139,13 +140,21 @@ export function OrgPanel({
         const invitedEmail = body.data.email as string;
         const invitedRole = body.data.role as string;
         const url = body.data.acceptUrl as string | undefined;
+        const emailed = body.data.emailed === true;
         setEmail("");
         setNote(`Invited ${invitedEmail} as ${invitedRole}.`);
-        setLastInvite({ email: invitedEmail, role: invitedRole, ...(url ? { url } : {}) });
+        setLastInvite({ email: invitedEmail, role: invitedRole, emailed, ...(url ? { url } : {}) });
         setCopied(false);
-        toast.success(`Invitation created for ${invitedEmail}`, {
-          description: `They'll join as ${invitedRole} once they accept.`,
-        });
+        toast.success(
+          emailed
+            ? `Invitation emailed to ${invitedEmail}`
+            : `Invitation created for ${invitedEmail}`,
+          {
+            description: emailed
+              ? `They'll join as ${invitedRole} once they accept.`
+              : `Email couldn't be delivered — share the invite link below.`,
+          },
+        );
         void load();
       } else {
         const message = body.error?.message ?? `Failed (${res.status})`;
@@ -382,16 +391,25 @@ export function OrgPanel({
               </Button>
             </div>
             {note ? <p className="text-sm text-muted-foreground">{note}</p> : null}
-            {/* Persistent copy-link box — the primary way to bring in a teammate while automatic
-                email delivery isn't configured. Stays until dismissed or the next invite. */}
-            {lastInvite?.url ? (
+            {/* After an invite: confirm it emailed, OR — when delivery failed / isn't configured —
+                fall back to the copyable accept link (which always works). Honest either way. */}
+            {lastInvite ? (
               <div className="space-y-2 rounded-md border bg-muted/40 p-3">
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-xs text-muted-foreground">
-                    Can&rsquo;t email yet? Send this link to{" "}
-                    <span className="font-medium text-foreground">{lastInvite.email}</span> so they
-                    can join:
-                  </p>
+                  {lastInvite.emailed ? (
+                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Check className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                      Invitation emailed to{" "}
+                      <span className="font-medium text-foreground">{lastInvite.email}</span>. You
+                      can also copy the link:
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Email couldn&rsquo;t be delivered — send this link to{" "}
+                      <span className="font-medium text-foreground">{lastInvite.email}</span> so
+                      they can join:
+                    </p>
+                  )}
                   <button
                     type="button"
                     onClick={() => setLastInvite(null)}
@@ -401,26 +419,28 @@ export function OrgPanel({
                     <X className="size-3.5" />
                   </button>
                 </div>
-                <div className="flex gap-2">
-                  <Input
-                    readOnly
-                    value={lastInvite.url}
-                    onFocus={(e) => e.currentTarget.select()}
-                    className="h-9 flex-1 font-mono text-xs"
-                    aria-label="Invite link"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      const u = lastInvite.url;
-                      if (u) void copyLink(u);
-                    }}
-                  >
-                    {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-                    {copied ? "Copied" : "Copy link"}
-                  </Button>
-                </div>
+                {lastInvite.url ? (
+                  <div className="flex gap-2">
+                    <Input
+                      readOnly
+                      value={lastInvite.url}
+                      onFocus={(e) => e.currentTarget.select()}
+                      className="h-9 flex-1 font-mono text-xs"
+                      aria-label="Invite link"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        const u = lastInvite.url;
+                        if (u) void copyLink(u);
+                      }}
+                    >
+                      {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                      {copied ? "Copied" : "Copy link"}
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </form>

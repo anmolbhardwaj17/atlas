@@ -33,7 +33,9 @@ export class EmailService {
     this.webOrigin = env.WEB_ORIGIN;
   }
 
-  async sendInvite(msg: InviteEmail): Promise<void> {
+  /** Returns whether the email was actually delivered (so callers can tell the user honestly, and
+   *  fall back to the copy-link only when it truly wasn't sent). */
+  async sendInvite(msg: InviteEmail): Promise<boolean> {
     const html = emailShell({
       heading: `You're invited to ${escapeHtml(msg.orgName)}`,
       body: `You've been invited to join <b>${escapeHtml(msg.orgName)}</b> on Atlas as <b>${escapeHtml(
@@ -44,7 +46,7 @@ export class EmailService {
         msg.to,
       )}</b> to accept. This link expires in 7 days. If you didn't expect this, you can ignore it.`,
     });
-    await this.send(msg.to, `You're invited to join ${msg.orgName} on Atlas`, html);
+    return this.send(msg.to, `You're invited to join ${msg.orgName} on Atlas`, html);
   }
 
   async sendWelcome(msg: WelcomeEmail): Promise<void> {
@@ -77,10 +79,12 @@ export class EmailService {
     await this.send(msg.to, "Welcome to Atlas", html);
   }
 
-  private async send(to: string, subject: string, html: string): Promise<void> {
+  /** Returns true only if the provider accepted the message. Never throws — a failure is logged and
+   *  reported as `false` so the caller can fall back (e.g. surface a copy-link) without breaking. */
+  private async send(to: string, subject: string, html: string): Promise<boolean> {
     if (!this.apiKey) {
       this.logger.warn(`RESEND_API_KEY unset - email "${subject}" to ${to} NOT sent.`);
-      return;
+      return false;
     }
     try {
       const res = await fetch("https://api.resend.com/emails", {
@@ -93,11 +97,13 @@ export class EmailService {
         this.logger.error(
           `Resend "${subject}" to ${to} failed (${res.status}): ${body.slice(0, 200)}`,
         );
-        return;
+        return false;
       }
       this.logger.log(`Email "${subject}" sent to ${to}.`);
+      return true;
     } catch (e) {
       this.logger.error(`Email "${subject}" to ${to} errored: ${(e as Error).message}`);
+      return false;
     }
   }
 }
