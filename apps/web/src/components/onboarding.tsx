@@ -23,6 +23,7 @@ import { PROVIDERS, ProviderLogo } from "@/components/integrations/providers";
 import { MapIllustration } from "@/components/onboarding/illustrations/map-illustration";
 import { InsightsIllustration } from "@/components/onboarding/illustrations/insights-illustration";
 import { SecurityIllustration } from "@/components/onboarding/illustrations/security-illustration";
+import { OperationalIllustration } from "@/components/onboarding/illustrations/operational-illustration";
 import { seedDemo } from "@/lib/browser-api";
 import { cn } from "@/lib/cn";
 
@@ -78,6 +79,7 @@ const CAPABILITIES: Capability[] = [
     title: "Operational intelligence",
     body: "See what's broken right now — with an AI root-cause, down to the PR.",
     tint: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+    Illustration: OperationalIllustration,
   },
   {
     icon: MessagesSquare,
