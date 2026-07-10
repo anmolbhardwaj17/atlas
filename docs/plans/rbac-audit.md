@@ -59,6 +59,12 @@ enforced twice: `PATCH /orgs/:id` is Admin-only, and `OrgCard` renders no edit a
 Member. Nothing to fix. The only open items are the two **policy** questions above (mute = Member?;
 AI conversations org-shared vs private), which are product decisions, not defects.
 
+### ⏳ Deferred (user, 2026-07-10) — live browser verification
+This audit is **code-level** (guards + UI conditionals + reasoning), not a live click-through. A
+follow-up pass — sign in as a Member and confirm the UI hides every Admin control and a direct API
+call returns 403 — is parked for later (needs a Member test account + the user's go-ahead per the
+browser-verification preference).
+
 ### Suggested (optional) hardening for regression safety
 - The generic guard logic is unit-tested (`roles.guard.test.ts`, `tenant-scope.guard.test.ts`). The
   **Owner-protection** rules in `org.service` (BR-MEM-2/3) are only covered by DB-gated integration
