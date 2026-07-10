@@ -46,6 +46,12 @@ const rds = (name: string, tags: Record<string, string>): NodeLite => ({
   kind: "aws.rds.instance",
   attributes: { dbInstanceIdentifier: name, tags },
 });
+const ec2 = (id: string, tags: Record<string, string>): NodeLite => ({
+  id,
+  urn: `aws:us-east-1:111122223333:ec2-instance:${id}`,
+  kind: "aws.ec2.instance",
+  attributes: { instanceId: id, tags },
+});
 
 describe("R11 tag_code_correlation", () => {
   it("repoSegment extracts the repo name from a path/URL and strips .git", () => {
@@ -131,5 +137,47 @@ describe("R11 tag_code_correlation", () => {
   it("no repos → no edges (nothing to match against)", () => {
     const input = buildInput([lambda("fn", { repository: "payments" })]);
     expect(tagCodeCorrelationRule.evaluate(input).edges).toHaveLength(0);
+  });
+
+  // --- Name-tag path (the repo→EC2 bridge over existing data) ---
+
+  it("an EC2 `Name` tag matching a repo → DEPLOYS_TO, but inferred-LOW (weaker than a code tag)", () => {
+    const input = buildInput([repo("payments"), ec2("i-0abc", { Name: "payments-prod" })]);
+    const edges = tagCodeCorrelationRule.evaluate(input).edges;
+    expect(edges).toHaveLength(1);
+    expect(edges[0]).toMatchObject({
+      type: "DEPLOYS_TO",
+      fromUrn: "bitbucket:siemba:repository/payments",
+      toUrn: "aws:us-east-1:111122223333:ec2-instance:i-0abc",
+      tier: "inferred-low", // a Name is a display label, never asserted high
+      evidence: { match: "resource-name-tag", tagKey: "Name" },
+    });
+  });
+
+  it("a unique `Name` match is still capped at low (never high, unlike a `repository` tag)", () => {
+    const input = buildInput([repo("checkout"), lambda("fn", { Name: "checkout" })]);
+    const edges = tagCodeCorrelationRule.evaluate(input).edges;
+    expect(edges).toHaveLength(1);
+    expect(edges[0]?.tier).toBe("inferred-low");
+  });
+
+  it("a messy `Name` that doesn't normalize to a clean slug → no edge (P3: miss, not wrong)", () => {
+    const input = buildInput([repo("payments"), ec2("i-1", { Name: "MyCo Prod Payments API" })]);
+    expect(tagCodeCorrelationRule.evaluate(input).edges).toHaveLength(0);
+  });
+
+  it("a generic `Name` (web/app/server) proves nothing → no edge", () => {
+    const input = buildInput([repo("web"), ec2("i-2", { Name: "web" })]);
+    expect(tagCodeCorrelationRule.evaluate(input).edges).toHaveLength(0);
+  });
+
+  it("a deliberate `repository` tag still beats a `Name` on the same host → inferred-high wins", () => {
+    const input = buildInput([
+      repo("payments"),
+      ec2("i-3", { repository: "payments", Name: "payments" }),
+    ]);
+    const edges = tagCodeCorrelationRule.evaluate(input).edges;
+    expect(edges).toHaveLength(1);
+    expect(edges[0]?.tier).toBe("inferred-high");
   });
 });

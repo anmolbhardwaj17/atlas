@@ -270,8 +270,8 @@ Each rule below shows: trigger, evidence, output edge, confidence, and *why that
 
 **R11 — `tag_code_correlation` → `DEPLOYS_TO` (inferred-high / inferred-low)**
 - **Inputs:** compute-runtime nodes (`aws.lambda.function`, `aws.ecs.service`, `aws.ec2.instance`) carrying resource `tags` + crawled `bitbucket.repository`/`github.repository` nodes.
-- **Match:** a recognized code-identifying tag (`repository`, `repo`, `git_repository`, `service`, `application`, `app`, `project`, `component`, `aws:cloudformation:stack-name`, …) whose value — reduced to its repo segment and normalized (env-suffix + non-alphanum stripped, shared with R10) — is **exactly equal** to a repo slug.
-- **Confidence:** `inferred-high` when the value matches exactly one repo (a tag is a deliberate human label — stronger than a name guess); `inferred-low` per repo when the same normalized value matches several (ambiguous → many low, never one wrong high, BR-EDGE-4/5). Generic or <4-char values are skipped (shared `GENERIC_TOKENS`).
+- **Match:** a recognized code-identifying tag (`repository`, `repo`, `git_repository`, `service`, `application`, `app`, `project`, `component`, `aws:cloudformation:stack-name`, …) whose value — reduced to its repo segment and normalized (env-suffix + non-alphanum stripped, shared with R10) — is **exactly equal** to a repo slug. The instance/resource **`Name`** tag is also matched (the universal identifier, esp. for EC2 — the main repo→EC2 bridge over data we already crawl), but only ever at `inferred-low`: a `Name` is a display label, weaker evidence than a deliberate code tag.
+- **Confidence:** `inferred-high` when a **deliberate code tag** matches exactly one repo (a tag is a deliberate human label — stronger than a name guess); `inferred-low` per repo when the same normalized value matches several (ambiguous → many low, never one wrong high, BR-EDGE-4/5), **and always `inferred-low` for a `Name`-tag match** (a hint, never asserted). Generic or <4-char values are skipped (shared `GENERIC_TOKENS`) — so a messy `Name` ("MyCo Prod Payments API") won't match; only a clean `payments` will.
 - **Scope:** only compute runtimes are `DEPLOYS_TO` targets — a `service`/`team` tag on a *datastore* is ownership, not deployment (a future `OWNED_BY` extension), not a deploy edge.
 - **Why:** teams already label what-belongs-to-what; reading that label is higher-precision than inferring from names (R1/R10). Exact-equality + non-generic is the precision guarantee (P3).
 - **Evidence stored:** the tag key + value + matched repo slug + the tagged resource URN (P4). See `docs/plans/signal-enrichment.md`.
@@ -296,7 +296,7 @@ Each rule below shows: trigger, evidence, output edge, confidence, and *why that
 |---|---|---|---|
 | `observed` | Directly read from a source API | R5, R7, SG/ENI facts | stated as fact + source link |
 | `inferred-high` | Strong structural/config evidence | R1(ARN), R2, R3, R4, R6(single-svc), R11(unique tag), R12(SHA match), R13(service-name env) | "Atlas infers (high confidence)… based on <evidence>" |
-| `inferred-low` | Plausible but uncertain (heuristic/permission) | R1(name), R6(monorepo), R8, R10, R11(ambiguous tag) | "possibly… (low confidence); evidence is <X>; not certain" |
+| `inferred-low` | Plausible but uncertain (heuristic/permission) | R1(name), R6(monorepo), R8, R10, R11(ambiguous tag / Name tag) | "possibly… (low confidence); evidence is <X>; not certain" |
 
 ### 6.5 Reconciliation & convergence (FR-4.6)
 After each sync's infer stage:

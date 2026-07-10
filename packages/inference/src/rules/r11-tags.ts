@@ -12,6 +12,12 @@
  * tag on a *datastore* is ownership, not deployment (a future OWNED_BY extension), so it is
  * deliberately out of scope here. Evidence carries the tag key/value + matched slug (P4).
  *
+ * The `Name` tag is handled too but always at `inferred-low`: it's a display label (often the
+ * only identifier an EC2 box carries), weaker evidence than a deliberate code tag — so an exact
+ * `Name` match to a repo is a hint, never asserted high. This is the main repo→EC2 bridge over
+ * data we already crawl (no extra IAM), and the same exact-equality + generic guard keeps it
+ * precise: a messy `Name` ("MyCo Prod Payments API") won't match; only a clean `payments` will.
+ *
  * Reuses R10's `normalizeWorkload` (env-suffix + non-alphanum stripping) and `GENERIC_TOKENS`
  * so the two code↔infra matchers share one notion of "meaningful name".
  */
@@ -37,7 +43,13 @@ const CODE_TAG_KEYS = new Set([
   "project",
   "component",
   "aws:cloudformation:stack-name",
+  // The instance/resource display name — the universal identifier (esp. for EC2). Weaker than a
+  // deliberate code tag, so matches on it are forced to inferred-low below.
+  "name",
 ]);
+
+/** Tag keys that are display labels, not deliberate code labels → capped at inferred-low. */
+const WEAK_TAG_KEYS = new Set(["name"]);
 
 /** Kinds that can be a DEPLOYS_TO target: compute runtimes only (not datastores). */
 const TARGET_KINDS = ["aws.lambda.function", "aws.ecs.service", "aws.ec2.instance"] as const;
@@ -92,9 +104,10 @@ export const tagCodeCorrelationRule: Rule = {
           if (norm.length < 4 || GENERIC_TOKENS.has(norm)) continue;
           const matched = reposByNorm.get(norm);
           if (!matched || matched.length === 0) continue;
-          // One repo → an explicit label to a single repo: inferred-high. Several repos with
-          // the same normalized slug → ambiguous → inferred-low each (never one wrong high).
-          const tier = matched.length === 1 ? "inferred-high" : "inferred-low";
+          // A deliberate code tag: unique match → inferred-high; ambiguous → inferred-low each
+          // (never one wrong high). A `Name` (display-label) match is always inferred-low.
+          const weak = WEAK_TAG_KEYS.has(rawKey.toLowerCase());
+          const tier = !weak && matched.length === 1 ? "inferred-high" : "inferred-low";
           for (const repo of matched) {
             keep({
               type: "DEPLOYS_TO",
@@ -103,7 +116,7 @@ export const tagCodeCorrelationRule: Rule = {
               tier,
               evidence: {
                 rule: "tag-code",
-                match: "resource-tag",
+                match: weak ? "resource-name-tag" : "resource-tag",
                 tagKey: rawKey,
                 tagValue: rawVal,
                 matchedRepoSlug: norm,
