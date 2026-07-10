@@ -171,9 +171,9 @@ export function CreateOrgForm() {
 
   if (step === 1) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+      <div className="w-full">
         <StepEyebrow n={1} />
-        <h2 className="mt-2 text-lg font-semibold">Name your workspace</h2>
+        <h2 className="mt-3 text-2xl font-semibold tracking-tight">Name your workspace</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           This is where your team&apos;s graph lives. You can change it later.
         </p>
