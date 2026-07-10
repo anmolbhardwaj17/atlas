@@ -40,15 +40,25 @@ export function createPool(connectionString: string): Pool {
  * migration 0002). Connecting as an owner/superuser/BYPASSRLS role would skip RLS.
  * This is our org-scoped isolation model — NOT Supabase's `auth.uid()` pattern.
  */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function withOrgScope<T>(
   pool: Pool,
   orgId: string,
   fn: (client: PoolClient) => Promise<T>,
 ): Promise<T> {
+  // orgId always originates from validated auth context (a UUID). Enforce that here so it's safe to
+  // inline below — it also catches any caller that would otherwise open an unscoped transaction.
+  if (!UUID_RE.test(orgId)) {
+    throw new Error(`withOrgScope: orgId must be a UUID (got "${orgId}")`);
+  }
   const client = await pool.connect();
   try {
-    await client.query("BEGIN");
-    await client.query("SELECT set_config('atlas.current_org', $1, true)", [orgId]);
+    // BEGIN + set the tenant GUC in a SINGLE round-trip (simple protocol, multi-statement). Each DB
+    // round-trip is a full network hop to Postgres, so folding these two saves one hop per scoped
+    // op — meaningful when the app and DB aren't co-located. set_config(..., true) keeps it
+    // transaction-local (the RLS contract, docs/04 §10); orgId is a validated UUID, safe to inline.
+    await client.query(`BEGIN; SELECT set_config('atlas.current_org', '${orgId}', true)`);
     const result = await fn(client);
     await client.query("COMMIT");
     return result;
