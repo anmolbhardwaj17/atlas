@@ -3,36 +3,38 @@
 import dynamic from "next/dynamic";
 
 /**
- * The Atlas mark rendered with Paper's liquid-metal shader (a flowing metallic material over the
- * logo's shape). WebGL, so it's loaded client-only via next/dynamic (ssr:false) with a plain-logo
- * fallback while the shader chunk downloads. No rotation — the motion is the liquid flow itself.
+ * The Atlas mark rendered with Paper's liquid-metal shader — the SAME configuration used on the
+ * login page (`app/login/page.tsx`), so the brand mark is identical across sign-in and onboarding.
+ * WebGL, so it's loaded client-only via next/dynamic (ssr:false). The motion is the liquid flow
+ * itself (no spin).
  */
 const LiquidMetal = dynamic(
   () => import("@paper-design/shaders-react").then((m) => m.LiquidMetal),
-  {
-    ssr: false,
-    loading: () => <span className="block size-full animate-pulse rounded-2xl bg-muted" />,
-  },
+  { ssr: false, loading: () => <div className="size-full" /> },
 );
 
-export function LiquidAtlasMark({ size = 64 }: { size?: number }) {
+export function LiquidAtlasMark({ size = 132 }: { size?: number }) {
   return (
-    <div style={{ width: size, height: size }} className="shrink-0">
+    <div
+      style={{ width: size, height: size }}
+      className="[filter:drop-shadow(0_14px_34px_rgba(0,0,0,0.12))]"
+    >
       <LiquidMetal
-        image="/atlas-logo.png"
         width={size}
         height={size}
-        // Gentle liquid flow — this is the motion; the old spin is gone.
-        speed={0.5}
-        colorBack="rgba(0,0,0,0)"
-        colorTint="#9aa4b2"
-        repetition={4}
-        softness={0.4}
+        image="/atlas-logo.png"
+        colorBack="#00000000"
+        colorTint="#999999"
+        repetition={2}
+        softness={0.1}
         shiftRed={0.3}
         shiftBlue={0.3}
-        contour={1}
-        distortion={0.12}
-        angle={0}
+        distortion={0.07}
+        contour={0.4}
+        angle={70}
+        speed={1}
+        scale={0.82}
+        fit="contain"
       />
     </div>
   );

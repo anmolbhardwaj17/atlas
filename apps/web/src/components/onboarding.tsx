@@ -99,7 +99,7 @@ export function Onboarding({ orgId, canSeed }: { orgId: string; canSeed: boolean
         {/* ── Hero ── */}
         <header className="space-y-5 text-center">
           <div className="mx-auto w-fit">
-            <LiquidAtlasMark size={64} />
+            <LiquidAtlasMark size={112} />
           </div>
           <div className="space-y-3">
             <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
