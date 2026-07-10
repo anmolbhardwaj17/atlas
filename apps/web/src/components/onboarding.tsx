@@ -107,13 +107,13 @@ const TRUST: Array<{ icon: LucideIcon; label: string }> = [
 
 export function Onboarding({ orgId, canSeed }: { orgId: string; canSeed: boolean }) {
   return (
-    <div className="relative isolate -m-4 overflow-hidden px-4 py-10 md:-m-6 md:px-6 md:py-14">
+    <div className="relative isolate overflow-hidden py-2">
       <GraphBackdrop />
 
       {/* Big liquid-metal Atlas mark, bleeding a little off the top-right corner (the left-aligned
-          content leaves this space open). Decorative; sits behind the content. A soft glow gives the
-          metal contrast so it reads on the dark background. */}
-      <div className="pointer-events-none absolute -right-10 -top-14 z-0 hidden md:block">
+          content leaves this space open). Decorative; sits behind the content, clipped by the
+          section's overflow-hidden so it never adds page-width. A soft glow gives it contrast. */}
+      <div className="pointer-events-none absolute -right-14 -top-14 z-0 hidden md:block">
         <div className="relative">
           <div className="absolute inset-12 rounded-full bg-foreground/5 blur-3xl" />
           <LiquidAtlasMark size={420} />
@@ -210,13 +210,13 @@ function CapabilityMarquee() {
   const items = [...CAPABILITIES, ...CAPABILITIES];
   return (
     <div
-      className="group relative -mx-4 overflow-hidden md:-mx-6"
+      className="group relative w-full overflow-hidden"
       style={{
-        maskImage: "linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent)",
-        WebkitMaskImage: "linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent)",
+        maskImage: "linear-gradient(90deg, transparent, #000 2%, #000 98%, transparent)",
+        WebkitMaskImage: "linear-gradient(90deg, transparent, #000 2%, #000 98%, transparent)",
       }}
     >
-      <div className="flex w-max animate-[marquee_50s_linear_infinite] pl-4 group-hover:[animation-play-state:paused] motion-reduce:animate-none md:pl-6">
+      <div className="flex w-max animate-[marquee_50s_linear_infinite] group-hover:[animation-play-state:paused] motion-reduce:animate-none">
         {items.map((c, i) => (
           <CapabilityCard key={`${c.title}-${i}`} c={c} />
         ))}
