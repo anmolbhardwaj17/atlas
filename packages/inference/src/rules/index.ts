@@ -11,6 +11,7 @@ import { logWorkloadCorrelationRule } from "./r10-log-workloads";
 import { tagCodeCorrelationRule } from "./r11-tags";
 import { imageCommitProvenanceRule } from "./r12-images";
 import { serviceNameEnvRule } from "./r13-service-env";
+import { imageNameCorrelationRule } from "./r14-image-name";
 import { serviceDerivationRule } from "./r4-service";
 import { ownershipPropagationRule } from "./r5-ownership";
 import { prChangesServiceRule } from "./r6-changed";
@@ -31,6 +32,7 @@ export const ALL_RULES: readonly Rule[] = [
   logWorkloadCorrelationRule,
   tagCodeCorrelationRule,
   imageCommitProvenanceRule,
+  imageNameCorrelationRule,
   serviceNameEnvRule,
   serviceDerivationRule,
   ownershipPropagationRule,
@@ -42,6 +44,7 @@ export { logWorkloadCorrelationRule } from "./r10-log-workloads";
 export { tagCodeCorrelationRule } from "./r11-tags";
 export { imageCommitProvenanceRule } from "./r12-images";
 export { serviceNameEnvRule } from "./r13-service-env";
+export { imageNameCorrelationRule } from "./r14-image-name";
 export { serviceDerivationRule } from "./r4-service";
 export { ownershipPropagationRule } from "./r5-ownership";
 export { prChangesServiceRule } from "./r6-changed";

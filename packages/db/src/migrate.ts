@@ -41,6 +41,7 @@ import { up as up0039 } from "./migrations/0039_rate_limits";
 import { up as up0040 } from "./migrations/0040_org_profile_analytics";
 import { up as up0041 } from "./migrations/0041_ai_suggested_edges";
 import { up as up0042 } from "./migrations/0042_provenance_ai_confidence";
+import { up as up0043 } from "./migrations/0043_image_name_seed";
 
 /**
  * Forward-only SQL migration runner (docs/04 §9). Plain `pg`, no ORM. Each
@@ -93,6 +94,7 @@ const MIGRATIONS: ReadonlyArray<{ version: string; statements: string[] }> = [
   { version: "0040_org_profile_analytics", statements: up0040 },
   { version: "0041_ai_suggested_edges", statements: up0041 },
   { version: "0042_provenance_ai_confidence", statements: up0042 },
+  { version: "0043_image_name_seed", statements: up0043 },
 ];
 
 async function main(): Promise<void> {

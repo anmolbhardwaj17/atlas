@@ -284,6 +284,13 @@ Each rule below shows: trigger, evidence, output edge, confidence, and *why that
 - **Why:** the highest-precision of the code→infra matchers — it doesn't guess from names/tags, it matches the artifact's actual build commit. A tag with no SHA-shaped token (e.g. `latest`, `v1.2.3`) yields nothing (P3).
 - **Evidence stored:** the image URI, the extracted image SHA, the matched commit SHA, and the ECS service URN (P4). See `docs/plans/signal-enrichment.md` (slice 2).
 
+**R14 — `image_name_correlation` → `DEPLOYS_TO` (inferred-high / inferred-low)** *(companion to R12)*
+- **Inputs:** ECS task-definition `images` + repo nodes. Resolves the ECS service running each task-def via the service's `taskDefinition` ARN (family), exactly like R12.
+- **Match:** when the image tag is **not** a git SHA (R12 can't fire — `:latest`, `:v1.2.3`), the image's **repository name** still names the code: `…/api-backend:latest` ← repo `api-backend-provapt`, `…/integration-prod:latest` ← `integrations`. Extract the image repo segment, normalize (shared with R10/R11), and match **exact-or-substring** (min 5, non-generic) to a repo slug → repo `DEPLOYS_TO` the ECS service running that task-def.
+- **Confidence:** `inferred-high` for a unique match (the ECR image name is a deliberate deploy artifact naming the code); several repos matching → `inferred-low` each (P3). Generic/short names skipped (shared `GENERIC_TOKENS`).
+- **Why:** most images are tagged `:latest`, so R12's SHA match rarely fires in practice — but the image *name* is a strong, general ECS→repo signal. R14 fills that gap without any crawl change (reuses the images the ECS module already captures).
+- **Evidence stored:** the image URI, the extracted image name, the matched repo slug, and the ECS service URN (P4).
+
 **R13 — `service_name_env_correlation` → `DEPLOYS_TO` (inferred-high / inferred-low)**
 - **Inputs:** the `aws.lambda.env` / `aws.ecs.env` signals (already extracted by the AWS connector) + repo nodes. Recognized keys are the canonical service-name env vars the org sets at runtime: `OTEL_SERVICE_NAME`, `DD_SERVICE`, `SERVICE_NAME`, `APP_NAME`, `NEW_RELIC_APP_NAME`, … and `service.name=` inside `OTEL_RESOURCE_ATTRIBUTES`.
 - **Match:** the env *value* (the self-reported service name), normalized (shared with R10/R11), matched by **exact equality** to a repo slug. The target runtime is the signal's subject — the Lambda directly, or (for a task-definition env) the ECS service(s) running that family.
@@ -296,7 +303,7 @@ Each rule below shows: trigger, evidence, output edge, confidence, and *why that
 | Tier | Meaning | Example rule | AI phrasing (10) |
 |---|---|---|---|
 | `observed` | Directly read from a source API | R5, R7, SG/ENI facts | stated as fact + source link |
-| `inferred-high` | Strong structural/config evidence | R1(ARN), R2, R3, R4, R6(single-svc), R11(unique tag), R12(SHA match), R13(service-name env) | "Atlas infers (high confidence)… based on <evidence>" |
+| `inferred-high` | Strong structural/config evidence | R1(ARN), R2, R3, R4, R6(single-svc), R11(unique tag), R12(SHA match), R13(service-name env), R14(unique image name) | "Atlas infers (high confidence)… based on <evidence>" |
 | `inferred-low` | Plausible but uncertain (heuristic/permission) | R1(name), R6(monorepo), R8, R10, R11(ambiguous tag / Name tag) | "possibly… (low confidence); evidence is <X>; not certain" |
 | `ai-suggested` | An **AI proposal** awaiting the user's confirm/reject — the lowest trust, never asserted (P3) | the AI edge-matcher (`origin='ai_suggested'`) | "Atlas suggests… — confirm or reject" (styled distinctly in the graph) |
 
