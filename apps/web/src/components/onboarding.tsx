@@ -110,12 +110,15 @@ export function Onboarding({ orgId, canSeed }: { orgId: string; canSeed: boolean
     <div className="relative isolate -m-4 overflow-hidden px-4 py-10 md:-m-6 md:px-6 md:py-14">
       <GraphBackdrop />
 
-      <div className="space-y-12 duration-700 animate-in fade-in slide-in-from-bottom-2">
-        {/* ── Hero (left-aligned; the right stays open for breathing room) ── */}
+      {/* Big liquid-metal Atlas mark, bleeding a little off the top-right corner (the left-aligned
+          content leaves this space open). Decorative; the content sits above it. */}
+      <div className="pointer-events-none absolute -right-20 -top-24 z-0 hidden md:block">
+        <LiquidAtlasMark size={400} />
+      </div>
+
+      <div className="relative z-10 space-y-12 duration-700 animate-in fade-in slide-in-from-bottom-2">
+        {/* ── Hero (left-aligned; the mark lives top-right) ── */}
         <header className="max-w-4xl space-y-5">
-          <div className="w-fit">
-            <LiquidAtlasMark size={112} />
-          </div>
           <div className="space-y-3">
             <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
               Welcome to Atlas
