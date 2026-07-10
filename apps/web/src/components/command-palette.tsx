@@ -78,6 +78,10 @@ export function CommandPalette({ orgId }: { orgId: string }) {
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [searching, setSearching] = useState(false);
   const [active, setActive] = useState(0);
+  // Whether Shift is currently held while the palette is open. Holding Shift switches the primary
+  // action from "navigate" to "ask Atlas", so we surface that affordance live (footer + active row)
+  // rather than hiding it behind an undiscoverable shortcut.
+  const [shiftHeld, setShiftHeld] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -105,7 +109,24 @@ export function CommandPalette({ orgId }: { orgId: string }) {
       setQ("");
       setHits([]);
       setActive(0);
+      setShiftHeld(false);
     }
+  }, [open]);
+
+  // Track Shift while the palette is open so the "hold Shift to ask" affordance can react live. We
+  // reset on blur/close too, so a released-outside-the-window Shift never leaves the hint stuck on.
+  useEffect(() => {
+    if (!open) return;
+    const sync = (e: KeyboardEvent) => setShiftHeld(e.shiftKey);
+    const clear = () => setShiftHeld(false);
+    window.addEventListener("keydown", sync);
+    window.addEventListener("keyup", sync);
+    window.addEventListener("blur", clear);
+    return () => {
+      window.removeEventListener("keydown", sync);
+      window.removeEventListener("keyup", sync);
+      window.removeEventListener("blur", clear);
+    };
   }, [open]);
 
   // Debounced resource search (only when the query is substantial enough to be a name).
@@ -190,7 +211,19 @@ export function CommandPalette({ orgId }: { orgId: string }) {
   // Keep the active index in range as the list changes.
   useEffect(() => setActive(0), [items.length]);
 
-  function run(item: Item | undefined) {
+  // Send the current context to Ask Atlas instead of navigating: a highlighted resource asks about
+  // that resource by name; otherwise the raw query is handed over. No-op if there's nothing to ask.
+  function ask(item: Item | undefined) {
+    const askQ = item?.type === "resource" ? item.label : q.trim();
+    if (!askQ) return;
+    setOpen(false);
+    router.push(`/ask?q=${encodeURIComponent(askQ)}`);
+  }
+
+  // Enter (or click) runs the item. Holding Shift flips the action to "ask Atlas" — the resource's
+  // href navigates you to it, Shift hands it to the AI instead (P1: the AI is the interface).
+  function run(item: Item | undefined, opts?: { ask?: boolean }) {
+    if (opts?.ask) return ask(item);
     if (!item) return;
     setOpen(false);
     router.push(item.href);
@@ -231,7 +264,7 @@ export function CommandPalette({ orgId }: { orgId: string }) {
                 setActive((a) => Math.max(a - 1, 0));
               } else if (e.key === "Enter") {
                 e.preventDefault();
-                run(items[active]);
+                run(items[active], { ask: e.shiftKey });
               }
             }}
             placeholder="Search resources, jump to a page, or ask Atlas…"
@@ -271,7 +304,7 @@ export function CommandPalette({ orgId }: { orgId: string }) {
                   ) : null}
                   <button
                     onMouseEnter={() => setActive(i)}
-                    onClick={() => run(item)}
+                    onClick={(e) => run(item, { ask: e.shiftKey })}
                     className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors ${
                       i === active ? "bg-accent text-accent-foreground" : "text-muted-foreground"
                     }`}
@@ -292,7 +325,13 @@ export function CommandPalette({ orgId }: { orgId: string }) {
                       <span className="shrink-0 text-xs text-muted-foreground">{item.sub}</span>
                     ) : null}
                     {i === active ? (
-                      <CornerDownLeft size={13} className="shrink-0 text-muted-foreground" />
+                      // With Shift held, the primary action becomes "ask Atlas" — swap the ↵ glyph
+                      // for the AI mark on non-ask rows so the alternate action reads at a glance.
+                      shiftHeld && item.type !== "ask" ? (
+                        <AtlasAiMark size={15} className="shrink-0" />
+                      ) : (
+                        <CornerDownLeft size={13} className="shrink-0 text-muted-foreground" />
+                      )
                     ) : null}
                   </button>
                 </li>
@@ -313,6 +352,16 @@ export function CommandPalette({ orgId }: { orgId: string }) {
             </span>
             <span className="flex items-center gap-1">
               <Kbd>↵</Kbd> select
+            </span>
+            {/* The Shift affordance — brightens while Shift is actually held so it reads as "active". */}
+            <span
+              className={cn(
+                "flex items-center gap-1 transition-colors",
+                shiftHeld && "text-foreground",
+              )}
+            >
+              <Kbd>⇧</Kbd>
+              <Kbd>↵</Kbd> ask
             </span>
           </span>
         </div>
