@@ -20,6 +20,11 @@ async function bootstrap(): Promise<void> {
   const adapter = new FastifyAdapter({
     requestIdHeader: "x-request-id",
     genReqId: () => randomUUID(),
+    // Fastify's default body cap is 1 MiB, which is smaller than the image-upload caps
+    // (decoded 1.5 MB → ~2 MB as base64, and the /me avatar zod cap is 3 MB), so a legit logo/
+    // avatar would fail with a confusing 413 before our own validators run. Lift it so the request
+    // reaches the handler and the ImageUploadService returns a clean, specific error (L1).
+    bodyLimit: 4_000_000,
   });
   // Echo the correlation id back so the client (and the browser Network tab) can quote it,
   // and set baseline security headers (docs/13). This is a JSON API (no HTML), so no CSP is
