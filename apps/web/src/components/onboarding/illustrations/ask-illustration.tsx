@@ -14,7 +14,7 @@ export function AskIllustration() {
       <div className="flex size-full flex-col justify-center gap-2 overflow-hidden rounded-xl border border-border bg-background/80 p-2.5 shadow-sm">
         {/* User question. */}
         <div className="flex items-start justify-end gap-1.5">
-          <div className="rounded-lg rounded-tr-sm bg-muted px-2 py-1.5 text-[9px] leading-snug">
+          <div className="rounded-lg rounded-tr-sm bg-foreground px-2 py-1.5 text-[9px] leading-snug text-background">
             Why is checkout slow?
           </div>
           <UserAvatar email="jordan@acme.com" name="Jordan Lee" size={18} className="mt-0.5" />
