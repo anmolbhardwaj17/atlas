@@ -113,10 +113,10 @@ export function Onboarding({ orgId, canSeed }: { orgId: string; canSeed: boolean
       {/* Big liquid-metal Atlas mark, bleeding a little off the top-right corner (the left-aligned
           content leaves this space open). Decorative; sits behind the content. A soft glow gives the
           metal contrast so it reads on the dark background. */}
-      <div className="pointer-events-none absolute -right-16 -top-16 z-0 hidden md:block">
+      <div className="pointer-events-none absolute -right-10 -top-14 z-0 hidden md:block">
         <div className="relative">
           <div className="absolute inset-12 rounded-full bg-foreground/5 blur-3xl" />
-          <LiquidAtlasMark size={440} />
+          <LiquidAtlasMark size={420} />
         </div>
       </div>
 
@@ -210,13 +210,13 @@ function CapabilityMarquee() {
   const items = [...CAPABILITIES, ...CAPABILITIES];
   return (
     <div
-      className="group relative overflow-hidden"
+      className="group relative -mx-4 overflow-hidden md:-mx-6"
       style={{
         maskImage: "linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent)",
         WebkitMaskImage: "linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent)",
       }}
     >
-      <div className="flex w-max animate-[marquee_50s_linear_infinite] group-hover:[animation-play-state:paused] motion-reduce:animate-none">
+      <div className="flex w-max animate-[marquee_50s_linear_infinite] pl-4 group-hover:[animation-play-state:paused] motion-reduce:animate-none md:pl-6">
         {items.map((c, i) => (
           <CapabilityCard key={`${c.title}-${i}`} c={c} />
         ))}
