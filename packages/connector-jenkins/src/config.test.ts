@@ -20,6 +20,22 @@ describe("parseJenkinsConfig", () => {
   it("requires a value", () => {
     expect(() => parseJenkinsConfig({})).toThrow(/required/);
   });
+
+  it("rejects a private/loopback/link-local host at parse time (SSRF, H1)", () => {
+    for (const baseUrl of [
+      "http://127.0.0.1:8080",
+      "http://169.254.169.254", // cloud metadata
+      "http://10.0.0.5",
+      "http://localhost:9200",
+      "http://[::1]",
+    ]) {
+      expect(() => parseJenkinsConfig({ baseUrl }), baseUrl).toThrow(/private, loopback, or/);
+    }
+    // A public host is still accepted.
+    expect(parseJenkinsConfig({ baseUrl: "https://ci.acme.com" }).baseUrl).toBe(
+      "https://ci.acme.com",
+    );
+  });
 });
 
 describe("parseJenkinsCredentials", () => {

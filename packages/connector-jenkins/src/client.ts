@@ -4,6 +4,8 @@
  * 429/5xx get bounded backoff; the sleeper is injectable for deterministic tests (mirrors
  * the AWS/GitHub/Bitbucket clients). Read-only — the connector never issues writes (P2).
  */
+import { assertResolvesToPublic } from "./ssrf-guard";
+
 export interface JenkinsClient {
   /** GET a JSON endpoint (path relative to the Jenkins root, e.g. "/api/json?tree=..."). */
   json<T>(path: string, signal?: AbortSignal): Promise<T>;
@@ -25,6 +27,8 @@ const defaultSleep = (ms: number): Promise<void> => new Promise((r) => setTimeou
 export class FetchJenkinsClient implements JenkinsClient {
   private readonly authHeader: string;
   private readonly baseUrl: string;
+  /** The base URL's host, re-checked against private ranges before every request (SSRF, H1). */
+  private readonly host: string;
   private readonly maxAttempts: number;
   private readonly maxWaitMs: number;
   private readonly sleep: (ms: number) => Promise<void>;
@@ -35,6 +39,7 @@ export class FetchJenkinsClient implements JenkinsClient {
       typeof btoa === "function" ? btoa(raw) : Buffer.from(raw, "utf8").toString("base64");
     this.authHeader = `Basic ${b64}`;
     this.baseUrl = deps.baseUrl.replace(/\/+$/, "");
+    this.host = new URL(this.baseUrl).hostname;
     this.maxAttempts = deps.maxAttempts ?? 5;
     this.maxWaitMs = deps.maxWaitMs ?? 60_000;
     this.sleep = deps.sleep ?? defaultSleep;
@@ -42,6 +47,7 @@ export class FetchJenkinsClient implements JenkinsClient {
 
   async json<T>(path: string, signal?: AbortSignal): Promise<T> {
     const url = this.resolve(path);
+    await assertResolvesToPublic(this.host); // SSRF re-check post-DNS at fetch time (H1)
     for (let attempt = 1; ; attempt++) {
       const res = await fetch(url, {
         headers: {
@@ -61,8 +67,12 @@ export class FetchJenkinsClient implements JenkinsClient {
   }
 
   async text(path: string, signal?: AbortSignal): Promise<string | null> {
+    const url = this.resolve(path);
+    // SSRF check is OUTSIDE the try so a blocked host propagates — the try only swallows transient
+    // fetch/parse failures into a best-effort null, never a security refusal (H1).
+    await assertResolvesToPublic(this.host);
     try {
-      const res = await fetch(this.resolve(path), {
+      const res = await fetch(url, {
         headers: { Authorization: this.authHeader, "User-Agent": "atlas-connector" },
         ...(signal ? { signal } : {}),
       });
@@ -73,8 +83,10 @@ export class FetchJenkinsClient implements JenkinsClient {
     }
   }
 
+  /** Join a RELATIVE path to the anchored base URL. The absolute-URL passthrough was removed (H1):
+   *  every path the crawler passes is already relative (it uses only the *pathname* of any
+   *  server-supplied job URL), so accepting `http…` here only ever opened an SSRF bypass. */
   private resolve(path: string): string {
-    if (path.startsWith("http")) return path;
     return this.baseUrl + (path.startsWith("/") ? path : `/${path}`);
   }
 

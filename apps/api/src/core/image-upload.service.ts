@@ -11,13 +11,47 @@ type ServiceClient = ReturnType<typeof createServiceClient>;
 
 /** Small, image-only. Logos/avatars are icons, not photos — 1.5 MB is generous. */
 const MAX_BYTES = 1_500_000;
+// Raster formats only. `image/svg+xml` is deliberately NOT here (security sweep M1): SVG is an active
+// document — an uploaded `<svg><script>…` served inline from our public bucket is stored XSS. Logos
+// and avatars have no need for vector, so the whole class is dropped rather than sanitized.
 const MIME_EXT: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
   "image/webp": "webp",
   "image/gif": "gif",
-  "image/svg+xml": "svg",
 };
+
+/**
+ * Verify the decoded bytes actually start with the declared type's magic number (security sweep L2)
+ * — so a caller can't smuggle arbitrary content past the allowlist by mislabelling its `data:` MIME.
+ * Returns true only when the bytes match `mime`. (SVG has no magic number and isn't allowed anyway.)
+ */
+function bytesMatchMime(mime: string, b: Buffer): boolean {
+  switch (mime) {
+    case "image/png":
+      return (
+        b.length >= 8 &&
+        b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+      );
+    case "image/jpeg":
+      return b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
+    case "image/gif":
+      return (
+        b.length >= 6 &&
+        (b.subarray(0, 6).toString("latin1") === "GIF87a" ||
+          b.subarray(0, 6).toString("latin1") === "GIF89a")
+      );
+    case "image/webp":
+      // RIFF <4-byte size> WEBP
+      return (
+        b.length >= 12 &&
+        b.subarray(0, 4).toString("latin1") === "RIFF" &&
+        b.subarray(8, 12).toString("latin1") === "WEBP"
+      );
+    default:
+      return false;
+  }
+}
 
 /**
  * Uploads small images (org logos, user avatars) to public Supabase Storage buckets and returns the
@@ -52,7 +86,7 @@ export class ImageUploadService {
     const ext = MIME_EXT[mime];
     if (!ext) {
       throw ApiException.validation(
-        [{ field: "image", issue: "must be a PNG, JPEG, WebP, GIF, or SVG image" }],
+        [{ field: "image", issue: "must be a PNG, JPEG, WebP, or GIF image" }],
         "Unsupported image type.",
       );
     }
@@ -60,6 +94,14 @@ export class ImageUploadService {
       throw ApiException.validation(
         [{ field: "image", issue: `must be ${Math.round(MAX_BYTES / 1000)} KB or smaller` }],
         "Image is too large.",
+      );
+    }
+    // The declared MIME is in the allowlist — now prove the bytes are really that format (L2), so a
+    // `data:image/png` header can't wrap a script/HTML/SVG payload.
+    if (!bytesMatchMime(mime, bytes)) {
+      throw ApiException.validation(
+        [{ field: "image", issue: "file contents don't match its image type" }],
+        "That doesn't look like a valid image.",
       );
     }
 

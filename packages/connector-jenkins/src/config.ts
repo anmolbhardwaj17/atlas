@@ -5,6 +5,8 @@
  * `secretRef` at call time (BR-CONN-1, docs/13 §7). Read-only by construction (P2): the
  * connector only ever GETs.
  */
+import { assertHostAllowed } from "./ssrf-guard";
+
 export interface JenkinsConfig {
   /** Jenkins server root URL, no trailing slash. */
   baseUrl: string;
@@ -27,6 +29,10 @@ export function parseJenkinsConfig(config: Record<string, unknown>): JenkinsConf
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new Error("jenkins config: `baseUrl` must be http(s)");
   }
+  // SSRF guard (security sweep H1): the baseUrl is tenant-supplied and the connector reaches it with
+  // Atlas credentials, so refuse a literal private/loopback/link-local host at save time. A public
+  // hostname that *resolves* to an internal IP is caught later, per-request, in the client.
+  assertHostAllowed(url.hostname);
   // Normalize: drop a trailing slash so path joins are predictable.
   return { baseUrl: url.toString().replace(/\/+$/, "") };
 }
