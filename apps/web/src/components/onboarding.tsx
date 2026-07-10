@@ -2,117 +2,60 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import {
-  Waypoints,
-  Lightbulb,
-  ShieldCheck,
-  Activity,
-  MessagesSquare,
-  Bell,
-  Sparkles,
-  Loader2,
-  Lock,
-  BadgeCheck,
-  RefreshCw,
-  ArrowRight,
-  type LucideIcon,
-} from "lucide-react";
+import { Sparkles, Loader2, ArrowRight } from "lucide-react";
 import { LiquidAtlasMark } from "@/components/liquid-atlas-mark";
 import { Button } from "@/components/ui/button";
 import { PROVIDERS, ProviderLogo } from "@/components/integrations/providers";
+import { ConnectIllustration } from "@/components/onboarding/illustrations/connect-illustration";
 import { MapIllustration } from "@/components/onboarding/illustrations/map-illustration";
-import { InsightsIllustration } from "@/components/onboarding/illustrations/insights-illustration";
-import { SecurityIllustration } from "@/components/onboarding/illustrations/security-illustration";
-import { OperationalIllustration } from "@/components/onboarding/illustrations/operational-illustration";
 import { AskIllustration } from "@/components/onboarding/illustrations/ask-illustration";
-import { AlertsIllustration } from "@/components/onboarding/illustrations/alerts-illustration";
 import { seedDemo } from "@/lib/browser-api";
-import { cn } from "@/lib/cn";
 
 /**
- * Onboarding / first-run empty state (P1.2, docs/09 §8). The graph is empty, so this is the org's
- * front door — and its pitch: it portrays what Atlas *is* today (a live map, security & vulnerability
- * intel, operational answers, cited AI, alerts) before giving a simple two-path get-started flow:
- *   1. **Load sample data** — one click seeds the "Shopyard" estate through the real ingest +
- *      inference pipeline, so the user is exploring a cited graph in seconds (TTFI, NFR-22). No creds.
- *   2. **Connect a real source** — AWS / GitHub / Bitbucket / Azure / GCP read-only setup, shared
- *      with the Integrations hub (docs/13 §4-5).
- *
- * Mono B&W design language (the only hue is the AI/status accent), shadcn primitives, theme-aware.
+ * Onboarding / first-run empty state (P1.2, docs/09 §8). A new org has already chosen Atlas, so this
+ * screen's ONE job is the fastest path from empty → first value: connect a real source (the real
+ * payoff) or load sample data (instant). Deliberately lean and action-first — the marketing-style
+ * "what you'll get" capability carousel now lives in `./onboarding/capability-marquee` (ready for a
+ * landing page) and is intentionally NOT rendered here.
  */
 
-interface Capability {
-  icon: LucideIcon;
-  title: string;
-  body: string;
-  /** Static (purge-safe) tint classes for the icon tile — one hue per capability. */
-  tint: string;
-  /** Bespoke animated illustration for this capability. Built one at a time; until a capability
-   *  has its own, the card shows a clean fallback (its icon on a tinted wash). */
-  Illustration?: React.ComponentType;
-}
-
-/** What a new org unlocks — kept in sync with what's actually shipped so the front door never
- *  undersells the product. Each gets its own hue so the grid reads as a colourful capability map. */
-const CAPABILITIES: Capability[] = [
+/** The three beats after "get started", each with a little illustration in our house style, so a new
+ *  user knows what to expect — that it's read-only, roughly how long the first sync takes, and what
+ *  they get at the end — instead of staring at an empty dashboard. */
+const STEPS: Array<{ title: string; body: string; Illustration: React.ComponentType }> = [
   {
-    icon: Waypoints,
-    title: "Live infrastructure map",
-    body: "Your cloud and code, wired together in one canvas you can trace end to end.",
-    tint: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+    title: "Connect",
+    body: "Read-only access — Atlas can never change your cloud or code.",
+    Illustration: ConnectIllustration,
+  },
+  {
+    title: "Atlas builds your graph",
+    body: "Your estate is crawled and wired together — usually just a few minutes.",
     Illustration: MapIllustration,
   },
   {
-    icon: Lightbulb,
-    title: "Insights & posture",
-    body: "Prioritized findings across the Well-Architected pillars — not a wall of alerts.",
-    tint: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-    Illustration: InsightsIllustration,
-  },
-  {
-    icon: ShieldCheck,
-    title: "Security & vulnerabilities",
-    body: "Known CVEs in your dependencies, ranked by real blast radius across repos.",
-    tint: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
-    Illustration: SecurityIllustration,
-  },
-  {
-    icon: Activity,
-    title: "Operational intelligence",
-    body: "See what's broken right now — with an AI root-cause, down to the PR.",
-    tint: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
-    Illustration: OperationalIllustration,
-  },
-  {
-    icon: MessagesSquare,
-    title: "Ask Atlas",
-    body: "Cited, confidence-tiered answers over your own graph — never a guess.",
-    tint: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+    title: "Explore & ask",
+    body: "Map it, see the risks, ask anything, and get alerted when it changes.",
     Illustration: AskIllustration,
   },
-  {
-    icon: Bell,
-    title: "Proactive alerts",
-    body: "A heads-up in Slack, Discord, or Teams the moment something changes.",
-    tint: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-    Illustration: AlertsIllustration,
-  },
 ];
 
-const TRUST: Array<{ icon: LucideIcon; label: string }> = [
-  { icon: Lock, label: "Read-only by construction" },
-  { icon: BadgeCheck, label: "Every claim cited" },
-  { icon: RefreshCw, label: "Continuously updated" },
-];
-
-export function Onboarding({ orgId, canSeed }: { orgId: string; canSeed: boolean }) {
+export function Onboarding({
+  orgId,
+  canSeed,
+  name,
+}: {
+  orgId: string;
+  canSeed: boolean;
+  name?: string | null | undefined;
+}) {
+  const firstName = name?.trim().split(/\s+/)[0] ?? null;
   return (
     <div className="relative isolate overflow-hidden py-2">
       <GraphBackdrop />
 
-      {/* Big liquid-metal Atlas mark, bleeding a little off the top-right corner (the left-aligned
-          content leaves this space open). Decorative; sits behind the content, clipped by the
-          section's overflow-hidden so it never adds page-width. A soft glow gives it contrast. */}
+      {/* Big liquid-metal Atlas mark, bleeding off the top-right corner (the left-aligned content
+          leaves this space open). Decorative; clipped by the section's overflow-hidden. */}
       <div className="pointer-events-none absolute -right-32 -top-36 z-0 hidden md:block">
         <div className="relative">
           <div className="absolute inset-16 rounded-full bg-foreground/5 blur-3xl" />
@@ -120,53 +63,60 @@ export function Onboarding({ orgId, canSeed }: { orgId: string; canSeed: boolean
         </div>
       </div>
 
-      <div className="relative z-10 space-y-12 duration-700 animate-in fade-in slide-in-from-bottom-2">
-        {/* ── Hero (left-aligned; the mark lives top-right) ── */}
-        <header className="max-w-4xl space-y-5">
-          <div className="space-y-3">
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-              Welcome to Atlas
-            </p>
-            <h1 className="text-pretty text-3xl font-semibold tracking-tight md:text-4xl">
-              Build your knowledge graph
-            </h1>
-            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground md:text-base">
-              Atlas turns your cloud and code into one live, cited graph — map it, surface the
-              risks, ask it anything, and get alerted the moment something breaks. Start exploring
-              in one click, or connect a real source.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1">
-            {TRUST.map((t) => (
-              <span
-                key={t.label}
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
-              >
-                <t.icon className="size-3.5" /> {t.label}
-              </span>
-            ))}
-          </div>
+      <div className="relative z-10 max-w-3xl space-y-10 duration-700 animate-in fade-in slide-in-from-bottom-2">
+        {/* Hero — short + personal; they already chose Atlas, so no re-pitch. */}
+        <header className="space-y-3">
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+            Welcome to Atlas
+          </p>
+          <h1 className="text-pretty text-3xl font-semibold tracking-tight md:text-4xl">
+            {firstName
+              ? `Let's build your graph, ${firstName}`
+              : "Let's build your knowledge graph"}
+          </h1>
+          <p className="max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
+            Connect a source and Atlas turns your cloud and code into one live, cited graph you can
+            explore, search, and ask — or explore a sample estate first.
+          </p>
         </header>
 
-        {/* ── What you'll get ── a full-bleed, infinite horizontal carousel of capability cards ── */}
+        {/* Get started — the whole point of the screen, front and centre. */}
         <section className="space-y-4">
-          <div className="max-w-4xl">
-            <SectionLabel>What you'll get</SectionLabel>
-          </div>
-          <CapabilityMarquee />
-        </section>
-
-        {/* ── Get started ── real source first (the destination), sample data as the instant try ── */}
-        <section className="max-w-4xl space-y-4">
           <SectionLabel>Get started</SectionLabel>
           <ConnectSource />
-
           <div className="flex items-center gap-3 pt-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             <span className="h-px flex-1 bg-border" />
-            or explore sample data first
+            or explore a sample estate first
             <span className="h-px flex-1 bg-border" />
           </div>
           <SampleDataCard orgId={orgId} canSeed={canSeed} />
+        </section>
+
+        {/* What happens next — expectation-setting (illustrated) so a slow first sync never feels
+            broken: connect (read-only) → Atlas builds the graph → explore & ask. */}
+        <section className="space-y-4">
+          <SectionLabel>What happens next</SectionLabel>
+          <ol className="grid gap-4 sm:grid-cols-3">
+            {STEPS.map((s, i) => (
+              <li
+                key={s.title}
+                className="overflow-hidden rounded-2xl border border-border bg-card/40"
+              >
+                <div className="p-2.5">
+                  <div className="relative aspect-[2/1] overflow-hidden rounded-xl bg-muted/20">
+                    <s.Illustration />
+                  </div>
+                </div>
+                <div className="px-4 pb-4 pt-1">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Step {i + 1}
+                  </span>
+                  <p className="mt-1 text-sm font-medium">{s.title}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{s.body}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
         </section>
       </div>
     </div>
@@ -178,62 +128,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     <h2 className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
       {children}
     </h2>
-  );
-}
-
-/** One capability card: the illustration in a padded, rounded panel (so it isn't edge-to-edge) plus
- *  the title + blurb. Fixed width so it tiles cleanly in the carousel. */
-function CapabilityCard({ c }: { c: Capability }) {
-  return (
-    <div className="mr-4 w-[300px] shrink-0 overflow-hidden rounded-2xl border border-border bg-card/40">
-      <div className="p-2.5">
-        <div className="relative aspect-[2/1] overflow-hidden rounded-xl bg-muted/20">
-          {c.Illustration ? (
-            <c.Illustration />
-          ) : (
-            <FallbackIllustration icon={c.icon} tint={c.tint} />
-          )}
-        </div>
-      </div>
-      <div className="px-4 pb-4 pt-1">
-        <p className="text-sm font-medium">{c.title}</p>
-        <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{c.body}</p>
-      </div>
-    </div>
-  );
-}
-
-/** The capability cards as a full-bleed, infinitely scrolling carousel. Two copies of the list are
- *  laid end to end and the row translates by -50%, so it loops seamlessly; it pauses on hover and
- *  holds still under reduced-motion. Edges fade via a horizontal mask. */
-function CapabilityMarquee() {
-  const items = [...CAPABILITIES, ...CAPABILITIES];
-  return (
-    <div
-      className="group relative w-full overflow-hidden"
-      style={{
-        maskImage: "linear-gradient(90deg, transparent, #000 2%, #000 98%, transparent)",
-        WebkitMaskImage: "linear-gradient(90deg, transparent, #000 2%, #000 98%, transparent)",
-      }}
-    >
-      <div className="flex w-max animate-[marquee_50s_linear_infinite] group-hover:[animation-play-state:paused] motion-reduce:animate-none">
-        {items.map((c, i) => (
-          <CapabilityCard key={`${c.title}-${i}`} c={c} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** Placeholder illustration for capabilities whose bespoke scene isn't built yet — its icon on a
- *  soft tinted wash, gently floating. Keeps the grid consistent while illustrations land one by one. */
-function FallbackIllustration({ icon: Icon, tint }: { icon: LucideIcon; tint: string }) {
-  return (
-    <div className="absolute inset-0 grid place-items-center">
-      <div className={cn("illo-float grid size-14 place-items-center rounded-2xl", tint)}>
-        <Icon className="size-7" />
-      </div>
-    </div>
   );
 }
 

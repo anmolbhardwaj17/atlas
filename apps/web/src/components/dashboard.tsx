@@ -120,7 +120,7 @@ export async function Dashboard({
 
   // Empty graph → the onboarding first-run experience.
   if (!s || s.inventory.resources === 0) {
-    return <Onboarding orgId={orgId} canSeed={role === "Owner" || role === "Admin"} />;
+    return <Onboarding orgId={orgId} canSeed={role === "Owner" || role === "Admin"} name={name} />;
   }
 
   const { inventory: inv, trust } = s;
