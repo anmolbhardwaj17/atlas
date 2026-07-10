@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Req,
   UseGuards,
 } from "@nestjs/common";
@@ -17,6 +18,7 @@ import { Roles } from "../auth/roles.decorator";
 import { ApiException } from "../common/errors";
 import { parseBody } from "../common/validation";
 import { AuditService } from "../core/audit.service";
+import { AnalyticsService } from "../core/analytics.service";
 import type { AuthedRequest } from "../auth/auth.types";
 import { OrgService } from "./org.service";
 import { InvitationService } from "./invitation.service";
@@ -24,10 +26,12 @@ import {
   ChangeRoleSchema,
   CreateInviteSchema,
   CreateOrgSchema,
+  OrgProfileSchema,
   UpdateOrgSchema,
   type InvitationDto,
   type MemberDto,
   type OrgDto,
+  type OrgProfileDto,
 } from "./dto";
 
 /**
@@ -41,6 +45,7 @@ export class OrgController {
     private readonly orgs: OrgService,
     private readonly invitations: InvitationService,
     private readonly audit: AuditService,
+    private readonly analytics: AnalyticsService,
   ) {}
 
   @Post()
@@ -55,7 +60,37 @@ export class OrgController {
       targetId: dto.id,
       requestId: req.id ?? null,
     });
+    // Activation funnel, step 1 (docs/12 §6.3).
+    await this.analytics.record(dto.id, "org.created", { actorUserId: claims(req).userId });
     return dto;
+  }
+
+  @Get(":orgId/profile")
+  @UseGuards(AuthGuard, TenantScopeGuard, RolesGuard)
+  @Roles("Member")
+  async getProfile(@Req() req: AuthedRequest): Promise<OrgProfileDto | null> {
+    return this.orgs.getProfile(org(req).id);
+  }
+
+  @Put(":orgId/profile")
+  @UseGuards(AuthGuard, TenantScopeGuard, RolesGuard)
+  @Roles("Admin")
+  async saveProfile(@Req() req: AuthedRequest, @Body() body: unknown): Promise<OrgProfileDto> {
+    const orgId = org(req).id;
+    const profile = await this.orgs.saveProfile(orgId, parseBody(OrgProfileSchema, body));
+    // Activation funnel, step 2 — the onboarding answers double as segmentation (docs/12 §6.3).
+    await this.analytics.record(orgId, "onboarding.completed", {
+      actorUserId: claims(req).userId,
+      properties: {
+        role: profile.role,
+        teamSize: profile.teamSize,
+        useCases: profile.useCases,
+        stack: profile.stack,
+        industry: profile.industry,
+        referralSource: profile.referralSource,
+      },
+    });
+    return profile;
   }
 
   @Get(":orgId")

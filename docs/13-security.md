@@ -97,6 +97,9 @@ flowchart TB
 | **C3 — Source/code metadata** | repo structure, workflows, PR titles/paths, CODEOWNERS | Encrypted; tenant-isolated; **no source code stored** (we read structure, not full code blobs beyond parsed config) |
 | **C4 — Identity/PII** | user email, name, avatar, `hd` domain | Encrypted; minimized (SEC-10); GDPR-deletable (§10) |
 | **C5 — Audit** | audit events | Immutable, long-retained, tenant-scoped |
+| **C6 — Product analytics** | onboarding profile (`org_profile`) + activation events (`analytics_events`) — role, team size, use-cases, stack, industry, referral (`12` §6.3, `04` §5.7) | Tenant-scoped; **disclosed in the privacy policy**; GDPR-deletable (cascades on org delete); **not** used to train models (DD-2) |
+
+> **Note on C6 vs SEC-10:** SEC-10 minimization governs what we ingest from a customer's cloud/repos into the **knowledge graph** (C2/C3). Product analytics (C6) is business data an account voluntarily provides about *itself* — a distinct, disclosed collection; every onboarding field is optional/skippable, keyed (not free-text where avoidable), and deletable.
 
 > **Note on C3 (a reviewer question):** Atlas indexes repo **structure and specific config files** (workflows, CODEOWNERS, manifests — `07`) and stores raw snapshots of *those*. It does **not** clone or store full source code (NG-aligned, SEC-10). This bounds the blast radius of any breach and is a key Persona-E reassurance.
 

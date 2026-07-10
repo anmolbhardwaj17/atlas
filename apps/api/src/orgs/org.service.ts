@@ -8,7 +8,14 @@ import { ApiException } from "../common/errors";
 import type { AuthClaims } from "../auth/auth.types";
 import { deriveSlug } from "./slug";
 import { OrgLogoService } from "./org-logo.service";
-import type { CreateOrgBody, MemberDto, OrgDto, UpdateOrgBody } from "./dto";
+import type {
+  CreateOrgBody,
+  MemberDto,
+  OrgDto,
+  OrgProfileBody,
+  OrgProfileDto,
+  UpdateOrgBody,
+} from "./dto";
 
 interface OrgRow {
   id: string;
@@ -65,6 +72,49 @@ export class OrgService {
       if (isPgUnique(e)) throw ApiException.alreadyExists(`Organization slug "${slug}" is taken.`);
       throw e;
     }
+  }
+
+  /** Upsert the org's onboarding profile (docs/12 §6.3). One row per org; last write wins. Runs in
+   *  the org's RLS scope. Returns the stored profile. */
+  async saveProfile(orgId: string, body: OrgProfileBody): Promise<OrgProfileDto> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      const { rows } = await c.query<OrgProfileRow>(
+        `INSERT INTO org_profile
+           (org_id, role, team_size, use_cases, stack, industry, referral_source, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+         ON CONFLICT (org_id) DO UPDATE SET
+           role            = EXCLUDED.role,
+           team_size       = EXCLUDED.team_size,
+           use_cases       = EXCLUDED.use_cases,
+           stack           = EXCLUDED.stack,
+           industry        = EXCLUDED.industry,
+           referral_source = EXCLUDED.referral_source,
+           updated_at      = now()
+         RETURNING role, team_size, use_cases, stack, industry, referral_source, updated_at`,
+        [
+          orgId,
+          body.role ?? null,
+          body.teamSize ?? null,
+          body.useCases ?? [],
+          body.stack ?? [],
+          body.industry ?? null,
+          body.referralSource ?? null,
+        ],
+      );
+      return toOrgProfileDto(rows[0]);
+    });
+  }
+
+  /** The org's onboarding profile, or null if none was captured. */
+  async getProfile(orgId: string): Promise<OrgProfileDto | null> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      const { rows } = await c.query<OrgProfileRow>(
+        `SELECT role, team_size, use_cases, stack, industry, referral_source, updated_at
+           FROM org_profile WHERE org_id = $1`,
+        [orgId],
+      );
+      return rows[0] ? toOrgProfileDto(rows[0]) : null;
+    });
   }
 
   async get(orgId: string): Promise<OrgDto> {
@@ -227,5 +277,28 @@ function toOrgDto(row: OrgRow | undefined): OrgDto {
     status: row.status,
     logoUrl: row.logo_url,
     createdAt: row.created_at.toISOString(),
+  };
+}
+
+interface OrgProfileRow {
+  role: string | null;
+  team_size: string | null;
+  use_cases: string[];
+  stack: string[];
+  industry: string | null;
+  referral_source: string | null;
+  updated_at: Date;
+}
+
+function toOrgProfileDto(row: OrgProfileRow | undefined): OrgProfileDto {
+  if (!row) throw new Error("expected an org_profile row");
+  return {
+    role: row.role,
+    teamSize: row.team_size,
+    useCases: row.use_cases,
+    stack: row.stack,
+    industry: row.industry,
+    referralSource: row.referral_source,
+    updatedAt: row.updated_at.toISOString(),
   };
 }

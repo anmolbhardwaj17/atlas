@@ -563,6 +563,43 @@ CREATE TABLE ai_conversations (
 
 ---
 
+### 5.7 Platform: org_profile & analytics_events *(added 0040)*
+
+Product/business data about the **account** — collected at onboarding (`12` §6.3) and the activation
+funnel. This is a **separate category from the knowledge graph**: SEC-10 minimization governs what we
+ingest from a customer's cloud/repos, not what an account voluntarily tells us about itself. Both are
+org-scoped by RLS (R8); collection is disclosed in the privacy policy and GDPR-deletable (cascades on
+org delete). `analytics_events` is append-only like `audit_events`.
+
+```sql
+-- ORG_PROFILE — the onboarding answers (one row per org). All optional; the step is skippable.
+CREATE TABLE org_profile (
+    org_id          uuid PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
+    role            text,                                    -- creator persona (00 §8 A–E), stable key
+    team_size       text,                                    -- 'solo' | '2-20' | '20-100' | '100-500' | '500+'
+    use_cases       text[] NOT NULL DEFAULT '{}',            -- intent keys (blast_radius, architecture, …)
+    stack           text[] NOT NULL DEFAULT '{}',            -- self-reported tools (provider ids)
+    industry        text,
+    referral_source text,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    updated_at      timestamptz NOT NULL DEFAULT now()
+);
+
+-- ANALYTICS_EVENTS — append-only product-analytics stream (activation funnel). INSERT+SELECT only
+-- for atlas_app; cross-org aggregation runs as the owner role, not the app role.
+CREATE TABLE analytics_events (
+    id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id        uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    actor_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+    event         text NOT NULL,                             -- 'org.created' | 'onboarding.completed' | …
+    properties    jsonb NOT NULL DEFAULT '{}'::jsonb,
+    created_at    timestamptz NOT NULL DEFAULT now()
+);
+REVOKE UPDATE, DELETE ON analytics_events FROM atlas_app;    -- append-only (mirrors audit_events)
+```
+
+---
+
 ## 6. Indexing Strategy
 
 > Every index is **org-prefixed** (SP-9). Targets NFR-1 (graph p95 < 1.5s) and the dominant query shapes from `01`/`05`.

@@ -33,6 +33,53 @@ export type UpdateOrgBody = z.infer<typeof UpdateOrgSchema>;
 export const ChangeRoleSchema = z.object({ role: z.enum(["Owner", "Admin", "Member"]) }).strict();
 export type ChangeRoleBody = z.infer<typeof ChangeRoleSchema>;
 
+/**
+ * Onboarding profile answers (docs/12 §6.3) — collected at org creation, for personalization +
+ * product analytics. Every field is optional (the whole step is skippable). Stable string keys
+ * (not display labels) so analytics stays clean across copy changes. `stack` is validated as slugs
+ * rather than a hard enum so it can track the integrations catalog (providers.tsx) without drift.
+ */
+export const ORG_PROFILE_ROLES = [
+  "on_call_sre",
+  "platform_staff",
+  "eng_manager",
+  "new_to_team",
+  "leadership",
+] as const;
+export const ORG_PROFILE_TEAM_SIZES = ["solo", "2-20", "20-100", "100-500", "500+"] as const;
+export const ORG_PROFILE_USE_CASES = [
+  "blast_radius",
+  "architecture",
+  "onboarding",
+  "security",
+  "change_tracking",
+] as const;
+
+export const OrgProfileSchema = z
+  .object({
+    role: z.enum(ORG_PROFILE_ROLES).optional(),
+    teamSize: z.enum(ORG_PROFILE_TEAM_SIZES).optional(),
+    useCases: z.array(z.enum(ORG_PROFILE_USE_CASES)).max(5).optional(),
+    stack: z
+      .array(z.string().regex(/^[a-z0-9-]{1,40}$/))
+      .max(20)
+      .optional(),
+    industry: z.string().trim().min(1).max(60).optional(),
+    referralSource: z.string().trim().min(1).max(60).optional(),
+  })
+  .strict();
+export type OrgProfileBody = z.infer<typeof OrgProfileSchema>;
+
+export interface OrgProfileDto {
+  role: string | null;
+  teamSize: string | null;
+  useCases: string[];
+  stack: string[];
+  industry: string | null;
+  referralSource: string | null;
+  updatedAt: string;
+}
+
 // Invites never grant Owner (docs/12 §6.2, BR - Owner only via transfer).
 export const CreateInviteSchema = z
   .object({

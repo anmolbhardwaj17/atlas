@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getSession, apiGet, type ApiOk } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CreateOrgForm } from "../create-org-form";
 
 export const dynamic = "force-dynamic";
@@ -26,8 +25,8 @@ export default async function CreateOrgPage() {
   const hasOrgs = (me?.memberships.length ?? 0) > 0;
 
   return (
-    <div className="grid min-h-dvh place-items-center bg-muted/40 px-6">
-      <div className="w-full max-w-md space-y-4">
+    <div className="grid min-h-dvh place-items-center bg-muted/40 px-6 py-10">
+      <div className="w-full max-w-xl space-y-4">
         {hasOrgs ? (
           <Link
             href="/dashboard"
@@ -35,20 +34,12 @@ export default async function CreateOrgPage() {
           >
             <ArrowLeft className="size-4" /> Back to dashboard
           </Link>
-        ) : null}
-        <Card>
-          <CardHeader>
-            <CardTitle>{hasOrgs ? "Create a new organization" : "Welcome to Atlas"}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              {hasOrgs
-                ? "Spin up a separate workspace — its own graph, members, and connections."
-                : "Create an organization to start building your graph."}
-            </p>
-            <CreateOrgForm />
-          </CardContent>
-        </Card>
+        ) : (
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+            Welcome to Atlas
+          </p>
+        )}
+        <CreateOrgForm />
       </div>
     </div>
   );

@@ -180,6 +180,17 @@ stateDiagram-v2
 - Accept: invitee authenticates with Google; if the invited email matches their verified Google email, accepting **atomically creates the User (if new) + Membership** (BR-INV-2). Mismatch → must accept with the invited address.
 - Only Admin+ invite (FR-7.3); enforced by guard.
 
+### 6.3 Onboarding questions (org profile + product analytics) *(added 0040)*
+
+Org creation is a **two-step** flow. **Connecting a real source is NOT part of it** — that lives in the dashboard onboarding, so signup stays light.
+
+1. **Name your workspace** — `name` (+ optional `logo`). `POST /orgs` creates the org, the creator becomes **Owner**, and the client switches into it (active-org cookie). Errors (e.g. slug taken) surface here.
+2. **Tell us about your team** — a **fully skippable** set of questions saved to **`org_profile`** (`04` §5.7) via `PUT /orgs/:orgId/profile` (Admin+): **role** (persona `00` §8 A–E), **team size**, **use-cases** (intent), **stack** (self-reported tools, keyed to the integrations catalog), and optional **industry** / **referral source**.
+
+These answers do double duty: **personalization** (tailor the first "aha" — SREs get blast-radius starters, staff get "explain our architecture") **and** **segmentation analytics**. They are **product/business data about the account** — a distinct category from the knowledge graph, so SEC-10 graph-minimization does not forbid it; it is disclosed in the privacy policy (`13`) and GDPR-deletable.
+
+**Activation funnel** — the flow emits `analytics_events` (`04` §5.7): `org.created` (step 1) → `onboarding.completed` (step 2) → (later) `source.connected` → first cited answer — instrumenting the `<30-min TTFI` north-star (`00` §7.1, `18` §7). Stable keys, not display labels, so analytics survives copy changes. Field allow-lists live in `apps/api/src/orgs/dto.ts` (`ORG_PROFILE_*`).
+
 ---
 
 ## 7. Domain-Based Membership / Auto-Join (PHASE 1 — designed now, built later)

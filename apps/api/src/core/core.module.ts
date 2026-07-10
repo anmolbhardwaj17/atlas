@@ -11,6 +11,7 @@ import { loadEnv, type Env } from "@atlas/config";
 import { assertRestrictedRole, createPool, type Db } from "@atlas/db";
 import { ENV, PG_POOL } from "./tokens";
 import { AuditService } from "./audit.service";
+import { AnalyticsService } from "./analytics.service";
 import { EmailService } from "./email.service";
 import { ImageUploadService } from "./image-upload.service";
 import { RateLimitService } from "./rate-limit.service";
@@ -43,11 +44,20 @@ const poolProvider: Provider = {
     envProvider,
     poolProvider,
     AuditService,
+    AnalyticsService,
     EmailService,
     ImageUploadService,
     RateLimitService,
   ],
-  exports: [ENV, PG_POOL, AuditService, EmailService, ImageUploadService, RateLimitService],
+  exports: [
+    ENV,
+    PG_POOL,
+    AuditService,
+    AnalyticsService,
+    EmailService,
+    ImageUploadService,
+    RateLimitService,
+  ],
 })
 export class CoreModule implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(CoreModule.name);
