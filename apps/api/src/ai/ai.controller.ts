@@ -74,6 +74,16 @@ export class AiController {
     return { ok: true };
   }
 
+  /** Generate AI-suggested repo→runtime links (docs/05 §6). Admin-gated (spends model budget);
+   *  returns how many suggestions were written for the user to confirm/reject in the graph. */
+  @Post("suggest-edges")
+  @Roles("Admin")
+  async suggestEdges(
+    @Req() req: AuthedRequest,
+  ): Promise<{ suggested: number; scannedRuntimes: number; overCap: number }> {
+    return this.ai.suggestEdges(org(req).id);
+  }
+
   @Post("conversations")
   @Roles("Member")
   async create(@Req() req: AuthedRequest, @Body() body: unknown): Promise<unknown> {

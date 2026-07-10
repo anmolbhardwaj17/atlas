@@ -4,6 +4,7 @@ import { withOrgScope, type Db } from "@atlas/db";
 import {
   answerQuestion,
   answerQuestionStream,
+  matchEdges,
   OpenRouterProvider,
   ClaudeProvider,
   type AnswerCitation,
@@ -17,6 +18,7 @@ import { SECRET_BROKER } from "../connections/tokens";
 import { ApiException } from "../common/errors";
 import { RateLimitService } from "../core/rate-limit.service";
 import { GraphRetrievalPort } from "./graph-retrieval.port";
+import { EdgeSuggestionService } from "./edge-suggestion.service";
 import { LLM_PROVIDER } from "./tokens";
 
 export type LlmProviderId = "openrouter" | "openai" | "anthropic";
@@ -82,7 +84,41 @@ export class AiService {
     @Inject(SECRET_BROKER) private readonly secrets: SecretBroker,
     @Inject(ENV) private readonly env: Env,
     private readonly rateLimit: RateLimitService,
+    private readonly edgeSuggest: EdgeSuggestionService,
   ) {}
+
+  /**
+   * AI edge suggestions (docs/05 §6, docs/10) — propose repo→runtime links that deterministic
+   * matching can't catch, written as `ai_suggested` edges for the user to confirm/reject. Gathers
+   * unmatched runtimes + candidate repos, asks the model which plausibly deploy where (+ why), and
+   * persists the accepted proposals. Atlas-initiated (like autoDiagnose): bounded by the caller's
+   * Admin gate, not per-user budget. Needs a real (non-mock) model.
+   */
+  async suggestEdges(
+    orgId: string,
+  ): Promise<{ suggested: number; scannedRuntimes: number; overCap: number }> {
+    const ctx = await this.edgeSuggest.gather(orgId);
+    if (ctx.input.runtimes.length === 0 || ctx.input.repos.length === 0) {
+      return {
+        suggested: 0,
+        scannedRuntimes: ctx.input.runtimes.length,
+        overCap: ctx.runtimesOverCap,
+      };
+    }
+    const { llm } = await this.resolveProvider(orgId);
+    if (llm.name === "mock") {
+      throw ApiException.invalidState(
+        "AI link suggestions need a configured model. Add a BYO-LLM key in Settings, or set ANTHROPIC_API_KEY.",
+      );
+    }
+    const suggestions = await matchEdges(llm, ctx.input);
+    const written = await this.edgeSuggest.write(orgId, suggestions, ctx);
+    return {
+      suggested: written,
+      scannedRuntimes: ctx.input.runtimes.length,
+      overCap: ctx.runtimesOverCap,
+    };
+  }
 
   /** The org's LLM config for the settings UI — never the key (BR-CONN-1). */
   async getLlmConfig(orgId: string): Promise<LlmConfigDto | null> {

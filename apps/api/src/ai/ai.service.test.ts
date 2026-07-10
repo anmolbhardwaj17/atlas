@@ -9,6 +9,7 @@ import { GraphService } from "../graph/graph.service";
 import { PostgresSearchProvider } from "../search/postgres-search.provider";
 import { GraphRetrievalPort } from "./graph-retrieval.port";
 import { AiService } from "./ai.service";
+import { EdgeSuggestionService } from "./edge-suggestion.service";
 import { RateLimitService } from "../core/rate-limit.service";
 
 /**
@@ -52,6 +53,7 @@ suite("G3.5 AiService", () => {
       new InMemorySecretBroker(),
       loadEnv({}),
       new RateLimitService(app),
+      new EdgeSuggestionService(app),
     );
   };
 

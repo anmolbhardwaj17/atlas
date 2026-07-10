@@ -7,6 +7,7 @@ import { SEARCH_PROVIDER } from "../search/search.provider";
 import { PostgresSearchProvider } from "../search/postgres-search.provider";
 import { GraphRetrievalPort } from "./graph-retrieval.port";
 import { AiService } from "./ai.service";
+import { EdgeSuggestionService } from "./edge-suggestion.service";
 import { AiController } from "./ai.controller";
 import { LLM_PROVIDER } from "./tokens";
 
@@ -35,7 +36,14 @@ const searchProvider: Provider = {
   // ConnectionsModule exports SECRET_BROKER (for per-org BYO-LLM key resolution).
   imports: [AuthModule, ConnectionsModule],
   controllers: [AiController],
-  providers: [GraphService, searchProvider, GraphRetrievalPort, AiService, llmProvider],
+  providers: [
+    GraphService,
+    searchProvider,
+    GraphRetrievalPort,
+    AiService,
+    EdgeSuggestionService,
+    llmProvider,
+  ],
   // The autonomous-diagnosis agent (AiService.autoDiagnose) is used by the notifications
   // dispatcher to investigate breaks proactively.
   exports: [AiService],
