@@ -136,17 +136,17 @@ export function Onboarding({ orgId, canSeed }: { orgId: string; canSeed: boolean
           </div>
         </section>
 
-        {/* ── Get started ── */}
+        {/* ── Get started ── real source first (the destination), sample data as the instant try ── */}
         <section className="space-y-4">
           <SectionLabel>Get started</SectionLabel>
-          <SampleDataCard orgId={orgId} canSeed={canSeed} />
+          <ConnectSource />
 
           <div className="flex items-center gap-3 pt-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             <span className="h-px flex-1 bg-border" />
-            or connect a real source
+            or explore sample data first
             <span className="h-px flex-1 bg-border" />
           </div>
-          <ConnectSource />
+          <SampleDataCard orgId={orgId} canSeed={canSeed} />
         </section>
       </div>
     </div>
