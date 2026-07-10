@@ -239,9 +239,24 @@
     stroke-dashoffset: -12;
   }
 }
+/* Sift backdrop — contribution cells breathe (glow up, dim down) on staggered timings. */
+@keyframes sift-twinkle {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
 @media (prefers-reduced-motion: no-preference) {
   .sift-edge {
     animation: sift-dash 0.9s linear infinite;
+  }
+  .sift-cell {
+    animation-name: sift-twinkle;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
   }
 }
 

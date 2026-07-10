@@ -20,7 +20,7 @@ export default function SiftPage() {
         {/* The pairing mark — Sift × Atlas (the Atlas globe rotates). */}
         <div className="flex items-center gap-3">
           <SiftMark className="size-10" />
-          <span className="text-xl text-muted-foreground">×</span>
+          <span className="text-xl text-muted-foreground pl-2">×</span>
           <AtlasLogo size={44} spin className="size-14 dark:invert" />
         </div>
 

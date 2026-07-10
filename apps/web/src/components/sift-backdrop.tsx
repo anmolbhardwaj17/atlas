@@ -22,32 +22,35 @@ function alphaFor(i: number): number {
   return 0.05;
 }
 
-// ── Right: infra-map slice (coords in 0..100 of the right strip) ──────────────────────────────
+// ── Right: infra-map slice (coords in 0..100 of the right strip), laid out in left→right lanes:
+//    repos → ingress → compute → data — so edges route cleanly like the real map. ──────────────
 const NET_NODES: { x: number; y: number; logo: string; name: string; short: string }[] = [
-  { x: 24, y: 30, logo: "github-icon", name: "payments-api", short: "Repository" },
-  { x: 46, y: 15, logo: "aws-elb", name: "prod-alb", short: "Load Balancer" },
-  { x: 42, y: 46, logo: "aws-api-gateway", name: "public-api", short: "API Gateway" },
-  { x: 64, y: 24, logo: "aws-ecs", name: "checkout-svc", short: "ECS Service" },
-  { x: 59, y: 53, logo: "aws-lambda", name: "on-connect", short: "Lambda" },
-  { x: 50, y: 75, logo: "aws-lambda", name: "stream-worker", short: "Lambda" },
-  { x: 87, y: 17, logo: "aws-rds", name: "orders-db", short: "RDS" },
-  { x: 90, y: 43, logo: "aws-dynamodb", name: "sessions", short: "DynamoDB" },
-  { x: 82, y: 65, logo: "aws-s3", name: "assets", short: "S3 Bucket" },
-  { x: 73, y: 86, logo: "aws-elasticache", name: "cache", short: "ElastiCache" },
+  { x: 17, y: 28, logo: "github-icon", name: "payments-api", short: "Repository" }, // 0
+  { x: 16, y: 56, logo: "bitbucket", name: "billing-svc", short: "Repository" }, // 1
+  { x: 40, y: 15, logo: "aws-elb", name: "prod-alb", short: "Load Balancer" }, // 2
+  { x: 42, y: 44, logo: "aws-api-gateway", name: "public-api", short: "API Gateway" }, // 3
+  { x: 62, y: 26, logo: "aws-ecs", name: "checkout-svc", short: "ECS Service" }, // 4
+  { x: 60, y: 55, logo: "aws-lambda", name: "on-connect", short: "Lambda" }, // 5
+  { x: 58, y: 82, logo: "aws-lambda", name: "stream-worker", short: "Lambda" }, // 6
+  { x: 86, y: 18, logo: "aws-rds", name: "orders-db", short: "RDS" }, // 7
+  { x: 88, y: 44, logo: "aws-dynamodb", name: "sessions", short: "DynamoDB" }, // 8
+  { x: 84, y: 67, logo: "aws-s3", name: "assets", short: "S3 Bucket" }, // 9
+  { x: 82, y: 90, logo: "aws-elasticache", name: "cache", short: "ElastiCache" }, // 10
 ];
+// Every edge runs left→right (source.x < target.x) so the orthogonal routing reads cleanly.
 const NET_EDGES: [number, number][] = [
-  [0, 3],
+  [0, 2],
   [1, 3],
-  [1, 2],
   [2, 4],
-  [2, 5],
+  [3, 5],
   [3, 6],
-  [3, 7],
-  [3, 9],
   [4, 7],
   [4, 8],
+  [4, 10],
   [5, 8],
   [5, 9],
+  [6, 9],
+  [6, 10],
 ];
 
 const GRID_MASK = "linear-gradient(to right, #000 0%, #000 12%, transparent 100%)";
@@ -59,6 +62,16 @@ const DOTS = {
     "radial-gradient(circle, hsl(var(--muted-foreground) / 0.25) 1px, transparent 1.4px)",
   backgroundSize: "22px 22px",
 };
+
+/** Deterministic twinkle timing for a grid cell (SSR-stable). ~1 in 7 cells breathes. */
+function twinkleFor(i: number): { on: boolean; delay: string; dur: string } {
+  const h = (Math.imul(i + 7, 40503) >>> 0) % 1000;
+  return {
+    on: h < 150,
+    delay: `-${(h % 50) / 10}s`, // 0–5s, negative so they're mid-cycle from the start
+    dur: `${2.4 + (h % 33) / 10}s`, // 2.4–5.7s
+  };
+}
 
 export function SiftBackdrop() {
   return (
@@ -72,13 +85,19 @@ export function SiftBackdrop() {
           className="grid gap-1.5"
           style={{ gridTemplateColumns: "repeat(auto-fill, 26px)", gridAutoRows: "26px" }}
         >
-          {Array.from({ length: CELLS }).map((_, i) => (
-            <span
-              key={i}
-              className="rounded-[5px]"
-              style={{ backgroundColor: `rgba(${GREEN}, ${alphaFor(i)})` }}
-            />
-          ))}
+          {Array.from({ length: CELLS }).map((_, i) => {
+            const t = twinkleFor(i);
+            return (
+              <span
+                key={i}
+                className={t.on ? "sift-cell rounded-[5px]" : "rounded-[5px]"}
+                style={{
+                  backgroundColor: `rgba(${GREEN}, ${alphaFor(i)})`,
+                  ...(t.on ? { animationDelay: t.delay, animationDuration: t.dur } : {}),
+                }}
+              />
+            );
+          })}
         </div>
       </div>
 
