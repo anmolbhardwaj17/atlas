@@ -13,13 +13,19 @@ import {
   DescribeServicesCommand,
 } from "@aws-sdk/client-ecs";
 import { RDSClient, DescribeDBInstancesCommand } from "@aws-sdk/client-rds";
-import { CloudWatchClient, DescribeAlarmsCommand } from "@aws-sdk/client-cloudwatch";
+import {
+  CloudWatchClient,
+  DescribeAlarmsCommand,
+  GetMetricDataCommand,
+} from "@aws-sdk/client-cloudwatch";
+import { LambdaClient, ListFunctionsCommand } from "@aws-sdk/client-lambda";
 import { collectAwsHealth } from "./health-collect";
 
 const elbMock = mockClient(ElasticLoadBalancingV2Client);
 const ecsMock = mockClient(ECSClient);
 const rdsMock = mockClient(RDSClient);
 const cwMock = mockClient(CloudWatchClient);
+const lambdaMock = mockClient(LambdaClient);
 
 const INPUT = {
   credentials: { accessKeyId: "AKIA", secretAccessKey: "s", expiration: null },
@@ -33,6 +39,8 @@ function emptyDefaults(): void {
   ecsMock.on(ListClustersCommand).resolves({ clusterArns: [] });
   rdsMock.on(DescribeDBInstancesCommand).resolves({ DBInstances: [] });
   cwMock.on(DescribeAlarmsCommand).resolves({ MetricAlarms: [] });
+  cwMock.on(GetMetricDataCommand).resolves({ MetricDataResults: [] });
+  lambdaMock.on(ListFunctionsCommand).resolves({ Functions: [] });
 }
 
 beforeEach(() => {
@@ -40,6 +48,7 @@ beforeEach(() => {
   ecsMock.reset();
   rdsMock.reset();
   cwMock.reset();
+  lambdaMock.reset();
   emptyDefaults();
 });
 
@@ -158,5 +167,43 @@ describe("collectAwsHealth", () => {
       },
     ]);
     expect(r.observations.some((o) => o.urn.includes(":rds:ok-db"))).toBe(true);
+  });
+
+  it("Lambda metric health: high error rate → unhealthy; an idle function stays unknown", async () => {
+    lambdaMock.on(ListFunctionsCommand).resolves({
+      Functions: [{ FunctionName: "api-handler" }, { FunctionName: "idle-fn" }],
+    });
+    cwMock.on(GetMetricDataCommand).resolves({
+      MetricDataResults: [
+        { Id: "e0", Values: [60] }, // api-handler: 60 errors …
+        { Id: "t0", Values: [0] },
+        { Id: "i0", Values: [100] }, // … of 100 invocations → 60% → unhealthy
+        { Id: "e1", Values: [] }, // idle-fn: no activity
+        { Id: "t1", Values: [] },
+        { Id: "i1", Values: [] },
+      ],
+    });
+
+    const r = await collectAwsHealth(INPUT);
+    const api = r.observations.find((o) => o.urn.includes(":lambda:api-handler"));
+    expect(api).toMatchObject({ state: "unhealthy" });
+    expect(api?.reason).toMatch(/60% error rate/);
+    // The idle function is left unknown (no annotation), never faked to "healthy".
+    expect(r.observations.some((o) => o.urn.includes(":lambda:idle-fn"))).toBe(false);
+  });
+
+  it("Lambda throttles → degraded", async () => {
+    lambdaMock.on(ListFunctionsCommand).resolves({ Functions: [{ FunctionName: "worker" }] });
+    cwMock.on(GetMetricDataCommand).resolves({
+      MetricDataResults: [
+        { Id: "e0", Values: [0] },
+        { Id: "t0", Values: [3] },
+        { Id: "i0", Values: [50] },
+      ],
+    });
+    const r = await collectAwsHealth(INPUT);
+    const w = r.observations.find((o) => o.urn.includes(":lambda:worker"));
+    expect(w).toMatchObject({ state: "degraded" });
+    expect(w?.reason).toMatch(/3 throttle/);
   });
 });

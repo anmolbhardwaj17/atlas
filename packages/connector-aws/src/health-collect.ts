@@ -28,7 +28,12 @@ import {
   DescribeServicesCommand,
 } from "@aws-sdk/client-ecs";
 import { RDSClient, paginateDescribeDBInstances } from "@aws-sdk/client-rds";
-import { CloudWatchClient, paginateDescribeAlarms } from "@aws-sdk/client-cloudwatch";
+import {
+  CloudWatchClient,
+  paginateDescribeAlarms,
+  GetMetricDataCommand,
+} from "@aws-sdk/client-cloudwatch";
+import { LambdaClient, paginateListFunctions } from "@aws-sdk/client-lambda";
 import { awsUrn } from "./urn";
 import { clientConfig } from "./aws/client-config";
 import { isAccessDenied } from "./permission-probe";
@@ -109,6 +114,11 @@ export async function collectAwsHealth(input: HealthCollectInput): Promise<Healt
     await run("rds-status", "rds:DescribeDBInstances", () => collectRds(input, region, at, keep));
     await run("cloudwatch-alarms", "cloudwatch:DescribeAlarms", () =>
       collectAlarms(input, region, at, keep),
+    );
+    // Lambda has no status field — its health lives in CloudWatch metrics (needs GetMetricData,
+    // beyond the crawl's permissions), so this lights up when that grant lands.
+    await run("lambda-metrics", "cloudwatch:GetMetricData", () =>
+      collectLambdaMetricHealth(input, region, at, keep),
     );
   }
 
@@ -313,5 +323,96 @@ async function collectAlarms(
         checkedAt: at,
       });
     }
+  }
+}
+
+const LAMBDA_WINDOW_MIN = 15;
+const LAMBDA_METRIC_CAP = 150; // ≤450 GetMetricData queries/call (3 per function)
+
+/**
+ * Lambda health from CloudWatch metrics (`cloudwatch:GetMetricData`). A function has no `status` to
+ * describe, so we read Errors / Throttles / Invocations over a short window and derive a state:
+ * high error rate → unhealthy, some errors/throttles → degraded, activity with no errors → healthy.
+ * A function with NO activity in the window is left `unknown` (we don't fabricate "healthy" from
+ * silence — docs/09 §7). This is what finally gives the Lambda mass live health on the map.
+ */
+async function collectLambdaMetricHealth(
+  input: HealthCollectInput,
+  region: string,
+  at: string,
+  keep: (o: HealthObservation) => void,
+): Promise<void> {
+  const lambda = new LambdaClient(clientConfig(input.credentials, region));
+  const names: string[] = [];
+  for await (const page of paginateListFunctions({ client: lambda }, {})) {
+    for (const f of page.Functions ?? []) if (f.FunctionName) names.push(f.FunctionName);
+  }
+  if (names.length === 0) return;
+
+  const cw = new CloudWatchClient(clientConfig(input.credentials, region));
+  const end = new Date(at);
+  const start = new Date(end.getTime() - LAMBDA_WINDOW_MIN * 60_000);
+  const period = LAMBDA_WINDOW_MIN * 60;
+
+  for (let i = 0; i < names.length; i += LAMBDA_METRIC_CAP) {
+    const batch = names.slice(i, i + LAMBDA_METRIC_CAP);
+    const query = (name: string, metric: string, id: string) => ({
+      Id: id,
+      ReturnData: true,
+      MetricStat: {
+        Metric: {
+          Namespace: "AWS/Lambda",
+          MetricName: metric,
+          Dimensions: [{ Name: "FunctionName", Value: name }],
+        },
+        Period: period,
+        Stat: "Sum",
+      },
+    });
+    const out = await cw.send(
+      new GetMetricDataCommand({
+        StartTime: start,
+        EndTime: end,
+        MetricDataQueries: batch.flatMap((name, j) => [
+          query(name, "Errors", `e${j}`),
+          query(name, "Throttles", `t${j}`),
+          query(name, "Invocations", `i${j}`),
+        ]),
+      }),
+    );
+    const sum = (id: string): number =>
+      (out.MetricDataResults?.find((r) => r.Id === id)?.Values ?? []).reduce((a, b) => a + b, 0);
+
+    batch.forEach((name, j) => {
+      const errors = sum(`e${j}`);
+      const throttles = sum(`t${j}`);
+      const invocations = sum(`i${j}`);
+      if (errors === 0 && throttles === 0 && invocations === 0) return; // idle → unknown, not faked
+      const rate = invocations > 0 ? errors / invocations : errors > 0 ? 1 : 0;
+      const pct = Math.round(rate * 100);
+      let state: HealthState = "healthy";
+      let reason = `${invocations} invocation(s), no errors in last ${LAMBDA_WINDOW_MIN}m`;
+      if (rate >= 0.5) {
+        state = "unhealthy";
+        reason = `${pct}% error rate (${errors}/${invocations}) in last ${LAMBDA_WINDOW_MIN}m`;
+      } else if (throttles > 0 || errors > 0) {
+        state = "degraded";
+        reason =
+          throttles > 0
+            ? `${throttles} throttle(s)${errors ? `, ${errors} error(s)` : ""} in last ${LAMBDA_WINDOW_MIN}m`
+            : `${errors} error(s) (${pct}%) in last ${LAMBDA_WINDOW_MIN}m`;
+      }
+      keep({
+        urn: awsUrn("aws.lambda.function", {
+          account: input.accountId,
+          region,
+          naturalKey: name,
+        }),
+        state,
+        reason,
+        evidence: { errors, throttles, invocations, windowMin: LAMBDA_WINDOW_MIN },
+        checkedAt: at,
+      });
+    });
   }
 }

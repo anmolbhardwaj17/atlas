@@ -19,6 +19,7 @@ const AWS_POLICY = `{
         "ecs:List*", "ecs:Describe*", "ecr:DescribeRepositories",
         "elasticloadbalancing:Describe*", "route53:List*", "route53:Get*",
         "rds:Describe*", "dynamodb:List*", "dynamodb:DescribeTable",
+        "cloudwatch:DescribeAlarms", "cloudwatch:GetMetricData",
         "s3:ListAllMyBuckets", "s3:GetBucketLocation", "s3:GetBucketTagging",
         "elasticache:Describe*",
         "iam:GetRole", "iam:ListRolePolicies", "iam:GetRolePolicy",
