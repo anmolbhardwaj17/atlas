@@ -57,6 +57,12 @@ const NAV: Array<{ label: string; href: string; icon: LucideIcon; keywords: stri
   { label: "Map", href: "/map", icon: Waypoints, keywords: "infrastructure graph flow" },
   { label: "Explore", href: "/explore", icon: Boxes, keywords: "browse resources repos" },
   { label: "Insights", href: "/insights", icon: Lightbulb, keywords: "findings recommendations" },
+  {
+    label: "Compliance",
+    href: "/compliance",
+    icon: ShieldCheck,
+    keywords: "compliance pci dss nist iso 27001 hipaa gdpr cis controls audit frameworks",
+  },
   // Sift carries its own brand glyph (the shield "S"), rendered specially like Ask Atlas — the
   // `icon` here is just a fallback the render never actually reaches (see href === "/sift" below).
   { label: "Sift", href: "/sift", icon: ShieldCheck, keywords: "security posture compliance soon" },
