@@ -14,8 +14,13 @@ import { plan, classifyIntent, smalltalkReply, type Intent } from "./planner";
 import { orchestrate } from "./retrieval";
 import { buildContext, buildAdvisoryContext, type BuiltContext, type Cite } from "./context";
 import { groundingGate } from "./grounding";
-import { SYSTEM_PROMPT, ADVISORY_SYSTEM, honestAbsence } from "./prompt";
+import { SYSTEM_PROMPT, ADVISORY_SYSTEM, ATLAS_CAPABILITIES, honestAbsence } from "./prompt";
 import { retrievalLoop, collectLoop } from "./loop";
+
+// Both narrator prompts get Atlas's self-knowledge appended, so the AI can guide users to the
+// right surface (the map, Compliance, Explore…) instead of being blind to the product it's in.
+const NARRATOR_SYSTEM = `${SYSTEM_PROMPT}\n\n${ATLAS_CAPABILITIES}`;
+const ADVISOR_SYSTEM = `${ADVISORY_SYSTEM}\n\n${ATLAS_CAPABILITIES}`;
 
 /**
  * Router (DD-P1-2): open-ended intents go through the agentic tool-loop when the provider can
@@ -111,7 +116,7 @@ async function prepare(
           grounded: true,
           intent: agenticIntent,
           built: loop.built,
-          system: SYSTEM_PROMPT,
+          system: NARRATOR_SYSTEM,
           advisory: false,
         }
       : { grounded: false, intent: agenticIntent, reason: NO_MATCH };
@@ -124,7 +129,7 @@ async function prepare(
       grounded: true,
       intent: "advisory",
       built: buildAdvisoryContext(orgId, estate),
-      system: ADVISORY_SYSTEM,
+      system: ADVISOR_SYSTEM,
       advisory: true,
     };
   }
@@ -138,7 +143,7 @@ async function prepare(
     grounded: true,
     intent: p.intent,
     built: buildContext(orgId, retrieval),
-    system: SYSTEM_PROMPT,
+    system: NARRATOR_SYSTEM,
     advisory: false,
   };
 }
@@ -233,7 +238,7 @@ export async function* answerQuestionStream(
           grounded: true,
           intent: agenticIntent,
           built: loop.built,
-          system: SYSTEM_PROMPT,
+          system: NARRATOR_SYSTEM,
           advisory: false,
         }
       : { grounded: false, intent: agenticIntent, reason: NO_MATCH };
