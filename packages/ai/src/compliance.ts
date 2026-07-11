@@ -274,11 +274,12 @@ export const CONTROLS: Control[] = [
     id: "logging.audit-trail",
     title: "Audit logging enabled",
     requirement:
-      "Account-wide audit logging (CloudTrail) and network flow logs are enabled and retained.",
+      "A multi-region CloudTrail is actively logging account-wide API activity - the audit trail you need to investigate an incident or prove what happened.",
     domain: "logging",
     assessKey: "auditLogging",
-    notAssessableReason:
-      "Atlas crawls log GROUPS but not CloudTrail/flow-log enablement or retention. Connector gap.",
+    appliesTo: ["aws.account"],
+    findingId: "no-cloudtrail",
+    notAssessableReason: "Atlas doesn't yet read CloudTrail enablement. Connector gap.",
     mappings: {
       pci: ["10.2.1", "10.3.1"],
       cis: ["3.1", "3.5"],

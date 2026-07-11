@@ -6,6 +6,7 @@
  * is what lets the Compliance page say "grant s3:GetBucketPublicAccessBlock" instead of a false pass.
  */
 import { S3Client, ListBucketsCommand, GetPublicAccessBlockCommand } from "@aws-sdk/client-s3";
+import { CloudTrailClient, DescribeTrailsCommand } from "@aws-sdk/client-cloudtrail";
 import { clientConfig } from "../aws/client-config";
 import { classifyAwsError } from "../aws/retry";
 import type { PermissionProbe } from "../permission-probe";
@@ -26,6 +27,15 @@ export const POSTURE_PROBES: readonly PermissionProbe[] = [
         if (classifyAwsError(err) === "access-denied") throw err;
         // NoSuchPublicAccessBlockConfiguration etc. → the permission works, there's just no config.
       }
+    },
+  },
+  {
+    service: "cloudtrail-config",
+    iamAction: "cloudtrail:DescribeTrails",
+    scope: "global",
+    async probe(input) {
+      const client = new CloudTrailClient(clientConfig(input.credentials, "us-east-1"));
+      await client.send(new DescribeTrailsCommand({}));
     },
   },
 ];

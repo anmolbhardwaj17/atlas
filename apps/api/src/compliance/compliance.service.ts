@@ -38,9 +38,10 @@ const CAPABILITIES: Record<string, Capability> = {
   encryptionInTransit: { supported: false, actions: ["elasticloadbalancing:DescribeListeners"] },
   // Public-access is gated by the posture probe's action; the ACL/policy sub-reads ride along.
   publicStorage: { supported: true, actions: ["s3:GetBucketPublicAccessBlock"] },
+  // Multi-region CloudTrail logging (aws.account.cloudTrailEnabled). Flow-logs are a later slice.
   auditLogging: {
-    supported: false,
-    actions: ["cloudtrail:DescribeTrails", "cloudtrail:GetTrailStatus", "ec2:DescribeFlowLogs"],
+    supported: true,
+    actions: ["cloudtrail:DescribeTrails", "cloudtrail:GetTrailStatus"],
   },
   // Root MFA is crawled (aws.account via GetAccountSummary). Credential-report/per-user MFA is a
   // later slice; root MFA is the headline control and needs only GetAccountSummary.

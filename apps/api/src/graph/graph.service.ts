@@ -576,6 +576,7 @@ export class GraphService {
           rootNoMfa,
           publicBuckets,
           unencryptedData,
+          noCloudTrail,
         ] = await Promise.all([
           c.query<{
             id: string;
@@ -705,6 +706,14 @@ export class GraphService {
                 AND ((kind = 'aws.rds.instance' AND attributes->>'storageEncrypted' = 'false')
                   OR (kind = 'aws.s3.bucket' AND attributes->>'encrypted' = 'false'))`,
           ),
+          // Audit logging: an account with NO multi-region CloudTrail actively logging (Phase 2b).
+          // Only fires on known-false (cloudTrailEnabled='false'), never 'unknown' (null) → no
+          // false-fire when the read was denied.
+          c.query<{ id: string; name: string | null }>(
+            `SELECT id, name FROM nodes
+              WHERE kind = 'aws.account' AND deleted_at IS NULL AND status <> 'deleted'
+                AND attributes->>'cloudTrailEnabled' = 'false'`,
+          ),
         ]);
         return {
           conns,
@@ -720,6 +729,7 @@ export class GraphService {
           rootNoMfa,
           publicBuckets,
           unencryptedData,
+          noCloudTrail,
         };
       }),
       scope(async (c) => {
@@ -863,6 +873,7 @@ export class GraphService {
       rootNoMfa,
       publicBuckets,
       unencryptedData,
+      noCloudTrail,
     } = grpTopology;
     const { contributors, mostActiveRepos, vulnSeverity, topVulnPkg, sprawl, exposedVulns } =
       grpPeopleVulns;
@@ -921,6 +932,7 @@ export class GraphService {
         rootNoMfa: rootNoMfa.rows,
         publicBuckets: publicBuckets.rows,
         unencryptedData: unencryptedData.rows,
+        noCloudTrail: noCloudTrail.rows,
         topContributors: contributors.rows.map((r) => ({ name: r.name ?? "unknown", count: r.n })),
         mostActiveRepos: mostActiveRepos.rows.map((r) => ({
           name: r.name ?? "unknown",
@@ -1075,6 +1087,21 @@ export class GraphService {
         href: first ? `/explore/${first.id}` : "/explore",
         count: unencrypted.length,
         evidence: unencrypted.map((d) => ({ id: d.id, label: d.name ?? d.id })),
+      });
+    }
+    // No multi-region CloudTrail actively logging (Security Phase 2b) - no audit trail of API activity.
+    const noCt = base.noCloudTrail ?? [];
+    if (noCt.length > 0) {
+      const first = noCt[0];
+      findings.push({
+        id: "no-cloudtrail",
+        severity: "medium",
+        category: "Security posture",
+        title: `No multi-region CloudTrail is actively logging`,
+        detail: `${noCt.map((a) => a.name ?? a.id).join(", ")} - without an account-wide audit trail you can't investigate an incident or prove what happened; enable a multi-region CloudTrail with log-file validation.`,
+        href: first ? `/explore/${first.id}` : "/explore?kind=aws.account",
+        count: noCt.length,
+        evidence: noCt.map((a) => ({ id: a.id, label: a.name ?? a.id })),
       });
     }
 

@@ -12,9 +12,40 @@ import {
   GetAccountSummaryCommand,
   GetAccountPasswordPolicyCommand,
 } from "@aws-sdk/client-iam";
+import {
+  CloudTrailClient,
+  DescribeTrailsCommand,
+  GetTrailStatusCommand,
+} from "@aws-sdk/client-cloudtrail";
 import { clientConfig } from "../aws/client-config";
 import { emit, type Discoverer } from "../aws/discoverer";
 import { classifyAwsError } from "../aws/retry";
+
+/** Is there a multi-region CloudTrail that's actively logging (CIS 3.1)? Checked from us-east-1,
+ *  where multi-region trails always appear. `null` when we couldn't read it (denied) — so the
+ *  finding never fires on "unknown", only on a genuine known-absence. */
+async function cloudTrailMultiRegionLogging(client: CloudTrailClient): Promise<boolean | null> {
+  try {
+    const { trailList } = await client.send(
+      new DescribeTrailsCommand({ includeShadowTrails: true }),
+    );
+    const multiRegion = (trailList ?? []).filter((t) => t.IsMultiRegionTrail);
+    if (multiRegion.length === 0) return false;
+    for (const t of multiRegion) {
+      if (!t.Name) continue;
+      try {
+        const status = await client.send(new GetTrailStatusCommand({ Name: t.TrailARN ?? t.Name }));
+        if (status.IsLogging) return true;
+      } catch (err) {
+        if (classifyAwsError(err) === "access-denied") return null; // can't confirm → unknown
+      }
+    }
+    return false;
+  } catch (err) {
+    if (classifyAwsError(err) === "access-denied") return null;
+    return null;
+  }
+}
 
 export const iamAccountDiscoverer: Discoverer = {
   service: "iam-account",
@@ -42,11 +73,17 @@ export const iamAccountDiscoverer: Discoverer = {
       else throw err;
     }
 
+    // Audit logging: is a multi-region CloudTrail actively logging? (us-east-1 sees multi-region
+    // trails.) Graceful — a denial leaves it null so the "no CloudTrail" finding can't false-fire.
+    const ctClient = new CloudTrailClient(clientConfig(input.credentials, "us-east-1"));
+    const cloudTrailMultiRegion = await cloudTrailMultiRegionLogging(ctClient);
+
     yield emit(iamAccountDiscoverer, input, input.account, {
       accountId: input.account,
       summaryMap: summary.SummaryMap ?? {},
       passwordPolicy,
       passwordPolicyKnown,
+      cloudTrailMultiRegion,
     });
   },
 };

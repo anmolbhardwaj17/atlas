@@ -11,6 +11,7 @@ interface AccountData {
   summaryMap: Record<string, number>;
   passwordPolicy: Record<string, unknown> | null;
   passwordPolicyKnown: boolean;
+  cloudTrailMultiRegion?: boolean | null;
 }
 
 export const accountModule: ServiceModule<AccountData> = {
@@ -36,6 +37,8 @@ export const accountModule: ServiceModule<AccountData> = {
         // true = a policy is set, false = none configured, null = we couldn't read it (denied).
         passwordPolicySet: data.passwordPolicyKnown ? data.passwordPolicy !== null : null,
         passwordPolicy: data.passwordPolicy,
+        // true = a multi-region CloudTrail is actively logging; false = none; null = couldn't read.
+        cloudTrailEnabled: data.cloudTrailMultiRegion ?? null,
       },
     };
   },
