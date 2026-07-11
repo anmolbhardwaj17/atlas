@@ -58,6 +58,36 @@ describe("jira issueNode", () => {
     expect(a.url).toBe("https://acme.atlassian.net/browse/ENG-142");
   });
 
+  it("captures detected intent custom fields (Acceptance Criteria / Remediation)", () => {
+    const withFields = withContext(
+      {
+        key: "SEC-9",
+        fields: {
+          summary: "Missing HttpOnly flag",
+          description: adf("Cookies lack HttpOnly."),
+          project: { key: "SEC" },
+          customfield_10101: adf("Set the HttpOnly attribute on all session cookies."),
+          customfield_10102: "", // empty → dropped
+        },
+      },
+      {
+        site: "acme",
+        intentFields: [
+          { id: "customfield_10101", label: "Remediation" },
+          { id: "customfield_10102", label: "Definition of Done" },
+        ],
+      },
+    );
+    const a = issueNode(withFields).attributes as Record<string, unknown>;
+    expect(a.intentFields).toEqual([
+      { label: "Remediation", text: "Set the HttpOnly attribute on all session cookies." },
+    ]);
+  });
+
+  it("omits intentFields when none are configured", () => {
+    expect((issueNode(ISSUE).attributes as Record<string, unknown>).intentFields).toBeUndefined();
+  });
+
   it("emits project CONTAINS issue", () => {
     const edges = issueEdges(ISSUE);
     expect(edges).toContainEqual({

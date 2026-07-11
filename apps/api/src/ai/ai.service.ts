@@ -125,6 +125,14 @@ function toIntentIssue(node: {
         })
         .filter((c) => c.text)
     : [];
+  const intentFields = Array.isArray(a.intentFields)
+    ? a.intentFields
+        .map((f) => {
+          const o = (f ?? {}) as Record<string, unknown>;
+          return { label: asString(o.label), text: asString(o.text) };
+        })
+        .filter((f) => f.label && f.text)
+    : [];
   return {
     id: node.id,
     key: asString(a.key) || node.name || "",
@@ -133,6 +141,7 @@ function toIntentIssue(node: {
     description: asString(a.description),
     subtasks,
     comments,
+    ...(intentFields.length ? { intentFields } : {}),
   };
 }
 

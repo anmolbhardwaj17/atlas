@@ -25,8 +25,14 @@ import type {
 } from "@atlas/connector-sdk";
 import { parseJiraConfig, parseJiraCredentials } from "./config";
 import { FetchJiraClient, JiraHttpError, type JiraClient } from "./jira/client";
-import { resolveProjectKeys, discoverProjects, discoverIssues } from "./jira/crawl";
+import {
+  resolveProjectKeys,
+  discoverProjects,
+  discoverIssues,
+  discoverIntentFields,
+} from "./jira/crawl";
 import { MODULE_BY_KIND, type JiraModule } from "./modules";
+import type { IntentField } from "./modules/context";
 
 const NOOP_LOGGER: ConnectorLogger = {
   debug: () => undefined,
@@ -54,6 +60,8 @@ export class JiraConnector implements Connector {
 
   private readonly runClients = new Map<string, Promise<JiraClient>>();
   private readonly pendingPayloads = new Map<string, unknown>();
+  /** Intent custom fields detected once per run in plan(), read back in discover(). */
+  private readonly intentFieldsByRun = new Map<string, IntentField[]>();
 
   constructor(deps: JiraConnectorDeps) {
     this.secrets = deps.secrets;
@@ -114,6 +122,8 @@ export class JiraConnector implements Connector {
     const client = await this.clientForRun(conn, run.id);
     const cfg = parseJiraConfig(conn.config);
     const keys = await resolveProjectKeys(client, cfg.projectKeys);
+    // Detect the org's intent custom fields once per run (convention-agnostic capture, IV-3 (b)).
+    this.intentFieldsByRun.set(run.id, await discoverIntentFields(client));
     const scopes: Scope[] = [
       { key: `projects:${cfg.site}`, params: { site: cfg.site, keys: keys.join(",") } },
       ...keys.map((key) => ({
@@ -138,7 +148,8 @@ export class JiraConnector implements Connector {
       const projectKey =
         typeof scope.params?.projectKey === "string" ? scope.params.projectKey : "";
       if (!projectKey) return;
-      source = discoverIssues(client, site, projectKey, scope.key);
+      const intentFields = this.intentFieldsByRun.get(ctx.run.id) ?? [];
+      source = discoverIssues(client, site, projectKey, scope.key, intentFields);
     } else {
       return;
     }

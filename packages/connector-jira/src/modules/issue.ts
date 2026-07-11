@@ -11,10 +11,16 @@ import { readContext, str, obj } from "./context";
  * as inference/AI over these attributes; the connector just captures them faithfully (P4).
  */
 export function issueNode(payload: unknown): NodeUpsert {
-  const { site } = readContext(payload);
+  const { site, intentFields } = readContext(payload);
   const p = payload as Record<string, unknown>;
   const key = str(p, "key") ?? "UNKNOWN";
   const f = obj(p, "fields") ?? {};
+
+  // Intent from the org's detected custom fields (Acceptance Criteria / Remediation / DoD). Read the
+  // value off `fields[<customfield_id>]`, ADF-flattened; empty ones are dropped (IV-3 (b)).
+  const capturedIntent = (intentFields ?? [])
+    .map((cf) => ({ label: cf.label, text: adfToText(f[cf.id]).trim() }))
+    .filter((s) => s.text);
   const summary = str(f, "summary") ?? key;
   const status = obj(f, "status");
   const labels = Array.isArray(f.labels)
@@ -60,6 +66,7 @@ export function issueNode(payload: unknown): NodeUpsert {
       parentKey: str(obj(f, "parent"), "key") ?? null,
       subtasks,
       comments,
+      ...(capturedIntent.length ? { intentFields: capturedIntent } : {}),
       createdAt: str(f, "created"),
       updatedAt: str(f, "updated"),
       url: `https://${site}.atlassian.net/browse/${key}`,

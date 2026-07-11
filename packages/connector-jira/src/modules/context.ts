@@ -4,8 +4,18 @@
  * transforms read it to build stable `jira:<site>:…` URNs. Reserved key so it round-trips through the
  * raw snapshot without colliding with API fields.
  */
+/** A Jira custom field detected (by name) to hold intent — Acceptance Criteria / Definition of
+ *  Done / Remediation. Discovered per connection (field ids are company-specific), so intent that
+ *  lives outside the description still reaches the coverage judge (IV-3 (b), convention-agnostic). */
+export interface IntentField {
+  id: string;
+  label: string;
+}
+
 export interface AtlasContext {
   site: string;
+  /** Intent-bearing custom fields to read off the issue's `fields` map, if any. */
+  intentFields?: IntentField[];
 }
 
 const KEY = "_atlas";

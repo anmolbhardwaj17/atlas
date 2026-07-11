@@ -1,6 +1,6 @@
 import type { ResourceRef } from "@atlas/connector-sdk";
 import { JiraHttpError, type JiraClient } from "./client";
-import { withContext } from "../modules/context";
+import { withContext, type IntentField } from "../modules/context";
 
 /**
  * Live discovery over the Jira Cloud REST API. Each generator yields a `Discovered` (a cheap ref +
@@ -23,6 +23,36 @@ const ISSUE_WINDOW_DAYS = 120;
 /** Fields we need for intent capture + linking. */
 const ISSUE_FIELDS =
   "summary,description,status,issuetype,parent,subtasks,comment,labels,assignee,reporter,created,updated,project";
+
+/** A custom field whose NAME signals it holds intent (acceptance criteria / remediation / DoD). */
+const INTENT_FIELD_NAME =
+  /accept.*criteria|definition of done|\bdod\b|remediation|expected (result|behaviou?r)|steps? to reproduce|requirement|acceptance/i;
+const MAX_INTENT_FIELDS = 8;
+
+/**
+ * Discover the org's intent-bearing CUSTOM fields (Acceptance Criteria / Remediation / DoD …) by
+ * reading Jira's field catalogue and matching on name. Field ids are company-specific, so this is
+ * how the connector stays convention-agnostic (IV-3 (b)). Best-effort: an unreadable catalogue just
+ * means we fall back to the description (no hard failure).
+ */
+export async function discoverIntentFields(client: JiraClient): Promise<IntentField[]> {
+  try {
+    const data = (await client.request<unknown>("/field")).data;
+    if (!Array.isArray(data)) return [];
+    const out: IntentField[] = [];
+    for (const f of data as Array<Record<string, unknown>>) {
+      if (out.length >= MAX_INTENT_FIELDS) break;
+      const id = s(f.id);
+      const name = s(f.name);
+      if (f.custom === true && id && name && INTENT_FIELD_NAME.test(name)) {
+        out.push({ id, label: name });
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
 
 /** Project keys to crawl: explicit config wins, else every project the token can see. */
 export async function resolveProjectKeys(
@@ -63,9 +93,15 @@ export async function* discoverIssues(
   site: string,
   projectKey: string,
   scopeKey: string,
+  intentFields: IntentField[] = [],
 ): AsyncIterable<Discovered> {
   const since = new Date(Date.now() - ISSUE_WINDOW_DAYS * 86400 * 1000).toISOString().slice(0, 10);
   const jql = `project = "${projectKey}" AND updated >= "${since}" ORDER BY updated DESC`;
+  // Pull the detected intent custom fields alongside the standard ones so the issue module can read
+  // them; stamp the id→label map into the payload context so it knows which fields to capture.
+  const fields = intentFields.length
+    ? `${ISSUE_FIELDS},${intentFields.map((f) => f.id).join(",")}`
+    : ISSUE_FIELDS;
   let count = 0;
   // `/search/jql` is the current enhanced-search endpoint (the old `/search` was removed for Jira
   // Cloud on 2025-05-01). It uses TOKEN pagination (`nextPageToken`/`isLast`), not startAt/total, so
@@ -77,7 +113,7 @@ export async function* discoverIssues(
       res = await client.request<Json>("/search/jql", {
         params: {
           jql,
-          fields: ISSUE_FIELDS,
+          fields,
           maxResults: 100,
           ...(nextPageToken ? { nextPageToken } : {}),
         },
@@ -96,7 +132,10 @@ export async function* discoverIssues(
       count += 1;
       yield {
         ref: { scopeKey, externalId: `issue:${key}`, kind: "jira.issue" },
-        payload: withContext(issue, { site }),
+        payload: withContext(issue, {
+          site,
+          ...(intentFields.length ? { intentFields } : {}),
+        }),
       };
     }
     const token = typeof res.data.nextPageToken === "string" ? res.data.nextPageToken : undefined;
