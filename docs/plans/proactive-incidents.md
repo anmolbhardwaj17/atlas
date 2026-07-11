@@ -1,6 +1,6 @@
 # Plan — Proactive Incidents (with alert-fatigue guardrails)
 
-> **Status:** 🔵 **Building 2026-07-11.** Turns the War Room from *pull* (you notice, you open it) into
+> **Status:** ✅ **BUILT 2026-07-11.** Turns the War Room from *pull* (you notice, you open it) into
 > *push* (Atlas tells you) — WITHOUT flooding people. Alert fatigue is the #1 reason ops tools get muted,
 > so the **guardrails ship before the trigger.**
 
