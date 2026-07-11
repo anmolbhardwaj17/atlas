@@ -16,9 +16,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { ProviderIcon } from "@/components/settings/provider-icon";
 import { setLlmSettings, deleteLlmSettings, type LlmSettings } from "@/lib/browser-api";
+
+// Small/lightweight models reason poorly — Ask Atlas will feel shallow on them no matter how good
+// the prompt is. Flag them so no one silently runs one (o-series/r1 "mini" models are reasoning
+// models, not weak, so they're excluded).
+const SMALL_MODEL = /mini|haiku|flash|nemo|-8b\b|\bsmall\b|\blite\b/i;
+const REASONING_MODEL = /\bo[13]\b|o[13]-|-r1\b|deepseek-r1|reasoning|thinking/i;
+const isWeakModel = (id: string): boolean => SMALL_MODEL.test(id) && !REASONING_MODEL.test(id);
 
 type Model = { id: string; label: string };
 type Group = { title: string; models: Model[] };
@@ -56,6 +64,15 @@ const PROVIDERS: ProviderCfg[] = [
           { id: "deepseek/deepseek-chat", label: "DeepSeek V3" },
           { id: "anthropic/claude-3-haiku", label: "Claude 3 Haiku" },
           { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+        ],
+      },
+      {
+        title: "Best reasoning · recommended for Atlas",
+        models: [
+          { id: "anthropic/claude-3.5-sonnet", label: "Claude 3.5 Sonnet" },
+          { id: "openai/gpt-4o", label: "GPT-4o" },
+          { id: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+          { id: "deepseek/deepseek-r1", label: "DeepSeek R1 (reasoning)" },
         ],
       },
     ],
@@ -189,15 +206,31 @@ export function LlmSettingsCard({
         <div
           className={cn(
             "rounded-md border px-3 py-2 text-sm",
-            current ? "border-success/30 bg-success/10 text-success" : "border-border bg-muted/30",
+            current && isWeakModel(current.model)
+              ? "border-warning/30 bg-warning/10 text-warning"
+              : current
+                ? "border-success/30 bg-success/10 text-success"
+                : "border-border bg-muted/30",
           )}
         >
           {current ? (
-            <span className="inline-flex items-center gap-1.5">
-              <span className="size-1.5 rounded-full bg-success" aria-hidden="true" />
+            <span className="inline-flex flex-wrap items-center gap-1.5">
+              <span
+                className={cn(
+                  "size-1.5 rounded-full",
+                  isWeakModel(current.model) ? "bg-warning" : "bg-success",
+                )}
+                aria-hidden="true"
+              />
               Active — using <span className="font-medium">{current.model}</span> via
               <ProviderIcon id={current.provider} className="size-3.5" />
               {providerOf(current.provider).label}.
+              {isWeakModel(current.model) ? (
+                <span className="font-medium">
+                  This is a lightweight model — answers will be shallow. Switch to a stronger one
+                  below, or Remove to use the platform default.
+                </span>
+              ) : null}
             </span>
           ) : (
             <span className="text-muted-foreground">
@@ -270,6 +303,13 @@ export function LlmSettingsCard({
                 ))}
               </SelectContent>
             </Select>
+            {isWeakModel(model) ? (
+              <span className="flex items-start gap-1.5 text-[11px] leading-relaxed text-warning">
+                <AlertTriangle className="mt-px size-3 shrink-0" />
+                Lightweight model — Ask Atlas answers will be shallow. Pick a{" "}
+                <span className="font-medium">Best reasoning</span> model for real analysis.
+              </span>
+            ) : null}
           </label>
         </div>
 
