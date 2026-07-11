@@ -2,6 +2,7 @@ import type { Connection, Connector } from "@atlas/connector-sdk";
 import { runInference, ALL_RULES } from "@atlas/inference";
 import { runStagedSync, type RunnerDeps, type SyncRunRecord } from "./sync-runner";
 import { runOsvEnrichment } from "./osv-enrichment";
+import { deriveDeployEvents } from "./deploy-events";
 import { silentLogger } from "./runtime";
 import type { Job, JobQueue } from "./queue";
 
@@ -65,6 +66,20 @@ export function createSyncHandler(deps: SyncWorkerDeps): (job: Job<SyncJobData>)
         await runInference({ db: deps.db }, orgId, ALL_RULES);
       } catch (err) {
         logger.error(`inference after sync ${runId} failed: ${(err as Error).message}`);
+      }
+    }
+
+    // Deploy-events stage: derive `deploy` node_events from the just-persisted runtimes (Lambda
+    // LastModified) so `diagnose` can correlate "deployed at 14:02 → broke at 14:05". Best-effort;
+    // idempotent, so a redeploy adds one event and unchanged functions are no-ops.
+    if (result.status !== "failed") {
+      try {
+        const dep = await deriveDeployEvents({ db: deps.db }, orgId);
+        logger.info(
+          `deploy events after sync ${runId}: +${dep.inserted} (${dep.scanned} lambdas scanned)`,
+        );
+      } catch (err) {
+        logger.error(`deploy-events after sync ${runId} failed: ${(err as Error).message}`);
       }
     }
 
