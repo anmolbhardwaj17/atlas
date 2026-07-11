@@ -100,9 +100,9 @@ export interface Control {
 export const CONTROLS: Control[] = [
   {
     id: "net.no-world-open-ingress",
-    title: "No security group open to the whole internet",
+    title: "No sensitive port open to the whole internet",
     requirement:
-      "No security group allows inbound traffic from 0.0.0.0/0 (or ::/0). Public entry belongs behind a load balancer/WAF with scoped ingress.",
+      "No security group exposes a sensitive port (SSH, RDP, databases, or all ports) to 0.0.0.0/0. A public web tier on 80/443 behind a load balancer is the intended front door and is fine; SSH/RDP/data tiers must stay scoped to known networks.",
     domain: "network",
     assessKey: "network",
     appliesTo: ["aws.securitygroup"],

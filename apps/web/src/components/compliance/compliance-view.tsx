@@ -419,15 +419,28 @@ function ControlRow({
         <p className="mt-0.5 max-w-2xl text-[11px] leading-relaxed text-muted-foreground">
           {r.control.requirement}
         </p>
-        {r.status === "fail" || r.status === "not-assessable" ? (
-          <p
-            className={cn(
-              "mt-1.5 text-[11px] leading-relaxed",
-              r.status === "fail" ? "text-danger" : "text-muted-foreground/80",
-            )}
-          >
-            {r.detail}
-          </p>
+        {/* Affected resources as chips (not a red run-on sentence). Falls back to the detail line
+            for findings that don't name specific resources. */}
+        {r.status === "fail" ? (
+          r.evidence.length > 0 ? (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {r.evidence.slice(0, 8).map((e) => (
+                <span
+                  key={e.id}
+                  className="inline-flex items-center rounded-md bg-danger/10 px-1.5 py-0.5 text-[11px] font-medium text-danger ring-1 ring-inset ring-danger/15"
+                >
+                  {e.label}
+                </span>
+              ))}
+              {r.evidence.length > 8 ? (
+                <span className="text-[11px] text-muted-foreground">
+                  +{r.evidence.length - 8} more
+                </span>
+              ) : null}
+            </div>
+          ) : (
+            <p className="mt-1.5 text-[11px] leading-relaxed text-danger">{r.detail}</p>
+          )
         ) : null}
         {/* framework refs inline on small screens (the dedicated column is lg+) */}
         {ids.length > 0 ? (

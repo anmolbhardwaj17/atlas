@@ -625,8 +625,10 @@ export class GraphService {
                    WHERE e.from_node_id = pr.id AND e.type = 'CONTAINS'
                      AND r.kind LIKE '%.repository')`,
           ),
-          // Security posture (Phase E, first slice): SGs with a world-open ingress rule
-          // (0.0.0.0/0 or ::/0) - computed from the crawl's aws.sg.rules signals.
+          // Security posture: SGs open to the internet (0.0.0.0/0 / ::/0) on a SENSITIVE port.
+          // A public ALB/VPN on 80/443 is the *intended* front door, not a misconfig — flagging it
+          // cries wolf. So we exclude pure single-port web rules (80/443) and keep only non-web or
+          // all-ports exposure (SSH/RDP/databases/VPN/custom), which is the real attack surface.
           c.query<{ id: string; name: string | null; ports: string | null }>(
             `SELECT n.id, n.name,
                     string_agg(DISTINCT coalesce(r->>'toPort', 'all'), ', ') AS ports
@@ -635,6 +637,11 @@ export class GraphService {
                CROSS JOIN LATERAL jsonb_array_elements(s.data->'ingress') AS r
               WHERE s.kind = 'aws.sg.rules'
                 AND (r->'cidrs' ? '0.0.0.0/0' OR r->'cidrs' ? '::/0')
+                AND (
+                  r->>'toPort' IS NULL            -- all ports (protocol -1) → always sensitive
+                  OR r->>'toPort' NOT IN ('80', '443')  -- a non-web port
+                  OR r->>'fromPort' <> r->>'toPort'     -- a port RANGE (not a pure single web port)
+                )
               GROUP BY n.id, n.name`,
           ),
           // Internet-facing load balancers (the estate's front door - worth stating, and a
@@ -932,7 +939,7 @@ export class GraphService {
         id: "sg-world-open",
         severity: "high",
         category: "Security posture",
-        title: `${openSgs2.length} security group${openSgs2.length > 1 ? "s allow" : " allows"} ingress from the whole internet (0.0.0.0/0)`,
+        title: `${openSgs2.length} security group${openSgs2.length > 1 ? "s expose" : " exposes"} a sensitive port to the whole internet (0.0.0.0/0)`,
         detail: openSgs2
           .map((g) => `${g.name ?? g.id}${g.ports ? ` (port ${g.ports})` : ""}`)
           .join("; "),
