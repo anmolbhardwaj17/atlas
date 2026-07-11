@@ -209,10 +209,14 @@ async function finalize(
   failedScopes: string[],
 ): Promise<void> {
   await withOrgScope(db, run.orgId, async (c) => {
-    await c.query(
-      "UPDATE sync_runs SET status = $2, stats = $3, scope_result = $4, finished_at = now() WHERE id = $1",
+    // Compare-and-set on `status='running'`: if the reaper already gave up on this run (marked it
+    // 'failed' after 15 min of no progress), a slow-but-late worker must NOT resurrect it back to
+    // 'succeeded' and stamp a bogus freshness. The reaped run stays failed; this finalize no-ops.
+    const res = await c.query(
+      "UPDATE sync_runs SET status = $2, stats = $3, scope_result = $4, finished_at = now() WHERE id = $1 AND status = 'running'",
       [run.id, status, JSON.stringify(stats), JSON.stringify({ completedScopes, failedScopes })],
     );
+    if (res.rowCount === 0) return; // reaped (or already finalized) — don't touch freshness
     // Stamp the connection's freshness so the UI can show "synced N ago". Only on a run that
     // actually persisted data (a hard failure leaves the prior last_synced_at untouched).
     if (status === "succeeded" || status === "partial") {
