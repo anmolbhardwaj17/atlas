@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, Info, ChevronRight, Check } from "lucide-react";
+import { ShieldCheck, Info, ChevronRight, Check, CircleHelp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
 
@@ -24,9 +24,11 @@ export interface Control {
   mappings: Partial<Record<Framework, string[]>>;
   findingId?: string;
 }
+export type ControlSeverity = "high" | "medium" | "low";
 export interface ControlResult {
   control: Control;
   status: ControlStatus;
+  severity: ControlSeverity;
   detail: string;
   count: number;
   evidence: Array<{ id: string; label: string }>;
@@ -36,6 +38,7 @@ export interface FrameworkSummary {
   results: ControlResult[];
   passed: number;
   failed: number;
+  highFails: number;
   notAssessable: number;
   notApplicable: number;
   assessed: number;
@@ -71,6 +74,8 @@ const STATUS: Record<
   },
 };
 
+const SEV_ORDER: Record<ControlSeverity, number> = { high: 0, medium: 1, low: 2 };
+
 function pct(n: number | null): string {
   return n === null ? "—" : `${Math.round(n * 100)}%`;
 }
@@ -99,13 +104,21 @@ export function ComplianceView({ report }: { report: ComplianceReport | null }) 
   const [active, setActive] = React.useState<Framework>(frameworks[0]?.framework.key ?? "pci");
   const current = frameworks.find((f) => f.framework.key === active) ?? frameworks[0] ?? null;
 
-  const rows = React.useMemo(
-    () =>
-      current
-        ? [...current.results].sort((a, b) => STATUS[a.status].order - STATUS[b.status].order)
-        : [],
-    [current],
-  );
+  // Split the actionable/graded controls (fail → pass → N/A, fails ranked by severity) from the
+  // not-assessable ones. The not-assessable set isn't the user's action list (it's Atlas's crawl
+  // gaps), so it renders quietly below instead of diluting what actually needs fixing.
+  const { graded, notAssessable } = React.useMemo(() => {
+    if (!current) return { graded: [] as ControlResult[], notAssessable: [] as ControlResult[] };
+    const sorted = [...current.results].sort(
+      (a, b) =>
+        STATUS[a.status].order - STATUS[b.status].order ||
+        SEV_ORDER[a.severity] - SEV_ORDER[b.severity],
+    );
+    return {
+      graded: sorted.filter((r) => r.status !== "not-assessable"),
+      notAssessable: sorted.filter((r) => r.status === "not-assessable"),
+    };
+  }, [current]);
 
   return (
     <div className="w-full space-y-6">
@@ -176,24 +189,39 @@ export function ComplianceView({ report }: { report: ComplianceReport | null }) 
                     controls
                   </p>
                 </div>
+                {/* Lead with what needs attention, not a raw pass-rate (which reads alarming when
+                    it's dominated by low-severity + not-assessable). */}
                 <div className="text-right">
-                  <div
-                    className={cn(
-                      "text-3xl font-semibold tabular-nums",
-                      current.passRate === null
-                        ? "text-muted-foreground"
-                        : current.passRate === 1
-                          ? "text-success"
-                          : current.failed > 0
-                            ? "text-danger"
-                            : "text-foreground",
-                    )}
-                  >
-                    {pct(current.passRate)}
-                  </div>
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                    assessed pass rate
-                  </div>
+                  {current.failed > 0 ? (
+                    <>
+                      <div className="text-3xl font-semibold tabular-nums text-danger">
+                        {current.failed}
+                      </div>
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        {current.highFails > 0
+                          ? `need attention · ${current.highFails} high`
+                          : "need attention"}
+                      </div>
+                    </>
+                  ) : current.assessed > 0 ? (
+                    <>
+                      <div className="text-3xl font-semibold tabular-nums text-success">
+                        All&nbsp;clear
+                      </div>
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        {current.assessed} assessed · {pct(current.passRate)}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-3xl font-semibold tabular-nums text-muted-foreground">
+                        —
+                      </div>
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        nothing assessable yet
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -243,7 +271,7 @@ export function ComplianceView({ report }: { report: ComplianceReport | null }) 
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {rows.map((r) => (
+                  {graded.map((r) => (
                     <ControlRow
                       key={r.control.id}
                       r={r}
@@ -259,6 +287,12 @@ export function ComplianceView({ report }: { report: ComplianceReport | null }) 
               </table>
             </div>
           </Card>
+
+          {/* Not assessable — Atlas's crawl gaps, not the user's action items. Kept quiet + separate
+              (a collapsible) so it never dilutes the controls that actually need fixing. */}
+          {notAssessable.length > 0 ? (
+            <NotAssessable rows={notAssessable} framework={active} />
+          ) : null}
         </>
       ) : (
         <Card>
@@ -271,6 +305,56 @@ export function ComplianceView({ report }: { report: ComplianceReport | null }) 
         </Card>
       )}
     </div>
+  );
+}
+
+/** Not-assessable controls — Atlas's crawl gaps, shown quietly in a collapsible so they never
+ *  compete with the actionable controls. Doubles as an honest "here's what we can't see yet" list. */
+function NotAssessable({ rows, framework }: { rows: ControlResult[]; framework: Framework }) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <Card className="overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/40"
+      >
+        <CircleHelp className="size-4 shrink-0 text-warning" />
+        <span className="text-sm font-medium">Not assessable by Atlas</span>
+        <span className="rounded-full bg-muted px-1.5 text-[11px] font-medium tabular-nums text-muted-foreground">
+          {rows.length}
+        </span>
+        <span className="ml-1 hidden text-xs text-muted-foreground sm:inline">
+          controls that need data Atlas doesn&apos;t crawl yet — not a pass or a fail
+        </span>
+        <ChevronRight
+          className={cn(
+            "ml-auto size-4 shrink-0 text-muted-foreground transition-transform",
+            open && "rotate-90",
+          )}
+        />
+      </button>
+      {open ? (
+        <ul className="divide-y divide-border border-t border-border">
+          {rows.map((r) => {
+            const ids = r.control.mappings[framework] ?? [];
+            return (
+              <li key={r.control.id} className="px-4 py-3">
+                <div className="text-sm font-medium text-foreground">{r.control.title}</div>
+                <p className="mt-0.5 max-w-2xl text-[11px] leading-relaxed text-muted-foreground">
+                  {r.detail}
+                </p>
+                {ids.length > 0 ? (
+                  <span className="mt-2 inline-flex rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                    {framework.toUpperCase()} {ids.join(", ")}
+                  </span>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+    </Card>
   );
 }
 
@@ -315,7 +399,23 @@ function ControlRow({
         </span>
       </td>
       <td className="px-4 py-3.5">
-        <div className="font-medium text-foreground">{r.control.title}</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-medium text-foreground">{r.control.title}</span>
+          {r.status === "fail" ? (
+            <span
+              className={cn(
+                "rounded-full px-1.5 py-px text-[10px] font-medium uppercase tracking-wide ring-1 ring-inset",
+                r.severity === "high"
+                  ? "bg-danger/10 text-danger ring-danger/20"
+                  : r.severity === "medium"
+                    ? "bg-warning/10 text-warning ring-warning/20"
+                    : "bg-muted text-muted-foreground ring-border",
+              )}
+            >
+              {r.severity}
+            </span>
+          ) : null}
+        </div>
         <p className="mt-0.5 max-w-2xl text-[11px] leading-relaxed text-muted-foreground">
           {r.control.requirement}
         </p>

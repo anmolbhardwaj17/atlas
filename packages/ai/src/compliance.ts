@@ -319,9 +319,29 @@ export interface ComplianceFacts {
   assessable: Record<string, boolean>;
 }
 
+export type ControlSeverity = "high" | "medium" | "low";
+
+/** Risk weight per control — used to prioritise what to fix (and to weight the coverage headline),
+ *  so a world-open SG or a reachable vuln outranks a missing CI gate. Independent of pass/fail. */
+const CONTROL_SEVERITY: Record<string, ControlSeverity> = {
+  "net.no-world-open-ingress": "high",
+  "net.lb-scheme-intentional": "medium",
+  "iam.no-wildcard": "high",
+  "vuln.no-known-critical": "high",
+  "vuln.no-reachable": "high",
+  "resilience.prod-db-multi-az": "medium",
+  "sdlc.ci-gate": "low",
+  "crypto.at-rest": "high",
+  "crypto.in-transit": "high",
+  "data.no-public-storage": "high",
+  "logging.audit-trail": "medium",
+  "access.mfa-privileged": "high",
+};
+
 export interface ControlResult {
   control: Control;
   status: ControlStatus;
+  severity: ControlSeverity;
   detail: string;
   count: number;
   evidence: EvidenceRef[];
@@ -335,9 +355,11 @@ function appliesInEstate(control: Control, inventory: Record<string, number>): b
 /** Pure: evaluate every control against the gathered facts. Deterministic and order-stable. */
 export function evaluateControls(facts: ComplianceFacts): ControlResult[] {
   return CONTROLS.map((control): ControlResult => {
+    const severity = CONTROL_SEVERITY[control.id] ?? "medium";
+    const base = { control, severity };
     if (!facts.assessable[control.assessKey]) {
       return {
-        control,
+        ...base,
         status: "not-assessable",
         detail:
           control.notAssessableReason ?? "Atlas does not yet crawl the data this control needs.",
@@ -347,7 +369,7 @@ export function evaluateControls(facts: ComplianceFacts): ControlResult[] {
     }
     if (!appliesInEstate(control, facts.inventory)) {
       return {
-        control,
+        ...base,
         status: "not-applicable",
         detail: "No resources of the relevant type in this estate.",
         count: 0,
@@ -357,14 +379,14 @@ export function evaluateControls(facts: ComplianceFacts): ControlResult[] {
     const finding = control.findingId ? facts.openFindings[control.findingId] : undefined;
     if (finding) {
       return {
-        control,
+        ...base,
         status: "fail",
         detail: finding.detail,
         count: finding.count,
         evidence: finding.evidence,
       };
     }
-    return { control, status: "pass", detail: "No violations found.", count: 0, evidence: [] };
+    return { ...base, status: "pass", detail: "No violations found.", count: 0, evidence: [] };
   });
 }
 
@@ -374,6 +396,8 @@ export interface FrameworkSummary {
   results: ControlResult[];
   passed: number;
   failed: number;
+  /** High-severity failures — the "fix these first" count that leads the UI (not the raw pass rate). */
+  highFails: number;
   notAssessable: number;
   notApplicable: number;
   /** Assessable = pass + fail (the controls we could actually judge). */
@@ -388,6 +412,7 @@ export function summarizeByFramework(results: ControlResult[]): FrameworkSummary
     const rs = results.filter((r) => r.control.mappings[framework.key]?.length);
     const passed = rs.filter((r) => r.status === "pass").length;
     const failed = rs.filter((r) => r.status === "fail").length;
+    const highFails = rs.filter((r) => r.status === "fail" && r.severity === "high").length;
     const notAssessable = rs.filter((r) => r.status === "not-assessable").length;
     const notApplicable = rs.filter((r) => r.status === "not-applicable").length;
     const assessed = passed + failed;
@@ -396,6 +421,7 @@ export function summarizeByFramework(results: ControlResult[]): FrameworkSummary
       results: rs,
       passed,
       failed,
+      highFails,
       notAssessable,
       notApplicable,
       assessed,
