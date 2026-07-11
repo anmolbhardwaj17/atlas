@@ -306,8 +306,10 @@ export function LlmSettingsCard({
             {isWeakModel(model) ? (
               <span className="flex items-start gap-1.5 text-[11px] leading-relaxed text-warning">
                 <AlertTriangle className="mt-px size-3 shrink-0" />
-                Lightweight model — Ask Atlas answers will be shallow. Pick a{" "}
-                <span className="font-medium">Best reasoning</span> model for real analysis.
+                <span>
+                  Lightweight model — Ask Atlas answers will be shallow. Pick a{" "}
+                  <span className="font-medium">Best reasoning</span> model for real analysis.
+                </span>
               </span>
             ) : null}
           </label>
