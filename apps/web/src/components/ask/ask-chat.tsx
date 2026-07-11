@@ -427,8 +427,8 @@ function AssistantBubble({
             model in Settings.
           </p>
         ) : (
-          <p
-            className={`whitespace-pre-wrap text-sm leading-relaxed ${honest ? "text-muted-foreground" : "text-foreground"}`}
+          <div
+            className={`text-sm leading-relaxed ${honest ? "text-muted-foreground" : "text-foreground"}`}
           >
             <TypewriterText
               text={message.text}
@@ -437,7 +437,7 @@ function AssistantBubble({
               cites={citeByMarker}
               onPeek={onPeek}
             />
-          </p>
+          </div>
         )}
 
         {message.caveats.length > 0 && (
@@ -549,6 +549,138 @@ function renderRich(
   return out;
 }
 
+/** Split a markdown table row into trimmed cells. */
+function tableCells(line: string): string[] {
+  return line
+    .trim()
+    .replace(/^\||\|$/g, "")
+    .split("|")
+    .map((c) => c.trim());
+}
+const isTableSep = (line: string): boolean =>
+  line.includes("|") && line.includes("-") && /^[\s:|-]+$/.test(line.trim());
+const listItem = /^\s*([-*]|\d+\.)\s+/;
+
+/**
+ * Block-level markdown renderer for a FINISHED answer — headings, bullet/numbered lists, and tables,
+ * with inline spans (bold, `code`, [N1] citation chips) delegated to renderRich. This lifts the old
+ * ceiling where every answer was a plain text blob (tabular data like "top contributors" or a
+ * blast-radius list could only ever be prose). Streaming still renders inline to avoid mid-stream
+ * table flicker; blocks kick in once the answer is complete.
+ */
+function renderBlocks(
+  text: string,
+  cites: Map<string, Citation>,
+  onPeek: (id: string) => void,
+): ReactNode[] {
+  const lines = text.split("\n");
+  const at = (idx: number): string => lines[idx] ?? "";
+  const inline = (s: string): ReactNode[] => renderRich(s, cites, onPeek);
+  const out: ReactNode[] = [];
+  let i = 0;
+  let key = 0;
+  while (i < lines.length) {
+    const line = at(i);
+    if (line.trim() === "") {
+      i++;
+      continue;
+    }
+    // Heading (#..####)
+    const h = /^(#{1,4})\s+(.*)$/.exec(line);
+    if (h) {
+      out.push(
+        <div key={key++} className="mt-1 text-sm font-semibold text-foreground">
+          {inline(h[2] ?? "")}
+        </div>,
+      );
+      i++;
+      continue;
+    }
+    // Table: a row of pipes followed by a |---|---| separator.
+    if (line.includes("|") && i + 1 < lines.length && isTableSep(at(i + 1))) {
+      const header = tableCells(line);
+      const rows: string[][] = [];
+      i += 2;
+      while (i < lines.length && at(i).includes("|") && at(i).trim() !== "") {
+        rows.push(tableCells(at(i)));
+        i++;
+      }
+      out.push(
+        <div key={key++} className="overflow-x-auto rounded-md border border-border">
+          <table className="w-full border-collapse text-[13px]">
+            <thead>
+              <tr className="border-b border-border bg-muted/40 text-left text-muted-foreground">
+                {header.map((c, ci) => (
+                  <th key={ci} className="px-3 py-1.5 font-medium">
+                    {inline(c)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {rows.map((r, ri) => (
+                <tr key={ri}>
+                  {r.map((c, ci) => (
+                    <td key={ci} className="px-3 py-1.5 align-top">
+                      {inline(c)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>,
+      );
+      continue;
+    }
+    // List (consecutive - / * / 1.)
+    if (listItem.test(line)) {
+      const ordered = /^\s*\d+\./.test(line);
+      const items: string[] = [];
+      while (i < lines.length && listItem.test(at(i))) {
+        items.push(at(i).replace(listItem, ""));
+        i++;
+      }
+      const cls = `space-y-1 pl-5 text-sm leading-relaxed ${ordered ? "list-decimal" : "list-disc"}`;
+      out.push(
+        ordered ? (
+          <ol key={key++} className={cls}>
+            {items.map((it, ix) => (
+              <li key={ix}>{inline(it)}</li>
+            ))}
+          </ol>
+        ) : (
+          <ul key={key++} className={cls}>
+            {items.map((it, ix) => (
+              <li key={ix}>{inline(it)}</li>
+            ))}
+          </ul>
+        ),
+      );
+      continue;
+    }
+    // Paragraph — gather until a blank line or a block starter.
+    const para: string[] = [line];
+    i++;
+    while (
+      i < lines.length &&
+      at(i).trim() !== "" &&
+      !/^#{1,4}\s/.test(at(i)) &&
+      !listItem.test(at(i)) &&
+      !at(i).includes("|")
+    ) {
+      para.push(at(i));
+      i++;
+    }
+    out.push(
+      <p key={key++} className="text-sm leading-relaxed">
+        {inline(para.join(" "))}
+      </p>,
+    );
+  }
+  return out;
+}
+
 /**
  * Smooth typewriter reveal that keeps pace with the stream. Animates only for LIVE turns (`live`);
  * reopened/persisted turns render instantly. Renders through `renderRich` so bold + inline
@@ -580,11 +712,16 @@ function TypewriterText({
     return () => window.clearInterval(id);
   }, [text]);
   const caret = streaming || shown < text.length;
+  // Once complete, render block-level markdown (tables/lists/headings); while revealing, stay inline
+  // + pre-wrap so a half-formed table doesn't flicker mid-stream.
+  if (!caret) {
+    return <div className="space-y-3">{renderBlocks(text, cites, onPeek)}</div>;
+  }
   return (
-    <>
+    <div className="whitespace-pre-wrap">
       {renderRich(text.slice(0, shown), cites, onPeek)}
-      {caret && <span className="ml-0.5 animate-pulse">▌</span>}
-    </>
+      <span className="ml-0.5 animate-pulse">▌</span>
+    </div>
   );
 }
 
