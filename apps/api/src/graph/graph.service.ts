@@ -574,6 +574,8 @@ export class GraphService {
           singleAzDbs,
           unhealthy,
           rootNoMfa,
+          publicBuckets,
+          unencryptedData,
         ] = await Promise.all([
           c.query<{
             id: string;
@@ -688,6 +690,21 @@ export class GraphService {
               WHERE kind = 'aws.account' AND deleted_at IS NULL AND status <> 'deleted'
                 AND attributes->>'rootMfaEnabled' = 'false'`,
           ),
+          // Publicly-accessible S3 buckets (Security Phase 2b). Only KNOWN-public (isPublic='true'),
+          // never 'unknown' — no false positive when the posture read was denied.
+          c.query<{ id: string; name: string | null }>(
+            `SELECT id, name FROM nodes
+              WHERE kind = 'aws.s3.bucket' AND deleted_at IS NULL AND status <> 'deleted'
+                AND attributes->>'isPublic' = 'true'`,
+          ),
+          // Datastores not encrypted at rest (Security Phase 2b): RDS StorageEncrypted=false or an
+          // S3 bucket with no default encryption. S3 is encrypted by default now, so this is mostly RDS.
+          c.query<{ id: string; name: string | null; kind: string }>(
+            `SELECT id, name, kind FROM nodes
+              WHERE deleted_at IS NULL AND status <> 'deleted'
+                AND ((kind = 'aws.rds.instance' AND attributes->>'storageEncrypted' = 'false')
+                  OR (kind = 'aws.s3.bucket' AND attributes->>'encrypted' = 'false'))`,
+          ),
         ]);
         return {
           conns,
@@ -701,6 +718,8 @@ export class GraphService {
           singleAzDbs,
           unhealthy,
           rootNoMfa,
+          publicBuckets,
+          unencryptedData,
         };
       }),
       scope(async (c) => {
@@ -842,6 +861,8 @@ export class GraphService {
       singleAzDbs,
       unhealthy,
       rootNoMfa,
+      publicBuckets,
+      unencryptedData,
     } = grpTopology;
     const { contributors, mostActiveRepos, vulnSeverity, topVulnPkg, sprawl, exposedVulns } =
       grpPeopleVulns;
@@ -898,6 +919,8 @@ export class GraphService {
         wildcardRoles: wildcardRoles.rows,
         singleAzDbs: singleAzDbs.rows,
         rootNoMfa: rootNoMfa.rows,
+        publicBuckets: publicBuckets.rows,
+        unencryptedData: unencryptedData.rows,
         topContributors: contributors.rows.map((r) => ({ name: r.name ?? "unknown", count: r.n })),
         mostActiveRepos: mostActiveRepos.rows.map((r) => ({
           name: r.name ?? "unknown",
@@ -1022,6 +1045,36 @@ export class GraphService {
         href: first ? `/explore/${first.id}` : "/explore?kind=aws.account",
         count: rootNoMfa2.length,
         evidence: rootNoMfa2.map((a) => ({ id: a.id, label: a.name ?? a.id })),
+      });
+    }
+    // Publicly-accessible S3 buckets (Security Phase 2b) - a classic data-exposure incident.
+    const publicS3 = base.publicBuckets ?? [];
+    if (publicS3.length > 0) {
+      const first = publicS3[0];
+      findings.push({
+        id: "s3-public",
+        severity: "high",
+        category: "Security posture",
+        title: `${publicS3.length} S3 bucket${publicS3.length > 1 ? "s are" : " is"} publicly accessible`,
+        detail: `${publicS3.map((b) => b.name ?? b.id).join(", ")} - reachable from the public internet via ACL or bucket policy; enable Block Public Access unless this is a deliberate public asset.`,
+        href: first ? `/explore/${first.id}` : "/explore?kind=aws.s3.bucket",
+        count: publicS3.length,
+        evidence: publicS3.map((b) => ({ id: b.id, label: b.name ?? b.id })),
+      });
+    }
+    // Datastores unencrypted at rest (Security Phase 2b).
+    const unencrypted = base.unencryptedData ?? [];
+    if (unencrypted.length > 0) {
+      const first = unencrypted[0];
+      findings.push({
+        id: "unencrypted-datastore",
+        severity: "high",
+        category: "Security posture",
+        title: `${unencrypted.length} datastore${unencrypted.length > 1 ? "s are" : " is"} not encrypted at rest`,
+        detail: `${unencrypted.map((d) => d.name ?? d.id).join(", ")} - enable encryption at rest (KMS); for existing resources, snapshot-and-restore into an encrypted copy.`,
+        href: first ? `/explore/${first.id}` : "/explore",
+        count: unencrypted.length,
+        evidence: unencrypted.map((d) => ({ id: d.id, label: d.name ?? d.id })),
       });
     }
 

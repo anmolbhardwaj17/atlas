@@ -16,6 +16,7 @@ interface RdsInstance {
   EngineVersion?: string;
   Endpoint?: { Address?: string; Port?: number };
   MultiAZ?: boolean;
+  StorageEncrypted?: boolean;
   VpcSecurityGroups?: Array<{ VpcSecurityGroupId?: string }>;
   DBSubnetGroup?: { VpcId?: string };
   /** DescribeDBInstances returns tags inline as `TagList` ({Key,Value}); feeds R11. */
@@ -38,6 +39,7 @@ export const rdsModule: ServiceModule<RdsInstance> = {
         engine: data.Engine,
         engineVersion: data.EngineVersion,
         multiAz: data.MultiAZ === true,
+        storageEncrypted: data.StorageEncrypted === true,
         endpointAddress: data.Endpoint?.Address,
         endpointPort: data.Endpoint?.Port,
         vpcId: data.DBSubnetGroup?.VpcId,
@@ -90,6 +92,12 @@ interface S3Bucket {
     LambdaFunctionConfigurations?: Array<{ LambdaFunctionArn?: string; Events?: string[] }>;
   };
   TagSet?: Array<{ Key?: string; Value?: string }>;
+  // Security posture (Phase 2b) — see the S3 discoverer.
+  publicAccessKnown?: boolean;
+  publicAccessBlock?: Record<string, boolean> | null;
+  policyIsPublic?: boolean | null;
+  aclPublic?: boolean | null;
+  encrypted?: boolean | null;
 }
 
 export const s3Module: ServiceModule<S3Bucket> = {
@@ -98,6 +106,20 @@ export const s3Module: ServiceModule<S3Bucket> = {
   scope: "global",
   normalize({ account, data }) {
     const homeRegion = data.LocationConstraint || "us-east-1";
+    // A bucket is PUBLIC only when an account/bucket public-access-block doesn't fully block it AND
+    // its policy is public OR its ACL grants to AllUsers/AuthenticatedUsers. If we couldn't read the
+    // posture (denied), `isPublic` is null (unknown) — never a false "not public".
+    const pab = data.publicAccessBlock;
+    const fullyBlocked =
+      !!pab &&
+      pab.BlockPublicAcls === true &&
+      pab.IgnorePublicAcls === true &&
+      pab.BlockPublicPolicy === true &&
+      pab.RestrictPublicBuckets === true;
+    const isPublic =
+      data.publicAccessKnown === false
+        ? null
+        : !fullyBlocked && (data.policyIsPublic === true || data.aclPublic === true);
     return {
       urn: awsUrn("aws.s3.bucket", { account, naturalKey: data.Name }),
       kind: "aws.s3.bucket",
@@ -107,6 +129,9 @@ export const s3Module: ServiceModule<S3Bucket> = {
         accountRef: account,
         bucketName: data.Name,
         tags: tagsToObject(data.TagSet),
+        isPublic,
+        publicAccessKnown: data.publicAccessKnown ?? null,
+        encrypted: data.encrypted ?? null,
       },
     };
   },

@@ -32,15 +32,12 @@ const CAPABILITIES: Record<string, Capability> = {
   multiAz: { supported: true, actions: [] }, // RDS MultiAZ (rds:DescribeDBInstances)
   ciPipeline: { supported: true, actions: [] }, // repo/pipeline nodes
   // Phase 2b — flip `supported` to true as each crawl lands; the actions gate assessability.
-  encryptionAtRest: {
-    supported: false,
-    actions: ["ec2:DescribeVolumes", "s3:GetEncryptionConfiguration"],
-  },
+  // Encryption-at-rest is assessed from RDS StorageEncrypted (rds:DescribeDBInstances, already
+  // granted) + S3 default encryption (best-effort) → no extra permission required.
+  encryptionAtRest: { supported: true, actions: [] },
   encryptionInTransit: { supported: false, actions: ["elasticloadbalancing:DescribeListeners"] },
-  publicStorage: {
-    supported: false,
-    actions: ["s3:GetBucketPublicAccessBlock", "s3:GetBucketPolicyStatus", "s3:GetBucketAcl"],
-  },
+  // Public-access is gated by the posture probe's action; the ACL/policy sub-reads ride along.
+  publicStorage: { supported: true, actions: ["s3:GetBucketPublicAccessBlock"] },
   auditLogging: {
     supported: false,
     actions: ["cloudtrail:DescribeTrails", "cloudtrail:GetTrailStatus", "ec2:DescribeFlowLogs"],

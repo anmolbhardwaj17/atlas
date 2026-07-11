@@ -218,12 +218,13 @@ export const CONTROLS: Control[] = [
   {
     id: "crypto.at-rest",
     title: "Data encrypted at rest",
-    requirement: "Datastores (RDS, S3, EBS, DynamoDB) encrypt data at rest with KMS.",
+    requirement: "Datastores (RDS, S3, DynamoDB) encrypt data at rest with KMS.",
     domain: "encryption",
     assessKey: "encryptionAtRest",
     appliesTo: ["aws.rds.instance", "aws.s3.bucket", "aws.dynamodb.table"],
+    findingId: "unencrypted-datastore",
     notAssessableReason:
-      "Atlas does not yet crawl encryption state (RDS StorageEncrypted / S3 default encryption / EBS). Connector gap.",
+      "Atlas does not yet crawl encryption state (RDS StorageEncrypted / S3 default encryption). Connector gap.",
     mappings: {
       pci: ["3.5.1"],
       cis: ["2.1.1", "2.3.1", "RDS.3"],
@@ -257,6 +258,7 @@ export const CONTROLS: Control[] = [
     domain: "data-protection",
     assessKey: "publicStorage",
     appliesTo: ["aws.s3.bucket"],
+    findingId: "s3-public",
     notAssessableReason:
       "Atlas does not yet crawl S3 public-access-block / bucket ACL / policy. Connector gap (Security Phase 2b).",
     mappings: {
