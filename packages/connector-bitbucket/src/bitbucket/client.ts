@@ -5,6 +5,8 @@
  * get bounded backoff; the sleeper is injectable for deterministic tests (mirrors the AWS/
  * GitHub clients). Read-only — the connector never issues writes (P2).
  */
+import { fetchWithTimeout } from "@atlas/connector-sdk";
+
 export interface BitbucketRequestOptions {
   params?: Record<string, string | number | undefined>;
   signal?: AbortSignal;
@@ -72,7 +74,7 @@ export class FetchBitbucketClient implements BitbucketClient {
   ): Promise<BitbucketResponse<T>> {
     const url = this.resolve(path, opts.params);
     for (let attempt = 1; ; attempt++) {
-      const res = await fetch(url, {
+      const res = await fetchWithTimeout(url, {
         headers: {
           Authorization: this.authHeader,
           Accept: "application/json",
@@ -96,7 +98,7 @@ export class FetchBitbucketClient implements BitbucketClient {
     // Bitbucket's redirect). Best-effort: unavailable/forbidden yields null, never throws.
     const url = this.resolve(`/repositories/${workspace}/${repoSlug}/pullrequests/${prId}/diff`);
     try {
-      const res = await fetch(url, {
+      const res = await fetchWithTimeout(url, {
         headers: { Authorization: this.authHeader, "User-Agent": "atlas-connector" },
       });
       if (!res.ok) return null;
@@ -118,7 +120,7 @@ export class FetchBitbucketClient implements BitbucketClient {
       `/repositories/${workspace}/${repoSlug}/src/${encodeURIComponent(revision)}/${path}`,
     );
     try {
-      const res = await fetch(url, {
+      const res = await fetchWithTimeout(url, {
         headers: { Authorization: this.authHeader, "User-Agent": "atlas-connector" },
       });
       if (!res.ok) return null;
@@ -155,7 +157,7 @@ export class FetchBitbucketClient implements BitbucketClient {
     signal?: AbortSignal,
   ): Promise<BitbucketResponse<T>> {
     for (let attempt = 1; ; attempt++) {
-      const res = await fetch(url, {
+      const res = await fetchWithTimeout(url, {
         headers: {
           Authorization: this.authHeader,
           Accept: "application/json",

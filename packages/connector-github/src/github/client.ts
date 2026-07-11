@@ -5,6 +5,8 @@
  * (`retry-after`) it waits that long; 5xx get bounded backoff. Waits are bounded and
  * the sleeper is injectable for deterministic tests (mirrors AWS DD-4).
  */
+import { fetchWithTimeout } from "@atlas/connector-sdk";
+
 export interface GithubRequestOptions {
   params?: Record<string, string | number | undefined>;
   signal?: AbortSignal;
@@ -53,7 +55,7 @@ export class FetchGithubClient implements GithubClient {
   async request<T>(path: string, opts: GithubRequestOptions = {}): Promise<GithubResponse<T>> {
     const url = this.resolve(path, opts.params);
     for (let attempt = 1; ; attempt++) {
-      const res = await fetch(url, {
+      const res = await fetchWithTimeout(url, {
         headers: {
           Authorization: `Bearer ${this.token}`,
           Accept: "application/vnd.github+json",

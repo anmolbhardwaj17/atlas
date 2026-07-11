@@ -7,6 +7,13 @@
  * API: POST /v1/querybatch (package -> vuln ids, index-aligned) then GET /v1/vulns/{id} (full record).
  */
 
+import { fetchWithTimeout } from "@atlas/connector-sdk";
+
+// Default fetch with a hard deadline (OSV runs inside the sync worker; a hung socket must not stall
+// it). Tests inject their own `fetchImpl`, so they're unaffected.
+const timeoutFetch: typeof fetch = (input, init) =>
+  fetchWithTimeout(input as string | URL, (init ?? {}) as RequestInit);
+
 const BATCH_ENDPOINT = "https://api.osv.dev/v1/querybatch";
 const VULN_ENDPOINT = "https://api.osv.dev/v1/vulns";
 const BATCH_SIZE = 100; // OSV accepts up to 1000/batch; keep it modest.
@@ -76,7 +83,7 @@ export class OsvClient {
   private readonly vulnEndpoint: string;
 
   constructor(config: OsvClientConfig = {}) {
-    this.fetchImpl = config.fetchImpl ?? fetch;
+    this.fetchImpl = config.fetchImpl ?? timeoutFetch;
     this.batchEndpoint = config.batchEndpoint ?? BATCH_ENDPOINT;
     this.vulnEndpoint = config.vulnEndpoint ?? VULN_ENDPOINT;
   }

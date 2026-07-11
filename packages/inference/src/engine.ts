@@ -38,6 +38,15 @@ export async function runInference(
 ): Promise<InferenceStats> {
   const logger = deps.logger ?? NOOP;
   return withOrgScope(deps.db, orgId, async (c) => {
+    // Serialize inference runs per org. Admin "Rebuild links" (reindex) can fire while the
+    // post-sync inference is mid-run; without this they race in upsertInferredEdge — both see "no
+    // edge yet", both INSERT, and the loser hits uq_edge (23505), which rolls back the WHOLE run.
+    // A transaction-scoped advisory lock makes the second run wait for the first to commit (then it
+    // sees the first run's edges and converges); it auto-releases on COMMIT/ROLLBACK.
+    await c.query(`SELECT pg_advisory_xact_lock(hashtext('atlas_inference'), hashtext($1))`, [
+      orgId,
+    ]);
+
     const input = await buildInput(c);
     const ruleIdByKey = await loadRuleIds(c);
     const stats: InferenceStats = { candidates: 0, upserted: 0, retired: 0, derivedNodes: 0 };
@@ -232,10 +241,15 @@ async function upsertInferredEdge(
     return { id: existing.id, wrote: true };
   }
 
+  // ON CONFLICT (defense-in-depth beyond the per-run advisory lock): if a concurrent writer already
+  // created this exact edge, reactivate it in place instead of crashing on uq_edge.
   const inserted = await c.query<{ id: string }>(
     `INSERT INTO edges
        (org_id, from_node_id, to_node_id, type, origin, confidence, provenance_id, inference_rule_id, last_seen)
      VALUES ($1,$2,$3,$4,'inferred',$5,$6,$7, now())
+     ON CONFLICT ON CONSTRAINT uq_edge DO UPDATE
+       SET status='active', origin='inferred', confidence=EXCLUDED.confidence,
+           provenance_id=EXCLUDED.provenance_id, retired_at=NULL, last_seen=now()
      RETURNING id`,
     [orgId, fromId, toId, cand.type, cand.tier, provId, ruleId],
   );

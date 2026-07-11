@@ -5,6 +5,7 @@
  * the AWS/GitHub/Bitbucket clients). Read-only — the connector never issues writes (P2).
  */
 import { assertResolvesToPublic } from "./ssrf-guard";
+import { fetchWithTimeout } from "@atlas/connector-sdk";
 
 export interface JenkinsClient {
   /** GET a JSON endpoint (path relative to the Jenkins root, e.g. "/api/json?tree=..."). */
@@ -49,7 +50,7 @@ export class FetchJenkinsClient implements JenkinsClient {
     const url = this.resolve(path);
     await assertResolvesToPublic(this.host); // SSRF re-check post-DNS at fetch time (H1)
     for (let attempt = 1; ; attempt++) {
-      const res = await fetch(url, {
+      const res = await fetchWithTimeout(url, {
         headers: {
           Authorization: this.authHeader,
           Accept: "application/json",
@@ -72,7 +73,7 @@ export class FetchJenkinsClient implements JenkinsClient {
     // fetch/parse failures into a best-effort null, never a security refusal (H1).
     await assertResolvesToPublic(this.host);
     try {
-      const res = await fetch(url, {
+      const res = await fetchWithTimeout(url, {
         headers: { Authorization: this.authHeader, "User-Agent": "atlas-connector" },
         ...(signal ? { signal } : {}),
       });

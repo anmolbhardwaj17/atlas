@@ -6,6 +6,7 @@
  * NARRATOR constrained by retrieved context (P1/AE-4), never the source of truth.
  */
 import type { ChatMessage, CompleteRequest, LLMEvent, LLMProvider } from "./llm";
+import { timeoutFetch } from "./net";
 
 export interface OpenRouterConfig {
   apiKey: string;
@@ -41,7 +42,7 @@ export class OpenRouterProvider implements LLMProvider {
 
   constructor(private readonly config: OpenRouterConfig) {
     this.name = `openrouter:${config.model}`;
-    this.fetchImpl = config.fetchImpl ?? fetch;
+    this.fetchImpl = config.fetchImpl ?? timeoutFetch;
     this.endpoint = config.endpoint ?? DEFAULT_ENDPOINT;
   }
 

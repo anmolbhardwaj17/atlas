@@ -18,7 +18,12 @@ export class ClaudeProvider implements LLMProvider {
   private readonly model: string;
 
   constructor(config: ClaudeConfig = {}) {
-    this.client = new Anthropic({ apiKey: config.apiKey ?? process.env.ANTHROPIC_API_KEY });
+    // Explicit request deadline (the SDK also retries): a dead socket can't hang an SSE request
+    // indefinitely. Generous — a long answer streams within it.
+    this.client = new Anthropic({
+      apiKey: config.apiKey ?? process.env.ANTHROPIC_API_KEY,
+      timeout: 300_000,
+    });
     this.model = config.model ?? "claude-opus-4-8";
   }
 

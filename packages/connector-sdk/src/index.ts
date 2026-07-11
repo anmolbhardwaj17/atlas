@@ -160,3 +160,6 @@ export interface Connector {
   /** Pure: raw → directly-observed edges (docs/05). */
   observedEdges(raw: RawResource): EdgeUpsert[];
 }
+
+export { fetchWithTimeout } from "./net";
+export type { FetchTimeoutOptions } from "./net";

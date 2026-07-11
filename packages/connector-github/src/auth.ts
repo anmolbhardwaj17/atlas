@@ -8,6 +8,7 @@
  */
 import { createPrivateKey } from "node:crypto";
 import { SignJWT } from "jose";
+import { fetchWithTimeout } from "@atlas/connector-sdk";
 
 export interface InstallationToken {
   token: string;
@@ -74,7 +75,7 @@ export class GithubAppTokenProvider implements InstallationTokenProvider {
     const url = `${this.baseUrl}/app/installations/${input.installationId}/access_tokens`;
     let res: Response;
     try {
-      res = await fetch(url, {
+      res = await fetchWithTimeout(url, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${appJwt}`,
