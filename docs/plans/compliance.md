@@ -42,9 +42,10 @@ So Atlas does the honest, valuable thing: **continuously check the infrastructur
 - ✅ **S3 public-access** — bucket public-access-block + policy + ACL (graceful, `unknown` on denial) → `s3-public` finding → `data.no-public-storage` control (gated on `s3:GetBucketPublicAccessBlock`).
 - ✅ **Encryption at rest** — RDS `StorageEncrypted` (+ S3 default encryption) → `unencrypted-datastore` finding → `crypto.at-rest` control (no extra permission — `rds:DescribeDBInstances` already granted).
 
-**Remaining (deliberately careful):**
-- ⏳ **CloudTrail / VPC flow-logs** (audit logging) — an *absence* finding, so it needs region-aggregation + gating on "actually checked" to avoid false-firing when denied. Its own slice.
-- ⏳ **Encryption in transit** (ELB listener TLS), **per-user MFA / credential report** (beyond root).
+- ✅ **CloudTrail audit logging** — account discoverer checks for a multi-region trail actively logging (CIS 3.1), modeled as `aws.account.cloudTrailEnabled: true/false/null`; `no-cloudtrail` finding fires ONLY on known-false (never null) so a denied read can't false-fire; `cloudtrail:DescribeTrails` posture probe surfaces the permission → `logging.audit-trail` control.
+
+**Remaining (the tail):**
+- ⏳ **Encryption in transit** (ELB listener TLS), **VPC flow-logs**, **per-user MFA / credential report** (beyond root). Lower value; the framework already shows them honestly as "not yet crawled".
 
 ## Next (v2+)
 - Per-framework export (PDF/CSV evidence pack); control history / drift over time; SOC 2 mapping; scoping (tag which resources are in a compliance boundary, e.g. PCI CDE).
