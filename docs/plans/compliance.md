@@ -33,9 +33,20 @@ So Atlas does the honest, valuable thing: **continuously check the infrastructur
 - **API:** `apps/api/src/compliance/` — `ComplianceService.assess(orgId)` reuses `GraphService.summary()` (findings) + a per-kind inventory query + `ATLAS_ASSESSABLE`; `GET /compliance` (Member+, org-scoped, read-only). Registered in `app.module.ts`.
 - **Web:** `/compliance` page + `ComplianceView` — framework tabs, a coverage band (assessed / pass / fail / not-assessable + pass-rate + the scope caveat), and the control list with status pills, the framework's mapped IDs, and a "View evidence" link to `/insights/[id]` for fails. Sidebar nav item (ShieldCheck). Per-page skeleton.
 
-## Next (v2+)
+## Phase 2b — closing the crawl gaps (in progress, 2026-07-11)
 
-- Close the not-assessable gaps by extending the AWS connector (encryption attrs, S3 public-access, CloudTrail/flow-log status, IAM credential report) — each flip of an `ATLAS_ASSESSABLE` flag lights up several controls across frameworks.
+**Framework (done):** assessability is now **per-org + dynamic** — a `CAPABILITIES` map (in `compliance.service.ts`) declares each capability's required IAM action(s) + `supported` flag; the service reads the org's denied actions from `connections.health.missingPermissions` (kept fresh by the health poll) and marks a control `not-assessable` for a precise reason: **"not crawled yet"** vs **"grant IAM action X"** (with the actions as code chips + the `SecurityAudit` shortcut). Per-resource sub-call denials (e.g. S3) are surfaced by dedicated **`POSTURE_PROBES`** so they're attributed to the correct action, never a false pass.
+
+**Crawls shipped:**
+- ✅ **Root MFA / account posture** — new `aws.account` node (`iam:GetAccountSummary`) → `root-no-mfa` finding → `access.mfa-privileged` control.
+- ✅ **S3 public-access** — bucket public-access-block + policy + ACL (graceful, `unknown` on denial) → `s3-public` finding → `data.no-public-storage` control (gated on `s3:GetBucketPublicAccessBlock`).
+- ✅ **Encryption at rest** — RDS `StorageEncrypted` (+ S3 default encryption) → `unencrypted-datastore` finding → `crypto.at-rest` control (no extra permission — `rds:DescribeDBInstances` already granted).
+
+**Remaining (deliberately careful):**
+- ⏳ **CloudTrail / VPC flow-logs** (audit logging) — an *absence* finding, so it needs region-aggregation + gating on "actually checked" to avoid false-firing when denied. Its own slice.
+- ⏳ **Encryption in transit** (ELB listener TLS), **per-user MFA / credential report** (beyond root).
+
+## Next (v2+)
 - Per-framework export (PDF/CSV evidence pack); control history / drift over time; SOC 2 mapping; scoping (tag which resources are in a compliance boundary, e.g. PCI CDE).
 
 ## Cross-refs
