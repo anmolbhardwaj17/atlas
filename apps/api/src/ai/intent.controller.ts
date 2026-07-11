@@ -26,6 +26,16 @@ export class IntentController {
   async coverage(@Req() req: AuthedRequest, @Param("id") id: string): Promise<CoverageAssessment> {
     return this.ai.coverageForPr(org(req).id, id);
   }
+
+  /** Propose fuzzy (no-key) PR→issue links as `ai_suggested` IMPLEMENTS edges for confirm/reject
+   *  in the graph (IV-4). Admin — it scans the estate + writes suggestions. */
+  @Post("suggest-links")
+  @Roles("Admin")
+  async suggestLinks(
+    @Req() req: AuthedRequest,
+  ): Promise<{ suggested: number; scannedPrs: number; scannedIssues: number }> {
+    return this.ai.suggestIntentLinks(org(req).id);
+  }
 }
 
 function org(req: AuthedRequest): { id: string } {

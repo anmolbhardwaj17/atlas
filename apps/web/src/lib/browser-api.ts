@@ -267,6 +267,24 @@ export async function suggestAiEdges(
   return (await res.json()).data;
 }
 
+/**
+ * Propose fuzzy (no-key) PR→Jira-issue links (IV-4). Writes `ai_suggested` IMPLEMENTS edges the
+ * user confirms/rejects in the graph. Admin-only. Returns how many were suggested.
+ */
+export async function suggestIntentLinks(
+  orgId: string,
+): Promise<{ suggested: number; scannedPrs: number; scannedIssues: number }> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/intent/suggest-links`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok)
+    throw new Error(await errorMessage(res, `Couldn't suggest intent links (${res.status}).`));
+  return (await res.json()).data;
+}
+
 /** Pending AI-suggested edges awaiting confirm/reject. */
 export async function getSuggestedEdges(orgId: string): Promise<SuggestedEdge[]> {
   const token = await getClientToken();

@@ -55,6 +55,7 @@ import {
   triggerSync,
   reindexGraph,
   suggestAiEdges,
+  suggestIntentLinks,
   setChannel,
   testChannel,
   removeChannel,
@@ -130,6 +131,7 @@ export function IntegrationsHub({
   const [query, setQuery] = React.useState("");
   const [rebuilding, setRebuilding] = React.useState(false);
   const [findingLinks, setFindingLinks] = React.useState(false);
+  const [linkingIntent, setLinkingIntent] = React.useState(false);
 
   // Ask the AI to propose repo→runtime links deterministic matching can't catch. They appear in
   // the graph badged "AI-suggested" for the user to confirm or reject.
@@ -154,6 +156,34 @@ export function IntegrationsHub({
       });
     } finally {
       setFindingLinks(false);
+    }
+  }
+
+  // Link PRs to the Jira tickets they implement when no key is in the PR (IV-4) — deterministic
+  // signals (shared words + timing) → `ai_suggested` IMPLEMENTS edges to confirm/reject in the graph.
+  async function findIntentLinks(): Promise<void> {
+    setLinkingIntent(true);
+    try {
+      const r = await suggestIntentLinks(orgId);
+      toast.success(
+        r.suggested > 0
+          ? `${r.suggested} PR${r.suggested === 1 ? "" : "s"} linked to a ticket`
+          : "No new PR↔ticket links found",
+        {
+          description:
+            r.suggested > 0
+              ? "Review them in the graph — confirm the good ones, reject the rest."
+              : r.scannedIssues === 0
+                ? "No Jira issues are synced yet."
+                : `Checked ${r.scannedPrs} unlinked PR${r.scannedPrs === 1 ? "" : "s"}.`,
+        },
+      );
+    } catch (e) {
+      toast.error("Couldn't suggest PR↔ticket links", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setLinkingIntent(false);
     }
   }
 
@@ -255,6 +285,21 @@ export function IntegrationsHub({
                 )}
                 Find AI links
               </Button>
+              {hasConn("jira") ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void findIntentLinks()}
+                  disabled={linkingIntent || rebuilding || findingLinks}
+                >
+                  {linkingIntent ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="size-3.5 text-primary" />
+                  )}
+                  Link PRs to Jira
+                </Button>
+              ) : null}
               <span className="text-xs text-muted-foreground">
                 Re-derive links, or let AI propose ones matching can&rsquo;t catch.
               </span>

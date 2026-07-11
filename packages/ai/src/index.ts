@@ -109,3 +109,5 @@ export type {
   DiffHunk,
 } from "./coverage";
 export { COVERAGE_SYSTEM, COVERAGE_PROMPT_VERSION } from "./prompt";
+export { suggestIntentLinks } from "./intent-links";
+export type { FuzzyPr, FuzzyIssue, IntentLinkSuggestion, IntentLinkOpts } from "./intent-links";

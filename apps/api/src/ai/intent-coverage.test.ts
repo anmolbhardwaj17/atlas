@@ -188,4 +188,72 @@ suite("IV-3b intent-coverage assembly", () => {
       code: "not_found",
     });
   });
+
+  // ── IV-4 fuzzy (no-key) PR↔issue linking ──────────────────────────────────
+  const countImplements = async (from: string, to: string): Promise<number> =>
+    Number(
+      (
+        await admin.query<{ n: string }>(
+          `SELECT count(*) n FROM edges WHERE from_node_id=$1 AND to_node_id=$2
+             AND type='IMPLEMENTS' AND origin='ai_suggested' AND status='active'`,
+          [from, to],
+        )
+      ).rows[0]?.n ?? "0",
+    );
+
+  it("writes an ai_suggested IMPLEMENTS edge for a fuzzy-matched unlinked PR", async () => {
+    const prId = await insertNode(
+      "bitbucket:acme:pullrequest/web/50",
+      "bitbucket.pullrequest",
+      "Handle checkout refund timeout",
+      { sourceBranch: "feature/checkout-refund-timeout", createdOn: "2026-06-03T00:00:00Z" },
+    );
+    const issueId = await insertNode(
+      "jira:acme:issue/ENG-9",
+      "jira.issue",
+      "ENG-9 — checkout refund",
+      {
+        key: "ENG-9",
+        summary: "Add checkout refund timeout handling",
+        createdAt: "2026-06-01T00:00:00Z",
+      },
+    );
+
+    const res = await makeAi().suggestIntentLinks(orgId);
+    expect(res.suggested).toBe(1);
+    expect(await countImplements(prId, issueId)).toBe(1);
+  });
+
+  it("does not fuzzily link a PR that already has an explicit IMPLEMENTS edge", async () => {
+    const prId = await insertNode(
+      "bitbucket:acme:pullrequest/web/51",
+      "bitbucket.pullrequest",
+      "Add checkout refund timeout handling",
+      { sourceBranch: "feature/checkout-refund", createdOn: "2026-06-03T00:00:00Z" },
+    );
+    const issueId = await insertNode("jira:acme:issue/ENG-10", "jira.issue", "ENG-10", {
+      key: "ENG-10",
+      summary: "Add checkout refund timeout handling",
+      createdAt: "2026-06-01T00:00:00Z",
+    });
+    await linkImplements(prId, issueId); // explicit (R18) link already present
+
+    const res = await makeAi().suggestIntentLinks(orgId);
+    expect(res.suggested).toBe(0);
+    expect(await countImplements(prId, issueId)).toBe(0); // no ai_suggested duplicate
+  });
+
+  it("suggests nothing when there are no Jira issues (the live estate today)", async () => {
+    await insertNode(
+      "bitbucket:acme:pullrequest/web/52",
+      "bitbucket.pullrequest",
+      "#52 bump deps",
+      {
+        sourceBranch: "chore/deps",
+      },
+    );
+    const res = await makeAi().suggestIntentLinks(orgId);
+    expect(res).toMatchObject({ suggested: 0, scannedIssues: 0 });
+    expect(res.scannedPrs).toBeGreaterThanOrEqual(1);
+  });
 });

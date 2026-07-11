@@ -6,12 +6,15 @@ import {
   answerQuestionStream,
   judgeCoverage,
   matchEdges,
+  suggestIntentLinks,
   OpenRouterProvider,
   ClaudeProvider,
   type AnswerCitation,
   type AnswerEvent,
   type CoverageAssessment,
   type CoverageInputs,
+  type FuzzyIssue,
+  type FuzzyPr,
   type IntentIssue,
   type LLMProvider,
 } from "@atlas/ai";
@@ -82,6 +85,10 @@ const DAY_SECONDS = 24 * 60 * 60;
 
 /** PR node kinds the coverage judge accepts (mirrors R18's linkable kinds). */
 const PR_KINDS = ["bitbucket.pullrequest", "github.pull_request"];
+
+/** Bound the fuzzy-link scan (it's O(prs × issues)); enough for a real estate, excess is reported. */
+const INTENT_PR_CAP = 400;
+const INTENT_ISSUE_CAP = 600;
 
 const asString = (v: unknown): string => (typeof v === "string" ? v : "");
 const asStringOrNull = (v: unknown): string | null => (typeof v === "string" ? v : null);
@@ -229,6 +236,111 @@ export class AiService {
       diff,
     };
     return judgeCoverage({ llm }, inputs);
+  }
+
+  /**
+   * Fuzzy (no-key) PR↔issue linking (IV-4, docs/plans/intent-verification.md §1). For PRs with no
+   * explicit-key `IMPLEMENTS` link (R18 found nothing), propose the ticket they likely implement from
+   * deterministic signals (shared meaningful words + temporal proximity) and write them as
+   * `ai_suggested` IMPLEMENTS edges the user confirms/rejects in the graph (the same loop as
+   * repo→runtime suggestions). No LLM — the signals are deterministic. Skips already-rejected pairs.
+   * Returns how many candidates were written. Org-scoped (RLS, R8); Admin-gated by the caller.
+   */
+  async suggestIntentLinks(
+    orgId: string,
+  ): Promise<{ suggested: number; scannedPrs: number; scannedIssues: number }> {
+    await this.rateLimit.enforce(
+      orgId,
+      "ai_intent_links",
+      10,
+      600,
+      "Link suggestions were just generated. Give it a few minutes before running again.",
+    );
+    return withOrgScope(this.db, orgId, async (c) => {
+      // Unlinked PRs = no ACTIVE IMPLEMENTS edge out (explicit-key or previously confirmed).
+      const { rows: prRows } = await c.query<{
+        id: string;
+        urn: string;
+        name: string | null;
+        attributes: Record<string, unknown>;
+      }>(
+        `SELECT id, urn, name, attributes FROM nodes n
+          WHERE kind = ANY($1) AND status = 'active'
+            AND NOT EXISTS (
+              SELECT 1 FROM edges e
+               WHERE e.from_node_id = n.id AND e.type = 'IMPLEMENTS' AND e.status = 'active'
+            )
+          ORDER BY last_seen DESC LIMIT $2`,
+        [PR_KINDS, INTENT_PR_CAP],
+      );
+      const { rows: issueRows } = await c.query<{
+        id: string;
+        urn: string;
+        attributes: Record<string, unknown>;
+      }>(
+        `SELECT id, urn, attributes FROM nodes
+          WHERE kind = 'jira.issue' AND status = 'active'
+          ORDER BY last_seen DESC LIMIT $1`,
+        [INTENT_ISSUE_CAP],
+      );
+      if (prRows.length === 0 || issueRows.length === 0) {
+        return { suggested: 0, scannedPrs: prRows.length, scannedIssues: issueRows.length };
+      }
+
+      const prs: FuzzyPr[] = prRows.map((r) => ({
+        id: r.id,
+        urn: r.urn,
+        title: r.name ?? "",
+        branch: asString(r.attributes.sourceBranch),
+        createdAt: asStringOrNull(r.attributes.createdOn) ?? asStringOrNull(r.attributes.createdAt),
+      }));
+      const issues: FuzzyIssue[] = issueRows.map((r) => ({
+        id: r.id,
+        urn: r.urn,
+        key: asString(r.attributes.key),
+        summary: asString(r.attributes.summary),
+        createdAt: asStringOrNull(r.attributes.createdAt),
+      }));
+
+      const suggestions = suggestIntentLinks(prs, issues);
+      if (suggestions.length === 0) {
+        return { suggested: 0, scannedPrs: prs.length, scannedIssues: issues.length };
+      }
+
+      const { rows: rejRows } = await c.query<{ from_node_id: string; to_node_id: string }>(
+        `SELECT from_node_id, to_node_id FROM edge_suggestion_rejections WHERE type = 'IMPLEMENTS'`,
+      );
+      const rejected = new Set(rejRows.map((r) => `${r.from_node_id}→${r.to_node_id}`));
+
+      let written = 0;
+      for (const s of suggestions) {
+        if (rejected.has(`${s.prId}→${s.issueId}`)) continue;
+        const prov = await c.query<{ id: string }>(
+          `INSERT INTO provenance (org_id, source, confidence, evidence)
+           VALUES ($1, 'ai:intent-linker', 'ai-suggested', $2) RETURNING id`,
+          [
+            orgId,
+            JSON.stringify({ matcher: "intent-linker", reasoning: s.reasoning, score: s.score }),
+          ],
+        );
+        const provId = prov.rows[0]?.id;
+        // Revive-on-conflict (mirrors edge-suggestion.write): a previously-retired suggestion for the
+        // same pair collides on uq_edge; reviving is safe since rejected pairs are already skipped.
+        const ins = await c.query<{ id: string }>(
+          `INSERT INTO edges
+             (org_id, from_node_id, to_node_id, type, origin, confidence, provenance_id, last_seen)
+           VALUES ($1, $2, $3, 'IMPLEMENTS', 'ai_suggested', 'ai-suggested', $4, now())
+           ON CONFLICT ON CONSTRAINT uq_edge DO UPDATE
+             SET status = 'active', origin = 'ai_suggested', confidence = 'ai-suggested',
+                 provenance_id = EXCLUDED.provenance_id, last_seen = now()
+             WHERE edges.status <> 'active'
+           RETURNING id`,
+          [orgId, s.prId, s.issueId, provId],
+        );
+        if (ins.rowCount) written += 1;
+      }
+      return { suggested: written, scannedPrs: prs.length, scannedIssues: issues.length };
+    });
   }
 
   /** The org's LLM config for the settings UI — never the key (BR-CONN-1). */

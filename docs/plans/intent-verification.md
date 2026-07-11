@@ -10,7 +10,11 @@
 > `POST /intent/prs/:id/coverage`; live-verified honest states on the real DB, 4 integration tests) ·
 > ✅ **IV-3c UI** ("Intent coverage" panel on the PR node in Explore — per-criterion status + hedged
 > cited notes + honest empty states; button-triggered; web build green). **IV-3 COMPLETE.**
-> ⏳ Remaining: fuzzy low-tier (no-key) PR↔issue linking + confirm/reject. Product owner's idea:
+> ✅ **IV-4 fuzzy (no-key) PR↔issue linking** (`@atlas/ai` `suggestIntentLinks`: deterministic
+> shared-words + temporal signals → best-with-clear-margin → `ai_suggested` IMPLEMENTS edges for the
+> existing confirm/reject loop; `POST /intent/suggest-links` + "Link PRs to Jira" hub button; 7 engine
+> + 3 live-DB tests). **Author↔assignee signal deferred** (PR connector doesn't capture author yet).
+> **EPIC COMPLETE** (IV-1→IV-4). Product owner's idea:
 > a PR references a Jira task (or should); the code doesn't *break*, but the **logic is wrong / the
 > intent isn't implemented**. Can Atlas link the PR to its issue (even when the key isn't in the PR),
 > read the story + subtasks + comments, and judge whether the intent was actually built?
