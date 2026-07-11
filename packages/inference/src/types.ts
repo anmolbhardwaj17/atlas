@@ -12,6 +12,8 @@ export interface NodeLite {
   id: string;
   urn: string;
   kind: string;
+  /** Display name (e.g. a PR's `#12 — title`) — optional so test fixtures can omit it. */
+  name?: string | null;
   attributes: Record<string, unknown>;
 }
 

@@ -121,14 +121,24 @@ async function buildInput(c: PoolClient): Promise<InferenceInput> {
     (await c.query<{ slug: string }>(`SELECT slug FROM organizations LIMIT 1`)).rows[0]?.slug ?? "";
 
   const nodes = (
-    await c.query<{ id: string; urn: string; kind: string; attributes: Record<string, unknown> }>(
-      `SELECT id, urn, kind, attributes FROM nodes WHERE status <> 'deleted'`,
-    )
+    await c.query<{
+      id: string;
+      urn: string;
+      kind: string;
+      name: string | null;
+      attributes: Record<string, unknown>;
+    }>(`SELECT id, urn, kind, name, attributes FROM nodes WHERE status <> 'deleted'`)
   ).rows;
   const nodesByUrn = new Map<string, NodeLite>();
   const nodesByKind = new Map<string, NodeLite[]>();
   for (const n of nodes) {
-    const lite: NodeLite = { id: n.id, urn: n.urn, kind: n.kind, attributes: n.attributes ?? {} };
+    const lite: NodeLite = {
+      id: n.id,
+      urn: n.urn,
+      kind: n.kind,
+      name: n.name,
+      attributes: n.attributes ?? {},
+    };
     nodesByUrn.set(lite.urn, lite);
     const list = nodesByKind.get(lite.kind);
     if (list) list.push(lite);

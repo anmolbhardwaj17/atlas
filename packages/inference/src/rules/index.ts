@@ -13,6 +13,7 @@ import { imageCommitProvenanceRule } from "./r12-images";
 import { serviceNameEnvRule } from "./r13-service-env";
 import { imageNameCorrelationRule } from "./r14-image-name";
 import { lambdaCommitProvenanceRule } from "./r17-lambda-commit";
+import { prImplementsIssueRule } from "./r18-pr-implements-issue";
 import { serviceDerivationRule } from "./r4-service";
 import { ownershipPropagationRule } from "./r5-ownership";
 import { prChangesServiceRule } from "./r6-changed";
@@ -41,6 +42,7 @@ export const ALL_RULES: readonly Rule[] = [
   imageCommitProvenanceRule,
   imageNameCorrelationRule,
   lambdaCommitProvenanceRule,
+  prImplementsIssueRule,
   serviceNameEnvRule,
   serviceDerivationRule,
   ownershipPropagationRule,
@@ -54,6 +56,7 @@ export { imageCommitProvenanceRule } from "./r12-images";
 export { serviceNameEnvRule } from "./r13-service-env";
 export { imageNameCorrelationRule } from "./r14-image-name";
 export { lambdaCommitProvenanceRule } from "./r17-lambda-commit";
+export { prImplementsIssueRule } from "./r18-pr-implements-issue";
 export { serviceDerivationRule } from "./r4-service";
 export { ownershipPropagationRule } from "./r5-ownership";
 export { prChangesServiceRule } from "./r6-changed";

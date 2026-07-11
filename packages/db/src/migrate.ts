@@ -51,6 +51,7 @@ import { up as up0049 } from "./migrations/0049_lambda_commit_seed";
 import { up as up0050 } from "./migrations/0050_incidents";
 import { up as up0051 } from "./migrations/0051_org_alert_settings";
 import { up as up0052 } from "./migrations/0052_jira";
+import { up as up0053 } from "./migrations/0053_pr_implements_seed";
 
 /**
  * Forward-only SQL migration runner (docs/04 §9). Plain `pg`, no ORM. Each
@@ -113,6 +114,7 @@ const MIGRATIONS: ReadonlyArray<{ version: string; statements: string[] }> = [
   { version: "0050_incidents", statements: up0050 },
   { version: "0051_org_alert_settings", statements: up0051 },
   { version: "0052_jira", statements: up0052 },
+  { version: "0053_pr_implements_seed", statements: up0053 },
 ];
 
 async function main(): Promise<void> {
