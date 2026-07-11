@@ -1,6 +1,8 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
+import type { Env } from "@atlas/config";
 import { withOrgScope, type Db } from "@atlas/db";
-import { PG_POOL } from "../core/tokens";
+import { PG_POOL, ENV } from "../core/tokens";
+import { EmailService } from "../core/email.service";
 import { GraphService } from "../graph/graph.service";
 import { inferEnvironment } from "../graph/environment";
 import { IncidentsService } from "./incidents.service";
@@ -12,6 +14,8 @@ export interface HealthChange {
   urn: string;
   from: string | null;
   to: string;
+  /** The health_transition event id, so the incident notification dedupes with the generic one. */
+  eventId?: string | null;
 }
 
 export type Classification =
@@ -90,12 +94,18 @@ export function deterministicHeadline(input: HeadlineInput): {
 export class ProactiveIncidentsService {
   private readonly logger = new Logger(ProactiveIncidentsService.name);
 
+  private readonly webOrigin: string;
+
   constructor(
     @Inject(PG_POOL) private readonly db: Db,
+    @Inject(ENV) env: Env,
     private readonly graph: GraphService,
     private readonly incidents: IncidentsService,
     private readonly policy: AlertPolicyService,
-  ) {}
+    private readonly email: EmailService,
+  ) {
+    this.webOrigin = env.WEB_ORIGIN;
+  }
 
   /** Returns true if an incident was opened. Safe to call on every detected transition. */
   async maybeOpenForRegression(orgId: string, change: HealthChange): Promise<boolean> {
@@ -149,11 +159,55 @@ export class ProactiveIncidentsService {
         source: "deterministic",
       },
     });
-    await this.notify(orgId, incident.id, node, change.to, verdict.summary);
+    await this.notify(orgId, incident.id, node, change.to, verdict.summary, change.eventId ?? null);
+    // Email is the "push you'll see when you're not in Atlas". Reserve it for the urgent case
+    // (unhealthy, not degraded) so it stays a real page, not noise. Best-effort.
+    if (change.to === "unhealthy") {
+      await this.emailAlert(orgId, incident.id, node, change.to, verdict.summary).catch((err) =>
+        this.logger.warn(`incident email failed: ${(err as Error).message}`),
+      );
+    }
     this.logger.log(
       `Proactive incident for ${node.name ?? node.kind} (${change.to}): ${verdict.classification}`,
     );
     return true;
+  }
+
+  /** Email the org's active members about a new prod incident (best-effort). */
+  private async emailAlert(
+    orgId: string,
+    incidentId: string,
+    node: { name: string | null; kind: string },
+    state: string,
+    cause: string,
+  ): Promise<void> {
+    const { orgName, recipients } = await withOrgScope(this.db, orgId, async (c) => {
+      const org = (
+        await c.query<{ name: string }>(
+          `SELECT name FROM organizations
+            WHERE id = NULLIF(current_setting('atlas.current_org', true), '')::uuid`,
+        )
+      ).rows[0];
+      const rows = (
+        await c.query<{ email: string }>(
+          `SELECT u.email FROM memberships m JOIN users u ON u.id = m.user_id
+            WHERE m.status = 'active' AND u.email IS NOT NULL`,
+        )
+      ).rows;
+      return { orgName: org?.name ?? "your team", recipients: rows.map((r) => r.email) };
+    });
+    const warRoomUrl = `${this.webOrigin}/war-room/${incidentId}`;
+    const label = node.name ?? node.kind;
+    for (const to of recipients) {
+      await this.email.sendIncidentAlert({
+        to,
+        orgName,
+        nodeName: label,
+        state,
+        cause,
+        warRoomUrl,
+      });
+    }
   }
 
   private async loadNode(
@@ -201,9 +255,14 @@ export class ProactiveIncidentsService {
     node: { name: string | null; kind: string },
     toState: string,
     headline: string,
+    eventId: string | null,
   ): Promise<void> {
     const severity = toState === "unhealthy" ? "danger" : "warning";
     const label = node.name ?? node.kind;
+    // Share the generic health notification's dedupe key (`health:<eventId>`) so this richer incident
+    // notification (likely cause + War Room link) REPLACES it rather than duplicating — whichever
+    // inserts first wins, and the poller runs right after the transition, so this one does.
+    const dedupe = eventId ? `health:${eventId}` : `incident:${incidentId}`;
     await withOrgScope(this.db, orgId, (c) =>
       c.query(
         `INSERT INTO notifications (org_id, kind, severity, title, body, href, node_kind, dedupe_key)
@@ -216,7 +275,7 @@ export class ProactiveIncidentsService {
           headline,
           `/war-room/${incidentId}`,
           node.kind,
-          `incident:${incidentId}`,
+          dedupe,
         ],
       ),
     );

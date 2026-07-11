@@ -15,6 +15,16 @@ export interface WelcomeEmail {
   to: string;
   name: string | null;
 }
+export interface IncidentAlertEmail {
+  to: string;
+  orgName: string;
+  nodeName: string;
+  /** "unhealthy" | "degraded". */
+  state: string;
+  /** The deterministic likely-cause headline (a full sentence). */
+  cause: string;
+  warRoomUrl: string;
+}
 export interface WeeklyDigestEmail {
   to: string;
   orgName: string;
@@ -112,6 +122,33 @@ export class EmailService {
       security: `You're receiving this because an account was created for you on Atlas. Questions? Just reply — a real person reads it.`,
     });
     return this.send(msg.to, "Welcome to Atlas", html);
+  }
+
+  /** Immediate incident alert (docs/plans/proactive-incidents.md): a healthy prod resource just broke.
+   *  Carries the deterministic likely-cause + a one-click link to the War Room's live diagnosis. */
+  async sendIncidentAlert(msg: IncidentAlertEmail): Promise<boolean> {
+    const meta: MetaRow[] = [
+      { label: "Resource", value: msg.nodeName },
+      { label: "Status", value: msg.state },
+      { label: "Likely cause", value: msg.cause },
+    ];
+    const html = emailShell({
+      preheader: `${msg.nodeName} went ${msg.state} — ${msg.cause}`,
+      heading: `${escapeHtml(msg.nodeName)} went ${escapeHtml(msg.state)}`,
+      intro: `Atlas detected that <b style="color:inherit">${escapeHtml(
+        msg.nodeName,
+      )}</b> in <b style="color:inherit">${escapeHtml(
+        msg.orgName,
+      )}</b> just went <b style="color:inherit">${escapeHtml(
+        msg.state,
+      )}</b>. ${escapeHtml(msg.cause)} Open the War Room for the full, cited trace to the root cause.`,
+      meta,
+      cta: { label: "Open the War Room", url: msg.warRoomUrl, width: 200 },
+      security: `You're receiving this because Atlas is set to alert on incidents for <b style="color:inherit">${escapeHtml(
+        msg.orgName,
+      )}</b>. An admin can change this in Settings → Incident alerts.`,
+    });
+    return this.send(msg.to, `${msg.nodeName} went ${msg.state} — ${msg.orgName}`, html);
   }
 
   /** Weekly posture digest (docs/plans/compliance + #44): open findings by severity, the top items
@@ -283,7 +320,9 @@ function metaTable(rows: MetaRow[]): string {
   </table>`;
 }
 
-function findingsList(items: Array<{ dot: string; title: string; sub?: string; url?: string }>): string {
+function findingsList(
+  items: Array<{ dot: string; title: string; sub?: string; url?: string }>,
+): string {
   const rows = items
     .map((it, i) => {
       const title = it.url

@@ -25,6 +25,9 @@ export interface HealthTransition {
   /** Previous state — null on first sighting (baseline; never a regression). */
   from: string | null;
   to: "healthy" | "degraded" | "unhealthy";
+  /** The health_transition node_event's id (null if it collided) — lets a proactive incident's
+   *  notification dedupe against the generic health notification syncFeed would create. */
+  eventId: string | null;
 }
 
 export interface HealthApplyResult {
@@ -78,10 +81,11 @@ export async function applyHealthObservations(
       const prev = row.prev_state;
       if (prev !== o.state && !(prev == null && o.state === "healthy")) {
         // First sighting as healthy is not a story; any other change is.
-        await c.query(
+        const ev = await c.query<{ id: string }>(
           `INSERT INTO node_events (org_id, node_id, kind, occurred_at, actor, title, evidence, source, dedupe_key)
            VALUES (current_setting('atlas.current_org')::uuid, $1, 'health_transition', $2, NULL, $3, $4::jsonb, 'health-poll', $5)
-           ON CONFLICT (org_id, dedupe_key) DO NOTHING`,
+           ON CONFLICT (org_id, dedupe_key) DO NOTHING
+           RETURNING id`,
           [
             row.id,
             o.checkedAt,
@@ -91,7 +95,13 @@ export async function applyHealthObservations(
           ],
         );
         transitions += 1;
-        changes.push({ nodeId: row.id, urn: o.urn, from: prev, to: o.state });
+        changes.push({
+          nodeId: row.id,
+          urn: o.urn,
+          from: prev,
+          to: o.state,
+          eventId: ev.rows[0]?.id ?? null,
+        });
       }
     }
     return { applied, unmatched: observations.length - applied, transitions, changes };
