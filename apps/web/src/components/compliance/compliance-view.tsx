@@ -76,12 +76,11 @@ const STATUS: Record<
 
 const SEV_ORDER: Record<ControlSeverity, number> = { high: 0, medium: 1, low: 2 };
 
-/** Severity chip styling — the dashboard donut's warm heat-ramp (red → orange → yellow), via explicit
- *  palette colours so the ring resolves (a semantic `ring-danger/x` silently falls back to blue). */
-const SEV_STYLE: Record<ControlSeverity, string> = {
-  high: "bg-red-500/10 text-red-600 ring-red-500/25 dark:text-red-400",
-  medium: "bg-orange-500/10 text-orange-600 ring-orange-500/25 dark:text-orange-400",
-  low: "bg-yellow-500/10 text-yellow-700 ring-yellow-500/25 dark:text-yellow-400",
+/** Severity as coloured text — the dashboard donut's warm heat-ramp (red → orange → yellow). */
+const SEV_TEXT: Record<ControlSeverity, string> = {
+  high: "text-red-600 dark:text-red-400",
+  medium: "text-orange-600 dark:text-orange-400",
+  low: "text-yellow-700 dark:text-yellow-400",
 };
 
 function pct(n: number | null): string {
@@ -408,14 +407,9 @@ function ControlRow({
         </span>
       </td>
       <td className="px-4 py-3.5">
-        {/* Severity is the control's inherent weight (donut heat-ramp), shown regardless of status —
-            a green Pass next to a red HIGH reads as "we check this important thing and you're fine". */}
-        <span
-          className={cn(
-            "inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1 ring-inset",
-            SEV_STYLE[r.severity],
-          )}
-        >
+        {/* Severity as plain coloured text (donut heat-ramp), shown regardless of status — the
+            control's inherent weight, not an alarm. */}
+        <span className={cn("text-xs font-medium capitalize", SEV_TEXT[r.severity])}>
           {r.severity}
         </span>
       </td>
