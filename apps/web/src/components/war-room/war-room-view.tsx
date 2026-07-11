@@ -14,9 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { streamAsk, createConversation, updateIncident, type Incident } from "@/lib/browser-api";
-import type { MapData } from "@/lib/map-types";
-import { kindIcon, KIND_LOGO } from "@/lib/kind-visual";
-import { CloudIcon } from "@/components/cloud-icon";
+import type { MapData, MapNode } from "@/lib/map-types";
 import { WarRoomMap } from "./war-room-map";
 import { MarkdownLite } from "./markdown-lite";
 import { ContextBar, Timeline, type NodeEvent } from "./war-room-context";
@@ -286,7 +284,9 @@ export function WarRoomView({
 
   const terminal = incident.status === "resolved" || incident.status === "dismissed";
   const diagnosed = turns.some((t) => t.role === "assistant" && t.text);
-  const firstAsstIdx = turns.findIndex((t) => t.role === "assistant");
+  const firstAsst = turns.find((t) => t.role === "assistant");
+  const verdict = firstAsst?.text ? parseVerdict(firstAsst.text) : null;
+  const heroConfidence = firstAsst?.confidence ?? null;
   const statusLabel = terminal
     ? incident.status
     : sending
@@ -335,12 +335,43 @@ export function WarRoomView({
         ) : null}
       </div>
 
-      {/* At-a-glance context — real facts about the broken resource. */}
-      <ContextBar node={focalNode} impactCount={impactCount} lastChange={lastChange} />
+      {/* Verdict hero — the answer FIRST (a non-expert reads this line and gets it; an SRE triages fast). */}
+      <VerdictHero
+        verdict={verdict}
+        confidence={heroConfidence}
+        sending={sending}
+        diagnosed={diagnosed}
+        node={focalNode}
+        impactCount={impactCount}
+        lastChange={lastChange}
+      />
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(380px,1fr)_1.35fr]">
-        {/* Investigation — a live AI chat (left) */}
-        <div className="flex h-[66vh] min-h-[460px] flex-col rounded-xl border border-border bg-background">
+      <div className="grid gap-4 lg:h-[72vh] lg:grid-cols-[1.35fr_1fr]">
+        {/* Left: the evidence — dependency chain (map) + what changed (timeline) */}
+        <div className="flex min-h-0 flex-col gap-4">
+          <div className="flex min-h-[300px] flex-1 flex-col overflow-hidden rounded-xl border border-border bg-background">
+            <div className="border-b border-border px-4 py-3">
+              <h2 className="text-sm font-semibold">Dependency chain</h2>
+              <p className="text-xs text-muted-foreground">
+                The culprit path is red · lit nodes are what the trace examined.
+              </p>
+            </div>
+            <div className="min-h-0 flex-1">
+              <WarRoomMap
+                full={map}
+                focusId={incident.nodeId}
+                activeIds={activeIds}
+                citedEdgeIds={citedEdgeIds}
+              />
+            </div>
+          </div>
+          <div className="h-[220px] shrink-0 overflow-hidden rounded-xl border border-border bg-background">
+            <Timeline events={events} />
+          </div>
+        </div>
+
+        {/* Right: the investigation — the full write-up + follow-up chat */}
+        <div className="flex min-h-[520px] flex-col rounded-xl border border-border bg-background lg:min-h-0">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <h2 className="text-sm font-semibold">Investigation</h2>
             {sending ? (
@@ -354,35 +385,6 @@ export function WarRoomView({
             )}
           </div>
 
-          {/* Resources traced — real provider icons, mirroring the lit map nodes. */}
-          {activeIds.length > 1 ? (
-            <div className="flex flex-wrap gap-1.5 border-b border-border px-4 py-2.5">
-              {activeIds.map((id) => {
-                const n = nodeById.get(id);
-                if (!n) return null;
-                const logo = KIND_LOGO[n.kind];
-                const Icon = kindIcon(n.kind);
-                const focal = id === incident.nodeId;
-                return (
-                  <span
-                    key={id}
-                    className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${
-                      focal ? "border-danger/50 bg-danger/[0.06]" : "border-border bg-muted/40"
-                    }`}
-                  >
-                    {logo ? (
-                      <CloudIcon name={logo} className="size-4" />
-                    ) : (
-                      <Icon className="size-3.5 text-muted-foreground" />
-                    )}
-                    <span className="max-w-[160px] truncate">{n.name ?? n.kind}</span>
-                  </span>
-                );
-              })}
-            </div>
-          ) : null}
-
-          {/* Thread */}
           <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
             {turns.length === 0 && !sending ? (
               <p className="text-sm text-muted-foreground">Starting the investigation…</p>
@@ -395,7 +397,7 @@ export function WarRoomView({
                   </div>
                 </div>
               ) : (
-                <AssistantTurn key={i} turn={t} primary={i === firstAsstIdx} />
+                <AssistantTurn key={i} turn={t} />
               ),
             )}
             {error ? (
@@ -405,7 +407,6 @@ export function WarRoomView({
             ) : null}
           </div>
 
-          {/* Ask a follow-up */}
           {!terminal ? (
             <form onSubmit={submit} className="border-t border-border p-2.5">
               <div className="flex items-end gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 focus-within:border-foreground/40">
@@ -431,29 +432,79 @@ export function WarRoomView({
             </form>
           ) : null}
         </div>
-
-        {/* Right column: live map (top) + real change timeline (bottom) */}
-        <div className="flex h-[66vh] min-h-[460px] flex-col gap-4">
-          <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-background">
-            <WarRoomMap
-              full={map}
-              focusId={incident.nodeId}
-              activeIds={activeIds}
-              citedEdgeIds={citedEdgeIds}
-            />
-          </div>
-          <div className="h-[38%] min-h-[170px] overflow-hidden rounded-xl border border-border bg-background">
-            <Timeline events={events} />
-          </div>
-        </div>
       </div>
     </div>
   );
 }
 
-/** One assistant turn. The first one (the auto-diagnosis) is elevated into a bordered "Diagnosis"
- *  card; follow-ups render as plain chat. Steps collapse to an accordion once the turn completes. */
-function AssistantTurn({ turn, primary }: { turn: Turn; primary?: boolean }) {
+/** The verdict hero — the answer, first. A classified badge + the one-line likely cause + confidence,
+ *  over a compact facts strip. Reads for a non-expert (plain sentence) and an SRE (fast triage). */
+function VerdictHero({
+  verdict,
+  confidence,
+  sending,
+  diagnosed,
+  node,
+  impactCount,
+  lastChange,
+}: {
+  verdict: { type: string; cause: string } | null;
+  confidence: string | null;
+  sending: boolean;
+  diagnosed: boolean;
+  node: MapNode | undefined;
+  impactCount: number;
+  lastChange: NodeEvent | null;
+}) {
+  const meta = verdict ? (VERDICT_META[verdict.type] ?? VERDICT_META.unknown) : null;
+  const headline =
+    verdict?.cause ??
+    (sending
+      ? "Tracing the likely cause…"
+      : diagnosed
+        ? "Diagnosis complete — see the investigation for detail."
+        : "Preparing the investigation…");
+  return (
+    <div className="rounded-xl border border-border bg-card p-5">
+      <div className="flex items-start gap-3">
+        <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-danger/10 text-danger">
+          {sending && !verdict ? (
+            <Loader2 className="size-5 animate-spin" />
+          ) : (
+            <Crosshair className="size-5" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Likely cause
+            </span>
+            {meta ? (
+              <span
+                className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${meta.cls}`}
+              >
+                {meta.label}
+              </span>
+            ) : null}
+            {confidence ? (
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium capitalize text-muted-foreground">
+                {confidence} confidence
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-1 text-[15px] font-medium leading-snug text-foreground">{headline}</p>
+        </div>
+      </div>
+      <div className="mt-4 border-t border-border pt-3">
+        <ContextBar node={node} impactCount={impactCount} lastChange={lastChange} />
+      </div>
+    </div>
+  );
+}
+
+/** One assistant turn — real tool-call steps (collapsed once done) + the markdown verdict prose. The
+ *  raw VERDICT line is stripped (the hero shows it). */
+function AssistantTurn({ turn }: { turn: Turn }) {
   const steps = turn.steps ?? [];
   const StepList = (
     <ol className="space-y-1.5">
@@ -501,43 +552,14 @@ function AssistantTurn({ turn, primary }: { turn: Turn; primary?: boolean }) {
     </p>
   ) : null;
 
-  if (primary) {
-    const verdict = turn.text ? parseVerdict(turn.text) : null;
-    const meta = verdict ? (VERDICT_META[verdict.type] ?? VERDICT_META.unknown) : null;
-    const prose = stripVerdict(turn.text);
-    return (
-      <div className="space-y-3 rounded-xl border border-danger/30 bg-danger/[0.04] p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Crosshair className="size-4 text-danger" />
-          <h3 className="text-sm font-semibold">Likely cause</h3>
-          {meta ? (
-            <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${meta.cls}`}>
-              {meta.label}
-            </span>
-          ) : null}
-          {confidenceChip}
-        </div>
-        {verdict?.cause ? (
-          <p className="text-sm font-medium text-foreground">{verdict.cause}</p>
-        ) : null}
-        {stepsBlock}
-        {prose ? (
-          <div className="space-y-2">
-            <MarkdownLite text={prose} />
-            {citationsNote}
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-
+  const prose = stripVerdict(turn.text);
   return (
     <div className="space-y-3">
       {stepsBlock}
-      {turn.text ? (
+      {prose ? (
         <div className="space-y-2">
           {confidenceChip}
-          <MarkdownLite text={turn.text} />
+          <MarkdownLite text={prose} />
           {citationsNote}
         </div>
       ) : null}

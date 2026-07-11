@@ -48,28 +48,8 @@ const HEALTH_TEXT: Record<string, string> = {
   healthy: "text-success",
 };
 
-/** A compact stat. */
-function Stat({
-  icon: Icon,
-  label,
-  children,
-}: {
-  icon: LucideIcon;
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="min-w-0 rounded-lg border border-border bg-background px-3 py-2">
-      <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        <Icon className="size-3" /> {label}
-      </div>
-      <div className="mt-0.5 truncate text-sm font-medium">{children}</div>
-    </div>
-  );
-}
-
-/** At-a-glance facts about the broken resource — real data, so the War Room reads as an incident
- *  dashboard rather than a bare chat. */
+/** A compact inline facts strip — the incident's key metadata, meant to sit under the verdict in the
+ *  hero (not five heavy cards competing with the answer). Real data throughout. */
 export function ContextBar({
   node,
   impactCount,
@@ -80,30 +60,43 @@ export function ContextBar({
   lastChange: NodeEvent | null;
 }) {
   const state = node?.health?.state ?? "unknown";
-  return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-      <Stat icon={Activity} label="Health">
+  const facts: Array<{ icon: LucideIcon; label: string; value: React.ReactNode }> = [
+    {
+      icon: Activity,
+      label: "Health",
+      value: (
         <span className="inline-flex items-center gap-1.5">
           <span className={`size-2 rounded-full ${HEALTH_DOT[state] ?? "bg-muted-foreground"}`} />
           <span className={`capitalize ${HEALTH_TEXT[state] ?? "text-muted-foreground"}`}>
             {state}
           </span>
         </span>
-      </Stat>
-      <Stat icon={Circle} label="Type">
-        {node ? kindShort(node.kind) : "—"}
-      </Stat>
-      <Stat icon={MapPin} label="Environment">
-        <span className={node?.environment === "production" ? "text-foreground" : ""}>
-          {node?.environment ?? node?.region ?? "—"}
-        </span>
-      </Stat>
-      <Stat icon={Waypoints} label="Blast radius">
-        {impactCount > 0 ? `${impactCount} depend on it` : "None downstream"}
-      </Stat>
-      <Stat icon={Clock} label="Last change">
-        {lastChange ? `${eventVerb(lastChange.kind)} · ${timeAgo(lastChange.occurredAt)}` : "None"}
-      </Stat>
+      ),
+    },
+    { icon: Circle, label: "Type", value: node ? kindShort(node.kind) : "—" },
+    { icon: MapPin, label: "Env", value: node?.environment ?? node?.region ?? "—" },
+    {
+      icon: Waypoints,
+      label: "Blast radius",
+      value: impactCount > 0 ? `${impactCount} depend on it` : "None downstream",
+    },
+    {
+      icon: Clock,
+      label: "Last change",
+      value: lastChange
+        ? `${eventVerb(lastChange.kind)} · ${timeAgo(lastChange.occurredAt)}`
+        : "None",
+    },
+  ];
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+      {facts.map((f) => (
+        <div key={f.label} className="flex items-center gap-1.5 text-sm">
+          <f.icon className="size-3.5 shrink-0 text-muted-foreground" />
+          <span className="text-muted-foreground">{f.label}</span>
+          <span className="font-medium">{f.value}</span>
+        </div>
+      ))}
     </div>
   );
 }
