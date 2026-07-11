@@ -2,8 +2,11 @@
 
 > **Status:** 🔵 **IN PROGRESS 2026-07-12.** ✅ **IV-1 Jira connector** (read-only; projects + issues with
 > description/subtasks/comments → `jira.*` nodes; connect flow in the hub) · ✅ **IV-2 PR↔issue linking**
-> (R18 `IMPLEMENTS`, explicit-key deterministic tier). ⏳ **IV-3 coverage judge** (the AI slice) + fuzzy
-> low-tier linking = what's left. Product owner's idea:
+> (R18 `IMPLEMENTS`, explicit-key deterministic tier) · ✅ **IV-3a coverage judge ENGINE** (`@atlas/ai`
+> `coverage.ts`: AC extractor + diff-hunk segmenter + `judgeCoverage` + `COVERAGE_SYSTEM` + the
+> deterministic **suppression gate** making false "you didn't build X" structurally impossible; own
+> adversarial eval, 14 tests, escaped-false-positive 0 on the set). ⏳ **IV-3b** wire into API
+> (`POST /intent/prs/:id/coverage`) · **IV-3c** UI panel · fuzzy low-tier linking = what's left. Product owner's idea:
 > a PR references a Jira task (or should); the code doesn't *break*, but the **logic is wrong / the
 > intent isn't implemented**. Can Atlas link the PR to its issue (even when the key isn't in the PR),
 > read the story + subtasks + comments, and judge whether the intent was actually built?

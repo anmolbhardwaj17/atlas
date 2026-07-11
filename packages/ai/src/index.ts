@@ -88,3 +88,24 @@ export {
   scoreConfidence,
 } from "./answer";
 export type { Answer, AnswerCitation, AnswerDeps, AnswerEvent, OverallConfidence } from "./answer";
+export {
+  judgeCoverage,
+  extractAcceptanceCriteria,
+  segmentDiff,
+  parseCoverageLines,
+} from "./coverage";
+export type {
+  CoverageInputs,
+  CoverageAssessment,
+  CoverageCriterion,
+  CoverageCitation,
+  CoverageStatus,
+  CriterionStatus,
+  CoverageDeps,
+  CoveragePr,
+  IntentIssue,
+  IntentSubtask,
+  IntentComment,
+  DiffHunk,
+} from "./coverage";
+export { COVERAGE_SYSTEM, COVERAGE_PROMPT_VERSION } from "./prompt";
