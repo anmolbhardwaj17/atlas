@@ -5,11 +5,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  Boxes,
-  Waypoints,
-  Lightbulb,
+  Compass,
+  Network,
+  Radar,
   ShieldCheck,
-  Plug,
+  Blocks,
   Settings,
   Loader2,
 } from "lucide-react";
@@ -49,13 +49,13 @@ const WORKSPACE_NAV: NavItem[] = [
   {
     href: "/map",
     label: "Map",
-    icon: Waypoints,
+    icon: Network,
     match: (p: string) => p.startsWith("/map"),
   },
   {
     href: "/explore",
     label: "Explore",
-    icon: Boxes,
+    icon: Compass,
     match: (p: string) => p.startsWith("/explore"),
   },
   // Ask Atlas carries its own brand mark (the green sphere), not a lucide glyph.
@@ -63,7 +63,7 @@ const WORKSPACE_NAV: NavItem[] = [
   {
     href: "/insights",
     label: "Insights",
-    icon: Lightbulb,
+    icon: Radar,
     match: (p: string) => p.startsWith("/insights"),
   },
   {
@@ -80,7 +80,7 @@ const MANAGE_NAV: NavItem[] = [
   {
     href: "/integrations",
     label: "Integrations",
-    icon: Plug,
+    icon: Blocks,
     match: (p: string) => p.startsWith("/integrations"),
   },
   {
