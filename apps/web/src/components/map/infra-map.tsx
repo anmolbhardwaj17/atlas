@@ -33,6 +33,7 @@ import {
   ChevronDown,
   Clock,
   CornerDownLeft,
+  Globe,
   ListFilter,
   Map as MapIcon,
   RotateCw,
@@ -86,11 +87,14 @@ export function InfraMap({
   data: rawData,
   orgId,
   focusId,
+  lens,
 }: {
   data: MapData;
   orgId: string;
   /** A node to open focused (from "View on map" — /map?node=<id>): selected + centred on load. */
   focusId?: string;
+  /** Open with a lens pre-activated (e.g. `/map?lens=exposed` from the exposed-vulnerable finding). */
+  lens?: string;
 }) {
   // Drop only the granular code activity (projects/pipelines/PRs/users) - a project fanning
   // out to its PRs is what buried the flow. EVERY repository stays: a repo that deploys joins
@@ -125,6 +129,10 @@ export function InfraMap({
   // "What changed" lens: highlight recently-observed (new) or drifted (stale/deleted) nodes; the
   // rest recede. Answers "what moved lately" at a glance.
   const [changedLens, setChangedLens] = useState(false);
+
+  // Exposed lens: keep only internet-reachable resources (R16 EXPOSED_VIA) lit, recede the rest —
+  // "what can the internet touch". Deep-linked from the exposed-vulnerable finding (?lens=exposed).
+  const [exposedLens, setExposedLens] = useState(lens === "exposed");
 
   // Kind filter: pick one or more resource kinds to focus (empty = show everything). Non-matching
   // nodes recede, same as the Health lens. The chip list is the kinds actually present.
@@ -283,6 +291,22 @@ export function InfraMap({
               <Clock className={cn("size-3.5", changedLens && "text-sky-500")} />
               Changed
             </button>
+            {exposedIds.size > 0 ? (
+              <button
+                type="button"
+                onClick={() => setExposedLens((v) => !v)}
+                aria-pressed={exposedLens}
+                title={
+                  exposedLens
+                    ? "Back to the normal map"
+                    : "Show only internet-exposed resources, dim everything else"
+                }
+                className={segCls(exposedLens)}
+              >
+                <Globe className={cn("size-3.5", exposedLens && "text-orange-500")} />
+                Exposed
+              </button>
+            ) : null}
           </div>
           <span className="relative">
             <button
@@ -402,6 +426,7 @@ export function InfraMap({
             showSecurity={showSecurity}
             healthLens={healthLens}
             changedLens={changedLens}
+            exposedLens={exposedLens}
             kindFilter={kindFilter}
           />
         </ReactFlowProvider>
@@ -454,6 +479,7 @@ function Flow({
   showSecurity,
   healthLens,
   changedLens,
+  exposedLens,
   kindFilter,
 }: {
   data: MapData;
@@ -471,6 +497,7 @@ function Flow({
   showSecurity: boolean;
   healthLens: boolean;
   changedLens: boolean;
+  exposedLens: boolean;
   kindFilter: Set<string>;
 }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -557,7 +584,7 @@ function Flow({
   // lens, so matches hiding in a collapsed shelf still surface. (A blast-radius click doesn't count
   // — its scope is on-canvas edges.)
   const shelvesForLayout = useMemo(() => {
-    const active = !!queryIds || kindFilter.size > 0 || healthLens || changedLens;
+    const active = !!queryIds || kindFilter.size > 0 || healthLens || changedLens || exposedLens;
     if (!active) return collapsedShelves;
     const now = Date.now();
     const WINDOW = 7 * 24 * 60 * 60 * 1000;
@@ -569,8 +596,9 @@ function Flow({
         !changedLens ||
         (!!n.firstSeen && now - new Date(n.firstSeen).getTime() < WINDOW) ||
         (!!n.status && n.status !== "active");
+      const passExposed = !exposedLens || exposedIds.has(n.id);
       const passKind = kindFilter.size === 0 || kindFilter.has(n.kind);
-      return passHealth && passChanged && passKind;
+      return passHealth && passChanged && passExposed && passKind;
     };
     const expanded = new Set(collapsedShelves);
     for (const n of data.nodes) {
@@ -580,7 +608,17 @@ function Flow({
       expanded.delete(n.kind.endsWith(".repository") ? "shelf-code" : "shelf-unconnected");
     }
     return expanded;
-  }, [queryIds, kindFilter, healthLens, changedLens, collapsedShelves, data.nodes, connectedIds]);
+  }, [
+    queryIds,
+    kindFilter,
+    healthLens,
+    changedLens,
+    exposedLens,
+    exposedIds,
+    collapsedShelves,
+    data.nodes,
+    connectedIds,
+  ]);
 
   const layout = useMemo(() => {
     const visibleNodes = data.nodes.filter((n) => !hiddenSet.has(n.id));
@@ -701,18 +739,30 @@ function Flow({
   const litSet = useMemo(() => {
     if (focusSet) return focusSet;
     if (queryIds) return queryIds;
-    if (!healthLens && !changedLens && kindFilter.size === 0) return null;
+    if (!healthLens && !changedLens && !exposedLens && kindFilter.size === 0) return null;
     const s = new Set<string>();
     for (const n of layout.nodes) {
       if (n.type !== "resource") continue;
       const kind = (n.data as { node: MapNode }).node.kind;
       const passHealth = !healthLens || alertIds.has(n.id);
       const passChanged = !changedLens || changedIds.has(n.id);
+      const passExposed = !exposedLens || exposedIds.has(n.id);
       const passKind = kindFilter.size === 0 || kindFilter.has(kind);
-      if (passHealth && passChanged && passKind) s.add(n.id);
+      if (passHealth && passChanged && passExposed && passKind) s.add(n.id);
     }
     return s;
-  }, [queryIds, focusSet, healthLens, changedLens, kindFilter, alertIds, changedIds, layout.nodes]);
+  }, [
+    queryIds,
+    focusSet,
+    healthLens,
+    changedLens,
+    exposedLens,
+    kindFilter,
+    alertIds,
+    changedIds,
+    exposedIds,
+    layout.nodes,
+  ]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layout.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layout.edges);

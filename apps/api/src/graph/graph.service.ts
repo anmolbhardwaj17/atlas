@@ -897,7 +897,6 @@ export class GraphService {
     // ── The toxic combination (Phase 2): exposed AND vulnerable — the headline security finding ──
     const exposedVulns2 = base.exposedVulns ?? [];
     if (exposedVulns2.length > 0) {
-      const first = exposedVulns2[0];
       const viaLabel = (v: string | null): string =>
         v === "world-open-sg"
           ? "a world-open security group"
@@ -915,7 +914,9 @@ export class GraphService {
               `${r.name ?? r.id}${r.sample_pkg ? ` (${r.sample_pkg}${r.sample_vuln ? ` · ${r.sample_vuln}` : ""})` : ""} - reachable via ${viaLabel(r.via)}`,
           )
           .join("; "),
-        href: first ? `/explore/${first.id}` : null,
+        // Click-through to the map with the Exposed lens on — the exposed resources lit, the rest
+        // dimmed (the per-resource + blast-radius drill-down lives on the /insights/[id] detail page).
+        href: `/map?lens=exposed`,
         count: exposedVulns2.length,
         evidence: exposedVulns2.map((r) => ({
           id: r.id,

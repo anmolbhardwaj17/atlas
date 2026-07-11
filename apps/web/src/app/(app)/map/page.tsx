@@ -15,10 +15,12 @@ async function MapContent({
   token,
   orgId,
   focusId,
+  lens,
 }: {
   token: string;
   orgId: string;
   focusId?: string;
+  lens?: string;
 }) {
   const data =
     (await apiGet<ApiOk<MapData>>("/graph?limit=400", { token, orgId })).body?.data ?? null;
@@ -42,7 +44,14 @@ async function MapContent({
     );
   }
 
-  return <InfraMapLazy data={data} orgId={orgId} {...(focusId ? { focusId } : {})} />;
+  return (
+    <InfraMapLazy
+      data={data}
+      orgId={orgId}
+      {...(focusId ? { focusId } : {})}
+      {...(lens ? { lens } : {})}
+    />
+  );
 }
 
 /**
@@ -55,12 +64,20 @@ export default async function MapPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const shell = await requireShell();
-  const focusRaw = (await searchParams).node;
+  const params = await searchParams;
+  const focusRaw = params.node;
   const focusId = (Array.isArray(focusRaw) ? focusRaw[0] : focusRaw) || undefined;
+  const lensRaw = params.lens;
+  const lens = (Array.isArray(lensRaw) ? lensRaw[0] : lensRaw) || undefined;
 
   return (
     <Suspense fallback={<MapLoading />}>
-      <MapContent token={shell.token} orgId={shell.orgId} {...(focusId ? { focusId } : {})} />
+      <MapContent
+        token={shell.token}
+        orgId={shell.orgId}
+        {...(focusId ? { focusId } : {})}
+        {...(lens ? { lens } : {})}
+      />
     </Suspense>
   );
 }
