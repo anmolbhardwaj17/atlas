@@ -11,6 +11,7 @@ import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
 import { kindIcon, kindShort, KIND_LOGO } from "@/lib/kind-visual";
 import { PROVIDER_META } from "@/lib/taxonomy";
 import { getNode } from "@/lib/browser-api";
+import type { NodeDetail } from "@/lib/graph-types";
 
 // LiquidMetal is a WebGL shader - client-only (no SSR), lazy-loaded so it never blocks paint.
 const LiquidMetal = dynamic(
@@ -31,6 +32,48 @@ function CitedGlyph({ kind }: { kind: string }) {
   if (logo) return <CloudIcon name={logo} className="size-3 shrink-0" />;
   const Icon = kindIcon(kind);
   return <Icon className="size-3 shrink-0" />;
+}
+
+/** A cited resource as a rich card — icon, name, kind · region · env, and a health dot — click to
+ *  peek. Renders a quiet placeholder while the node detail loads. Used in the "Referenced resources"
+ *  grid under an answer, so the resources the AI cited are recognizable at a glance. */
+function ResourceCard({ node, onPeek }: { node?: NodeDetail | undefined; onPeek: () => void }) {
+  const kind = node?.kind;
+  const health = (node?.attributes?.["health"] ?? null) as { state?: string } | null;
+  const unhealthy = health?.state === "unhealthy" || health?.state === "degraded";
+  const env = node?.environment;
+  return (
+    <button
+      type="button"
+      onClick={onPeek}
+      title="Preview this resource"
+      className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 text-left transition-colors hover:border-foreground/40"
+    >
+      <span className="grid size-7 shrink-0 place-items-center rounded-md bg-muted/60">
+        {kind ? (
+          <CitedGlyph kind={kind} />
+        ) : (
+          <span className="size-3 animate-pulse rounded-full bg-muted-foreground/30" />
+        )}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-xs font-medium text-foreground">
+          {node?.name ?? (kind ? kindShort(kind) : "Loading…")}
+        </span>
+        <span className="block truncate text-[10px] uppercase tracking-wide text-muted-foreground">
+          {kind ? kindShort(kind) : "resource"}
+          {node?.region ? ` · ${node.region}` : ""}
+          {env && env !== "unknown" ? ` · ${env}` : ""}
+        </span>
+      </span>
+      {unhealthy ? (
+        <span
+          className={`ml-1 size-1.5 shrink-0 rounded-full ${health?.state === "unhealthy" ? "bg-danger" : "bg-warning"}`}
+          title={health?.state}
+        />
+      ) : null}
+    </button>
+  );
 }
 
 interface Citation {
@@ -376,8 +419,9 @@ function AssistantBubble({
     const seen = new Set<string>();
     return message.citations.filter((c) => c.kind === "node" && !seen.has(c.id) && seen.add(c.id));
   })();
-  // Resolve friendly names for the rail chips (cached client-side); fall back to the kind.
-  const [names, setNames] = useState<Record<string, string>>({});
+  // Resolve the cited resources' detail (name, kind, region, health) for the resource cards below,
+  // cached client-side. getNode already returns the full node — we keep all of it now, not just name.
+  const [nodes, setNodes] = useState<Record<string, NodeDetail>>({});
   const showExtras = !message.streaming && message.text.length > 0;
   const citeIds = nodeCites.map((c) => c.id).join(",");
   useEffect(() => {
@@ -385,8 +429,7 @@ function AssistantBubble({
     let live = true;
     for (const id of citeIds.split(",")) {
       void getNode(orgId, id).then((n) => {
-        const nm = n?.name;
-        if (live && nm) setNames((prev) => (prev[id] ? prev : { ...prev, [id]: nm }));
+        if (live && n) setNodes((prev) => (prev[id] ? prev : { ...prev, [id]: n }));
       });
     }
     return () => {
@@ -450,24 +493,18 @@ function AssistantBubble({
           </ul>
         )}
 
-        {/* Sources rail — the cited resources, click to peek without leaving the chat. */}
+        {/* Referenced resources — the cited nodes as rich cards (icon, name, kind · region, health),
+            click to peek without leaving the chat. */}
         {showExtras && nodeCites.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+          <div className="space-y-1.5 pt-0.5">
             <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
-              Sources
+              {nodeCites.length === 1 ? "Referenced resource" : "Referenced resources"}
             </span>
-            {nodeCites.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => onPeek(c.id)}
-                title="Preview this resource"
-                className="inline-flex max-w-[12rem] items-center gap-1 rounded-md border border-border bg-card px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
-              >
-                <CitedGlyph kind={c.kind} />
-                <span className="truncate">{names[c.id] ?? kindShort(c.kind)}</span>
-              </button>
-            ))}
+            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              {nodeCites.map((c) => (
+                <ResourceCard key={c.id} node={nodes[c.id]} onPeek={() => onPeek(c.id)} />
+              ))}
+            </div>
           </div>
         ) : null}
 
