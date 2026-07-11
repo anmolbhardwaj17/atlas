@@ -9,9 +9,9 @@
 
 ## 📍 YOU ARE HERE
 
-> **Blueprint phase complete.** All 19 design docs are written (v1.0). Continuity scaffolding (this board, README, CLAUDE.md, memory, skills) is being set up.
-> **Next milestone:** begin the build at **Sprint F1 — Foundation** (auth + tenancy + CI gates). Nothing is coded yet.
-> **Suggested next action:** decide whether to `git init` the repo, then scaffold the monorepo per `docs/16` §2 and start F1.
+> **Deep in build.** Core platform + graph + AI + Map/Explore/Insights/Compliance are live. Recently shipped: **Operational Intelligence** (health→trace→advise) incl. the **War Room** (live cited incident diagnosis) and **Proactive Incidents** (auto-open + alert on a healthy→broken regression, gated by an alert policy). **AI polish** (Claude adaptive thinking on the narration). Now building **Intent Verification** (`docs/plans/intent-verification.md`).
+> **Suggested next action:** **continue Intent Verification — build IV-3, the intent-coverage judge** (does a linked PR actually implement its Jira ticket? — hedged, cited *questions*, own adversarial eval; deep code review stays SIFT's job). Then fuzzy (no-key) PR↔issue linking.
+> **Parked / waiting on the product owner:** see `docs/plans/check-back.md` — the AWS logs grant (→ log-onset + Phase-2b tail), turning on health polling (`HEALTH_INTERVAL_MINUTES>0` → proactive incidents fire live), switching the org LLM off gpt-4o-mini. Deferred-by-design: EC2/EKS deploy events, full cascade grouping.
 
 **Progress at a glance**
 - 📘 Blueprint (docs): **19 / 19 ✅ (100%)**
