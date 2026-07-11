@@ -55,12 +55,19 @@ const SEV_TEXT: Record<string, string> = {
   low: "text-yellow-600 dark:text-yellow-500",
 };
 
+interface Saved {
+  turns: Turn[];
+  citedIds: string[];
+  citedEdgeIds: string[];
+}
 /** Restore a saved investigation (new turn-based shape, or the older single-answer shape). */
-function loadSaved(evidence: unknown): { turns: Turn[]; citedIds: string[] } | null {
+function loadSaved(evidence: unknown): Saved | null {
   if (typeof evidence !== "object" || evidence === null) return null;
   const e = evidence as Record<string, unknown>;
+  const citedIds = (e.citedIds as string[]) ?? [];
+  const citedEdgeIds = (e.citedEdgeIds as string[]) ?? [];
   if (Array.isArray(e.turns)) {
-    return { turns: e.turns as Turn[], citedIds: (e.citedIds as string[]) ?? [] };
+    return { turns: e.turns as Turn[], citedIds, citedEdgeIds };
   }
   if (typeof e.answer === "string" && Array.isArray(e.steps)) {
     return {
@@ -73,7 +80,8 @@ function loadSaved(evidence: unknown): { turns: Turn[]; citedIds: string[] } | n
           citations: (e.citations as number) ?? 0,
         },
       ],
-      citedIds: (e.citedIds as string[]) ?? [],
+      citedIds,
+      citedEdgeIds,
     };
   }
   return null;
@@ -107,6 +115,7 @@ export function WarRoomView({
 
   const [turns, setTurns] = React.useState<Turn[]>(saved?.turns ?? []);
   const [activeIds, setActiveIds] = React.useState<string[]>(saved?.citedIds ?? [incident.nodeId]);
+  const [citedEdgeIds, setCitedEdgeIds] = React.useState<string[]>(saved?.citedEdgeIds ?? []);
   const [input, setInput] = React.useState("");
   const [sending, setSending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -117,6 +126,7 @@ export function WarRoomView({
   const convRef = React.useRef<string | null>(null);
   const turnsRef = React.useRef<Turn[]>(turns);
   const citedRef = React.useRef<Set<string>>(new Set(saved?.citedIds ?? [incident.nodeId]));
+  const citedEdgesRef = React.useRef<Set<string>>(new Set(saved?.citedEdgeIds ?? []));
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -175,6 +185,10 @@ export function WarRoomView({
           } else if (ev.type === "citation") {
             asst.citations = (asst.citations ?? 0) + 1;
             if (ev.citation.kind === "node") light([ev.citation.id]);
+            else if (ev.citation.kind === "edge" && !citedEdgesRef.current.has(ev.citation.id)) {
+              citedEdgesRef.current.add(ev.citation.id);
+              setCitedEdgeIds([...citedEdgesRef.current]);
+            }
             commit();
           } else if (ev.type === "confidence") {
             asst.confidence = ev.overall;
@@ -198,6 +212,7 @@ export function WarRoomView({
         evidence: {
           turns: finalTurns,
           citedIds: [...citedRef.current],
+          citedEdgeIds: [...citedEdgesRef.current],
           ranAt: new Date().toISOString(),
         },
         verdict: { summary: firstAsst?.text ?? "", confidence: firstAsst?.confidence ?? null },
@@ -231,7 +246,9 @@ export function WarRoomView({
 
   function rerun() {
     citedRef.current = new Set([incident.nodeId]);
+    citedEdgesRef.current = new Set();
     setActiveIds([incident.nodeId]);
+    setCitedEdgeIds([]);
     setTurns([]);
     turnsRef.current = [];
     void ask(diagnoseQuestion, { initial: true });
@@ -239,6 +256,7 @@ export function WarRoomView({
 
   const terminal = incident.status === "resolved" || incident.status === "dismissed";
   const diagnosed = turns.some((t) => t.role === "assistant" && t.text);
+  const firstAsstIdx = turns.findIndex((t) => t.role === "assistant");
   const statusLabel = terminal
     ? incident.status
     : sending
@@ -347,7 +365,7 @@ export function WarRoomView({
                   </div>
                 </div>
               ) : (
-                <AssistantTurn key={i} turn={t} />
+                <AssistantTurn key={i} turn={t} primary={i === firstAsstIdx} />
               ),
             )}
             {error ? (
@@ -387,7 +405,12 @@ export function WarRoomView({
         {/* Right column: live map (top) + real change timeline (bottom) */}
         <div className="flex h-[66vh] min-h-[460px] flex-col gap-4">
           <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-background">
-            <WarRoomMap full={map} focusId={incident.nodeId} activeIds={activeIds} />
+            <WarRoomMap
+              full={map}
+              focusId={incident.nodeId}
+              activeIds={activeIds}
+              citedEdgeIds={citedEdgeIds}
+            />
           </div>
           <div className="h-[38%] min-h-[170px] overflow-hidden rounded-xl border border-border bg-background">
             <Timeline events={events} />
@@ -398,8 +421,9 @@ export function WarRoomView({
   );
 }
 
-/** One assistant turn: its real tool-call steps (collapsed once done) + the markdown verdict. */
-function AssistantTurn({ turn }: { turn: Turn }) {
+/** One assistant turn. The first one (the auto-diagnosis) is elevated into a bordered "Diagnosis"
+ *  card; follow-ups render as plain chat. Steps collapse to an accordion once the turn completes. */
+function AssistantTurn({ turn, primary }: { turn: Turn; primary?: boolean }) {
   const steps = turn.steps ?? [];
   const StepList = (
     <ol className="space-y-1.5">
@@ -420,8 +444,14 @@ function AssistantTurn({ turn }: { turn: Turn }) {
     </ol>
   );
 
-  return (
-    <div className="space-y-3">
+  const confidenceChip = turn.confidence ? (
+    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium capitalize text-muted-foreground">
+      {turn.confidence} confidence
+    </span>
+  ) : null;
+
+  const body = (
+    <>
       {steps.length > 0 ? (
         turn.streaming ? (
           StepList
@@ -435,14 +465,9 @@ function AssistantTurn({ turn }: { turn: Turn }) {
           </details>
         )
       ) : null}
-
       {turn.text ? (
         <div className="space-y-2">
-          {turn.confidence ? (
-            <span className="inline-block rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium capitalize text-muted-foreground">
-              {turn.confidence} confidence
-            </span>
-          ) : null}
+          {!primary && confidenceChip}
           <MarkdownLite text={turn.text} />
           {turn.citations ? (
             <p className="pt-0.5 text-xs text-muted-foreground">
@@ -451,6 +476,20 @@ function AssistantTurn({ turn }: { turn: Turn }) {
           ) : null}
         </div>
       ) : null}
-    </div>
+    </>
   );
+
+  if (primary) {
+    return (
+      <div className="space-y-3 rounded-xl border border-danger/30 bg-danger/[0.04] p-4">
+        <div className="flex items-center gap-2">
+          <Crosshair className="size-4 text-danger" />
+          <h3 className="text-sm font-semibold">Likely cause</h3>
+          {confidenceChip}
+        </div>
+        {body}
+      </div>
+    );
+  }
+  return <div className="space-y-3">{body}</div>;
 }

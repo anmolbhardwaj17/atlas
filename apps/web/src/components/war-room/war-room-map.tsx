@@ -92,13 +92,16 @@ function WarRoomMapInner({
   full,
   focusId,
   activeIds,
+  citedEdgeIds,
 }: {
   full: MapData;
   focusId: string;
   activeIds: string[];
+  citedEdgeIds: string[];
 }) {
   const rf = useReactFlow();
   const active = React.useMemo(() => new Set(activeIds), [activeIds]);
+  const citedEdges = React.useMemo(() => new Set(citedEdgeIds), [citedEdgeIds]);
   const slice = React.useMemo(() => visibleSlice(full, focusId, active), [full, focusId, active]);
   const base = React.useMemo(() => buildLayout(slice.nodes, slice.edges), [slice]);
 
@@ -112,15 +115,17 @@ function WarRoomMapInner({
     };
   });
 
-  // An edge is "hot" (red) when both its endpoints have been touched — the connection the trace is
-  // walking, and afterwards the evidence/culprit path. Animated so it reads as live during the trace.
+  // An edge is "hot" (red) when the model actually CITED it (the culprit connection), or when both its
+  // endpoints have been touched (the walked evidence path). Animated so it reads as live during the
+  // trace; a cited edge is drawn thicker as the pinpointed link.
   const edges: Edge[] = base.edges.map((e) => {
-    const hot = active.has(e.source) && active.has(e.target);
+    const cited = citedEdges.has(e.id);
+    const hot = cited || (active.has(e.source) && active.has(e.target));
     if (!hot) return e;
     return {
       ...e,
       animated: true,
-      style: { ...(e.style ?? {}), stroke: HOT, strokeWidth: 2.5 },
+      style: { ...(e.style ?? {}), stroke: HOT, strokeWidth: cited ? 3.5 : 2.5 },
     };
   });
 
@@ -161,7 +166,12 @@ function WarRoomMapInner({
   );
 }
 
-export function WarRoomMap(props: { full: MapData; focusId: string; activeIds: string[] }) {
+export function WarRoomMap(props: {
+  full: MapData;
+  focusId: string;
+  activeIds: string[];
+  citedEdgeIds: string[];
+}) {
   const has = props.full.nodes.some((n) => n.id === props.focusId);
   if (!has) {
     return (
