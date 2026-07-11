@@ -1,5 +1,5 @@
 import type { ResourceRef } from "@atlas/connector-sdk";
-import type { JiraClient } from "./client";
+import { JiraHttpError, type JiraClient } from "./client";
 import { withContext } from "../modules/context";
 
 /**
@@ -67,11 +67,30 @@ export async function* discoverIssues(
   const since = new Date(Date.now() - ISSUE_WINDOW_DAYS * 86400 * 1000).toISOString().slice(0, 10);
   const jql = `project = "${projectKey}" AND updated >= "${since}" ORDER BY updated DESC`;
   let count = 0;
-  try {
-    for await (const issue of client.paginate<Json>("/search", "issues", {
-      params: { jql, fields: ISSUE_FIELDS },
-    })) {
-      if (count >= ISSUE_CAP) break;
+  // `/search/jql` is the current enhanced-search endpoint (the old `/search` was removed for Jira
+  // Cloud on 2025-05-01). It uses TOKEN pagination (`nextPageToken`/`isLast`), not startAt/total, so
+  // we page it by hand rather than via the offset-based `client.paginate`.
+  let nextPageToken: string | undefined;
+  for (;;) {
+    let res;
+    try {
+      res = await client.request<Json>("/search/jql", {
+        params: {
+          jql,
+          fields: ISSUE_FIELDS,
+          maxResults: 100,
+          ...(nextPageToken ? { nextPageToken } : {}),
+        },
+      });
+    } catch (err) {
+      // A forbidden project is fine to skip (partial coverage beats a failed sync, P3); any OTHER
+      // failure must surface (the scope fails visibly) rather than silently yielding zero issues.
+      if (err instanceof JiraHttpError && (err.status === 401 || err.status === 403)) return;
+      throw err;
+    }
+    const issues = (res.data.issues as Json[] | undefined) ?? [];
+    for (const issue of issues) {
+      if (count >= ISSUE_CAP) return;
       const key = s(issue.key);
       if (!key) continue;
       count += 1;
@@ -80,7 +99,8 @@ export async function* discoverIssues(
         payload: withContext(issue, { site }),
       };
     }
-  } catch {
-    // issue search not permitted for this project — skip
+    const token = typeof res.data.nextPageToken === "string" ? res.data.nextPageToken : undefined;
+    if (res.data.isLast === true || !token || issues.length === 0) break;
+    nextPageToken = token;
   }
 }
