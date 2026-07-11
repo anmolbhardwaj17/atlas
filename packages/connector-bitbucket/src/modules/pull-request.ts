@@ -36,6 +36,9 @@ export function pullRequestNode(payload: unknown): NodeUpsert {
       destinationBranch: str(obj(obj(payload, "destination"), "branch"), "name"),
       createdOn: str(payload, "created_on"),
       updatedOn: str(payload, "updated_on"),
+      // Author display name — matched against a linked ticket's assignee for the fuzzy PR↔issue
+      // link's author↔assignee signal (IV-4 (c)). Same Atlassian identity as Jira, so names align.
+      author: str(obj(payload, "author"), "display_name"),
       commitShas,
     },
   };

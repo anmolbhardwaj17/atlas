@@ -313,6 +313,7 @@ export class AiService {
         title: r.name ?? "",
         branch: asString(r.attributes.sourceBranch),
         createdAt: asStringOrNull(r.attributes.createdOn) ?? asStringOrNull(r.attributes.createdAt),
+        author: asStringOrNull(r.attributes.author),
       }));
       const issues: FuzzyIssue[] = issueRows.map((r) => ({
         id: r.id,
@@ -320,6 +321,7 @@ export class AiService {
         key: asString(r.attributes.key),
         summary: asString(r.attributes.summary),
         createdAt: asStringOrNull(r.attributes.createdAt),
+        assignee: asStringOrNull(r.attributes.assignee),
       }));
 
       const suggestions = suggestIntentLinks(prs, issues);

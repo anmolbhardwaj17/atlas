@@ -82,6 +82,20 @@ describe("suggestIntentLinks", () => {
     expect(out[0]?.issueId).toBe("i1");
   });
 
+  it("uses author↔assignee: the PR author being the ticket assignee corroborates a weak match", () => {
+    // A borderline word-match that wouldn't clear the bar on its own…
+    const weak = pr({ title: "wire up refund path", branch: "", createdAt: null });
+    const iss = issue({ summary: "refund path handling", createdAt: null });
+    const without = suggestIntentLinks([weak], [iss]);
+    // …clears it when the author is the ticket's assignee (the +0.25 boost).
+    const withMatch = suggestIntentLinks(
+      [{ ...weak, author: "Anmol Bhardwaj" }],
+      [{ ...iss, assignee: "anmol  bhardwaj" }], // normalized match (case/space-insensitive)
+    );
+    expect(withMatch.length).toBeGreaterThanOrEqual(without.length);
+    expect(withMatch[0]?.reasoning).toMatch(/assignee/i);
+  });
+
   it("returns [] on empty input", () => {
     expect(suggestIntentLinks([], [issue({})])).toEqual([]);
     expect(suggestIntentLinks([pr({})], [])).toEqual([]);

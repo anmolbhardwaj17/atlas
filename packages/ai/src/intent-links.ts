@@ -22,6 +22,8 @@ export interface FuzzyPr {
   branch: string;
   /** ISO open date, or null. */
   createdAt: string | null;
+  /** Author display name, if captured (for the author↔assignee signal, IV-4 (c)). */
+  author?: string | null;
 }
 
 export interface FuzzyIssue {
@@ -31,6 +33,8 @@ export interface FuzzyIssue {
   summary: string;
   /** ISO created date, or null. */
   createdAt: string | null;
+  /** Assignee display name, if set. */
+  assignee?: string | null;
 }
 
 export interface IntentLinkSuggestion {
@@ -195,6 +199,8 @@ export function suggestIntentLinks(
           score = Math.min(1, score + 0.15); // opened soon after → boost
         else if (gap > 180) score *= 0.7; // very stale pairing
       }
+      // author↔assignee: a PR opened by the ticket's assignee is a strong corroborating signal.
+      if (sameName(pr.author, issue.assignee)) score = Math.min(1, score + 0.25);
 
       if (!best || score > best.score) {
         secondScore = best ? best.score : secondScore;
@@ -220,6 +226,15 @@ export function suggestIntentLinks(
   return out;
 }
 
+/** True when two people-names refer to the same person (normalized exact match). Best-effort:
+ *  Bitbucket/Jira share Atlassian display names; GitHub logins won't match a Jira display name. */
+function sameName(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  const norm = (s: string): string => s.toLowerCase().replace(/\s+/g, " ").trim();
+  const x = norm(a);
+  return x.length > 0 && x === norm(b);
+}
+
 function reasoningFor(pr: FuzzyPr, issue: FuzzyIssue, shared: string[]): string {
   const words = shared.slice(0, 5).join(", ");
   const gap = daysBetween(pr.createdAt, issue.createdAt);
@@ -227,5 +242,8 @@ function reasoningFor(pr: FuzzyPr, issue: FuzzyIssue, shared: string[]): string 
     gap !== null && gap >= -2 && gap <= 45
       ? ` It opened ${gap < 1 ? "the same day as" : `${Math.round(gap)} day(s) after`} the ticket was created.`
       : "";
-  return `No explicit key, but this PR shares "${words}" with ${issue.key} ("${issue.summary.slice(0, 80)}").${timing} Confirm if it implements this ticket.`;
+  const byAssignee = sameName(pr.author, issue.assignee)
+    ? ` The PR author (${pr.author}) is the ticket's assignee.`
+    : "";
+  return `No explicit key, but this PR shares "${words}" with ${issue.key} ("${issue.summary.slice(0, 80)}").${timing}${byAssignee} Confirm if it implements this ticket.`;
 }
