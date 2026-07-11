@@ -990,6 +990,9 @@ export async function acceptInvitation(
   const res = await fetch(`${apiUrl()}/invitations/${token}/accept`, {
     method: "POST",
     headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
+    // Fastify's JSON parser rejects a declared application/json with an empty body ("Body cannot be
+    // empty…"). The accept endpoint takes no fields, so send an empty object.
+    body: "{}",
   });
   const body = (await res.json().catch(() => null)) as {
     data?: { org: { id: string; name: string } };
