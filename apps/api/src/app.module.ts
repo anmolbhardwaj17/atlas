@@ -8,6 +8,7 @@ import { NotificationsModule } from "./notifications/notifications.module";
 import { GraphModule } from "./graph/graph.module";
 import { ComplianceModule } from "./compliance/compliance.module";
 import { DigestModule } from "./digest/digest.module";
+import { IncidentsModule } from "./incidents/incidents.module";
 import { SearchModule } from "./search/search.module";
 import { AiModule } from "./ai/ai.module";
 import { DemoModule } from "./demo/demo.module";
@@ -29,6 +30,7 @@ import { HttpExceptionFilter } from "./common/http-exception.filter";
     GraphModule,
     ComplianceModule,
     DigestModule,
+    IncidentsModule,
     SearchModule,
     AiModule,
     DemoModule,
