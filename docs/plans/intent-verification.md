@@ -1,6 +1,9 @@
 # Plan — Intent Verification (spec → code: "did we build the right thing?")
 
-> **Status:** 📋 **Captured 2026-07-11 — NOT started. Phase-2+ epic, own feature.** Product owner's idea:
+> **Status:** 🔵 **IN PROGRESS 2026-07-12.** ✅ **IV-1 Jira connector** (read-only; projects + issues with
+> description/subtasks/comments → `jira.*` nodes; connect flow in the hub) · ✅ **IV-2 PR↔issue linking**
+> (R18 `IMPLEMENTS`, explicit-key deterministic tier). ⏳ **IV-3 coverage judge** (the AI slice) + fuzzy
+> low-tier linking = what's left. Product owner's idea:
 > a PR references a Jira task (or should); the code doesn't *break*, but the **logic is wrong / the
 > intent isn't implemented**. Can Atlas link the PR to its issue (even when the key isn't in the PR),
 > read the story + subtasks + comments, and judge whether the intent was actually built?
