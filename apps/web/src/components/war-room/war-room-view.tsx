@@ -19,6 +19,7 @@ import { kindIcon, KIND_LOGO } from "@/lib/kind-visual";
 import { CloudIcon } from "@/components/cloud-icon";
 import { WarRoomMap } from "./war-room-map";
 import { MarkdownLite } from "./markdown-lite";
+import { ContextBar, Timeline, type NodeEvent } from "./war-room-context";
 
 interface Step {
   tool: string;
@@ -87,16 +88,22 @@ function loadSaved(evidence: unknown): { turns: Turn[]; citedIds: string[] } | n
 export function WarRoomView({
   incident,
   map,
+  events,
+  impactCount,
   orgId,
 }: {
   incident: Incident;
   map: MapData;
+  events: NodeEvent[];
+  impactCount: number;
   orgId: string;
 }) {
   const router = useRouter();
   const saved = React.useMemo(() => loadSaved(incident.evidence), [incident.evidence]);
 
   const nodeById = React.useMemo(() => new Map(map.nodes.map((n) => [n.id, n] as const)), [map]);
+  const focalNode = nodeById.get(incident.nodeId);
+  const lastChange = events.find((e) => e.kind !== "health_transition") ?? events[0] ?? null;
 
   const [turns, setTurns] = React.useState<Turn[]>(saved?.turns ?? []);
   const [activeIds, setActiveIds] = React.useState<string[]>(saved?.citedIds ?? [incident.nodeId]);
@@ -280,6 +287,9 @@ export function WarRoomView({
         ) : null}
       </div>
 
+      {/* At-a-glance context — real facts about the broken resource. */}
+      <ContextBar node={focalNode} impactCount={impactCount} lastChange={lastChange} />
+
       <div className="grid gap-4 lg:grid-cols-[minmax(380px,1fr)_1.35fr]">
         {/* Investigation — a live AI chat (left) */}
         <div className="flex h-[66vh] min-h-[460px] flex-col rounded-xl border border-border bg-background">
@@ -374,9 +384,14 @@ export function WarRoomView({
           ) : null}
         </div>
 
-        {/* Live map (right) */}
-        <div className="h-[66vh] min-h-[460px] overflow-hidden rounded-xl border border-border bg-background">
-          <WarRoomMap full={map} focusId={incident.nodeId} activeIds={activeIds} />
+        {/* Right column: live map (top) + real change timeline (bottom) */}
+        <div className="flex h-[66vh] min-h-[460px] flex-col gap-4">
+          <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-background">
+            <WarRoomMap full={map} focusId={incident.nodeId} activeIds={activeIds} />
+          </div>
+          <div className="h-[38%] min-h-[170px] overflow-hidden rounded-xl border border-border bg-background">
+            <Timeline events={events} />
+          </div>
         </div>
       </div>
     </div>
