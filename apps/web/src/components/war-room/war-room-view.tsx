@@ -15,7 +15,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { streamAsk, createConversation, updateIncident, type Incident } from "@/lib/browser-api";
 import type { MapData } from "@/lib/map-types";
-import { WarRoomMap, subgraphAround } from "./war-room-map";
+import { kindIcon, KIND_LOGO } from "@/lib/kind-visual";
+import { CloudIcon } from "@/components/cloud-icon";
+import { WarRoomMap } from "./war-room-map";
 import { MarkdownLite } from "./markdown-lite";
 
 interface Step {
@@ -82,10 +84,7 @@ export function WarRoomView({
   const router = useRouter();
   const saved = isTrace(incident.evidence) ? incident.evidence : null;
 
-  const subgraph = React.useMemo(
-    () => subgraphAround(map, incident.nodeId, 2),
-    [map, incident.nodeId],
-  );
+  const nodeById = React.useMemo(() => new Map(map.nodes.map((n) => [n.id, n] as const)), [map]);
 
   const [phase, setPhase] = React.useState<Phase>(saved ? "done" : "idle");
   const [steps, setSteps] = React.useState<Step[]>(saved?.steps ?? []);
@@ -168,7 +167,6 @@ export function WarRoomView({
       ranAt: new Date().toISOString(),
     };
     void updateIncident(orgId, incident.id, {
-      status: "analyzing",
       evidence: trace,
       verdict: { summary: text, confidence: conf },
     });
@@ -189,6 +187,14 @@ export function WarRoomView({
   }
 
   const terminal = incident.status === "resolved" || incident.status === "dismissed";
+  // Reflect the LIVE phase, not the stale server status ("analyzing" lingering after it's done).
+  const statusLabel = terminal
+    ? incident.status
+    : phase === "running"
+      ? "analyzing…"
+      : answer
+        ? "diagnosed"
+        : incident.status;
 
   return (
     <div className="space-y-4">
@@ -215,7 +221,7 @@ export function WarRoomView({
               </>
             ) : null}
             {" · "}
-            <span className="capitalize">{incident.status}</span>
+            <span className="capitalize">{statusLabel}</span>
           </p>
         </div>
         {!terminal ? (
@@ -233,7 +239,7 @@ export function WarRoomView({
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         {/* Live blast-radius map */}
         <div className="h-[64vh] min-h-[440px] overflow-hidden rounded-xl border border-border bg-background">
-          <WarRoomMap data={subgraph} focusId={incident.nodeId} activeIds={activeIds} />
+          <WarRoomMap full={map} focusId={incident.nodeId} activeIds={activeIds} />
         </div>
 
         {/* Investigation */}
@@ -292,6 +298,39 @@ export function WarRoomView({
               <p className="inline-flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="size-3.5 animate-spin" /> Starting the investigation…
               </p>
+            ) : null}
+
+            {/* Resources the trace touched — with their real kind icons, mirroring the lit map nodes. */}
+            {activeIds.length > 0 ? (
+              <div className="space-y-1.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Resources traced
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {activeIds.map((id) => {
+                    const n = nodeById.get(id);
+                    if (!n) return null;
+                    const logo = KIND_LOGO[n.kind];
+                    const Icon = kindIcon(n.kind);
+                    const focal = id === incident.nodeId;
+                    return (
+                      <span
+                        key={id}
+                        className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${
+                          focal ? "border-danger/50 bg-danger/[0.06]" : "border-border bg-muted/40"
+                        }`}
+                      >
+                        {logo ? (
+                          <CloudIcon name={logo} className="size-4" />
+                        ) : (
+                          <Icon className="size-3.5 text-muted-foreground" />
+                        )}
+                        <span className="max-w-[180px] truncate">{n.name ?? n.kind}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
             ) : null}
 
             {/* Verdict */}
