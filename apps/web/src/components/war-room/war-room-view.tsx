@@ -55,6 +55,36 @@ const SEV_TEXT: Record<string, string> = {
   low: "text-yellow-600 dark:text-yellow-500",
 };
 
+// The structured verdict the model appends (parsed client-side; no AI-backend change). Classifies the
+// likely cause so the "Likely cause" card leads with a definite answer, not a wall of prose (P3/P4 —
+// the classification is the model's, grounded in its own cited reasoning; "unknown" is first-class).
+const VERDICT_META: Record<string, { label: string; cls: string }> = {
+  "code-change": { label: "Code change", cls: "border-danger/40 bg-danger/10 text-danger" },
+  "config-change": { label: "Config change", cls: "border-warning/40 bg-warning/10 text-warning" },
+  dependency: { label: "Dependency", cls: "border-warning/40 bg-warning/10 text-warning" },
+  capacity: {
+    label: "Capacity",
+    cls: "border-sky-500/40 bg-sky-500/10 text-sky-600 dark:text-sky-400",
+  },
+  chronic: {
+    label: "Not new (chronic)",
+    cls: "border-border bg-muted text-muted-foreground",
+  },
+  unknown: { label: "No clear culprit", cls: "border-border bg-muted text-muted-foreground" },
+};
+
+/** Hide the raw "VERDICT: …" line from the displayed prose (even mid-stream, before it's complete). */
+function stripVerdict(text: string): string {
+  const i = text.search(/\n?\s*VERDICT:/i);
+  return i >= 0 ? text.slice(0, i).trim() : text.trim();
+}
+/** Pull the structured {type, cause} once the VERDICT line has fully streamed in. */
+function parseVerdict(text: string): { type: string; cause: string } | null {
+  const m = /VERDICT:\s*([a-z][a-z-]*)\s*[—:-]+\s*(.+?)\s*$/im.exec(text);
+  if (!m) return null;
+  return { type: (m[1] ?? "").toLowerCase(), cause: (m[2] ?? "").trim() };
+}
+
 interface Saved {
   turns: Turn[];
   citedIds: string[];
@@ -135,7 +165,7 @@ export function WarRoomView({
   }, [turns]);
 
   const label = incident.nodeName ?? incident.nodeKind ?? "this resource";
-  const diagnoseQuestion = `Why is ${label} unhealthy or at risk right now? Diagnose the most likely cause, what changed recently (deploys, config changes, merged PRs), and what depends on it. If nothing correlates, say so plainly.`;
+  const diagnoseQuestion = `Why is ${label} unhealthy or at risk right now? Diagnose the most likely cause, what changed recently (deploys, config changes, merged PRs), and what depends on it. If nothing correlates, say so plainly. End your reply with ONE final line exactly in this format: "VERDICT: <type> — <one concise sentence naming the likely cause>", where <type> is one of code-change, config-change, dependency, capacity, chronic, or unknown (use "unknown" if nothing correlates).`;
 
   const light = React.useCallback((ids: Iterable<string>) => {
     let changed = false;
@@ -450,46 +480,67 @@ function AssistantTurn({ turn, primary }: { turn: Turn; primary?: boolean }) {
     </span>
   ) : null;
 
-  const body = (
-    <>
-      {steps.length > 0 ? (
-        turn.streaming ? (
-          StepList
-        ) : (
-          <details className="group">
-            <summary className="mb-2 inline-flex cursor-pointer list-none items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
-              <span className="transition-transform group-open:rotate-90">▸</span>
-              Traced {steps.length} {steps.length === 1 ? "step" : "steps"}
-            </summary>
-            {StepList}
-          </details>
-        )
-      ) : null}
-      {turn.text ? (
-        <div className="space-y-2">
-          {!primary && confidenceChip}
-          <MarkdownLite text={turn.text} />
-          {turn.citations ? (
-            <p className="pt-0.5 text-xs text-muted-foreground">
-              {turn.citations} cited {turn.citations === 1 ? "source" : "sources"} · lit on the map
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-    </>
-  );
+  const stepsBlock =
+    steps.length > 0 ? (
+      turn.streaming ? (
+        StepList
+      ) : (
+        <details className="group">
+          <summary className="mb-2 inline-flex cursor-pointer list-none items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
+            <span className="transition-transform group-open:rotate-90">▸</span>
+            Traced {steps.length} {steps.length === 1 ? "step" : "steps"}
+          </summary>
+          {StepList}
+        </details>
+      )
+    ) : null;
+
+  const citationsNote = turn.citations ? (
+    <p className="pt-0.5 text-xs text-muted-foreground">
+      {turn.citations} cited {turn.citations === 1 ? "source" : "sources"} · lit on the map
+    </p>
+  ) : null;
 
   if (primary) {
+    const verdict = turn.text ? parseVerdict(turn.text) : null;
+    const meta = verdict ? (VERDICT_META[verdict.type] ?? VERDICT_META.unknown) : null;
+    const prose = stripVerdict(turn.text);
     return (
       <div className="space-y-3 rounded-xl border border-danger/30 bg-danger/[0.04] p-4">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Crosshair className="size-4 text-danger" />
           <h3 className="text-sm font-semibold">Likely cause</h3>
+          {meta ? (
+            <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${meta.cls}`}>
+              {meta.label}
+            </span>
+          ) : null}
           {confidenceChip}
         </div>
-        {body}
+        {verdict?.cause ? (
+          <p className="text-sm font-medium text-foreground">{verdict.cause}</p>
+        ) : null}
+        {stepsBlock}
+        {prose ? (
+          <div className="space-y-2">
+            <MarkdownLite text={prose} />
+            {citationsNote}
+          </div>
+        ) : null}
       </div>
     );
   }
-  return <div className="space-y-3">{body}</div>;
+
+  return (
+    <div className="space-y-3">
+      {stepsBlock}
+      {turn.text ? (
+        <div className="space-y-2">
+          {confidenceChip}
+          <MarkdownLite text={turn.text} />
+          {citationsNote}
+        </div>
+      ) : null}
+    </div>
+  );
 }
