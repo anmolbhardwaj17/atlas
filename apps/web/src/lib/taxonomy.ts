@@ -126,6 +126,7 @@ export const PROVIDER_META: Record<string, ProviderMeta> = {
   gcp: { brand: "#1A73E8", logo: "google-cloud" },
   github: { brand: "#24292F", logo: "github-icon" },
   bitbucket: { brand: "#0052CC", logo: "bitbucket" },
+  jira: { brand: "#2684FF", logo: "jira" },
   gitlab: { brand: "#FC6D26", logo: "gitlab" },
   datadog: { brand: "#632CA6", logo: "datadog" },
   atlas: { brand: "#111111", fallbackIcon: Boxes },
