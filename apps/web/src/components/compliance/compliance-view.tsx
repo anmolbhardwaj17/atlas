@@ -76,6 +76,14 @@ const STATUS: Record<
 
 const SEV_ORDER: Record<ControlSeverity, number> = { high: 0, medium: 1, low: 2 };
 
+/** Severity chip styling — the dashboard donut's warm heat-ramp (red → orange → yellow), via explicit
+ *  palette colours so the ring resolves (a semantic `ring-danger/x` silently falls back to blue). */
+const SEV_STYLE: Record<ControlSeverity, string> = {
+  high: "bg-red-500/10 text-red-600 ring-red-500/25 dark:text-red-400",
+  medium: "bg-orange-500/10 text-orange-600 ring-orange-500/25 dark:text-orange-400",
+  low: "bg-yellow-500/10 text-yellow-700 ring-yellow-500/25 dark:text-yellow-400",
+};
+
 function pct(n: number | null): string {
   return n === null ? "—" : `${Math.round(n * 100)}%`;
 }
@@ -262,7 +270,8 @@ export function ComplianceView({ report }: { report: ComplianceReport | null }) 
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-                    <th className="w-36 px-4 py-2.5 font-medium">Status</th>
+                    <th className="w-28 px-4 py-2.5 font-medium">Status</th>
+                    <th className="w-24 px-4 py-2.5 font-medium">Severity</th>
                     <th className="px-4 py-2.5 font-medium">Control</th>
                     <th className="hidden px-4 py-2.5 font-medium lg:table-cell">
                       {current.framework.label} controls
@@ -399,23 +408,19 @@ function ControlRow({
         </span>
       </td>
       <td className="px-4 py-3.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium text-foreground">{r.control.title}</span>
-          {r.status === "fail" ? (
-            <span
-              className={cn(
-                "rounded-full px-1.5 py-px text-[10px] font-medium uppercase tracking-wide ring-1 ring-inset",
-                r.severity === "high"
-                  ? "bg-danger/10 text-danger ring-danger/20"
-                  : r.severity === "medium"
-                    ? "bg-warning/10 text-warning ring-warning/20"
-                    : "bg-muted text-muted-foreground ring-border",
-              )}
-            >
-              {r.severity}
-            </span>
-          ) : null}
-        </div>
+        {/* Severity is the control's inherent weight (donut heat-ramp), shown regardless of status —
+            a green Pass next to a red HIGH reads as "we check this important thing and you're fine". */}
+        <span
+          className={cn(
+            "inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1 ring-inset",
+            SEV_STYLE[r.severity],
+          )}
+        >
+          {r.severity}
+        </span>
+      </td>
+      <td className="px-4 py-3.5">
+        <div className="font-medium text-foreground">{r.control.title}</div>
         <p className="mt-0.5 max-w-2xl text-[11px] leading-relaxed text-muted-foreground">
           {r.control.requirement}
         </p>
@@ -427,7 +432,7 @@ function ControlRow({
               {r.evidence.slice(0, 8).map((e) => (
                 <span
                   key={e.id}
-                  className="inline-flex items-center rounded-md bg-danger/10 px-1.5 py-0.5 text-[11px] font-medium text-danger ring-1 ring-inset ring-danger/15"
+                  className="inline-flex items-center rounded-md border border-red-500/20 bg-red-500/10 px-1.5 py-0.5 text-[11px] font-medium text-red-600 dark:text-red-400"
                 >
                   {e.label}
                 </span>

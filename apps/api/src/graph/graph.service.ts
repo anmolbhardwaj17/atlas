@@ -927,7 +927,7 @@ export class GraphService {
         count: exposedVulns2.length,
         evidence: exposedVulns2.map((r) => ({
           id: r.id,
-          label: `${r.name ?? r.id}${r.sample_vuln ? ` · ${r.sample_vuln}` : ""}${r.vulns > 1 ? ` (+${r.vulns - 1} more)` : ""}`,
+          label: `${r.name ?? r.id} · ${r.vulns} ${r.vulns === 1 ? "CVE" : "CVEs"}`,
         })),
       });
     }
