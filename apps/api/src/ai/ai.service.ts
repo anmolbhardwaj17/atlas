@@ -93,6 +93,11 @@ const INTENT_ISSUE_CAP = 600;
 const asString = (v: unknown): string => (typeof v === "string" ? v : "");
 const asStringOrNull = (v: unknown): string | null => (typeof v === "string" ? v : null);
 
+/** The Jira key out of an issue URN (`jira:<site>:issue/<KEY>` → `<KEY>`), upper-cased. */
+function jiraKeyFromUrn(urn: string): string {
+  return /issue\/([A-Za-z][A-Za-z0-9]*-\d+)$/.exec(urn)?.[1]?.toUpperCase() ?? "";
+}
+
 /** Map a crawled `jira.issue` node's captured attributes (IV-1) into the judge's IntentIssue. */
 function toIntentIssue(node: {
   id: string;
@@ -219,7 +224,13 @@ export class AiService {
       type: "IMPLEMENTS",
       limit: 10,
     });
-    const issueEdge = edges.find((e) => e.to.kind === "jira.issue");
+    const issueEdges = edges.filter((e) => e.to.kind === "jira.issue");
+    // A PR can implement several tickets (e.g. a foundation story + a feature story). Judge against
+    // the one whose key the author named IN THE PR TITLE — the strongest intent signal — rather than
+    // an arbitrary first link, which would wrongly review the diff against a ticket it never targeted.
+    const titleKeys = new Set((pr.name ?? "").toUpperCase().match(/[A-Z][A-Z0-9]{1,9}-\d+/g) ?? []);
+    const issueEdge =
+      issueEdges.find((e) => titleKeys.has(jiraKeyFromUrn(e.to.urn))) ?? issueEdges[0];
     let issue: IntentIssue | null = null;
     if (issueEdge) {
       const node = await this.graph.getNode(orgId, issueEdge.to.id);

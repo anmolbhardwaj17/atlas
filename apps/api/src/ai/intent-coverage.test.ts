@@ -162,6 +162,29 @@ suite("IV-3b intent-coverage assembly", () => {
     expect(a.pr.id).toBe(prId);
   });
 
+  it("judges against the title-named ticket when a PR links several (not an arbitrary first)", async () => {
+    const prId = await insertNode(
+      "bitbucket:acme:pullrequest/web/70",
+      "bitbucket.pullrequest",
+      "[ENG-200] add the widget", // author named ENG-200 in the title
+    );
+    const foundation = await insertNode("jira:acme:issue/ENG-199", "jira.issue", "ENG-199 — base", {
+      key: "ENG-199",
+      summary: "Foundation work",
+      description: "AC:\n- lay the foundation",
+    });
+    const target = await insertNode("jira:acme:issue/ENG-200", "jira.issue", "ENG-200 — widget", {
+      key: "ENG-200",
+      summary: "Add the widget",
+      description: "AC:\n- add the widget",
+    });
+    await linkImplements(prId, foundation); // linked first…
+    await linkImplements(prId, target); // …but the title names this one
+
+    const a = await makeAi().coverageForPr(orgId, prId);
+    expect(a.issue?.key).toBe("ENG-200"); // title-key wins over an arbitrary first link
+  });
+
   it("returns no-intent for a PR with no linked issue", async () => {
     const prId = await insertNode(
       "bitbucket:acme:pullrequest/web/43",
