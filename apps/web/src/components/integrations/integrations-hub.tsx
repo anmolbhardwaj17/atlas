@@ -42,6 +42,7 @@ import {
   GcpSetup,
   BitbucketSetup,
   JenkinsSetup,
+  JiraSetup,
   SlackSetup,
   DiscordSetup,
   TeamsSetup,
@@ -92,6 +93,8 @@ function ProviderSetup({ providerId }: { providerId: string }) {
       return <BitbucketSetup />;
     case "jenkins":
       return <JenkinsSetup />;
+    case "jira":
+      return <JiraSetup />;
     default:
       return <GithubSetup />;
   }
@@ -1112,7 +1115,9 @@ function ConnectSheet({
   const isBitbucket = provider?.id === "bitbucket";
   const isAws = provider?.id === "aws";
   const isJenkins = provider?.id === "jenkins";
-  const needsCreds = isBitbucket || isAws || isJenkins;
+  // Jira reuses the `workspace` state as its site field (<company>.atlassian.net) + email + token.
+  const isJira = provider?.id === "jira";
+  const needsCreds = isBitbucket || isAws || isJenkins || isJira;
 
   // Reset the form whenever a different provider's sheet opens.
   React.useEffect(() => {
@@ -1209,6 +1214,27 @@ function ConnectSheet({
           setError(
             "Jenkins rejected the credentials - check the server URL, username, and API token.",
           );
+          setBusy(false);
+          return;
+        }
+      } else if (isJira) {
+        if (!workspace.trim()) {
+          setError("Enter your Jira site (e.g. acme.atlassian.net).");
+          setBusy(false);
+          return;
+        }
+        if (!email.trim() || !token.trim()) {
+          setError("Enter your Atlassian email and API token.");
+          setBusy(false);
+          return;
+        }
+        const connId = await ensureConn({ site: workspace.trim() });
+        const verified = await verifyConnection(orgId, connId, {
+          email: email.trim(),
+          apiToken: token.trim(),
+        });
+        if (verified.status === "error") {
+          setError("Jira rejected the credentials - check the site, email, token, and its scope.");
           setBusy(false);
           return;
         }
@@ -1399,6 +1425,52 @@ function ConnectSheet({
                         Sent once to verify + stored encrypted in the secrets broker - never saved
                         in the database or shown again. Use a user with Overall/Read + Job/Read
                         only.
+                      </p>
+                    </div>
+                  </>
+                ) : isJira ? (
+                  <>
+                    <div className="space-y-2">
+                      <label htmlFor="jira-site" className="text-sm font-medium">
+                        Jira site
+                      </label>
+                      <Input
+                        id="jira-site"
+                        value={workspace}
+                        onChange={(e) => setWorkspace(e.target.value)}
+                        placeholder="acme.atlassian.net"
+                        autoComplete="off"
+                        spellCheck={false}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="jira-email" className="text-sm font-medium">
+                        Atlassian email
+                      </label>
+                      <Input
+                        id="jira-email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="you@company.com"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="jira-token" className="text-sm font-medium">
+                        API token
+                      </label>
+                      <Input
+                        id="jira-token"
+                        type="password"
+                        value={token}
+                        onChange={(e) => setToken(e.target.value)}
+                        placeholder="Scoped API token (read:jira-work)"
+                        autoComplete="off"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Sent once to verify + stored encrypted in the secrets broker - never saved
+                        in the database or shown again.
                       </p>
                     </div>
                   </>

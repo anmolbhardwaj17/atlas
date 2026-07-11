@@ -259,6 +259,31 @@ export function TeamsSetup() {
   );
 }
 
+export function JiraSetup() {
+  return (
+    <div className="space-y-5">
+      <Steps>
+        <Step title="Create a read-only API token with scopes">
+          In your Atlassian account → <strong>Security → API tokens</strong>, choose{" "}
+          <InlineCode>Create API token with scopes</InlineCode>, select <strong>Jira</strong>, and
+          grant only the <InlineCode>read:jira-work</InlineCode> scope.
+        </Step>
+        <Step title="Give Atlas your site, email + the token">
+          Atlas authenticates with your Atlassian <strong>account email</strong> as the username and
+          the <strong>API token</strong> as the password (read-only). The <strong>site</strong> is
+          your <InlineCode>&lt;company&gt;.atlassian.net</InlineCode> address.
+        </Step>
+        <Step title="Atlas reads intent, not code">
+          It indexes each project&apos;s issues — the summary, description (acceptance criteria),
+          subtasks, and comments — so it can later check whether a PR actually implemented what the
+          ticket asked. It never gets write access.
+        </Step>
+      </Steps>
+      <CodeBlock label="Required read scope" code="read:jira-work" />
+    </div>
+  );
+}
+
 export function BitbucketSetup() {
   return (
     <div className="space-y-5">

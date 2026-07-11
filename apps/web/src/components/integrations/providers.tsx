@@ -1,4 +1,4 @@
-import { Hammer } from "lucide-react";
+import { Hammer, SquareKanban } from "lucide-react";
 import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
 import { cn } from "@/lib/cn";
 
@@ -27,7 +27,9 @@ export function ProviderLogo({
   if (hasCloudIcon(provider.logo)) {
     return <CloudIcon name={provider.logo} className={className ?? ""} />;
   }
-  return <Hammer className={cn("text-muted-foreground", className)} />;
+  // No bundled brand SVG (Jira/Jenkins aren't in the CC0 set) → a fitting lucide glyph.
+  const Fallback = provider.logo === "jira" ? SquareKanban : Hammer;
+  return <Fallback className={cn("text-muted-foreground", className)} />;
 }
 
 /**
@@ -78,6 +80,15 @@ export const PROVIDERS: ProviderMeta[] = [
     status: "available",
     blurb: "Repositories, Pipelines, and pull requests - via a read-only App password.",
     logo: "bitbucket",
+  },
+  {
+    id: "jira",
+    name: "Jira",
+    category: "Code",
+    status: "available",
+    blurb:
+      "Projects + issues (story, acceptance criteria, subtasks, comments) — via a read-only API token.",
+    logo: "jira",
   },
   {
     id: "gitlab",
