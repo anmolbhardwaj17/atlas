@@ -6,12 +6,16 @@ import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
 import { AtlasAiMark } from "@/components/brand";
 import { NodeConnections } from "@/components/explore/node-connections";
 import { NodeRisks } from "@/components/explore/node-risks";
+import { IntentCoverage } from "@/components/explore/intent-coverage";
 import { CopyButton } from "@/components/explore/copy-button";
 import { kindIcon, kindStyle, KIND_LOGO } from "@/lib/kind-visual";
 import { PROVIDER_META } from "@/lib/taxonomy";
 import { keyFacts, cloudwatchLink } from "@/lib/node-facts";
 import { cn } from "@/lib/cn";
 import type { NodeDetail, EdgeDto, NodeEvent, TraversalResult } from "@/lib/graph-types";
+
+/** Pull-request node kinds — the ones that carry an intent-coverage review (IV-3). */
+const PR_KINDS = new Set(["bitbucket.pullrequest", "github.pull_request"]);
 
 /** The real logo for a node: its specific service logo (aws-ec2…) if we have one, else the
  *  provider's brand mark (aws / github / gcp…). Mirrors the Explore list. */
@@ -184,6 +188,9 @@ export function NodeDetailView({
 
       {/* ── Risks (findings that name this node) ────────────────── */}
       <NodeRisks orgId={orgId} nodeId={node.id} />
+
+      {/* ── Intent coverage (PRs only): did this PR build its linked ticket? (IV-3) ── */}
+      {PR_KINDS.has(node.kind) ? <IntentCoverage orgId={orgId} prId={node.id} /> : null}
 
       {/* ── Key facts + Timeline — side by side, equal height ──── */}
       <div className="grid items-stretch gap-6 lg:grid-cols-2">

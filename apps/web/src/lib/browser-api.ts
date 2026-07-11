@@ -492,6 +492,56 @@ export async function deleteConnection(orgId: string, id: string): Promise<void>
   }
 }
 
+// ── Intent coverage (IV-3, docs/plans/intent-verification.md) ────────────────
+export interface CoverageCitation {
+  marker: string;
+  kind: "acceptance-criterion" | "diff-hunk";
+  ref: string;
+  url?: string;
+}
+export interface CoverageCriterion {
+  id: string;
+  text: string;
+  source: "description" | "subtask" | "comment";
+  status: "implemented" | "possibly-missing" | "cannot-tell";
+  note: string;
+  citations: CoverageCitation[];
+}
+export interface CoverageAssessment {
+  status: "assessed" | "no-intent" | "no-diff";
+  pr: { id: string; name: string | null };
+  issue: { id: string; key: string; url: string | null; summary: string } | null;
+  criteria: CoverageCriterion[];
+  summary: string;
+  caveats: string[];
+  reviewNote: string;
+}
+
+/**
+ * Review whether a PR implements the intent of its linked Jira issue (IV-3). On-demand (spends
+ * model budget), so it's button-triggered, not run on load. Throws with the API's message on
+ * failure (rate limit, non-PR, unreachable) so the caller can surface it inline.
+ */
+export async function reviewIntentCoverage(
+  orgId: string,
+  prId: string,
+): Promise<CoverageAssessment> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/intent/prs/${prId}/coverage`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  const body = (await res.json().catch(() => null)) as {
+    data?: CoverageAssessment;
+    error?: { message?: string };
+  } | null;
+  if (!res.ok || !body?.data) {
+    throw new Error(body?.error?.message ?? `Couldn't review coverage (${res.status}).`);
+  }
+  return body.data;
+}
+
 export interface LlmSettings {
   provider: string;
   model: string;

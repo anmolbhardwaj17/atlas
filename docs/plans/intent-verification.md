@@ -7,8 +7,10 @@
 > deterministic **suppression gate** making false "you didn't build X" structurally impossible; own
 > adversarial eval, 14 tests, escaped-false-positive 0 on the set) · ✅ **IV-3b API wiring**
 > (`AiService.coverageForPr` assembles PR → `IMPLEMENTS` → issue attributes → diff; `IntentController`
-> `POST /intent/prs/:id/coverage`; live-verified honest states on the real DB, 4 integration tests).
-> ⏳ **IV-3c** UI panel · fuzzy low-tier linking = what's left. Product owner's idea:
+> `POST /intent/prs/:id/coverage`; live-verified honest states on the real DB, 4 integration tests) ·
+> ✅ **IV-3c UI** ("Intent coverage" panel on the PR node in Explore — per-criterion status + hedged
+> cited notes + honest empty states; button-triggered; web build green). **IV-3 COMPLETE.**
+> ⏳ Remaining: fuzzy low-tier (no-key) PR↔issue linking + confirm/reject. Product owner's idea:
 > a PR references a Jira task (or should); the code doesn't *break*, but the **logic is wrong / the
 > intent isn't implemented**. Can Atlas link the PR to its issue (even when the key isn't in the PR),
 > read the story + subtasks + comments, and judge whether the intent was actually built?
