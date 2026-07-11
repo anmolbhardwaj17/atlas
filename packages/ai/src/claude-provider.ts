@@ -28,12 +28,17 @@ export class ClaudeProvider implements LLMProvider {
   }
 
   async *complete(req: CompleteRequest): AsyncIterable<LLMEvent> {
+    // Adaptive thinking (opus-4.6+ family): the model reasons before answering. Only requested on
+    // single-turn calls (the narration) — thinking blocks stream as `thinking_delta`, which we drop
+    // from the token stream below, so the answer text is unaffected. `temperature` must be omitted when
+    // thinking is on (the API rejects a non-default temperature with thinking).
+    const thinking = req.thinking ? ({ type: "adaptive" } as const) : undefined;
     const stream = this.client.messages.stream(
       {
         model: this.model,
         system: req.system,
         max_tokens: req.maxTokens,
-        temperature: req.temperature,
+        ...(thinking ? { thinking } : { temperature: req.temperature }),
         messages: req.messages.map(toClaudeMessage),
         ...(req.tools && req.tools.length > 0
           ? {

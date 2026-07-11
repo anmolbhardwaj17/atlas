@@ -50,6 +50,10 @@ export interface CompleteRequest {
   /** Abort the in-flight model call (user cancelled / disconnected) - providers pass it to the
    *  underlying request so work + cost stop server-side, not just client-side (WS cancel). */
   signal?: AbortSignal;
+  /** Ask the model to reason before answering (Claude adaptive thinking). Safe ONLY on single-turn
+   *  calls (e.g. the final narration) — a multi-turn tool loop would need thinking-block replay.
+   *  Providers without native thinking (OpenRouter/gpt) ignore it. */
+  thinking?: boolean;
 }
 
 export interface LLMProvider {

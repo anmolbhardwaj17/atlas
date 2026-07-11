@@ -270,6 +270,9 @@ export async function* answerQuestionStream(
     // tool selection must be deterministic.
     maxTokens: deps.maxTokens ?? 1500,
     temperature: 0.4,
+    // Reason before narrating (Claude adaptive thinking) — a single-turn call, so no thinking-block
+    // replay is needed; providers without it (gpt) ignore the flag.
+    thinking: true,
     ...(signal ? { signal } : {}),
   })) {
     if (ev.type === "token") {
@@ -305,6 +308,7 @@ async function narrate(
     ],
     maxTokens: deps.maxTokens ?? 1500,
     temperature: 0.4,
+    thinking: true, // single-turn narration → adaptive thinking is safe (no tool-block replay)
     ...(signal ? { signal } : {}),
   })) {
     if (ev.type === "token") parts.push(ev.text);
