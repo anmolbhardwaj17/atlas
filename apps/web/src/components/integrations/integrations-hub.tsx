@@ -335,7 +335,7 @@ export function IntegrationsHub({
   );
 }
 
-const TABS = ["All", "Cloud", "Code", "CI/CD", "Observability", "Alerts"] as const;
+const TABS = ["All", "Cloud", "Code", "Planning", "CI/CD", "Observability", "Alerts"] as const;
 
 // A decorative wall of exactly the integrations in the catalog above — nothing we don't actually
 // offer. Logos only (no labels, no status).

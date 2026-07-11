@@ -8,7 +8,7 @@ export interface ProviderMeta {
   /** For available providers this is the connection `provider` value (aws/github). */
   id: string;
   name: string;
-  category: "Cloud" | "Code" | "CI/CD" | "Observability" | "Alerts";
+  category: "Cloud" | "Code" | "Planning" | "CI/CD" | "Observability" | "Alerts";
   status: ProviderStatus;
   blurb: string;
   /** Real brand logo key in CLOUD_ICONS (cloud-icons-data), or a key we fall back to a glyph for. */
@@ -82,21 +82,22 @@ export const PROVIDERS: ProviderMeta[] = [
     logo: "bitbucket",
   },
   {
-    id: "jira",
-    name: "Jira",
-    category: "Code",
-    status: "available",
-    blurb:
-      "Projects + issues (story, acceptance criteria, subtasks, comments) — via a read-only API token.",
-    logo: "jira",
-  },
-  {
     id: "gitlab",
     name: "GitLab",
     category: "Code",
     status: "coming-soon",
     blurb: "Projects, members, and CI/CD pipelines.",
     logo: "gitlab",
+  },
+  // ── Planning (the INTENT source — what the team meant to build, docs/plans/intent-verification.md) ──
+  {
+    id: "jira",
+    name: "Jira",
+    category: "Planning",
+    status: "available",
+    blurb:
+      "Projects + issues (story, acceptance criteria, subtasks, comments) — via a read-only API token.",
+    logo: "jira",
   },
   // ── CI/CD (the code↔infra keystone, docs/07c) ──
   {
