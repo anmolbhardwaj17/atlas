@@ -39,8 +39,10 @@ import {
   RotateCw,
   Search,
   Shield,
+  Crosshair,
   Square,
   Stethoscope,
+  Loader2,
   X,
 } from "lucide-react";
 import { buildLayout, containmentChildren } from "@/lib/map-layout";
@@ -52,7 +54,7 @@ import {
   type MapData,
   type MapNode,
 } from "@/lib/map-types";
-import { createConversation, streamAskWS } from "@/lib/browser-api";
+import { createConversation, streamAskWS, openIncident } from "@/lib/browser-api";
 import { CloudIcon } from "@/components/cloud-icon";
 import { AtlasAiMark } from "@/components/brand";
 import { ResourceNode, EnvLaneNode } from "@/components/map/resource-node";
@@ -1097,6 +1099,7 @@ function Flow({
         {selected && (
           <DetailPanel
             node={selected}
+            orgId={orgId}
             protectedBy={protectedBy.get(selected.id) ?? []}
             onClose={() => onSelect(null)}
           />
@@ -1942,10 +1945,12 @@ function MonitoringRow({ node }: { node: MapNode }) {
 
 function DetailPanel({
   node,
+  orgId,
   protectedBy,
   onClose,
 }: {
   node: MapNode;
+  orgId: string;
   protectedBy: string[];
   onClose: () => void;
 }) {
@@ -2013,12 +2018,7 @@ function DetailPanel({
       <MonitoringRow node={node} />
 
       {node.health && node.health.state !== "healthy" ? (
-        <Link
-          href={diagnoseHref(node)}
-          className="mt-4 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-foreground px-3 text-xs font-medium text-background transition-opacity hover:opacity-90"
-        >
-          <AtlasAiMark size={14} className="shrink-0" /> Diagnose with Atlas AI
-        </Link>
+        <WarRoomCta orgId={orgId} nodeId={node.id} />
       ) : null}
 
       <Link
@@ -2028,6 +2028,29 @@ function DetailPanel({
         View details
       </Link>
     </div>
+  );
+}
+
+/** Open (or reuse) a War Room for a broken node straight from the map, then navigate to it. The map is
+ *  where "something's on fire" is felt, so this is the primary incident entry point (docs/plans/war-room.md). */
+function WarRoomCta({ orgId, nodeId }: { orgId: string; nodeId: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        const incident = await openIncident(orgId, nodeId, "map");
+        if (incident) router.push(`/war-room/${incident.id}`);
+        else setBusy(false);
+      }}
+      className="mt-4 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-danger px-3 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+    >
+      {busy ? <Loader2 className="size-4 animate-spin" /> : <Crosshair className="size-4" />} Take to
+      War Room
+    </button>
   );
 }
 

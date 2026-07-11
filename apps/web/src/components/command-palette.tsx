@@ -13,6 +13,7 @@ import {
   Plug,
   Settings,
   ShieldCheck,
+  Crosshair,
   CornerDownLeft,
   type LucideIcon,
 } from "lucide-react";
@@ -57,6 +58,12 @@ const NAV: Array<{ label: string; href: string; icon: LucideIcon; keywords: stri
   { label: "Map", href: "/map", icon: Waypoints, keywords: "infrastructure graph flow" },
   { label: "Explore", href: "/explore", icon: Boxes, keywords: "browse resources repos" },
   { label: "Insights", href: "/insights", icon: Lightbulb, keywords: "findings recommendations" },
+  {
+    label: "War Room",
+    href: "/war-room",
+    icon: Crosshair,
+    keywords: "incident diagnose outage broken rca root cause investigate",
+  },
   {
     label: "Compliance",
     href: "/compliance",

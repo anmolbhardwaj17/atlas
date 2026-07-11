@@ -8,6 +8,7 @@ import {
   Compass,
   Network,
   Radar,
+  Crosshair,
   ShieldCheck,
   Blocks,
   Settings,
@@ -65,6 +66,12 @@ const WORKSPACE_NAV: NavItem[] = [
     label: "Insights",
     icon: Radar,
     match: (p: string) => p.startsWith("/insights"),
+  },
+  {
+    href: "/war-room",
+    label: "War Room",
+    icon: Crosshair,
+    match: (p: string) => p.startsWith("/war-room"),
   },
   {
     href: "/compliance",

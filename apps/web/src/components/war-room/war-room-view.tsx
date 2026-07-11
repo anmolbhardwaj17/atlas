@@ -7,7 +7,7 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
-  Radar,
+  Crosshair,
   ArrowLeft,
   RotateCw,
   CornerDownLeft,
@@ -259,7 +259,7 @@ export function WarRoomView({
             <ArrowLeft className="size-3.5" /> Back to Insights
           </Link>
           <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-            <Radar className="size-6 text-danger" /> War Room
+            <Crosshair className="size-6 text-danger" /> War Room
           </h1>
           <p className="text-sm text-muted-foreground">
             <span className="font-medium text-foreground">{label}</span>
