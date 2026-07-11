@@ -10,7 +10,7 @@ import {
   Radar,
   ArrowLeft,
   RotateCw,
-  ChevronDown,
+  CornerDownLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { streamAsk, createConversation, updateIncident, type Incident } from "@/lib/browser-api";
@@ -24,20 +24,17 @@ interface Step {
   tool: string;
   summary: string;
 }
-interface Trace {
-  steps: Step[];
-  answer: string;
-  confidence: string | null;
-  citations: number;
-  citedIds: string[];
-  ranAt: string;
+interface Turn {
+  role: "user" | "assistant";
+  text: string;
+  steps?: Step[];
+  confidence?: string | null;
+  citations?: number;
+  streaming?: boolean;
 }
-
-type Phase = "idle" | "running" | "done" | "error";
 
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 
-/** Human label for a tool call in the live investigation log. */
 function toolLabel(tool: string): string {
   const t = tool.toLowerCase();
   if (t.includes("diagnose")) return "Diagnosing the resource";
@@ -57,20 +54,35 @@ const SEV_TEXT: Record<string, string> = {
   low: "text-yellow-600 dark:text-yellow-500",
 };
 
-function isTrace(v: unknown): v is Trace {
-  return (
-    typeof v === "object" &&
-    v !== null &&
-    Array.isArray((v as Trace).steps) &&
-    typeof (v as Trace).answer === "string"
-  );
+/** Restore a saved investigation (new turn-based shape, or the older single-answer shape). */
+function loadSaved(evidence: unknown): { turns: Turn[]; citedIds: string[] } | null {
+  if (typeof evidence !== "object" || evidence === null) return null;
+  const e = evidence as Record<string, unknown>;
+  if (Array.isArray(e.turns)) {
+    return { turns: e.turns as Turn[], citedIds: (e.citedIds as string[]) ?? [] };
+  }
+  if (typeof e.answer === "string" && Array.isArray(e.steps)) {
+    return {
+      turns: [
+        {
+          role: "assistant",
+          text: e.answer,
+          steps: e.steps as Step[],
+          confidence: (e.confidence as string | null) ?? null,
+          citations: (e.citations as number) ?? 0,
+        },
+      ],
+      citedIds: (e.citedIds as string[]) ?? [],
+    };
+  }
+  return null;
 }
 
 /**
- * War Room (docs/plans/war-room.md). The broken node + its blast radius on a purpose-built live map,
- * beside a streamed, cited investigation. Every step shown is a REAL tool call from the existing
- * agentic diagnose loop; as it cites/touches nodes, they light up on the map so you watch the trace
- * walk the graph. The transcript is persisted so a reopened incident replays instead of re-running.
+ * War Room (docs/plans/war-room.md). Investigation (left) as a live AI chat beside a purpose-built map
+ * (right). The first turn auto-diagnoses the broken node; every step is a REAL tool call and the nodes
+ * it touches light up + connect in red on the map. You can then ASK FOLLOW-UPS in the same conversation.
+ * The whole thread is persisted so a reopened incident replays it.
  */
 export function WarRoomView({
   incident,
@@ -82,102 +94,126 @@ export function WarRoomView({
   orgId: string;
 }) {
   const router = useRouter();
-  const saved = isTrace(incident.evidence) ? incident.evidence : null;
+  const saved = React.useMemo(() => loadSaved(incident.evidence), [incident.evidence]);
 
   const nodeById = React.useMemo(() => new Map(map.nodes.map((n) => [n.id, n] as const)), [map]);
 
-  const [phase, setPhase] = React.useState<Phase>(saved ? "done" : "idle");
-  const [steps, setSteps] = React.useState<Step[]>(saved?.steps ?? []);
-  const [answer, setAnswer] = React.useState<string>(saved?.answer ?? "");
-  const [confidence, setConfidence] = React.useState<string | null>(saved?.confidence ?? null);
-  const [citations, setCitations] = React.useState<number>(saved?.citations ?? 0);
-  const [activeIds, setActiveIds] = React.useState<string[]>(saved?.citedIds ?? []);
-  const [stepsOpen, setStepsOpen] = React.useState(!saved);
+  const [turns, setTurns] = React.useState<Turn[]>(saved?.turns ?? []);
+  const [activeIds, setActiveIds] = React.useState<string[]>(saved?.citedIds ?? [incident.nodeId]);
+  const [input, setInput] = React.useState("");
+  const [sending, setSending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
+
   const started = React.useRef(false);
+  const asking = React.useRef(false);
+  const convRef = React.useRef<string | null>(null);
+  const turnsRef = React.useRef<Turn[]>(turns);
+  const citedRef = React.useRef<Set<string>>(new Set(saved?.citedIds ?? [incident.nodeId]));
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    turnsRef.current = turns;
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [turns]);
 
   const label = incident.nodeName ?? incident.nodeKind ?? "this resource";
-  const question = `Why is ${label} unhealthy or at risk right now? Diagnose the most likely cause, what changed recently (deploys, config changes, merged PRs), and what depends on it. If nothing correlates, say so plainly.`;
+  const diagnoseQuestion = `Why is ${label} unhealthy or at risk right now? Diagnose the most likely cause, what changed recently (deploys, config changes, merged PRs), and what depends on it. If nothing correlates, say so plainly.`;
 
-  const run = React.useCallback(async () => {
-    setPhase("running");
-    setSteps([]);
-    setAnswer("");
-    setConfidence(null);
-    setCitations(0);
-    setActiveIds([incident.nodeId]);
-    setStepsOpen(true);
-    setError(null);
-
-    const convId = await createConversation(orgId, `War Room — ${label}`, "map");
-    if (!convId) {
-      setError("Couldn't start the investigation.");
-      setPhase("error");
-      return;
-    }
-    const collectedSteps: Step[] = [];
-    const cited = new Set<string>([incident.nodeId]);
-    let text = "";
-    let conf: string | null = null;
-    let cites = 0;
-
-    const light = (ids: Iterable<string>) => {
-      let changed = false;
-      for (const id of ids)
-        if (!cited.has(id)) {
-          cited.add(id);
-          changed = true;
-        }
-      if (changed) setActiveIds([...cited]);
-    };
-
-    try {
-      for await (const ev of streamAsk(orgId, convId, question)) {
-        if (ev.type === "retrieval_step") {
-          collectedSteps.push({ tool: ev.tool, summary: ev.summary });
-          setSteps([...collectedSteps]);
-          light(ev.summary.match(UUID_RE) ?? []); // light nodes as the trace mentions them
-        } else if (ev.type === "token") {
-          text += ev.text;
-          setAnswer(text);
-        } else if (ev.type === "citation") {
-          cites += 1;
-          setCitations(cites);
-          if (ev.citation.kind === "node") light([ev.citation.id]);
-        } else if (ev.type === "confidence") {
-          conf = ev.overall;
-          setConfidence(ev.overall);
-        } else if (ev.type === "error") {
-          setError(ev.message);
-        }
+  const light = React.useCallback((ids: Iterable<string>) => {
+    let changed = false;
+    for (const id of ids)
+      if (!citedRef.current.has(id)) {
+        citedRef.current.add(id);
+        changed = true;
       }
-    } catch {
-      setError("The investigation stream was interrupted.");
-    }
+    if (changed) setActiveIds([...citedRef.current]);
+  }, []);
 
-    setPhase(text ? "done" : "error");
-    setStepsOpen(false);
-    const trace: Trace = {
-      steps: collectedSteps,
-      answer: text,
-      confidence: conf,
-      citations: cites,
-      citedIds: [...cited],
-      ranAt: new Date().toISOString(),
-    };
-    void updateIncident(orgId, incident.id, {
-      evidence: trace,
-      verdict: { summary: text, confidence: conf },
-    });
-  }, [orgId, incident.id, incident.nodeId, label, question]);
+  const ask = React.useCallback(
+    async (question: string, opts?: { initial?: boolean }) => {
+      if (asking.current || !question.trim()) return;
+      asking.current = true;
+      setSending(true);
+      setError(null);
 
+      if (!convRef.current) {
+        convRef.current = await createConversation(orgId, `War Room — ${label}`, "map");
+      }
+      const convId = convRef.current;
+      if (!convId) {
+        setError("Couldn't start the investigation.");
+        asking.current = false;
+        setSending(false);
+        return;
+      }
+
+      const base = turnsRef.current;
+      const lead: Turn[] = opts?.initial ? [] : [{ role: "user", text: question }];
+      const asst: Turn = { role: "assistant", text: "", steps: [], streaming: true };
+      const commit = () => setTurns([...base, ...lead, { ...asst }]);
+      commit();
+
+      const collectedSteps: Step[] = [];
+      try {
+        for await (const ev of streamAsk(orgId, convId, question)) {
+          if (ev.type === "retrieval_step") {
+            collectedSteps.push({ tool: ev.tool, summary: ev.summary });
+            asst.steps = [...collectedSteps];
+            light(ev.summary.match(UUID_RE) ?? []);
+            commit();
+          } else if (ev.type === "token") {
+            asst.text += ev.text;
+            commit();
+          } else if (ev.type === "citation") {
+            asst.citations = (asst.citations ?? 0) + 1;
+            if (ev.citation.kind === "node") light([ev.citation.id]);
+            commit();
+          } else if (ev.type === "confidence") {
+            asst.confidence = ev.overall;
+            commit();
+          } else if (ev.type === "error") {
+            setError(ev.message);
+          }
+        }
+      } catch {
+        setError("The investigation stream was interrupted.");
+      }
+
+      asst.streaming = false;
+      const finalTurns = [...base, ...lead, { ...asst }];
+      setTurns(finalTurns);
+      asking.current = false;
+      setSending(false);
+
+      const firstAsst = finalTurns.find((t) => t.role === "assistant");
+      void updateIncident(orgId, incident.id, {
+        evidence: {
+          turns: finalTurns,
+          citedIds: [...citedRef.current],
+          ranAt: new Date().toISOString(),
+        },
+        verdict: { summary: firstAsst?.text ?? "", confidence: firstAsst?.confidence ?? null },
+      });
+    },
+    [orgId, incident.id, label, light],
+  );
+
+  // Auto-diagnose once for a fresh incident.
   React.useEffect(() => {
     if (!saved && !started.current) {
       started.current = true;
-      void run();
+      void ask(diagnoseQuestion, { initial: true });
     }
-  }, [saved, run]);
+  }, [saved, ask, diagnoseQuestion]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const q = input.trim();
+    if (!q || sending) return;
+    setInput("");
+    await ask(q);
+  }
 
   async function close(status: "resolved" | "dismissed") {
     setBusy(true);
@@ -186,13 +222,21 @@ export function WarRoomView({
     router.refresh();
   }
 
+  function rerun() {
+    citedRef.current = new Set([incident.nodeId]);
+    setActiveIds([incident.nodeId]);
+    setTurns([]);
+    turnsRef.current = [];
+    void ask(diagnoseQuestion, { initial: true });
+  }
+
   const terminal = incident.status === "resolved" || incident.status === "dismissed";
-  // Reflect the LIVE phase, not the stale server status ("analyzing" lingering after it's done).
+  const diagnosed = turns.some((t) => t.role === "assistant" && t.text);
   const statusLabel = terminal
     ? incident.status
-    : phase === "running"
+    : sending
       ? "analyzing…"
-      : answer
+      : diagnosed
         ? "diagnosed"
         : incident.status;
 
@@ -236,138 +280,162 @@ export function WarRoomView({
         ) : null}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        {/* Live blast-radius map */}
-        <div className="h-[64vh] min-h-[440px] overflow-hidden rounded-xl border border-border bg-background">
-          <WarRoomMap full={map} focusId={incident.nodeId} activeIds={activeIds} />
-        </div>
-
-        {/* Investigation */}
-        <div className="flex h-[64vh] min-h-[440px] flex-col rounded-xl border border-border bg-background">
+      <div className="grid gap-4 lg:grid-cols-[minmax(380px,1fr)_1.35fr]">
+        {/* Investigation — a live AI chat (left) */}
+        <div className="flex h-[66vh] min-h-[460px] flex-col rounded-xl border border-border bg-background">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <h2 className="text-sm font-semibold">Investigation</h2>
-            {phase !== "running" ? (
-              <Button variant="ghost" size="sm" onClick={() => void run()}>
-                <RotateCw className="mr-1.5 size-3.5" /> Re-run
-              </Button>
-            ) : (
+            {sending ? (
               <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Loader2 className="size-3.5 animate-spin" /> Tracing…
               </span>
+            ) : (
+              <Button variant="ghost" size="sm" onClick={rerun}>
+                <RotateCw className="mr-1.5 size-3.5" /> Re-run
+              </Button>
             )}
           </div>
 
-          <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-            {/* Steps — real tool calls. Live while running; collapsed to an accordion once done. */}
-            {steps.length > 0 ? (
-              <div>
-                {phase !== "running" ? (
-                  <button
-                    type="button"
-                    onClick={() => setStepsOpen((v) => !v)}
-                    className="mb-2 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+          {/* Resources traced — real provider icons, mirroring the lit map nodes. */}
+          {activeIds.length > 1 ? (
+            <div className="flex flex-wrap gap-1.5 border-b border-border px-4 py-2.5">
+              {activeIds.map((id) => {
+                const n = nodeById.get(id);
+                if (!n) return null;
+                const logo = KIND_LOGO[n.kind];
+                const Icon = kindIcon(n.kind);
+                const focal = id === incident.nodeId;
+                return (
+                  <span
+                    key={id}
+                    className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${
+                      focal ? "border-danger/50 bg-danger/[0.06]" : "border-border bg-muted/40"
+                    }`}
                   >
-                    <ChevronDown
-                      className={`size-3.5 transition-transform ${stepsOpen ? "" : "-rotate-90"}`}
-                    />
-                    Traced {steps.length} {steps.length === 1 ? "step" : "steps"}
-                  </button>
-                ) : null}
-                {stepsOpen ? (
-                  <ol className="space-y-1.5">
-                    {steps.map((s, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm">
-                        <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-success" />
-                        <span>
-                          <span className="font-medium">{toolLabel(s.tool)}</span>
-                          {s.summary ? (
-                            <span className="text-muted-foreground"> — {s.summary}</span>
-                          ) : null}
-                        </span>
-                      </li>
-                    ))}
-                    {phase === "running" ? (
-                      <li className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Loader2 className="size-3.5 animate-spin" /> Working…
-                      </li>
-                    ) : null}
-                  </ol>
-                ) : null}
-              </div>
-            ) : phase === "running" || phase === "idle" ? (
-              <p className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="size-3.5 animate-spin" /> Starting the investigation…
-              </p>
-            ) : null}
+                    {logo ? (
+                      <CloudIcon name={logo} className="size-4" />
+                    ) : (
+                      <Icon className="size-3.5 text-muted-foreground" />
+                    )}
+                    <span className="max-w-[160px] truncate">{n.name ?? n.kind}</span>
+                  </span>
+                );
+              })}
+            </div>
+          ) : null}
 
-            {/* Resources the trace touched — with their real kind icons, mirroring the lit map nodes. */}
-            {activeIds.length > 0 ? (
-              <div className="space-y-1.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Resources traced
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {activeIds.map((id) => {
-                    const n = nodeById.get(id);
-                    if (!n) return null;
-                    const logo = KIND_LOGO[n.kind];
-                    const Icon = kindIcon(n.kind);
-                    const focal = id === incident.nodeId;
-                    return (
-                      <span
-                        key={id}
-                        className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${
-                          focal ? "border-danger/50 bg-danger/[0.06]" : "border-border bg-muted/40"
-                        }`}
-                      >
-                        {logo ? (
-                          <CloudIcon name={logo} className="size-4" />
-                        ) : (
-                          <Icon className="size-3.5 text-muted-foreground" />
-                        )}
-                        <span className="max-w-[180px] truncate">{n.name ?? n.kind}</span>
-                      </span>
-                    );
-                  })}
+          {/* Thread */}
+          <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+            {turns.length === 0 && !sending ? (
+              <p className="text-sm text-muted-foreground">Starting the investigation…</p>
+            ) : null}
+            {turns.map((t, i) =>
+              t.role === "user" ? (
+                <div key={i} className="flex justify-end">
+                  <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-muted px-3.5 py-2 text-sm">
+                    {t.text}
+                  </div>
                 </div>
-              </div>
-            ) : null}
-
-            {/* Verdict */}
-            {answer ? (
-              <div className="space-y-2 border-t border-border pt-4">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold">What Atlas found</h3>
-                  {confidence ? (
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium capitalize text-muted-foreground">
-                      {confidence} confidence
-                    </span>
-                  ) : null}
-                </div>
-                <MarkdownLite text={answer} />
-                {citations > 0 ? (
-                  <p className="pt-1 text-xs text-muted-foreground">
-                    {citations} cited {citations === 1 ? "source" : "sources"} · lit on the map ·
-                    open Ask Atlas for the full evidence trail.
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-
+              ) : (
+                <AssistantTurn key={i} turn={t} />
+              ),
+            )}
             {error ? (
-              <div className="flex items-start gap-2 border-t border-border pt-4 text-sm text-danger">
+              <div className="flex items-start gap-2 text-sm text-danger">
                 <XCircle className="mt-0.5 size-4 shrink-0" /> {error}
               </div>
             ) : null}
           </div>
 
-          {incident.resolution ? (
-            <div className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
-              Resolution: {incident.resolution}
-            </div>
+          {/* Ask a follow-up */}
+          {!terminal ? (
+            <form onSubmit={submit} className="border-t border-border p-2.5">
+              <div className="flex items-end gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 focus-within:border-foreground/40">
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) void submit(e);
+                  }}
+                  rows={1}
+                  placeholder="Ask a follow-up — e.g. “what did that PR change?”"
+                  className="max-h-28 flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                />
+                <button
+                  type="submit"
+                  disabled={sending || !input.trim()}
+                  className="grid size-7 shrink-0 place-items-center rounded-md bg-foreground text-background transition-opacity hover:opacity-90 disabled:opacity-40"
+                  title="Send"
+                >
+                  <CornerDownLeft className="size-4" />
+                </button>
+              </div>
+            </form>
           ) : null}
         </div>
+
+        {/* Live map (right) */}
+        <div className="h-[66vh] min-h-[460px] overflow-hidden rounded-xl border border-border bg-background">
+          <WarRoomMap full={map} focusId={incident.nodeId} activeIds={activeIds} />
+        </div>
       </div>
+    </div>
+  );
+}
+
+/** One assistant turn: its real tool-call steps (collapsed once done) + the markdown verdict. */
+function AssistantTurn({ turn }: { turn: Turn }) {
+  const steps = turn.steps ?? [];
+  const StepList = (
+    <ol className="space-y-1.5">
+      {steps.map((s, i) => (
+        <li key={i} className="flex items-start gap-2 text-sm">
+          <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-success" />
+          <span>
+            <span className="font-medium">{toolLabel(s.tool)}</span>
+            {s.summary ? <span className="text-muted-foreground"> — {s.summary}</span> : null}
+          </span>
+        </li>
+      ))}
+      {turn.streaming ? (
+        <li className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-3.5 animate-spin" /> Working…
+        </li>
+      ) : null}
+    </ol>
+  );
+
+  return (
+    <div className="space-y-3">
+      {steps.length > 0 ? (
+        turn.streaming ? (
+          StepList
+        ) : (
+          <details className="group">
+            <summary className="mb-2 inline-flex cursor-pointer list-none items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
+              <span className="transition-transform group-open:rotate-90">▸</span>
+              Traced {steps.length} {steps.length === 1 ? "step" : "steps"}
+            </summary>
+            {StepList}
+          </details>
+        )
+      ) : null}
+
+      {turn.text ? (
+        <div className="space-y-2">
+          {turn.confidence ? (
+            <span className="inline-block rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium capitalize text-muted-foreground">
+              {turn.confidence} confidence
+            </span>
+          ) : null}
+          <MarkdownLite text={turn.text} />
+          {turn.citations ? (
+            <p className="pt-0.5 text-xs text-muted-foreground">
+              {turn.citations} cited {turn.citations === 1 ? "source" : "sources"} · lit on the map
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
