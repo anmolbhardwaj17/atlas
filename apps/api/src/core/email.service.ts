@@ -15,6 +15,23 @@ export interface WelcomeEmail {
   to: string;
   name: string | null;
 }
+export interface WeeklyDigestEmail {
+  to: string;
+  orgName: string;
+  postureScore: number | null;
+  resources: number;
+  counts: { high: number; medium: number; low: number };
+  /** Top findings to surface (already ranked; typically 5-6). */
+  findings: Array<{ severity: "high" | "medium" | "low"; title: string; url: string }>;
+  insightsUrl: string;
+  unsubscribeUrl: string;
+}
+
+const SEV_HEX: Record<"high" | "medium" | "low", string> = {
+  high: "#ef4444",
+  medium: "#f97316",
+  low: "#eab308",
+};
 
 /**
  * Transactional email via Resend (docs/12 §6.2). Behind a tiny interface so SES/others can swap in
@@ -97,6 +114,54 @@ export class EmailService {
     return this.send(msg.to, "Welcome to Atlas", html);
   }
 
+  /** Weekly posture digest (docs/plans/compliance + #44): open findings by severity, the top items
+   *  each linking to their evidence, and posture. Honest — "all clear" is a first-class state, not a
+   *  fabricated problem. Every digest carries a one-click unsubscribe. */
+  async sendWeeklyDigest(msg: WeeklyDigestEmail): Promise<boolean> {
+    const total = msg.counts.high + msg.counts.medium + msg.counts.low;
+    const meta: MetaRow[] = [{ label: "Resources mapped", value: String(msg.resources) }];
+    meta.push({
+      label: "Open findings",
+      value:
+        total > 0
+          ? `${total}  ·  ${msg.counts.high} high, ${msg.counts.medium} med, ${msg.counts.low} low`
+          : "none",
+    });
+    if (msg.postureScore !== null)
+      meta.push({ label: "Security posture", value: `${msg.postureScore} / 100` });
+
+    const list = msg.findings.slice(0, 6).map((f) => ({
+      dot: SEV_HEX[f.severity],
+      title: f.title,
+      sub: f.severity.toUpperCase(),
+      url: f.url,
+    }));
+    const intro =
+      total > 0
+        ? `Here's what Atlas is flagging across <b style="color:inherit">${escapeHtml(
+            msg.orgName,
+          )}</b> this week. The top items are below - open Atlas for the full list, the cited evidence, and how to fix each.`
+        : `Good news - Atlas isn't flagging anything to act on across <b style="color:inherit">${escapeHtml(
+            msg.orgName,
+          )}</b> right now. Your estate is mapped and clean this week.`;
+
+    const html = emailShell({
+      preheader:
+        total > 0
+          ? `${total} open findings across ${msg.orgName} - ${msg.counts.high} high-severity.`
+          : `All clear across ${msg.orgName} this week.`,
+      heading: "Your weekly Atlas digest",
+      intro,
+      meta,
+      ...(list.length > 0 ? { list } : {}),
+      cta: { label: "Open Atlas", url: msg.insightsUrl, width: 170 },
+      security: `You're receiving Atlas's weekly digest for <b style="color:inherit">${escapeHtml(
+        msg.orgName,
+      )}</b>. <a href="${msg.unsubscribeUrl}" class="link" style="color:#8a938d;text-decoration:underline">Unsubscribe from the weekly digest</a>.`,
+    });
+    return this.send(msg.to, `Your weekly Atlas digest - ${msg.orgName}`, html);
+  }
+
   /** Returns true only if the provider accepted the message. Never throws — a failure is logged and
    *  reported as `false` so the caller can fall back (e.g. surface a copy-link) without breaking. */
   private async send(to: string, subject: string, html: string): Promise<boolean> {
@@ -149,6 +214,8 @@ interface Shell {
   intro: string;
   meta?: MetaRow[];
   steps?: Array<{ n: string; t: string; d: string }>;
+  /** A list of items with a colored severity dot (the weekly digest's findings). */
+  list?: Array<{ dot: string; title: string; sub?: string; url?: string }>;
   cta: { label: string; url: string; width: number };
   /** A raw URL shown as a selectable fallback ("or copy this link"). */
   linkFallback?: string;
@@ -216,6 +283,28 @@ function metaTable(rows: MetaRow[]): string {
   </table>`;
 }
 
+function findingsList(items: Array<{ dot: string; title: string; sub?: string; url?: string }>): string {
+  const rows = items
+    .map((it, i) => {
+      const title = it.url
+        ? `<a href="${it.url}" class="link text-strong" style="color:#141a17;text-decoration:none;font-weight:600">${escapeHtml(it.title)}</a>`
+        : `<span class="text-strong" style="color:#141a17;font-weight:600">${escapeHtml(it.title)}</span>`;
+      const sub = it.sub
+        ? `<span style="font-size:11px;font-weight:700;letter-spacing:.04em;color:${it.dot};font-family:${FONT}">${escapeHtml(it.sub)}</span>`
+        : "";
+      return `
+      <tr>
+        <td valign="top" width="16" style="padding:${i === 0 ? "0" : "12px"} 0 12px 0;${i === 0 ? "" : "border-top:1px solid #eef1ef;"}">
+          <div style="width:8px;height:8px;border-radius:9px;background:${it.dot};margin-top:5px"></div>
+        </td>
+        <td valign="top" style="padding:${i === 0 ? "0" : "12px"} 0 12px 10px;${i === 0 ? "" : "border-top:1px solid #eef1ef;"}font-size:14px;line-height:1.5;font-family:${FONT}" class="text-body">${title}</td>
+        <td valign="top" align="right" style="padding:${i === 0 ? "0" : "12px"} 0 12px 10px;${i === 0 ? "" : "border-top:1px solid #eef1ef;"}white-space:nowrap">${sub}</td>
+      </tr>`;
+    })
+    .join("");
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0 4px">${rows}</table>`;
+}
+
 function stepsTable(steps: Array<{ n: string; t: string; d: string }>): string {
   const rows = steps
     .map(
@@ -247,6 +336,7 @@ function emailShell(s: Shell): string {
   const year = new Date().getFullYear();
   const meta = s.meta?.length ? metaTable(s.meta) : "";
   const steps = s.steps?.length ? stepsTable(s.steps) : "";
+  const list = s.list?.length ? findingsList(s.list) : "";
   const linkFallback = s.linkFallback
     ? `<div class="text-muted" style="font-size:12px;color:#8a938d;line-height:1.5;margin-top:20px;font-family:${FONT}">Or paste this link into your browser:<br>
        <a href="${s.linkFallback}" class="link" style="color:${BRAND.green};word-break:break-all;text-decoration:none">${escapeHtml(
@@ -319,6 +409,7 @@ function emailShell(s: Shell): string {
               <h1 class="h1 text-strong" style="margin:0 0 12px;font-size:24px;line-height:1.25;font-weight:700;color:#141a17;letter-spacing:-.02em;font-family:${FONT}">${s.heading}</h1>
               <div class="text-body" style="font-size:15px;line-height:1.65;color:#3b4641;font-family:${FONT}">${s.intro}</div>
               ${meta}
+              ${list}
               ${steps}
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:28px"><tr><td>
                 ${ctaButton(s.cta.label, s.cta.url, s.cta.width)}
