@@ -6,8 +6,8 @@
  * code/config deploy. Idempotent by `deploy:<urn>:<timestamp>` — a redeploy changes `LastModified` and
  * so produces exactly one new event; re-runs of an unchanged function are no-ops (P-honest history).
  *
- * ECS/other runtimes will slot in the same way once their deploy timestamp is captured (ECS service
- * `deployments[].createdAt`); this first slice covers Lambda, where the timestamp is already in hand.
+ * Covers Lambda (`LastModified`) and ECS services (the PRIMARY deployment's `createdAt`, captured as
+ * `lastDeployedAt`). Other runtimes slot in the same way once their deploy timestamp is captured.
  */
 import { withOrgScope, type Db } from "@atlas/db";
 import { applyNodeEvents, type NodeEventInput } from "./node-events";
@@ -61,24 +61,57 @@ export function lambdaDeployEvent(
   };
 }
 
-/** Read the org's Lambda nodes and persist a `deploy` event per function's last-modified time. */
+/** ECS service → a `deploy` event from the PRIMARY deployment's createdAt (`lastDeployedAt`). */
+export function ecsDeployEvent(
+  urn: string,
+  name: string | null,
+  attributes: Record<string, unknown>,
+): NodeEventInput | null {
+  const iso = toIso(attributes.lastDeployedAt);
+  if (!iso) return null;
+  const label = name ?? urn.split(":").pop() ?? "service";
+  const evidence: Record<string, unknown> = { via: "ecs-primary-deployment" };
+  const td = str(attributes.taskDefinition);
+  if (td) evidence.taskDefinition = td;
+  return {
+    urn,
+    kind: "deploy",
+    occurredAt: iso,
+    actor: null,
+    title: `${label} deployed`,
+    evidence,
+    source: "aws-ecs",
+    dedupeKey: `deploy:${urn}:${iso}`,
+  };
+}
+
+/** Read the org's runtimes and persist a `deploy` event per Lambda (LastModified) and ECS service
+ *  (PRIMARY deployment). Idempotent by `deploy:<urn>:<timestamp>` — a redeploy adds exactly one event. */
 export async function deriveDeployEvents(
   deps: { db: Db },
   orgId: string,
 ): Promise<DeployEventsResult> {
   const rows = await withOrgScope(deps.db, orgId, (c) =>
     c
-      .query<{ urn: string; name: string | null; attributes: Record<string, unknown> }>(
-        `SELECT urn, name, attributes FROM nodes
-          WHERE kind = 'aws.lambda.function' AND deleted_at IS NULL
-            AND attributes->>'lastModified' IS NOT NULL`,
+      .query<{
+        urn: string;
+        name: string | null;
+        kind: string;
+        attributes: Record<string, unknown>;
+      }>(
+        `SELECT urn, name, kind, attributes FROM nodes
+          WHERE kind IN ('aws.lambda.function', 'aws.ecs.service') AND deleted_at IS NULL`,
       )
       .then((r) => r.rows),
   );
 
   const events: NodeEventInput[] = [];
   for (const n of rows) {
-    const e = lambdaDeployEvent(n.urn, n.name, n.attributes ?? {});
+    const attrs = n.attributes ?? {};
+    const e =
+      n.kind === "aws.ecs.service"
+        ? ecsDeployEvent(n.urn, n.name, attrs)
+        : lambdaDeployEvent(n.urn, n.name, attrs);
     if (e) events.push(e);
   }
   const res = await applyNodeEvents(deps.db, orgId, events);

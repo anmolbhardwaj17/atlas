@@ -51,8 +51,19 @@ interface EcsService {
     containerName?: string;
     containerPort?: number;
   }>;
+  /** DescribeServices returns the rollouts; the PRIMARY one's createdAt is the last deploy time. */
+  deployments?: Array<{ status?: string; createdAt?: Date | string; rolloutState?: string }>;
   /** From DescribeServices `include=TAGS` ({key,value} array); may be absent. Feeds R11. */
   tags?: Array<{ key?: string; value?: string }>;
+}
+
+/** The PRIMARY deployment's createdAt as ISO — when the currently-running task set was deployed. */
+function lastDeployedAt(data: EcsService): string | null {
+  const primary = (data.deployments ?? []).find((d) => d.status === "PRIMARY");
+  const raw = primary?.createdAt ?? data.deployments?.[0]?.createdAt;
+  if (!raw) return null;
+  const t = raw instanceof Date ? raw.getTime() : Date.parse(raw);
+  return Number.isNaN(t) ? null : new Date(t).toISOString();
 }
 
 /** Cluster name is the last `/` segment of a cluster ARN (`…:cluster/<name>`). */
@@ -89,6 +100,9 @@ export const ecsServiceModule: ServiceModule<EcsService> = {
         cluster,
         taskDefinition: data.taskDefinition,
         desiredCount: data.desiredCount,
+        // Deploy provenance for the change timeline (R? / deploy events): when the running task set
+        // was last deployed. Null when DescribeServices didn't return deployments.
+        lastDeployedAt: lastDeployedAt(data),
         tags: tagsToObject(data.tags),
       },
     };
