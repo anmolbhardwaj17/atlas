@@ -141,11 +141,22 @@ export class EdgeSuggestionService {
         );
         const provId = prov.rows[0]?.id;
 
+        // Revive-on-conflict (reconnect bug fix). `uq_edge` includes `inference_rule_id` (NULL here),
+        // so a previously-suggested edge that was later RETIRED (soft — the row persists) still
+        // collides. `DO NOTHING` meant a purged suggestion never came back on re-sync even though the
+        // active-only existence check above passed. Reviving is safe: rejected pairs live in a separate
+        // table and are already skipped, so the only conflicting row is a non-active suggestion.
         const ins = await c.query<{ id: string }>(
           `INSERT INTO edges
              (org_id, from_node_id, to_node_id, type, origin, confidence, provenance_id, last_seen)
            VALUES ($1, $2, $3, 'DEPLOYS_TO', 'ai_suggested', 'ai-suggested', $4, now())
-           ON CONFLICT ON CONSTRAINT uq_edge DO NOTHING
+           ON CONFLICT ON CONSTRAINT uq_edge DO UPDATE
+             SET status = 'active',
+                 origin = 'ai_suggested',
+                 confidence = 'ai-suggested',
+                 provenance_id = EXCLUDED.provenance_id,
+                 last_seen = now()
+             WHERE edges.status <> 'active'
            RETURNING id`,
           [orgId, fromId, toId, provId],
         );

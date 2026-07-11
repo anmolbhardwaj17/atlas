@@ -29,6 +29,19 @@ import { inferEnvironment } from "./environment";
 const MAX_DEPTH = 6;
 const MAX_NODE_BUDGET = 500;
 
+/** Trust ranking for collapsing duplicate edges to their strongest witness (observed ≫ inferred ≫
+ *  ai-suggested). Higher wins. Unknown confidence sorts lowest. */
+const EDGE_CONFIDENCE_RANK: Record<string, number> = {
+  observed: 5,
+  "inferred-high": 4,
+  "inferred-low": 3,
+  inferred: 2,
+  "ai-suggested": 1,
+};
+function edgeConfidenceRank(confidence: string): number {
+  return EDGE_CONFIDENCE_RANK[confidence] ?? 0;
+}
+
 const NODE_COLS = `id, urn, kind, name, provider, region, status, confidence, attributes, tags,
   first_seen, last_seen`;
 
@@ -1580,16 +1593,28 @@ export class GraphService {
       }
 
       const nodes = frontier.length ? [...budget, ...frontier] : budget;
-      const edges = touchingEdges
-        .filter((e) => inView.has(e.from_node_id) && inView.has(e.to_node_id))
-        .map((e) => ({
-          id: e.id,
-          from: e.from_node_id,
-          to: e.to_node_id,
-          type: e.type,
-          origin: e.origin,
-          confidence: e.confidence,
-        }));
+      // Collapse duplicate edges to ONE per (from,to,type) at the highest confidence. `uq_edge`
+      // includes `inference_rule_id`, so several rules (e.g. R1 name-match + R12/R17 SHA-match) each
+      // persist their own DEPLOYS_TO row for the same pair — correct for provenance, but the map must
+      // show a single cited edge at its strongest tier, not the same arrow twice at conflicting
+      // confidence (P3 — one high-confidence edge, not a high AND a low).
+      const bestByPair = new Map<string, (typeof touchingEdges)[number]>();
+      for (const e of touchingEdges) {
+        if (!(inView.has(e.from_node_id) && inView.has(e.to_node_id))) continue;
+        const key = `${e.from_node_id}|${e.to_node_id}|${e.type}`;
+        const prev = bestByPair.get(key);
+        if (!prev || edgeConfidenceRank(e.confidence) > edgeConfidenceRank(prev.confidence)) {
+          bestByPair.set(key, e);
+        }
+      }
+      const edges = [...bestByPair.values()].map((e) => ({
+        id: e.id,
+        from: e.from_node_id,
+        to: e.to_node_id,
+        type: e.type,
+        origin: e.origin,
+        confidence: e.confidence,
+      }));
 
       return { nodes, edges, truncated };
     });
