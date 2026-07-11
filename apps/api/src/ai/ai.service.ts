@@ -97,6 +97,15 @@ export class AiService {
   async suggestEdges(
     orgId: string,
   ): Promise<{ suggested: number; scannedRuntimes: number; overCap: number }> {
+    // Cost + load guard: this scans the estate and spends LLM budget. Per-org, since it's an
+    // org-wide Admin action (docs: rate-limit expensive endpoints).
+    await this.rateLimit.enforce(
+      orgId,
+      "ai_suggest_edges",
+      10,
+      600,
+      "AI link suggestions were just run. Give it a few minutes before running again.",
+    );
     const ctx = await this.edgeSuggest.gather(orgId);
     if (ctx.input.runtimes.length === 0 || ctx.input.repos.length === 0) {
       return {
@@ -334,13 +343,16 @@ export class AiService {
     orgId: string,
     conversationId: string,
     message: string,
+    userId?: string | null,
     signal?: AbortSignal,
   ): AsyncIterable<AnswerEvent> {
     // Abuse guard (H2), enforced here so BOTH transports (SSE controller + WS socket) are covered.
-    // Burst first — cheap, kills a tight loop before any DB/LLM work.
+    // Burst first — cheap, kills a tight loop before any DB/LLM work. Keyed PER-USER so one member's
+    // loop can't consume the whole org's burst allowance and DoS their teammates (the shared *cost*
+    // budget below stays per-org). Falls back to a per-org bucket if the user is somehow unknown.
     await this.rateLimit.enforce(
       orgId,
-      "ai_ask",
+      userId ? `ai_ask:${userId}` : "ai_ask",
       AI_BURST_LIMIT,
       AI_BURST_WINDOW_S,
       "You're sending AI requests too quickly. Give it a moment and try again.",

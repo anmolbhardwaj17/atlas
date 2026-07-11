@@ -85,6 +85,7 @@ export async function registerAskSocket(app: NestFastifyApplication): Promise<vo
     }
 
     let orgId: string | null = null;
+    let userId: string | null = null;
     let current: AbortController | null = null;
     const send = (obj: unknown): void => {
       try {
@@ -139,6 +140,7 @@ export async function registerAskSocket(app: NestFastifyApplication): Promise<vo
               return;
             }
             orgId = member.id;
+            userId = claims.userId;
             send({ t: "ready" });
           } catch {
             send({ type: "error", message: "invalid or expired token" });
@@ -169,6 +171,7 @@ export async function registerAskSocket(app: NestFastifyApplication): Promise<vo
               orgId,
               msg.conversationId,
               msg.message,
+              userId,
               ac.signal,
             )) {
               if (ac.signal.aborted) break;

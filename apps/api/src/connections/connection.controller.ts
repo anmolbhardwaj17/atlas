@@ -6,6 +6,7 @@ import { Roles } from "../auth/roles.decorator";
 import { ApiException } from "../common/errors";
 import { parseBody } from "../common/validation";
 import { AuditService } from "../core/audit.service";
+import { RateLimitService } from "../core/rate-limit.service";
 import type { InferenceStats } from "@atlas/inference";
 import type { AuthedRequest } from "../auth/auth.types";
 import { ConnectionService } from "./connection.service";
@@ -28,6 +29,7 @@ export class ConnectionController {
   constructor(
     private readonly connections: ConnectionService,
     private readonly audit: AuditService,
+    private readonly rateLimit: RateLimitService,
   ) {}
 
   @Post()
@@ -74,6 +76,15 @@ export class ConnectionController {
   @Post("reindex")
   @Roles("Admin")
   async reindex(@Req() req: AuthedRequest): Promise<InferenceStats> {
+    // Reindex runs the whole inference engine synchronously in the request thread — cap it so a
+    // loop of clicks can't self-DoS the API (docs: rate-limit expensive endpoints). Per-org.
+    await this.rateLimit.enforce(
+      org(req).id,
+      "reindex",
+      10,
+      600,
+      "Links were just rebuilt. Give it a few minutes before rebuilding again.",
+    );
     const stats = await this.connections.reindex(org(req).id);
     await this.audit.fromRequest(req, {
       action: "graph.reindex",

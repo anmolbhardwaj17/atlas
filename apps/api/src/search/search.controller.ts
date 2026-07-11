@@ -6,17 +6,30 @@ import { Roles } from "../auth/roles.decorator";
 import { ApiException } from "../common/errors";
 import { parseBody } from "../common/validation";
 import type { AuthedRequest } from "../auth/auth.types";
+import { RateLimitService } from "../core/rate-limit.service";
 import { SEARCH_PROVIDER, SearchQuerySchema, type SearchProvider } from "./search.provider";
 
 /** Search (docs/08 §10.1, docs/11). Hybrid keyword+semantic; MVP is keyword (Postgres). */
 @Controller("search")
 @UseGuards(AuthGuard, TenantScopeGuard, RolesGuard)
 export class SearchController {
-  constructor(@Inject(SEARCH_PROVIDER) private readonly search: SearchProvider) {}
+  constructor(
+    @Inject(SEARCH_PROVIDER) private readonly search: SearchProvider,
+    private readonly rateLimit: RateLimitService,
+  ) {}
 
   @Get()
   @Roles("Member")
   async run(@Req() req: AuthedRequest, @Query() query: unknown): Promise<unknown> {
+    // Heavy multi-join read. Per-user backstop against a scripted loop (generous — normal typing
+    // through the ⌘K palette stays well under it).
+    await this.rateLimit.enforce(
+      org(req).id,
+      `search:${req.auth?.userId ?? "anon"}`,
+      120,
+      60,
+      "Too many searches in a short time. Give it a moment.",
+    );
     return this.search.search(org(req).id, parseBody(SearchQuerySchema, query));
   }
 }

@@ -4,6 +4,7 @@ import { AuthGuard } from "../auth/auth.guard";
 import { TenantScopeGuard } from "../auth/tenant-scope.guard";
 import { RolesGuard } from "../auth/roles.guard";
 import { Roles } from "../auth/roles.decorator";
+import { RateLimitService } from "../core/rate-limit.service";
 import { ApiException } from "../common/errors";
 import { parseBody } from "../common/validation";
 import type { AuthedRequest } from "../auth/auth.types";
@@ -27,7 +28,23 @@ const MuteFindingSchema = z.object({ reason: z.string().trim().max(280).optional
 @Controller()
 @UseGuards(AuthGuard, TenantScopeGuard, RolesGuard)
 export class GraphController {
-  constructor(private readonly graph: GraphService) {}
+  constructor(
+    private readonly graph: GraphService,
+    private readonly rateLimit: RateLimitService,
+  ) {}
+
+  /** Shared per-user backstop for the heavy dashboard reads (summary/insights): each opens several
+   *  parallel org-scoped connections of full-estate joins, so a scripted refresh loop could saturate
+   *  the pool. Generous — normal navigation stays well under it. */
+  private async heavyReadGuard(req: AuthedRequest): Promise<void> {
+    await this.rateLimit.enforce(
+      org(req).id,
+      `heavy_read:${req.auth?.userId ?? "anon"}`,
+      120,
+      60,
+      "Loading dashboards too quickly. Give it a moment and refresh.",
+    );
+  }
 
   @Get("overview")
   @Roles("Member")
@@ -38,6 +55,7 @@ export class GraphController {
   @Get("summary")
   @Roles("Member")
   async summary(@Req() req: AuthedRequest): Promise<unknown> {
+    await this.heavyReadGuard(req);
     return this.graph.summary(org(req).id);
   }
 
@@ -65,6 +83,7 @@ export class GraphController {
   @Get("insights")
   @Roles("Member")
   async insights(@Req() req: AuthedRequest): Promise<unknown> {
+    await this.heavyReadGuard(req);
     const orgId = org(req).id;
     const [s, mutes, states] = await Promise.all([
       this.graph.summary(orgId),

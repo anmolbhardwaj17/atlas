@@ -144,7 +144,7 @@ export class AiController {
       }
     }, 15_000);
     try {
-      for await (const ev of this.ai.askStream(orgId, id, message)) {
+      for await (const ev of this.ai.askStream(orgId, id, message, req.auth?.userId ?? null)) {
         reply.raw.write(`event: ${ev.type}\ndata: ${JSON.stringify(ev)}\n\n`);
       }
     } catch (err) {
