@@ -69,15 +69,13 @@ export function ContributorsDonut({
                   content={({ viewBox }) => {
                     if (viewBox && "cx" in viewBox && "cy" in viewBox) {
                       return (
-                        <text
-                          x={viewBox.cx}
-                          y={viewBox.cy}
-                          textAnchor="middle"
-                          dominantBaseline="middle"
-                        >
+                        <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
+                          {/* dy=0.35em centers on the baseline — cross-browser reliable, unlike
+                              dominantBaseline="middle" which Safari renders too high. */}
                           <tspan
                             x={viewBox.cx}
                             y={viewBox.cy}
+                            dy="0.35em"
                             className="fill-foreground text-2xl font-semibold"
                           >
                             {total.toLocaleString()}
@@ -85,6 +83,7 @@ export function ContributorsDonut({
                           <tspan
                             x={viewBox.cx}
                             y={(viewBox.cy || 0) + 20}
+                            dy="0.35em"
                             className="fill-muted-foreground text-xs"
                           >
                             PRs

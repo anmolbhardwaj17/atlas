@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { getClientToken, acceptInvitation } from "@/lib/browser-api";
+import { ACTIVE_ORG_COOKIE } from "@/lib/active-org";
 import { Button } from "@/components/ui/button";
 import { AtlasLogo } from "@/components/brand";
 
@@ -35,8 +36,16 @@ export default function InviteAcceptPage() {
       try {
         const res = await acceptInvitation(token);
         if (cancelled) return;
+        // Land in the workspace they just joined, not whatever org was active before. Set the
+        // switcher cookie so the server render picks the invited org.
+        if (res?.orgId) {
+          document.cookie = `${ACTIVE_ORG_COOKIE}=${res.orgId}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+        }
         setState({ k: "done", org: res?.orgName ?? "your team" });
-        setTimeout(() => router.push("/dashboard"), 1400);
+        setTimeout(() => {
+          router.push("/dashboard");
+          router.refresh();
+        }, 1400);
       } catch (e) {
         if (!cancelled) {
           setState({ k: "error", msg: e instanceof Error ? e.message : "Couldn't accept." });

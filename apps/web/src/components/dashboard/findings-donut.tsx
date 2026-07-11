@@ -69,15 +69,13 @@ export function FindingsDonut({ findings }: { findings: Array<{ severity: string
                   content={({ viewBox }) => {
                     if (viewBox && "cx" in viewBox && "cy" in viewBox) {
                       return (
-                        <text
-                          x={viewBox.cx}
-                          y={viewBox.cy}
-                          textAnchor="middle"
-                          dominantBaseline="middle"
-                        >
+                        <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
+                          {/* dy=0.35em centers on the baseline — cross-browser reliable, unlike
+                              dominantBaseline="middle" which Safari renders too high. */}
                           <tspan
                             x={viewBox.cx}
                             y={viewBox.cy}
+                            dy="0.35em"
                             className="fill-foreground text-3xl font-semibold"
                           >
                             {total}
