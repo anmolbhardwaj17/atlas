@@ -1,7 +1,7 @@
 "use client";
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { ChevronDown, ChevronRight, GitPullRequest, Shield } from "lucide-react";
+import { ChevronDown, ChevronRight, GitPullRequest, Globe, Shield } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { CloudIcon } from "@/components/cloud-icon";
 import { kindIcon, kindStyle, kindShort, KIND_LOGO } from "@/lib/kind-visual";
@@ -39,6 +39,8 @@ export function ResourceNode({ data, selected }: NodeProps) {
     node: MapNode;
     collapse?: CollapseInfo;
     openPrCount?: number;
+    /** Internet-reachable (R16 EXPOSED_VIA: world-open SG or internet-facing LB) - shown as a chip. */
+    exposed?: boolean;
     /** Security groups protecting this node - protection reads as a chip, not canvas rails. */
     protectedBy?: string[];
     /** Recede this node (Health lens / blast-radius focus dims everything out of scope). */
@@ -47,6 +49,7 @@ export function ResourceNode({ data, selected }: NodeProps) {
   const node = d.node;
   const collapse = d.collapse;
   const openPrs = d.openPrCount ?? 0;
+  const exposed = d.exposed ?? false;
   const protectors = d.protectedBy ?? [];
   const Icon = kindIcon(node.kind);
   const logo = KIND_LOGO[node.kind];
@@ -101,6 +104,15 @@ export function ResourceNode({ data, selected }: NodeProps) {
           {short}
           {node.region ? ` · ${node.region}` : ""}
         </div>
+        {exposed ? (
+          <span
+            className="mt-1 inline-flex max-w-full items-center gap-1 truncate rounded-full bg-orange-500/15 px-1.5 py-px text-[9px] font-medium text-orange-600 dark:text-orange-400"
+            title="Reachable from the public internet - via a world-open security group or an internet-facing load balancer (R16)"
+          >
+            <Globe className="size-2.5 shrink-0" />
+            <span className="truncate">Internet-exposed</span>
+          </span>
+        ) : null}
         {health && health.state !== "healthy" ? (
           <span
             className={cn(

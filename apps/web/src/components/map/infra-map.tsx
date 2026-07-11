@@ -150,9 +150,19 @@ export function InfraMap({
   // shield chip on the protected node (full list in its detail panel); an SG whose only
   // edges were PROTECTS then drops off the map automatically (still in Explore). The
   // Security toggle brings both back.
+  // EXPOSED_VIA is a node-level fact (the "Internet-exposed" chip), not a drawn line — as an edge it
+  // would just merge with the existing PROTECTS line to the same SG and read as noise. Keep it off
+  // the canvas; the exposed set below drives the chip. PROTECTS stays overlay-gated as before.
   const canvasEdges = useMemo(
-    () => (showSecurity ? data.edges : data.edges.filter((e) => e.type !== "PROTECTS")),
+    () =>
+      data.edges.filter((e) => e.type !== "EXPOSED_VIA" && (showSecurity || e.type !== "PROTECTS")),
     [data.edges, showSecurity],
+  );
+  // Internet-exposed compute (R16 EXPOSED_VIA, from a world-open SG or an internet-facing LB) — a
+  // security-critical fact shown always, like health. The node is the `from` of the edge.
+  const exposedIds = useMemo(
+    () => new Set(data.edges.filter((e) => e.type === "EXPOSED_VIA").map((e) => e.from)),
+    [data.edges],
   );
   const protectedBy = useMemo(() => {
     const byId = new Map(data.nodes.map((n) => [n.id, n]));
@@ -386,6 +396,7 @@ export function InfraMap({
             onSelect={setSelectedId}
             childrenOf={childrenOf}
             connectedIds={connectedIds}
+            exposedIds={exposedIds}
             collapsed={effectiveCollapsed}
             onToggleCollapse={toggleCollapse}
             showSecurity={showSecurity}
@@ -437,6 +448,7 @@ function Flow({
   onSelect,
   childrenOf,
   connectedIds,
+  exposedIds,
   collapsed,
   onToggleCollapse,
   showSecurity,
@@ -453,6 +465,7 @@ function Flow({
   onSelect: (id: string | null) => void;
   childrenOf: Map<string, string[]>;
   connectedIds: Set<string>;
+  exposedIds: Set<string>;
   collapsed: Set<string>;
   onToggleCollapse: (id: string) => void;
   showSecurity: boolean;
@@ -585,12 +598,14 @@ function Flow({
       const kids = childrenOf.get(nd.id);
       const openPrCount = openPrByRepo.get(nd.id) ?? 0;
       const protectors = protectedBy.get(nd.id);
-      if ((!kids || kids.length === 0) && openPrCount === 0 && !protectors) return nd;
+      const exposed = exposedIds.has(nd.id);
+      if ((!kids || kids.length === 0) && openPrCount === 0 && !protectors && !exposed) return nd;
       return {
         ...nd,
         data: {
           ...nd.data,
           openPrCount,
+          ...(exposed ? { exposed: true } : {}),
           ...(protectors ? { protectedBy: protectors } : {}),
           ...(kids && kids.length > 0
             ? {
@@ -614,6 +629,7 @@ function Flow({
     collapsed,
     childrenOf,
     connectedIds,
+    exposedIds,
     onToggleCollapse,
     openPrByRepo,
     shelvesForLayout,
