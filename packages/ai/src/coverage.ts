@@ -35,6 +35,14 @@ export interface IntentComment {
   text: string;
 }
 
+/** Intent captured from a named Jira custom field (Acceptance Criteria / Definition of Done /
+ *  Remediation …) — the connector detects these per-company so intent that lives OUTSIDE the
+ *  description still reaches the judge (IV-3 (b), convention-agnostic). */
+export interface IntentField {
+  label: string;
+  text: string;
+}
+
 /** The stated intent: a `jira.issue` node's captured attributes (IV-1). */
 export interface IntentIssue {
   /** The issue node id (for citation provenance). */
@@ -45,6 +53,8 @@ export interface IntentIssue {
   description: string;
   subtasks: IntentSubtask[];
   comments: IntentComment[];
+  /** Intent from named custom fields (highest-priority criteria when present). */
+  intentFields?: IntentField[];
 }
 
 /** The PR under review. */
@@ -182,23 +192,61 @@ function allListItems(lines: string[]): string[] {
   return out;
 }
 
+// A heading whose CONTENT expresses intent a fix should satisfy — for templated tickets that don't
+// use "Acceptance Criteria": security findings (Remediation Recommendation / Finding Description) or
+// bug reports (Expected behaviour / Steps to Reproduce). The heading name becomes the criterion label.
+const INTENT_SECTION =
+  /^\s*(#+\s*)?(remediation( recommendation)?|acceptance criteria|definition of done|expected( results?| behaviou?rs?)?|steps? to reproduce|requirements?|finding description|scope)\s*:?\s*$/i;
+// Any short Title-Case (or markdown) line that bounds a section — used to find where a section ends.
+const ANY_SECTION_HEADING = /^\s*(#+\s+\S|[A-Z][A-Za-z /]{2,45}:?)\s*$/;
+const EMPTY_VALUE = /^\s*(na|n\/?a|none|tbd|-|nil)\s*$/i;
+
+/**
+ * Extract intent-bearing sections from a heading/value templated description (e.g. a Jira
+ * "Remediation Recommendation" block). Each matched section's content becomes one criterion,
+ * labelled by its heading; empty/"NA" sections are skipped.
+ */
+function intentSectionsFromDescription(lines: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    if (!INTENT_SECTION.test(lines[i] ?? "")) continue;
+    const label = (lines[i] ?? "").replace(/[:#]/g, "").trim();
+    const buf: string[] = [];
+    for (let j = i + 1; j < lines.length; j += 1) {
+      const line = lines[j] ?? "";
+      if (line.trim() === "") {
+        if (buf.length) break;
+        continue;
+      }
+      if (ANY_SECTION_HEADING.test(line)) break; // next heading ends this section
+      buf.push(line.trim());
+    }
+    const value = buf.join(" ").replace(/\s+/g, " ").trim();
+    if (value && !EMPTY_VALUE.test(value)) out.push(`${label}: ${value}`);
+  }
+  return out;
+}
+
+/** Split a custom-field value into bullet items if it's a list, else the whole value as one item. */
+function splitFieldItems(text: string): string[] {
+  const items = allListItems(text.split(/\r?\n/));
+  return items.length > 0 ? items : [text.replace(/\s+/g, " ").trim()];
+}
+
 const MAX_CRITERIA = 12;
 
 /**
- * Extract acceptance criteria from a Jira issue (deterministic). Priority: an explicit
- * "Acceptance Criteria" list -> Gherkin scenarios -> any bullet list in the description. Each open
- * unit of intent also comes in as a criterion from the subtasks. Returns `explicit=false` when no
- * structured criteria were found (the caller then assesses against the description, with a caveat).
+ * Extract acceptance criteria from a Jira issue (deterministic, convention-agnostic). Priority:
+ * named custom fields (Acceptance Criteria / Remediation / DoD, if the connector captured them) ->
+ * an explicit "Acceptance Criteria" list -> Gherkin scenarios -> intent-bearing template sections
+ * (Remediation Recommendation / Expected / Steps to Reproduce, for non-AC tickets) -> any bullet
+ * list. Subtasks add per-item criteria. Returns `explicit=false` only when nothing structured is
+ * found (the caller then assesses against the whole description, with a caveat).
  */
 export function extractAcceptanceCriteria(issue: IntentIssue): {
   seeds: CriterionSeed[];
   explicit: boolean;
 } {
-  const lines = issue.description.split(/\r?\n/);
-  let texts = itemsUnderAcHeading(lines);
-  if (texts.length === 0) texts = gherkinScenarios(lines);
-  if (texts.length === 0) texts = allListItems(lines);
-
   const seeds: CriterionSeed[] = [];
   const seen = new Set<string>();
   const push = (text: string, source: CoverageCriterion["source"]): void => {
@@ -210,19 +258,37 @@ export function extractAcceptanceCriteria(issue: IntentIssue): {
     seeds.push({ text: t.length > 300 ? `${t.slice(0, 300)}…` : t, source });
   };
 
-  const explicit = texts.length > 0;
-  for (const t of texts) push(t, "description");
-  // Subtasks are units of intent too (the plan explicitly calls them out). Include them so a
-  // ticket that expresses its "what" as subtasks still gets per-item coverage.
+  // 1) Named custom fields win — the company put intent in a dedicated field, on purpose.
+  for (const f of issue.intentFields ?? []) {
+    const items = splitFieldItems(f.text);
+    if (items.length > 1) for (const it of items) push(it, "description");
+    else if (items[0]) push(`${f.label}: ${items[0]}`, "description");
+  }
+  let explicit = seeds.length > 0;
+
+  // 2) Structure inside the description.
+  if (seeds.length === 0) {
+    const lines = issue.description.split(/\r?\n/);
+    let texts = itemsUnderAcHeading(lines);
+    if (texts.length === 0) texts = gherkinScenarios(lines);
+    if (texts.length === 0) texts = intentSectionsFromDescription(lines);
+    if (texts.length === 0) texts = allListItems(lines);
+    for (const t of texts) push(t, "description");
+    if (seeds.length > 0) explicit = true;
+  }
+
+  // 3) Subtasks are units of intent too — include them so a ticket that expresses its "what" as
+  // subtasks still gets per-item coverage.
   for (const s of issue.subtasks) {
     const label = s.summary?.trim();
     if (label) push(label, "subtask");
   }
 
   if (seeds.length === 0) {
-    // No structured criteria and no subtasks: fall back to the summary as a single criterion so
-    // the judge still assesses the diff against the stated goal (the caller flags the caveat).
-    push(issue.summary, "description");
+    // Nothing structured: assess against the whole DESCRIPTION (not just the summary — the intent
+    // usually lives there), else the summary. The caller flags the coarser-assessment caveat.
+    const desc = issue.description.replace(/\s+/g, " ").trim();
+    push(desc || issue.summary, "description");
     return { seeds: seeds.slice(0, MAX_CRITERIA), explicit: false };
   }
   return { seeds: seeds.slice(0, MAX_CRITERIA), explicit };
@@ -323,9 +389,15 @@ function prepare(inputs: CoverageInputs, issue: IntentIssue, diffText: string): 
   const intentLines: string[] = [
     `ISSUE: ${issue.key} - ${issue.summary}`,
     `DESCRIPTION: ${trim(issue.description.replace(/\s+\n/g, "\n").trim() || "(none)", MAX_DESC_CHARS)}`,
+  ];
+  // Named custom fields (Acceptance Criteria / Remediation / DoD) - the company's own intent fields.
+  for (const f of issue.intentFields ?? []) {
+    if (f.text.trim()) intentLines.push(`${f.label.toUpperCase()}: ${trim(f.text.trim(), 800)}`);
+  }
+  intentLines.push(
     "ACCEPTANCE CRITERIA (judge the diff against each; cite its [AC#] when you flag a gap):",
     ...criteria.map((c) => `  ${c.id} (${c.source}) ${c.text}`),
-  ];
+  );
   const comments = issue.comments.slice(0, MAX_COMMENTS).filter((c) => c.text.trim());
   if (comments.length) {
     intentLines.push("CLARIFYING COMMENTS (intent context; not separate criteria):");

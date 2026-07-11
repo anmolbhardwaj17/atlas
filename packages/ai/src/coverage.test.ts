@@ -90,17 +90,55 @@ describe("acceptance-criteria extraction", () => {
     expect(seeds.some((x) => x.source === "subtask" && x.text === "Add audit logging")).toBe(true);
   });
 
-  it("falls back to the summary (explicit=false) when nothing structured is found", () => {
+  it("falls back to the DESCRIPTION (explicit=false) when nothing structured is found", () => {
     const bare: IntentIssue = {
       ...ISSUE,
-      description: "just some prose",
+      description: "just some prose about the goal",
       subtasks: [],
       comments: [],
     };
     const { seeds, explicit } = extractAcceptanceCriteria(bare);
     expect(explicit).toBe(false);
     expect(seeds).toHaveLength(1);
-    expect(seeds[0]?.text).toBe("Harden the login flow");
+    expect(seeds[0]?.text).toBe("just some prose about the goal"); // description, not summary
+  });
+
+  it("pulls intent from a templated description (security-finding Remediation section)", () => {
+    const finding: IntentIssue = {
+      ...ISSUE,
+      summary: "Cookie missing HttpOnly flag",
+      description: [
+        "Finding Description",
+        "Cookies are set without the HttpOnly flag.",
+        "Severity",
+        "Medium",
+        "Remediation Recommendation",
+        "Set the HttpOnly attribute on all session cookies.",
+        "Steps to Reproduce",
+        "NA",
+      ].join("\n"),
+      subtasks: [],
+      comments: [],
+    };
+    const { seeds, explicit } = extractAcceptanceCriteria(finding);
+    expect(explicit).toBe(true);
+    const texts = seeds.map((s) => s.text);
+    expect(texts.some((t) => /Remediation.*HttpOnly attribute/i.test(t))).toBe(true);
+    expect(texts.some((t) => /steps to reproduce/i.test(t))).toBe(false); // "NA" section skipped
+  });
+
+  it("prefers named custom fields (intentFields) over description parsing", () => {
+    const withField: IntentIssue = {
+      ...ISSUE,
+      description: "As a user I want a thing.\nAcceptance Criteria:\n- from the description",
+      intentFields: [{ label: "Acceptance Criteria", text: "- email verified\n- session cleared" }],
+    };
+    const { seeds, explicit } = extractAcceptanceCriteria(withField);
+    expect(explicit).toBe(true);
+    expect(seeds.map((s) => s.text)).toEqual(
+      expect.arrayContaining(["email verified", "session cleared"]),
+    );
+    expect(seeds.some((s) => s.text === "from the description")).toBe(false); // custom field won
   });
 });
 

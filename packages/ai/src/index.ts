@@ -104,6 +104,7 @@ export type {
   CoverageDeps,
   CoveragePr,
   IntentIssue,
+  IntentField,
   IntentSubtask,
   IntentComment,
   DiffHunk,
