@@ -655,8 +655,10 @@ export class GraphService {
               WHERE kind = 'aws.elb' AND deleted_at IS NULL AND status <> 'deleted'
                 AND attributes->>'scheme' = 'internet-facing'`,
           ),
-          // Wildcard IAM (Phase E): roles whose policy statements Allow action AND resource
-          // '*' - the classic over-broad grant (aws.iam.policy_statements signals).
+          // Wildcard IAM: roles whose policy statements Allow action AND resource '*' - the classic
+          // over-broad grant. Trust: EXCLUDE AWS service-linked roles (path /aws-service-role/ or
+          // name AWSServiceRoleFor*) - those are AWS-owned, wildcard by design, and not something the
+          // customer can (or should) scope down. Only customer-managed roles are actionable.
           c.query<{ id: string; name: string | null }>(
             `SELECT DISTINCT n.id, n.name
                FROM signals s
@@ -665,13 +667,20 @@ export class GraphService {
               WHERE s.kind = 'aws.iam.policy_statements'
                 AND st->>'effect' = 'Allow'
                 AND st->'actions' ? '*'
-                AND st->'resources' ? '*'`,
+                AND st->'resources' ? '*'
+                AND coalesce(n.attributes->>'path', '') NOT LIKE '/aws-service-role/%'
+                AND coalesce(n.name, '') NOT LIKE 'AWSServiceRoleFor%'`,
           ),
-          // Single-AZ production databases (Phase E): one AZ failure takes them down.
+          // Single-AZ PRODUCTION databases: one AZ failure takes them down. Trust: a dev/test/staging
+          // DB legitimately doesn't need Multi-AZ, so exclude obviously non-prod names (and non-prod
+          // env tags) - flagging a scratch DB is noise. The recommendation is for prod data.
           c.query<{ id: string; name: string | null }>(
             `SELECT id, name FROM nodes
               WHERE kind = 'aws.rds.instance' AND deleted_at IS NULL AND status <> 'deleted'
-                AND attributes->>'multiAz' = 'false'`,
+                AND attributes->>'multiAz' = 'false'
+                AND coalesce(name, '') !~* '(dev|test|staging|stage|sandbox|sbx|qa|demo|scratch|tmp)'
+                AND coalesce(lower(attributes->'tags'->>'environment'), attributes->'tags'->>'env', '')
+                    !~* '(dev|test|staging|stage|sandbox|qa|demo)'`,
           ),
           // Runtime health (operational-intelligence Phase B): nodes the health poll marked
           // degraded/unhealthy, worst first - the "something is broken right now" finding.
