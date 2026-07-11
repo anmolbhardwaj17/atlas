@@ -79,9 +79,65 @@ Output contract: **ranked hypotheses, each citing its evidence chain** (alarm �
 
 Deterministic rule library over the real graph — findings, not vibes: SG open to `0.0.0.0/0` reaching a datastore · public ALB with no WAF · single-AZ prod RDS · unencrypted storage · wildcard IAM · **exposed AND vulnerable** (the toxic combo — `docs/plans/security-vulnerabilities.md` Phase 2, now unblocked by live AWS). Each feeds the existing advisory path (KE-P2 knowledge packs: facts cited, advice labelled). Personalization is structural: rules fire on *their* graph, the AI narrates *their* paths — not generic best-practice prose.
 
+## Code context — how we know the *logic*, not just the PR
+
+> The recurring question: to trace a fault into the code, do we index/vectorize the whole codebase?
+> **No — not as the foundation, and not first.** The incident already points at the code. Retrieval is
+> *targeted*, driven by the error itself; the LLM supplies comprehension. Atlas's job is **evidence
+> assembly, not pre-computed understanding.** Layered, cheapest → most expensive:
+
+| Layer | What | When needed | Cost / staleness |
+|---|---|---|---|
+| **L0 — structural map** | repos, PR→changed-files, CODEOWNERS, manifests (already crawled) | attribution ranking: stack-trace files ∩ PR diff | free, already have |
+| **L1 — targeted fetch at the *deployed SHA*** | pull the blamed files (+ direct imports) at the commit **actually running in prod**, plus the candidate PR diffs; drop into the model's context | every incident | cheap, always fresh, reuses the connector's existing `content()` fetch |
+| **L2 — symbol/reference index** | tree-sitter/LSP-style def/ref/import graph → walk from the crashing symbol outward | "what calls this / what does it touch" blast-radius *in code* | per-language work; deterministic + citeable; a later phase |
+| **L3 — semantic embeddings** | vectorize code chunks for *fuzzy* retrieval | **fallback only** — when there's no stack trace, just a vague message | most expensive, re-embed on every change, **lowest precision** (P3 distrusts "looks related") |
+
+**Two distinct jobs, don't conflate them:** *localize* the fault (structural — the log's stack trace
+does most of the work) vs. *explain* it (the model reads the actual code at the deployed SHA + the diff
+and reasons "this hunk produces this error"). We never pre-compute "understanding"; we assemble the
+right ~200 lines + evidence at incident time and let a strong model (Opus, 1M ctx) reason over it, every
+claim cited to a real file/commit/log line.
+
+**Onset & signatures (the "5-year-old silent bug" answer).** Normalize each error log into a
+**signature** (strip volatile tokens → template → hash); track `first_seen` + `rate_before/after`.
+- brand-new signature after a deploy → cleanest code attribution.
+- old signature, steady → flagged **"not new — first seen <date>"**; reframed as chronic, *not* blamed on today's PR.
+- old signature, rate **stepped up** at T → correlate T to what changed then (usually traffic/data/config, not code).
+
+**Attribution is ranked, never asserted.** Candidate changes in `[onset−W, onset]` ranked by: *did this
+deploy actually reach the failing node* × temporal proximity × **code-path overlap** (stack-trace
+files/symbols ∩ each PR's changed files — the strongest disambiguator, and honest because the log itself
+names the code) × dependency/blast-radius overlap. Output is a **classified verdict**:
+`code-correlated | config-correlated | dependency-correlated | chronic-no-onset | unknown` — not a single PR.
+
+**Commit-precision depends on deploy provenance, which we *auto-detect*, not ask.** We probe the real
+artifacts — ECS image tags, Lambda version/description/`CodeSha256` — for an embedded git SHA. Present →
+exact commit. Absent (`:latest`) → repo-level only, **stated out loud** ("traced to `payments-svc`, but
+the image is tagged `latest` — I can't pin the commit"). The gap is a trust signal, not a hidden failure;
+it also tells the customer the highest-ROI fix is to start SHA-tagging their builds.
+
+**Data-handling (P2 + tenant/BYO-LLM boundary):** reading code is within P2 (read-only; we already fetch
+file content). But source → LLM is sensitive: fetch **only failure-path files**, never the whole repo;
+route through the org's configured model (BYO or shared Claude) under the same tenant isolation; log what
+was fetched. Note in `docs/13` when this ships.
+
+## Decisions (interactive) — 2026-07-11
+
+- **Logs = on-demand at incident time for v1** (bounded Logs Insights queries on the implicated log
+  groups + window; persist error *signatures*, not raw lines). **Continuous monitoring later** — a
+  configurable poll (15/30/60 min, cadence TBD by cost) that pre-computes onset/signatures. Not a TSDB.
+- **v1 scope = acute-onset correlation** (clean onset + ranked candidates + symptom-vs-cause via the
+  graph). **Chronic is reframed honestly, not fake-diagnosed**; genuine latent-bug *discovery* (finding a
+  5-year-old line) is explicitly out of v1 — pretending to would be the dishonesty we're avoiding.
+- **Code context = targeted retrieval (L0→L1) first; embeddings (L3) are a later fallback, not the base.**
+- **Deploy-provenance (git SHA) is probed from the artifacts, not asked of the user;** the gap is surfaced.
+- **Health/logs need an IAM grant beyond `SecurityAudit`** (`logs:StartQuery`/`GetQueryResults`/
+  `FilterLogEvents`, `cloudwatch:GetMetricData`) — track as a distinct grant in the hub (FR-1.6).
+
 ## IAM delta (append to the read-only policy)
 
-`cloudwatch:DescribeAlarms` · `cloudwatch:GetMetricData` · `elasticloadbalancing:DescribeTargetHealth` · `ecs:ListTasks` · `ecs:DescribeTasks` · `ecs:DescribeServices` · `cloudtrail:LookupEvents` · `ssm:DescribeInstanceInformation` · `ssm:ListInventoryEntries`. All Describe/List/Get — P2 intact. Missing grants degrade per FR-1.6 (named in the hub, never silent).
+`cloudwatch:DescribeAlarms` · `cloudwatch:GetMetricData` · `elasticloadbalancing:DescribeTargetHealth` · `ecs:ListTasks` · `ecs:DescribeTasks` · `ecs:DescribeServices` · `cloudtrail:LookupEvents` · `ssm:DescribeInstanceInformation` · `ssm:ListInventoryEntries` · **logs (Phase D):** `logs:DescribeLogGroups` · `logs:StartQuery` · `logs:GetQueryResults` · `logs:FilterLogEvents`. All Describe/List/Get/Query — P2 intact (read-only). Missing grants degrade per FR-1.6 (named in the hub, never silent). Note: several `logs:*` and `cloudwatch:GetMetricData` are **not** in the AWS-managed `SecurityAudit` policy — surface them as a separate grant.
 
 ## Hard boundaries (say them out loud)
 
