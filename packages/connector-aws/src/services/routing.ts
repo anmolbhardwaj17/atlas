@@ -63,8 +63,19 @@ export const elbModule: ServiceModule<LoadBalancer> = {
     }
     return edges;
   },
-  extractSignals() {
-    return [];
+  // The LB's target-group ARNs (all target types) as a signal. ECS-service targets can't be turned
+  // into an observed ROUTES_TO here (the service ARN isn't on the target — targets are ENIs/IPs), so
+  // R15 matches this against the ECS service's own `aws.ecs.targetgroups` signal by shared ARN to
+  // draw ALB→service routing. `scheme` rides along so exposure inference (R16) can cite it.
+  extractSignals({ account, region, data }) {
+    const targetGroupArns = (data.TargetGroups ?? [])
+      .map((tg) => tg.TargetGroupArn)
+      .filter((arn): arn is string => typeof arn === "string");
+    if (targetGroupArns.length === 0) return [];
+    const subjectUrn = awsUrn("aws.elb", { account, region, naturalKey: data.LoadBalancerName });
+    return [
+      { kind: "aws.elb.targetgroups", subjectUrn, data: { targetGroupArns, scheme: data.Scheme } },
+    ];
   },
 };
 

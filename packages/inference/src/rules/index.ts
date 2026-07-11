@@ -19,6 +19,8 @@ import { sgCorrelationConnectsRule } from "./r2-sg";
 import { configRefConnectsRule } from "./r3-config";
 import { iamAccessConnectsRule } from "./r8-iam";
 import { crossBoundaryConnectsRule } from "./r9-cross-boundary";
+import { albRoutesToServiceRule } from "./r15-alb-service";
+import { internetExposureRule } from "./r16-exposure";
 
 export const ALL_RULES: readonly Rule[] = [
   // Connection rules (R2/R3/R8/R9) are independent of R1/R4 and can run first or last.
@@ -26,6 +28,10 @@ export const ALL_RULES: readonly Rule[] = [
   configRefConnectsRule,
   iamAccessConnectsRule,
   crossBoundaryConnectsRule,
+  // Exposure chain: R15 (ALB→service ROUTES_TO) must run before R16, which reads that inferred
+  // ROUTES_TO (plus observed PROTECTS/ROUTES_TO) to derive EXPOSED_VIA.
+  albRoutesToServiceRule,
+  internetExposureRule,
   // Deploy → service chain (dependency-ordered). R1/R10/R11/R12/R13 all emit DEPLOYS_TO(repo→runtime)
   // and must run before R4 (service derivation reads high-confidence DEPLOYS_TO).
   repoDeploysToRuntimeRule,
@@ -52,3 +58,5 @@ export { sgCorrelationConnectsRule } from "./r2-sg";
 export { configRefConnectsRule } from "./r3-config";
 export { iamAccessConnectsRule } from "./r8-iam";
 export { crossBoundaryConnectsRule } from "./r9-cross-boundary";
+export { albRoutesToServiceRule } from "./r15-alb-service";
+export { internetExposureRule } from "./r16-exposure";

@@ -688,8 +688,8 @@ export class GraphService {
         };
       }),
       scope(async (c) => {
-        const [contributors, mostActiveRepos, vulnSeverity, topVulnPkg, sprawl] = await Promise.all(
-          [
+        const [contributors, mostActiveRepos, vulnSeverity, topVulnPkg, sprawl, exposedVulns] =
+          await Promise.all([
             // Top contributors by PRs raised (open + merged) in the last 90 days.
             c.query<{ name: string | null; n: number }>(
               `SELECT u.name, count(*)::int AS n
@@ -765,9 +765,49 @@ export class GraphService {
              HAVING count(DISTINCT pv.evidence->>'version') >= 3
               ORDER BY versions DESC LIMIT 1`,
             ),
-          ],
-        );
-        return { contributors, mostActiveRepos, vulnSeverity, topVulnPkg, sprawl };
+            // ── The toxic combination (Phase 2): internet-EXPOSED resources running known-
+            // vulnerable code. Walk the whole chain — EXPOSED_VIA(resource) ← DEPLOYS_TO(repo) →
+            // DEPENDS_ON_PKG(pkg) ← AFFECTS(vuln) — keeping only critical/high vulns. One row per
+            // exposed, vulnerable runtime, worst severity first. This is the finding that matters
+            // (reachable > buried), the payoff of holding code + cloud + exposure in one graph.
+            c.query<{
+              id: string;
+              name: string | null;
+              kind: string;
+              vulns: number;
+              worst_rank: number;
+              sample_vuln: string | null;
+              sample_pkg: string | null;
+              via: string | null;
+            }>(
+              `SELECT rt.id, rt.name, rt.kind,
+                      count(DISTINCT v.id)::int AS vulns,
+                      min(CASE v.attributes->>'severity'
+                            WHEN 'critical' THEN 0 WHEN 'high' THEN 1
+                            WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END) AS worst_rank,
+                      (array_agg(v.attributes->>'osvId' ORDER BY
+                          CASE v.attributes->>'severity' WHEN 'critical' THEN 0 WHEN 'high' THEN 1
+                               WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END))[1] AS sample_vuln,
+                      (array_agg(pkg.name))[1] AS sample_pkg,
+                      (array_agg(ev_prov.evidence->>'via'))[1] AS via
+                 FROM nodes rt
+                 JOIN edges ev ON ev.from_node_id = rt.id AND ev.type = 'EXPOSED_VIA'
+                       AND ev.status = 'active'
+                 LEFT JOIN provenance ev_prov ON ev_prov.id = ev.provenance_id
+                 JOIN edges dt ON dt.to_node_id = rt.id AND dt.type = 'DEPLOYS_TO'
+                       AND dt.status = 'active'
+                 JOIN edges dep ON dep.from_node_id = dt.from_node_id
+                       AND dep.type = 'DEPENDS_ON_PKG' AND dep.status = 'active'
+                 JOIN nodes pkg ON pkg.id = dep.to_node_id AND pkg.kind = 'external.package'
+                 JOIN edges a ON a.to_node_id = pkg.id AND a.type = 'AFFECTS' AND a.status = 'active'
+                 JOIN nodes v ON v.id = a.from_node_id AND v.kind = 'security.vulnerability'
+                WHERE rt.status <> 'deleted' AND rt.deleted_at IS NULL
+                  AND v.attributes->>'severity' IN ('critical', 'high')
+                GROUP BY rt.id, rt.name, rt.kind
+                ORDER BY worst_rank, vulns DESC LIMIT 20`,
+            ),
+          ]);
+        return { contributors, mostActiveRepos, vulnSeverity, topVulnPkg, sprawl, exposedVulns };
       }),
       // 4th parallel scope: the human PR-centric activity feed (was a sequential round-trip).
       this.recentActivity(orgId, activitySince, 6),
@@ -786,7 +826,8 @@ export class GraphService {
       singleAzDbs,
       unhealthy,
     } = grpTopology;
-    const { contributors, mostActiveRepos, vulnSeverity, topVulnPkg, sprawl } = grpPeopleVulns;
+    const { contributors, mostActiveRepos, vulnSeverity, topVulnPkg, sprawl, exposedVulns } =
+      grpPeopleVulns;
 
     const base = (() => {
       const code = codeCounts.rows[0];
@@ -847,11 +888,41 @@ export class GraphService {
         vulnSeverity: vulnSeverity.rows,
         topVulnPkg: topVulnPkg.rows[0] ?? null,
         sprawl: sprawl.rows[0] ?? null,
+        exposedVulns: exposedVulns.rows,
       };
     })();
 
     // ── Findings (severity-ranked, cited) ──────────────────────────────────────
     const findings: Finding[] = [];
+    // ── The toxic combination (Phase 2): exposed AND vulnerable — the headline security finding ──
+    const exposedVulns2 = base.exposedVulns ?? [];
+    if (exposedVulns2.length > 0) {
+      const first = exposedVulns2[0];
+      const viaLabel = (v: string | null): string =>
+        v === "world-open-sg"
+          ? "a world-open security group"
+          : v === "internet-facing-lb"
+            ? "an internet-facing load balancer"
+            : "the internet";
+      findings.push({
+        id: "exposed-vulnerable",
+        severity: "high",
+        category: "Reachable vulnerability",
+        title: `${exposedVulns2.length} internet-exposed ${exposedVulns2.length > 1 ? "resources are" : "resource is"} running known-vulnerable code`,
+        detail: exposedVulns2
+          .map(
+            (r) =>
+              `${r.name ?? r.id}${r.sample_pkg ? ` (${r.sample_pkg}${r.sample_vuln ? ` · ${r.sample_vuln}` : ""})` : ""} - reachable via ${viaLabel(r.via)}`,
+          )
+          .join("; "),
+        href: first ? `/explore/${first.id}` : null,
+        count: exposedVulns2.length,
+        evidence: exposedVulns2.map((r) => ({
+          id: r.id,
+          label: `${r.name ?? r.id}${r.sample_vuln ? ` · ${r.sample_vuln}` : ""}${r.vulns > 1 ? ` (+${r.vulns - 1} more)` : ""}`,
+        })),
+      });
+    }
     // ── Security posture (Phase E, first slice) ──
     const openSgs2 = base.openSgs ?? [];
     if (openSgs2.length > 0) {

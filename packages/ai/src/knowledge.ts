@@ -55,6 +55,12 @@ const GUIDANCE: Record<string, Guidance> = {
     pillar: "hygiene",
     source: "Dependency management best practice (SLSA / supply-chain)",
   },
+  "reachable vulnerability": {
+    why: "The toxic combination: a known CVE ships in code that is deployed to an internet-reachable resource (behind an internet-facing load balancer or a world-open security group). Unlike a buried dependency, this one is remotely exploitable right now - it's the handful worth fixing before the wall of other CVEs.",
+    fix: "Patch the internet-exposed services first - upgrade each affected package to its fixed version. Where the exposure is unintended, also cut the reachability: restrict the security group off 0.0.0.0/0 or make the load balancer internal, so a future vulnerability behind it isn't remotely exploitable. Prioritise by severity AND reachability, not severity alone.",
+    pillar: "security",
+    source: "OWASP A06:2021 + reachability-based prioritisation (EPSS/KEV)",
+  },
   "source health": {
     why: "A degraded or disconnected source means the graph is going stale for that provider - answers and findings silently drift from reality.",
     fix: "Reconnect the source / rotate its credentials and re-sync so coverage is current; check the connector's least-privilege role is still valid.",

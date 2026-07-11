@@ -142,6 +142,7 @@ All segments are lowercased except case-significant natural keys (e.g. GitHub re
 | `USES_IMAGE` | ecs.taskdef → ecr.repository | Task definition references a container image | observed |
 | `OWNED_BY` | resource/repo → team/user | Ownership (from CODEOWNERS, AWS tags) | observed |
 | `DEPENDS_ON_PKG` | repo → external package | Dependency manifest edge (repo→library) | observed |
+| `EXPOSED_VIA` | compute resource → sg/elb | Resource is internet-reachable via this exposer (world-open SG or internet-facing LB) — the cloud-posture half of the "exposed AND vulnerable" toxic combination (R16) | inferred |
 | `STORES_IN` | service/runtime → datastore | Persists data in (service→S3/RDS/DynamoDB) | inferred |
 | `TRIGGERS` | source → target | Event source triggers compute (S3→Lambda, EventBridge→Lambda) | observed |
 | `CHANGED_BY` | resource → pull_request | A resource was likely affected by a PR (for "what changed"/culprit) | inferred |
@@ -298,12 +299,26 @@ Each rule below shows: trigger, evidence, output edge, confidence, and *why that
 - **Why:** the observability service name is the *canonical* identifier engineers use for a service — a high-signal, near-observed link that costs nothing extra (the env vars are already crawled for R3). Distinct from R3, which matches env values against *datastore endpoints*, not service names.
 - **Evidence stored:** the env key + value + matched repo slug + the runtime URN (P4). See `docs/plans/signal-enrichment.md` (slice 3).
 
+**R15 — `alb_routes_to_service` → `ROUTES_TO` (inferred-high)** *(fills the ALB→ECS routing gap)*
+- **Inputs:** the `aws.elb.targetgroups` signal (each LB's target-group ARNs — emitted by the ELB module) + the `aws.ecs.targetgroups` signal (each ECS service's target-group ARNs).
+- **Match:** an ALB and an ECS service that **share a target-group ARN** are wired together — the ALB forwards to that target group; the service registers its tasks into it. The connector can't emit this as an observed edge (an ELB target lists ENIs/IPs, not the service ARN), so each side publishes its ARNs as a signal and R15 joins them.
+- **Confidence:** `inferred-high` — an exact shared-ARN match is strong evidence.
+- **Why:** without it, an ECS service behind an ALB has no routing edge (only instance targets get an observed `ROUTES_TO`). This is the link that lets exposure inference (R16) reach an ECS service behind an internet-facing ALB — the toxic-combination path.
+- **Evidence stored:** the shared target-group ARN + the ELB and service URNs (P4).
+
+**R16 — `internet_exposure` → `EXPOSED_VIA` (inferred-high)** *(cloud-posture half of "exposed AND vulnerable")*
+- **Inputs:** `PROTECTS(sg→resource)` observed edges + the `aws.sg.rules` signals (ingress CIDRs); `ROUTES_TO` edges (observed elb→instance + R15's inferred alb→service) + ELB `scheme` attributes.
+- **Match:** a **compute** resource (`aws.ec2.instance`/`aws.ecs.service`/`aws.lambda.function`) is internet-exposed when either **(1)** it is `PROTECTS`-ed by a SG whose ingress allows `0.0.0.0/0`/`::/0`, or **(2)** it is the target of a `ROUTES_TO` from an `internet-facing` load balancer → `EXPOSED_VIA(resource→sg|elb)`.
+- **Confidence:** `inferred-high` (both paths are definite exposure). **Precision-first (P3):** public IPs, public subnets, and S3 public-access are **not** inferred — those attributes aren't crawled, and a *missing* exposure beats a *wrong* one. That is Phase 2b (needs connector changes).
+- **Why:** exposure becomes a first-class, citable graph fact (`EXPOSED_VIA`) that the "internet-exposed vulnerability" finding and Ask AI both build on — the intersection of exposure × known-vulnerable code is the finding that matters (reachable > buried). See `docs/plans/security-vulnerabilities.md`.
+- **Evidence stored:** the exposer URN + `via` (`world-open-sg` with the open ports, or `internet-facing-lb`) (P4).
+
 > **Confidence calibration table** (the contract `10` relies on to phrase answers):
 
 | Tier | Meaning | Example rule | AI phrasing (10) |
 |---|---|---|---|
 | `observed` | Directly read from a source API | R5, R7, SG/ENI facts | stated as fact + source link |
-| `inferred-high` | Strong structural/config evidence | R1(ARN), R2, R3, R4, R6(single-svc), R11(unique tag), R12(SHA match), R13(service-name env), R14(unique image name) | "Atlas infers (high confidence)… based on <evidence>" |
+| `inferred-high` | Strong structural/config evidence | R1(ARN), R2, R3, R4, R6(single-svc), R11(unique tag), R12(SHA match), R13(service-name env), R14(unique image name), R15(shared target-group), R16(world-open SG / internet-facing LB) | "Atlas infers (high confidence)… based on <evidence>" |
 | `inferred-low` | Plausible but uncertain (heuristic/permission) | R1(name), R6(monorepo), R8, R10, R11(ambiguous tag / Name tag) | "possibly… (low confidence); evidence is <X>; not certain" |
 | `ai-suggested` | An **AI proposal** awaiting the user's confirm/reject — the lowest trust, never asserted (P3) | the AI edge-matcher (`origin='ai_suggested'`) | "Atlas suggests… — confirm or reject" (styled distinctly in the graph) |
 
