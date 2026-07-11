@@ -271,11 +271,11 @@ export function ComplianceView({ report }: { report: ComplianceReport | null }) 
                 <thead>
                   <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground">
                     <th className="w-28 px-4 py-2.5 font-medium">Status</th>
-                    <th className="w-24 px-4 py-2.5 font-medium">Severity</th>
                     <th className="px-4 py-2.5 font-medium">Control</th>
                     <th className="hidden px-4 py-2.5 font-medium lg:table-cell">
                       {current.framework.label} controls
                     </th>
+                    <th className="w-24 px-4 py-2.5 font-medium">Severity</th>
                     <th className="w-10 px-2 py-2.5" />
                   </tr>
                 </thead>
@@ -408,18 +408,6 @@ function ControlRow({
         </span>
       </td>
       <td className="px-4 py-3.5">
-        {/* Severity is the control's inherent weight (donut heat-ramp), shown regardless of status —
-            a green Pass next to a red HIGH reads as "we check this important thing and you're fine". */}
-        <span
-          className={cn(
-            "inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1 ring-inset",
-            SEV_STYLE[r.severity],
-          )}
-        >
-          {r.severity}
-        </span>
-      </td>
-      <td className="px-4 py-3.5">
         <div className="font-medium text-foreground">{r.control.title}</div>
         <p className="mt-0.5 max-w-2xl text-[11px] leading-relaxed text-muted-foreground">
           {r.control.requirement}
@@ -462,6 +450,18 @@ function ControlRow({
         ) : (
           <span className="text-muted-foreground/50">—</span>
         )}
+      </td>
+      <td className="px-4 py-3.5 align-top">
+        {/* Severity is the control's inherent weight (donut heat-ramp), shown regardless of status —
+            a green Pass next to a red HIGH reads as "we check this important thing and you're fine". */}
+        <span
+          className={cn(
+            "inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1 ring-inset",
+            SEV_STYLE[r.severity],
+          )}
+        >
+          {r.severity}
+        </span>
       </td>
       <td className="px-2 py-3.5">
         {onOpen ? (
