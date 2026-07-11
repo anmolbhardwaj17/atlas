@@ -18,6 +18,15 @@ export interface HealthObservationInput {
   checkedAt: string;
 }
 
+/** A health state change on a node (Phase C timeline; drives proactive incidents). */
+export interface HealthTransition {
+  nodeId: string;
+  urn: string;
+  /** Previous state — null on first sighting (baseline; never a regression). */
+  from: string | null;
+  to: "healthy" | "degraded" | "unhealthy";
+}
+
 export interface HealthApplyResult {
   /** Observations that matched (and annotated) a live node. */
   applied: number;
@@ -25,6 +34,8 @@ export interface HealthApplyResult {
   unmatched: number;
   /** State CHANGES recorded to node_events (healthy→unhealthy etc.) - Phase C timeline. */
   transitions: number;
+  /** The changes themselves, so the poller can act on regressions (proactive incidents). */
+  changes: HealthTransition[];
 }
 
 export async function applyHealthObservations(
@@ -32,10 +43,11 @@ export async function applyHealthObservations(
   orgId: string,
   observations: HealthObservationInput[],
 ): Promise<HealthApplyResult> {
-  if (observations.length === 0) return { applied: 0, unmatched: 0, transitions: 0 };
+  if (observations.length === 0) return { applied: 0, unmatched: 0, transitions: 0, changes: [] };
   return withOrgScope(db, orgId, async (c) => {
     let applied = 0;
     let transitions = 0;
+    const changes: HealthTransition[] = [];
     for (const o of observations) {
       // Single statement: read the previous state, write the new annotation, report both -
       // a state CHANGE becomes a health_transition timeline event (Phase C).
@@ -79,8 +91,9 @@ export async function applyHealthObservations(
           ],
         );
         transitions += 1;
+        changes.push({ nodeId: row.id, urn: o.urn, from: prev, to: o.state });
       }
     }
-    return { applied, unmatched: observations.length - applied, transitions };
+    return { applied, unmatched: observations.length - applied, transitions, changes };
   });
 }

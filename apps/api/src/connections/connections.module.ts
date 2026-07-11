@@ -13,6 +13,7 @@ import { createBitbucketConnector } from "@atlas/connector-bitbucket";
 import { createJenkinsConnector } from "@atlas/connector-jenkins";
 import { AuthModule } from "../auth/auth.module";
 import { GraphModule } from "../graph/graph.module";
+import { IncidentsModule } from "../incidents/incidents.module";
 import { ENV, PG_POOL } from "../core/tokens";
 import { ConnectionService } from "./connection.service";
 import { NodeMetricsController } from "./node-metrics.controller";
@@ -67,7 +68,7 @@ const connectorRegistryProvider: Provider = {
 };
 
 @Module({
-  imports: [AuthModule, GraphModule],
+  imports: [AuthModule, GraphModule, IncidentsModule],
   controllers: [ConnectionController, NodeMetricsController],
   providers: [
     ConnectionService,

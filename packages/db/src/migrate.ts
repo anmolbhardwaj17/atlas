@@ -49,6 +49,7 @@ import { up as up0047 } from "./migrations/0047_weekly_digest";
 import { up as up0048 } from "./migrations/0048_digest_runs";
 import { up as up0049 } from "./migrations/0049_lambda_commit_seed";
 import { up as up0050 } from "./migrations/0050_incidents";
+import { up as up0051 } from "./migrations/0051_org_alert_settings";
 
 /**
  * Forward-only SQL migration runner (docs/04 §9). Plain `pg`, no ORM. Each
@@ -109,6 +110,7 @@ const MIGRATIONS: ReadonlyArray<{ version: string; statements: string[] }> = [
   { version: "0048_digest_runs", statements: up0048 },
   { version: "0049_lambda_commit_seed", statements: up0049 },
   { version: "0050_incidents", statements: up0050 },
+  { version: "0051_org_alert_settings", statements: up0051 },
 ];
 
 async function main(): Promise<void> {

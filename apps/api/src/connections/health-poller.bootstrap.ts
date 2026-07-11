@@ -13,6 +13,7 @@ import type { HealthCollectResult, CloudTrailCollectResult } from "@atlas/connec
 import { PG_POOL, ENV } from "../core/tokens";
 import { SECRET_BROKER } from "./tokens";
 import { ConnectorRegistry } from "./connector-registry";
+import { ProactiveIncidentsService } from "../incidents/proactive-incidents.service";
 
 /** Structural check: a connector that can run a runtime-health pass (AWS today). */
 interface HealthCapable {
@@ -62,6 +63,7 @@ export class HealthPollerBootstrap implements OnModuleInit, OnApplicationShutdow
     @Inject(ENV) private readonly env: Env,
     @Inject(SECRET_BROKER) private readonly secrets: SecretBroker,
     private readonly registry: ConnectorRegistry,
+    private readonly proactive: ProactiveIncidentsService,
   ) {}
 
   onModuleInit(): void {
@@ -134,11 +136,22 @@ export class HealthPollerBootstrap implements OnModuleInit, OnApplicationShutdow
       secretRef: conn.secret_ref,
     };
     const result = await connector.collectHealth(sdkConn, this.secrets);
-    const { applied, unmatched, transitions } = await applyHealthObservations(
+    const { applied, unmatched, transitions, changes } = await applyHealthObservations(
       this.db,
       orgId,
       result.observations,
     );
+
+    // Proactive incidents (docs/plans/proactive-incidents.md): a REGRESSION (healthy → broken) may
+    // auto-open a War Room incident + alert, gated by the org's policy + prod. Best-effort — a failure
+    // here never affects the health annotation. Recoveries / first-sightings are ignored downstream.
+    for (const change of changes) {
+      try {
+        await this.proactive.maybeOpenForRegression(orgId, change);
+      } catch (err) {
+        this.logger.warn(`proactive incident skipped for ${change.urn}: ${(err as Error).message}`);
+      }
+    }
     const bad = result.observations.filter((o) => o.state !== "healthy").length;
     this.logger.log(
       `health ${conn.display_name}: ${applied} annotated (${bad} not healthy)` +

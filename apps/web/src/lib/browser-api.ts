@@ -1097,3 +1097,36 @@ export async function updateIncident(
   const body = (await res.json().catch(() => null)) as { data?: Incident } | null;
   return body?.data ?? null;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Alert policy (docs/plans/proactive-incidents.md)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type AlertPolicy = "off" | "prod" | "all";
+
+export async function getAlertPolicy(orgId: string): Promise<AlertPolicy> {
+  const token = await getClientToken();
+  if (!token) return "prod";
+  const res = await fetch(`${apiUrl()}/alerts/policy`, {
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) return "prod";
+  const body = (await res.json().catch(() => null)) as { data?: { policy?: AlertPolicy } } | null;
+  return body?.data?.policy ?? "prod";
+}
+
+/** Admin-only. Returns true on success. */
+export async function setAlertPolicy(orgId: string, policy: AlertPolicy): Promise<boolean> {
+  const token = await getClientToken();
+  if (!token) return false;
+  const res = await fetch(`${apiUrl()}/alerts/policy`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "X-Atlas-Org": orgId,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ policy }),
+  });
+  return res.ok;
+}

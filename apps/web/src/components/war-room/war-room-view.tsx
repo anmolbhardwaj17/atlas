@@ -285,7 +285,16 @@ export function WarRoomView({
   const terminal = incident.status === "resolved" || incident.status === "dismissed";
   const diagnosed = turns.some((t) => t.role === "assistant" && t.text);
   const firstAsst = turns.find((t) => t.role === "assistant");
-  const verdict = firstAsst?.text ? parseVerdict(firstAsst.text) : null;
+  const liveVerdict = firstAsst?.text ? parseVerdict(firstAsst.text) : null;
+  // A proactively-opened incident carries a deterministic headline (no LLM) — show it immediately in
+  // the hero while the full live diagnosis streams; the live verdict replaces it when it lands.
+  const preliminaryVerdict = React.useMemo(() => {
+    const v = incident.verdict as { classification?: string; summary?: string } | null;
+    return v && typeof v.summary === "string" && v.summary
+      ? { type: v.classification ?? "unknown", cause: v.summary }
+      : null;
+  }, [incident.verdict]);
+  const verdict = liveVerdict ?? preliminaryVerdict;
   const heroConfidence = firstAsst?.confidence ?? null;
   const statusLabel = terminal
     ? incident.status

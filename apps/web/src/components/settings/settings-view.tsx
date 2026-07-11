@@ -6,6 +6,7 @@ import { ProfileCard } from "@/components/settings/profile-card";
 import { OrgCard } from "@/components/settings/org-card";
 import { DangerZoneCard } from "@/components/settings/danger-zone-card";
 import { LlmSettingsCard } from "@/components/settings/llm-settings";
+import { AlertSettingsCard } from "@/components/settings/alert-settings";
 import type { LlmSettings } from "@/lib/browser-api";
 
 interface MemberDto {
@@ -74,6 +75,8 @@ export function SettingsView({
       </div>
 
       {isAdmin ? <LlmSettingsCard orgId={orgId} initial={llm} /> : null}
+
+      {isAdmin ? <AlertSettingsCard orgId={orgId} /> : null}
 
       <OrgPanel
         orgId={orgId}
