@@ -18,6 +18,7 @@ import { logsModule } from "./logs";
 import { elbModule, route53Module } from "./routing";
 import { rdsModule, s3Module } from "./data";
 import { iamRoleModule } from "./identity";
+import { accountModule } from "./account";
 import { dynamodbModule, elasticacheModule, apigatewayModule } from "./additive";
 
 export const SERVICE_MODULES: ReadonlyArray<ServiceModule> = [
@@ -36,6 +37,7 @@ export const SERVICE_MODULES: ReadonlyArray<ServiceModule> = [
   rdsModule,
   s3Module,
   iamRoleModule,
+  accountModule,
   dynamodbModule,
   elasticacheModule,
   apigatewayModule,

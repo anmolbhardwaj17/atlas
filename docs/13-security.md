@@ -169,9 +169,17 @@ sequenceDiagram
       "s3:GetBucketNotification","s3:GetBucketPolicyStatus",
       "elasticache:Describe*",
       "iam:GetRole","iam:ListRolePolicies","iam:GetRolePolicy",
-      "iam:ListAttachedRolePolicies","iam:GetPolicy","iam:GetPolicyVersion"
+      "iam:ListAttachedRolePolicies","iam:GetPolicy","iam:GetPolicyVersion",
+      "iam:GetAccountSummary","iam:GetAccountPasswordPolicy"
     ],"Resource":"*" }
 ] }
+// Security Phase 2b (posture) reads — grant to light up the corresponding compliance controls
+// (Atlas degrades gracefully: a missing action → the control shows "not assessable · grant X",
+// never a false pass). Simplest: attach the AWS-managed `SecurityAudit` policy. Fine-grained:
+//   iam:GetAccountSummary,iam:GetAccountPasswordPolicy   (root MFA / password policy)  ← shipped
+//   s3:GetBucketPublicAccessBlock,s3:GetBucketPolicyStatus,s3:GetBucketAcl,s3:GetEncryptionConfiguration (public S3 / encryption)
+//   ec2:DescribeVolumes                                  (EBS encryption)
+//   cloudtrail:DescribeTrails,cloudtrail:GetTrailStatus,ec2:DescribeFlowLogs (audit logging)
 // NOTE: no s3:GetObject, no secretsmanager:GetSecretValue, no ssm:GetParameter,
 // no *:Create/Update/Delete/Put/Modify anywhere. Read-only & minimal by construction (SEC-1/3).
 ```

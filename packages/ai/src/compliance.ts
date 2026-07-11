@@ -287,12 +287,15 @@ export const CONTROLS: Control[] = [
   },
   {
     id: "access.mfa-privileged",
-    title: "MFA on root and privileged accounts",
-    requirement: "The account root user and privileged IAM users have MFA enabled.",
+    title: "MFA on the root account",
+    requirement:
+      "The AWS account root user has MFA enabled. Root is unrestricted and can't be scoped, so it must be protected by a hardware/virtual MFA device.",
     domain: "access",
     assessKey: "iamCredentials",
+    appliesTo: ["aws.account"],
+    findingId: "root-no-mfa",
     notAssessableReason:
-      "Atlas does not yet crawl IAM credential report / MFA / root usage. Connector gap.",
+      "Atlas does not yet crawl the IAM account summary (root MFA). Connector gap.",
     mappings: {
       pci: ["8.4.2", "8.5.1"],
       cis: ["1.5", "1.6", "1.10"],

@@ -47,6 +47,7 @@ export const AWS_NODE_KINDS = {
   },
   "aws.iam.role": { kind: "aws.iam.role", type: "iam-role", scope: "global" },
   "aws.iam.policy": { kind: "aws.iam.policy", type: "iam-policy", scope: "global" },
+  "aws.account": { kind: "aws.account", type: "account", scope: "global" },
 } as const satisfies Record<string, AwsKindDescriptor>;
 
 /** Union of all AWS node kinds the connector can emit. */

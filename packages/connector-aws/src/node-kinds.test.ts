@@ -3,8 +3,8 @@ import { AWS_NODE_KINDS, AWS_NODE_KIND_LIST, describeKind } from "./node-kinds";
 
 describe("AWS node-kind catalog", () => {
   it("covers the full MVP catalog (docs/05 §3.1 / docs/06 §4)", () => {
-    // 19 AWS kinds: 6 compute, 6 networking, 4 data, 2 identity, 1 observability (logs).
-    expect(AWS_NODE_KIND_LIST.length).toBe(19);
+    // 20 AWS kinds: 6 compute, 6 networking, 4 data, 3 identity (role/policy/account), 1 logs.
+    expect(AWS_NODE_KIND_LIST.length).toBe(20);
     for (const kind of Object.keys(AWS_NODE_KINDS)) {
       expect(kind.startsWith("aws.")).toBe(true);
     }

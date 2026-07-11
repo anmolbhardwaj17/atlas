@@ -573,6 +573,7 @@ export class GraphService {
           wildcardRoles,
           singleAzDbs,
           unhealthy,
+          rootNoMfa,
         ] = await Promise.all([
           c.query<{
             id: string;
@@ -680,6 +681,13 @@ export class GraphService {
               ORDER BY CASE attributes->'health'->>'state' WHEN 'unhealthy' THEN 0 ELSE 1 END
               LIMIT 20`,
           ),
+          // Root account without MFA (Security Phase 2b): the classic CIS/critical finding — the
+          // root user is unrestricted, so it MUST have MFA. From the aws.account node.
+          c.query<{ id: string; name: string | null }>(
+            `SELECT id, name FROM nodes
+              WHERE kind = 'aws.account' AND deleted_at IS NULL AND status <> 'deleted'
+                AND attributes->>'rootMfaEnabled' = 'false'`,
+          ),
         ]);
         return {
           conns,
@@ -692,6 +700,7 @@ export class GraphService {
           wildcardRoles,
           singleAzDbs,
           unhealthy,
+          rootNoMfa,
         };
       }),
       scope(async (c) => {
@@ -832,6 +841,7 @@ export class GraphService {
       wildcardRoles,
       singleAzDbs,
       unhealthy,
+      rootNoMfa,
     } = grpTopology;
     const { contributors, mostActiveRepos, vulnSeverity, topVulnPkg, sprawl, exposedVulns } =
       grpPeopleVulns;
@@ -887,6 +897,7 @@ export class GraphService {
         publicElbs: publicElbs.rows,
         wildcardRoles: wildcardRoles.rows,
         singleAzDbs: singleAzDbs.rows,
+        rootNoMfa: rootNoMfa.rows,
         topContributors: contributors.rows.map((r) => ({ name: r.name ?? "unknown", count: r.n })),
         mostActiveRepos: mostActiveRepos.rows.map((r) => ({
           name: r.name ?? "unknown",
@@ -996,6 +1007,21 @@ export class GraphService {
         href: first ? `/explore/${first.id}` : "/explore?kind=aws.rds.instance",
         count: singleAz.length,
         evidence: singleAz.map((d) => ({ id: d.id, label: d.name ?? d.id })),
+      });
+    }
+    // Root account without MFA (Security Phase 2b) - critical: the root user is unrestricted.
+    const rootNoMfa2 = base.rootNoMfa ?? [];
+    if (rootNoMfa2.length > 0) {
+      const first = rootNoMfa2[0];
+      findings.push({
+        id: "root-no-mfa",
+        severity: "high",
+        category: "Security posture",
+        title: `AWS root account has no MFA`,
+        detail: `${rootNoMfa2.map((a) => a.name ?? a.id).join(", ")} - the root user can do anything and can't be scoped; enable a hardware/virtual MFA device on it immediately.`,
+        href: first ? `/explore/${first.id}` : "/explore?kind=aws.account",
+        count: rootNoMfa2.length,
+        evidence: rootNoMfa2.map((a) => ({ id: a.id, label: a.name ?? a.id })),
       });
     }
 
@@ -1384,7 +1410,7 @@ export class GraphService {
       // top). Keep the canvas about infrastructure + code; an explicit ?kind can still target them.
       if (!q.kind) {
         where.push(
-          `kind <> 'external.package' AND kind <> 'security.vulnerability' AND kind <> 'aws.logs.group' AND kind <> 'aws.iam.role'`,
+          `kind <> 'external.package' AND kind <> 'security.vulnerability' AND kind <> 'aws.logs.group' AND kind <> 'aws.iam.role' AND kind <> 'aws.account'`,
         );
       }
       const params: unknown[] = [];

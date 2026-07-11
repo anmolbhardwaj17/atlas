@@ -17,6 +17,7 @@ import { elbDiscoverer } from "./elb";
 import { route53Discoverer } from "./route53";
 import { s3Discoverer } from "./s3";
 import { iamRoleDiscoverer } from "./iam";
+import { iamAccountDiscoverer } from "./iam-account";
 import { logsDiscoverer } from "./logs";
 
 export const DISCOVERERS: ReadonlyArray<Discoverer> = [
@@ -34,6 +35,7 @@ export const DISCOVERERS: ReadonlyArray<Discoverer> = [
   rdsDiscoverer,
   s3Discoverer,
   iamRoleDiscoverer,
+  iamAccountDiscoverer,
   logsDiscoverer,
 ];
 

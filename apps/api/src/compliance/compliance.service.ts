@@ -45,9 +45,11 @@ const CAPABILITIES: Record<string, Capability> = {
     supported: false,
     actions: ["cloudtrail:DescribeTrails", "cloudtrail:GetTrailStatus", "ec2:DescribeFlowLogs"],
   },
+  // Root MFA is crawled (aws.account via GetAccountSummary). Credential-report/per-user MFA is a
+  // later slice; root MFA is the headline control and needs only GetAccountSummary.
   iamCredentials: {
-    supported: false,
-    actions: ["iam:GetAccountSummary", "iam:GenerateCredentialReport", "iam:GetCredentialReport"],
+    supported: true,
+    actions: ["iam:GetAccountSummary"],
   },
 };
 
