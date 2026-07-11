@@ -61,12 +61,36 @@ export class ComplianceService {
       }),
     ]);
 
+    // Enrich each evidence resource with its node kind, so the UI can show a provider icon per chip.
+    // One lookup over every UUID-shaped evidence id across all findings (RLS-scoped).
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const evidenceIds = [
+      ...new Set(
+        summary.findings
+          .flatMap((f) => (f.evidence ?? []).map((e) => e.id))
+          .filter((id) => UUID.test(id)),
+      ),
+    ];
+    const kindById = new Map<string, string>();
+    if (evidenceIds.length > 0) {
+      await withOrgScope(this.db, orgId, async (c) => {
+        const { rows } = await c.query<{ id: string; kind: string }>(
+          `SELECT id, kind FROM nodes WHERE id = ANY($1::uuid[])`,
+          [evidenceIds],
+        );
+        for (const r of rows) kindById.set(r.id, r.kind);
+      });
+    }
+
     const openFindings: ComplianceFacts["openFindings"] = {};
     for (const f of summary.findings) {
       openFindings[f.id] = {
         count: f.count ?? f.evidence?.length ?? 1,
         detail: f.detail,
-        evidence: (f.evidence ?? []).map((e) => ({ id: e.id, label: e.label })),
+        evidence: (f.evidence ?? []).map((e) => {
+          const kind = kindById.get(e.id);
+          return kind ? { id: e.id, label: e.label, kind } : { id: e.id, label: e.label };
+        }),
       };
     }
 

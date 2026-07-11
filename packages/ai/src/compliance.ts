@@ -307,6 +307,8 @@ export const CONTROLS: Control[] = [
 export interface EvidenceRef {
   id: string;
   label: string;
+  /** The resource's node kind (e.g. `aws.ecs.service`), so the UI can show its provider icon. */
+  kind?: string;
 }
 
 /** Everything the evaluator needs, gathered by the API from the graph (no API types leak in here). */

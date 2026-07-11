@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, Info, ChevronRight, Check, CircleHelp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { kindIcon, KIND_LOGO } from "@/lib/kind-visual";
+import { CloudIcon } from "@/components/cloud-icon";
 import { cn } from "@/lib/cn";
 
 export type Framework = "pci" | "nist" | "iso" | "hipaa" | "cis" | "gdpr";
@@ -31,7 +33,7 @@ export interface ControlResult {
   severity: ControlSeverity;
   detail: string;
   count: number;
-  evidence: Array<{ id: string; label: string }>;
+  evidence: Array<{ id: string; label: string; kind?: string }>;
 }
 export interface FrameworkSummary {
   framework: FrameworkMeta;
@@ -366,6 +368,16 @@ function NotAssessable({ rows, framework }: { rows: ControlResult[]; framework: 
   );
 }
 
+/** Provider/kind icon for an evidence chip — the AWS (or other provider) logo when we have one,
+ *  else the kind's lucide glyph. Nothing if the kind is unknown. */
+function EvidenceIcon({ kind }: { kind?: string | undefined }) {
+  if (!kind) return null;
+  const logo = KIND_LOGO[kind];
+  if (logo) return <CloudIcon name={logo} className="size-3.5 shrink-0" />;
+  const Icon = kindIcon(kind);
+  return <Icon className="size-3.5 shrink-0 text-muted-foreground" />;
+}
+
 function Seg({ n, total, className }: { n: number; total: number; className: string }) {
   if (n <= 0 || total <= 0) return null;
   return <div className={className} style={{ width: `${(n / total) * 100}%` }} />;
@@ -426,8 +438,9 @@ function ControlRow({
               {r.evidence.slice(0, 8).map((e) => (
                 <span
                   key={e.id}
-                  className="inline-flex items-center rounded-md border border-red-500/20 bg-red-500/10 px-1.5 py-0.5 text-[11px] font-medium text-red-600 dark:text-red-400"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/60 px-1.5 py-0.5 text-[11px] font-medium text-foreground/80"
                 >
+                  <EvidenceIcon kind={e.kind} />
                   {e.label}
                 </span>
               ))}
