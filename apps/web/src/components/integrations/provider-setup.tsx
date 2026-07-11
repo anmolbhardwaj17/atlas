@@ -263,10 +263,16 @@ export function JiraSetup() {
   return (
     <div className="space-y-5">
       <Steps>
-        <Step title="Create a read-only API token with scopes">
-          In your Atlassian account → <strong>Security → API tokens</strong>, choose{" "}
-          <InlineCode>Create API token with scopes</InlineCode>, select <strong>Jira</strong>, and
-          grant only the <InlineCode>read:jira-work</InlineCode> scope.
+        <Step title="Create a classic API token">
+          In your Atlassian account → <strong>Security → API tokens</strong>, click{" "}
+          <InlineCode>Create API token</InlineCode> (the plain one). It inherits your own read
+          permissions, which is all Atlas needs.
+        </Step>
+        <Step title="Don't use a scoped token">
+          Do <strong>not</strong> pick <InlineCode>Create API token with scopes</InlineCode> —
+          scoped tokens only work against Atlassian&apos;s API gateway, not your{" "}
+          <InlineCode>&lt;company&gt;.atlassian.net</InlineCode> site, so verification fails with a
+          401. Use the plain token above.
         </Step>
         <Step title="Give Atlas your site, email + the token">
           Atlas authenticates with your Atlassian <strong>account email</strong> as the username and
@@ -279,7 +285,6 @@ export function JiraSetup() {
           ticket asked. It never gets write access.
         </Step>
       </Steps>
-      <CodeBlock label="Required read scope" code="read:jira-work" />
     </div>
   );
 }

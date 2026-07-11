@@ -83,7 +83,8 @@ export class JiraConnector implements Connector {
       if (err instanceof JiraHttpError && (err.status === 401 || err.status === 403)) {
         return {
           status: "error",
-          message: "Jira rejected the credentials — check the email, API token, and site.",
+          message:
+            "Jira rejected the credentials (401). Check the email + site, and use a CLASSIC API token — a scoped token (read:jira-work) won't authenticate against your atlassian.net site.",
         };
       }
       return { status: "error", message: `Jira account probe failed: ${(err as Error).message}` };
