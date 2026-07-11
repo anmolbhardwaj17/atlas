@@ -10,12 +10,13 @@ import {
   Radar,
   ArrowLeft,
   RotateCw,
-  CircleDot,
+  ChevronDown,
 } from "lucide-react";
-import { InfraMapLazy } from "@/components/map/infra-map-lazy";
 import { Button } from "@/components/ui/button";
 import { streamAsk, createConversation, updateIncident, type Incident } from "@/lib/browser-api";
 import type { MapData } from "@/lib/map-types";
+import { WarRoomMap, subgraphAround } from "./war-room-map";
+import { MarkdownLite } from "./markdown-lite";
 
 interface Step {
   tool: string;
@@ -26,12 +27,15 @@ interface Trace {
   answer: string;
   confidence: string | null;
   citations: number;
+  citedIds: string[];
   ranAt: string;
 }
 
 type Phase = "idle" | "running" | "done" | "error";
 
-/** Human label for a tool call in the live investigation log (mirrors the map chat's toolLabel). */
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+
+/** Human label for a tool call in the live investigation log. */
 function toolLabel(tool: string): string {
   const t = tool.toLowerCase();
   if (t.includes("diagnose")) return "Diagnosing the resource";
@@ -40,7 +44,7 @@ function toolLabel(tool: string): string {
   if (t.includes("event") || t.includes("change") || t.includes("timeline"))
     return "Checking recent changes";
   if (t.includes("pr") || t.includes("diff")) return "Reading the PR diff";
-  if (t.includes("search") || t.includes("lookup") || t.includes("graph"))
+  if (t.includes("search") || t.includes("lookup") || t.includes("graph") || t.includes("traverse"))
     return "Searching the graph";
   return tool.replace(/[_-]+/g, " ");
 }
@@ -61,10 +65,10 @@ function isTrace(v: unknown): v is Trace {
 }
 
 /**
- * War Room (docs/plans/war-room.md). The broken node + its blast radius on a live map, beside a
- * streamed, cited investigation. The diagnosis reuses the existing agentic loop (a `culprit`-phrased
- * question), so every step shown is a real tool call — no theater. The transcript is persisted to the
- * incident so it's revisitable; a reopened incident replays the saved trace instead of re-running.
+ * War Room (docs/plans/war-room.md). The broken node + its blast radius on a purpose-built live map,
+ * beside a streamed, cited investigation. Every step shown is a REAL tool call from the existing
+ * agentic diagnose loop; as it cites/touches nodes, they light up on the map so you watch the trace
+ * walk the graph. The transcript is persisted so a reopened incident replays instead of re-running.
  */
 export function WarRoomView({
   incident,
@@ -78,11 +82,18 @@ export function WarRoomView({
   const router = useRouter();
   const saved = isTrace(incident.evidence) ? incident.evidence : null;
 
+  const subgraph = React.useMemo(
+    () => subgraphAround(map, incident.nodeId, 2),
+    [map, incident.nodeId],
+  );
+
   const [phase, setPhase] = React.useState<Phase>(saved ? "done" : "idle");
   const [steps, setSteps] = React.useState<Step[]>(saved?.steps ?? []);
   const [answer, setAnswer] = React.useState<string>(saved?.answer ?? "");
   const [confidence, setConfidence] = React.useState<string | null>(saved?.confidence ?? null);
   const [citations, setCitations] = React.useState<number>(saved?.citations ?? 0);
+  const [activeIds, setActiveIds] = React.useState<string[]>(saved?.citedIds ?? []);
+  const [stepsOpen, setStepsOpen] = React.useState(!saved);
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
   const started = React.useRef(false);
@@ -96,6 +107,8 @@ export function WarRoomView({
     setAnswer("");
     setConfidence(null);
     setCitations(0);
+    setActiveIds([incident.nodeId]);
+    setStepsOpen(true);
     setError(null);
 
     const convId = await createConversation(orgId, `War Room — ${label}`, "map");
@@ -105,20 +118,34 @@ export function WarRoomView({
       return;
     }
     const collectedSteps: Step[] = [];
+    const cited = new Set<string>([incident.nodeId]);
     let text = "";
     let conf: string | null = null;
     let cites = 0;
+
+    const light = (ids: Iterable<string>) => {
+      let changed = false;
+      for (const id of ids)
+        if (!cited.has(id)) {
+          cited.add(id);
+          changed = true;
+        }
+      if (changed) setActiveIds([...cited]);
+    };
+
     try {
       for await (const ev of streamAsk(orgId, convId, question)) {
         if (ev.type === "retrieval_step") {
           collectedSteps.push({ tool: ev.tool, summary: ev.summary });
           setSteps([...collectedSteps]);
+          light(ev.summary.match(UUID_RE) ?? []); // light nodes as the trace mentions them
         } else if (ev.type === "token") {
           text += ev.text;
           setAnswer(text);
         } else if (ev.type === "citation") {
           cites += 1;
           setCitations(cites);
+          if (ev.citation.kind === "node") light([ev.citation.id]);
         } else if (ev.type === "confidence") {
           conf = ev.overall;
           setConfidence(ev.overall);
@@ -130,23 +157,23 @@ export function WarRoomView({
       setError("The investigation stream was interrupted.");
     }
 
+    setPhase(text ? "done" : "error");
+    setStepsOpen(false);
     const trace: Trace = {
       steps: collectedSteps,
       answer: text,
       confidence: conf,
       citations: cites,
+      citedIds: [...cited],
       ranAt: new Date().toISOString(),
     };
-    setPhase(text ? "done" : "error");
-    // Persist the transcript so the incident is revisitable (best-effort).
     void updateIncident(orgId, incident.id, {
       status: "analyzing",
       evidence: trace,
       verdict: { summary: text, confidence: conf },
     });
-  }, [orgId, incident.id, label, question]);
+  }, [orgId, incident.id, incident.nodeId, label, question]);
 
-  // Auto-start once for a fresh incident (no saved trace).
   React.useEffect(() => {
     if (!saved && !started.current) {
       started.current = true;
@@ -205,12 +232,12 @@ export function WarRoomView({
 
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         {/* Live blast-radius map */}
-        <div className="h-[62vh] min-h-[420px] overflow-hidden rounded-xl border border-border bg-background">
-          <InfraMapLazy data={map} orgId={orgId} focusId={incident.nodeId} />
+        <div className="h-[64vh] min-h-[440px] overflow-hidden rounded-xl border border-border bg-background">
+          <WarRoomMap data={subgraph} focusId={incident.nodeId} activeIds={activeIds} />
         </div>
 
         {/* Investigation */}
-        <div className="flex h-[62vh] min-h-[420px] flex-col rounded-xl border border-border bg-background">
+        <div className="flex h-[64vh] min-h-[440px] flex-col rounded-xl border border-border bg-background">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <h2 className="text-sm font-semibold">Investigation</h2>
             {phase !== "running" ? (
@@ -225,26 +252,47 @@ export function WarRoomView({
           </div>
 
           <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-            {/* Steps — each is a real tool call */}
-            <ol className="space-y-1.5">
-              {steps.map((s, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm">
-                  <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-success" />
-                  <span>
-                    <span className="font-medium">{toolLabel(s.tool)}</span>
-                    {s.summary ? (
-                      <span className="text-muted-foreground"> — {s.summary}</span>
+            {/* Steps — real tool calls. Live while running; collapsed to an accordion once done. */}
+            {steps.length > 0 ? (
+              <div>
+                {phase !== "running" ? (
+                  <button
+                    type="button"
+                    onClick={() => setStepsOpen((v) => !v)}
+                    className="mb-2 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                  >
+                    <ChevronDown
+                      className={`size-3.5 transition-transform ${stepsOpen ? "" : "-rotate-90"}`}
+                    />
+                    Traced {steps.length} {steps.length === 1 ? "step" : "steps"}
+                  </button>
+                ) : null}
+                {stepsOpen ? (
+                  <ol className="space-y-1.5">
+                    {steps.map((s, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm">
+                        <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-success" />
+                        <span>
+                          <span className="font-medium">{toolLabel(s.tool)}</span>
+                          {s.summary ? (
+                            <span className="text-muted-foreground"> — {s.summary}</span>
+                          ) : null}
+                        </span>
+                      </li>
+                    ))}
+                    {phase === "running" ? (
+                      <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="size-3.5 animate-spin" /> Working…
+                      </li>
                     ) : null}
-                  </span>
-                </li>
-              ))}
-              {phase === "running" ? (
-                <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <CircleDot className="mt-0.5 size-3.5 shrink-0 animate-pulse" />
-                  <span>Working…</span>
-                </li>
-              ) : null}
-            </ol>
+                  </ol>
+                ) : null}
+              </div>
+            ) : phase === "running" || phase === "idle" ? (
+              <p className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-3.5 animate-spin" /> Starting the investigation…
+              </p>
+            ) : null}
 
             {/* Verdict */}
             {answer ? (
@@ -257,13 +305,11 @@ export function WarRoomView({
                     </span>
                   ) : null}
                 </div>
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-                  {answer}
-                </p>
+                <MarkdownLite text={answer} />
                 {citations > 0 ? (
-                  <p className="text-xs text-muted-foreground">
-                    {citations} cited {citations === 1 ? "source" : "sources"} · open Ask Atlas for
-                    the full evidence trail.
+                  <p className="pt-1 text-xs text-muted-foreground">
+                    {citations} cited {citations === 1 ? "source" : "sources"} · lit on the map ·
+                    open Ask Atlas for the full evidence trail.
                   </p>
                 ) : null}
               </div>
@@ -273,10 +319,6 @@ export function WarRoomView({
               <div className="flex items-start gap-2 border-t border-border pt-4 text-sm text-danger">
                 <XCircle className="mt-0.5 size-4 shrink-0" /> {error}
               </div>
-            ) : null}
-
-            {phase === "idle" ? (
-              <p className="text-sm text-muted-foreground">Starting the investigation…</p>
             ) : null}
           </div>
 
