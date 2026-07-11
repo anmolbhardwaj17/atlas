@@ -18,6 +18,7 @@ import { AtlasAiMark } from "@/components/brand";
 import { SetBreadcrumbs } from "@/components/breadcrumb-context";
 import { ErrorState } from "@/components/patterns/empty-state";
 import { FindingActions } from "@/components/insights/finding-actions";
+import { WarRoomButton } from "@/components/war-room/war-room-button";
 import { pillarMeta } from "@/components/insights/pillars";
 import { type Finding, type Mute } from "@/components/insights/insights-view";
 import { cn } from "@/lib/cn";
@@ -222,6 +223,14 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
             >
               <AtlasAiMark size={15} className="size-4" /> Ask Atlas how to fix this
             </Link>
+            {affected[0] ? (
+              <WarRoomButton
+                orgId={shell.orgId}
+                nodeId={affected[0].id}
+                trigger="finding"
+                variant="outline"
+              />
+            ) : null}
             <FindingActions orgId={shell.orgId} findingId={finding.id} muted={mute !== null} />
           </div>
         </div>

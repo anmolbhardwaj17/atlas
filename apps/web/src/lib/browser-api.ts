@@ -1023,3 +1023,74 @@ export async function getMyOrgs(): Promise<{ memberships: MyOrg[]; defaultOrgId:
     defaultOrgId: body?.data?.defaultOrgId ?? null,
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// War Room incidents (docs/plans/war-room.md)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface Incident {
+  id: string;
+  nodeId: string;
+  nodeName: string | null;
+  nodeKind: string | null;
+  title: string;
+  trigger: "map" | "finding" | "alert" | "manual";
+  status: "open" | "analyzing" | "resolved" | "dismissed";
+  severity: "high" | "medium" | "low" | null;
+  verdict: unknown | null;
+  evidence: unknown;
+  resolution: string | null;
+  openedBy: string | null;
+  openedAt: string;
+  updatedAt: string;
+  resolvedAt: string | null;
+}
+
+/** Open (or reuse) a War Room investigation for a node, returning the incident. */
+export async function openIncident(
+  orgId: string,
+  nodeId: string,
+  trigger: Incident["trigger"] = "manual",
+): Promise<Incident | null> {
+  const token = await getClientToken();
+  if (!token) return null;
+  const res = await fetch(`${apiUrl()}/incidents`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "X-Atlas-Org": orgId,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ nodeId, trigger }),
+  });
+  if (!res.ok) return null;
+  const body = (await res.json().catch(() => null)) as { data?: Incident } | null;
+  return body?.data ?? null;
+}
+
+/** Patch an incident (attach the diagnosis verdict/trace, or resolve/dismiss it). */
+export async function updateIncident(
+  orgId: string,
+  id: string,
+  patch: {
+    status?: Incident["status"];
+    verdict?: unknown;
+    evidence?: unknown;
+    resolution?: string | null;
+  },
+): Promise<Incident | null> {
+  const token = await getClientToken();
+  if (!token) return null;
+  const res = await fetch(`${apiUrl()}/incidents/${id}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "X-Atlas-Org": orgId,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) return null;
+  const body = (await res.json().catch(() => null)) as { data?: Incident } | null;
+  return body?.data ?? null;
+}
