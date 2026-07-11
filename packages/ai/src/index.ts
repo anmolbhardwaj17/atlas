@@ -42,6 +42,18 @@ export type {
 } from "./edge-matcher";
 export { guidanceFor, KNOWLEDGE_PACK_VERSION } from "./knowledge";
 export type { Guidance } from "./knowledge";
+export { FRAMEWORKS, CONTROLS, evaluateControls, summarizeByFramework } from "./compliance";
+export type {
+  Framework,
+  FrameworkMeta,
+  ControlStatus,
+  ControlDomain,
+  Control,
+  ComplianceFacts,
+  ControlResult,
+  FrameworkSummary,
+  EvidenceRef as ComplianceEvidenceRef,
+} from "./compliance";
 export { TOOL_SPECS, TOOL_NAMES, runTool } from "./tools";
 export type { ToolOutcome } from "./tools";
 export { retrievalLoop, collectLoop, ContextAccumulator } from "./loop";

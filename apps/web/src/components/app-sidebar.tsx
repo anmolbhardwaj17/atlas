@@ -8,6 +8,7 @@ import {
   Boxes,
   Waypoints,
   Lightbulb,
+  ShieldCheck,
   Plug,
   Settings,
   Loader2,
@@ -64,6 +65,12 @@ const WORKSPACE_NAV: NavItem[] = [
     label: "Insights",
     icon: Lightbulb,
     match: (p: string) => p.startsWith("/insights"),
+  },
+  {
+    href: "/compliance",
+    label: "Compliance",
+    icon: ShieldCheck,
+    match: (p: string) => p.startsWith("/compliance"),
   },
   // Sift carries its own brand glyph (the shield "S"), not a lucide icon.
   { href: "/sift", label: "Sift", icon: null, match: (p: string) => p.startsWith("/sift") },
