@@ -7,6 +7,7 @@
  */
 import { S3Client, ListBucketsCommand, GetPublicAccessBlockCommand } from "@aws-sdk/client-s3";
 import { CloudTrailClient, DescribeTrailsCommand } from "@aws-sdk/client-cloudtrail";
+import { LambdaClient, paginateListFunctions, GetFunctionCommand } from "@aws-sdk/client-lambda";
 import { clientConfig } from "../aws/client-config";
 import { classifyAwsError } from "../aws/retry";
 import type { PermissionProbe } from "../permission-probe";
@@ -36,6 +37,23 @@ export const POSTURE_PROBES: readonly PermissionProbe[] = [
     async probe(input) {
       const client = new CloudTrailClient(clientConfig(input.credentials, "us-east-1"));
       await client.send(new DescribeTrailsCommand({}));
+    },
+  },
+  {
+    // Deploy provenance for container Lambdas (Phase A → R17): the image URI (hence the build SHA)
+    // is only reachable via GetFunction, a distinct permission from lambda:ListFunctions.
+    service: "lambda-image",
+    iamAction: "lambda:GetFunction",
+    scope: "region",
+    async probe(input) {
+      const client = new LambdaClient(clientConfig(input.credentials, input.region ?? "us-east-1"));
+      let first: string | undefined;
+      for await (const page of paginateListFunctions({ client }, {})) {
+        first = (page.Functions ?? [])[0]?.FunctionName;
+        break;
+      }
+      if (!first) return; // no functions → nothing to probe
+      await client.send(new GetFunctionCommand({ FunctionName: first }));
     },
   },
 ];

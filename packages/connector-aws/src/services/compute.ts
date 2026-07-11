@@ -80,6 +80,16 @@ interface LambdaFunction {
   VpcConfig?: { SubnetIds?: string[]; SecurityGroupIds?: string[] };
   /** From ListTags (a separate call, gated on `lambda:ListTags`); may be absent. Feeds R11. */
   Tags?: Record<string, string>;
+  // Deploy provenance (docs/plans/operational-intelligence.md Phase A → R17). ListFunctions returns
+  // these for free; `ImageUri` is merged in by the discoverer via GetFunction for container Lambdas.
+  Description?: string;
+  Version?: string;
+  /** Zip-package hash — NOT a git SHA; captured for reference/onset, never matched as a commit. */
+  CodeSha256?: string;
+  LastModified?: string;
+  PackageType?: string;
+  /** ECR image URI for container (`PackageType: Image`) Lambdas; carries the build-SHA tag. */
+  ImageUri?: string;
 }
 
 export const lambdaModule: ServiceModule<LambdaFunction> = {
@@ -102,6 +112,14 @@ export const lambdaModule: ServiceModule<LambdaFunction> = {
         // Lambda ListTags returns a flat record already (unlike the {Key,Value} array
         // shape elsewhere); feeds R11 tag→repo correlation (docs/05).
         tags: data.Tags ?? {},
+        // Deploy provenance (R17 lambda_commit_provenance) + a deploy timestamp for later
+        // change-timeline correlation (Phase C). `imageUri`/`description`/`tags` carry the git SHA.
+        description: data.Description ?? null,
+        version: data.Version ?? null,
+        codeSha256: data.CodeSha256 ?? null,
+        lastModified: data.LastModified ?? null,
+        packageType: data.PackageType ?? null,
+        imageUri: data.ImageUri ?? null,
       },
     };
   },

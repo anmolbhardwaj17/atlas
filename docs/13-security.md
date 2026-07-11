@@ -160,7 +160,7 @@ sequenceDiagram
 ```jsonc
 { "Version":"2012-10-17","Statement":[
   { "Sid":"AtlasReadOnlyCore","Effect":"Allow","Action":[
-      "ec2:Describe*","lambda:List*","lambda:GetFunctionConfiguration",
+      "ec2:Describe*","lambda:List*","lambda:GetFunctionConfiguration","lambda:GetFunction",
       "ecs:List*","ecs:Describe*","ecr:DescribeRepositories",
       "elasticloadbalancing:Describe*","route53:List*","route53:Get*",
       "apigateway:GET",

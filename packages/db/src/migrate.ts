@@ -47,6 +47,7 @@ import { up as up0045 } from "./migrations/0045_reap_orphaned_syncs";
 import { up as up0046 } from "./migrations/0046_account_kind";
 import { up as up0047 } from "./migrations/0047_weekly_digest";
 import { up as up0048 } from "./migrations/0048_digest_runs";
+import { up as up0049 } from "./migrations/0049_lambda_commit_seed";
 
 /**
  * Forward-only SQL migration runner (docs/04 §9). Plain `pg`, no ORM. Each
@@ -105,6 +106,7 @@ const MIGRATIONS: ReadonlyArray<{ version: string; statements: string[] }> = [
   { version: "0046_account_kind", statements: up0046 },
   { version: "0047_weekly_digest", statements: up0047 },
   { version: "0048_digest_runs", statements: up0048 },
+  { version: "0049_lambda_commit_seed", statements: up0049 },
 ];
 
 async function main(): Promise<void> {
