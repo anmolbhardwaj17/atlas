@@ -4,11 +4,15 @@ import { withOrgScope, type Db } from "@atlas/db";
 import {
   answerQuestion,
   answerQuestionStream,
+  judgeCoverage,
   matchEdges,
   OpenRouterProvider,
   ClaudeProvider,
   type AnswerCitation,
   type AnswerEvent,
+  type CoverageAssessment,
+  type CoverageInputs,
+  type IntentIssue,
   type LLMProvider,
 } from "@atlas/ai";
 import type { SecretBroker } from "@atlas/ingest";
@@ -19,6 +23,7 @@ import { ApiException } from "../common/errors";
 import { RateLimitService } from "../core/rate-limit.service";
 import { GraphRetrievalPort } from "./graph-retrieval.port";
 import { EdgeSuggestionService } from "./edge-suggestion.service";
+import { GraphService } from "../graph/graph.service";
 import { LLM_PROVIDER } from "./tokens";
 
 export type LlmProviderId = "openrouter" | "openai" | "anthropic";
@@ -75,6 +80,50 @@ const AI_BURST_WINDOW_S = 60; // … per 60s
 const AI_SHARED_DAILY_LIMIT = 100; // asks per org per day on Atlas's shared key
 const DAY_SECONDS = 24 * 60 * 60;
 
+/** PR node kinds the coverage judge accepts (mirrors R18's linkable kinds). */
+const PR_KINDS = ["bitbucket.pullrequest", "github.pull_request"];
+
+const asString = (v: unknown): string => (typeof v === "string" ? v : "");
+const asStringOrNull = (v: unknown): string | null => (typeof v === "string" ? v : null);
+
+/** Map a crawled `jira.issue` node's captured attributes (IV-1) into the judge's IntentIssue. */
+function toIntentIssue(node: {
+  id: string;
+  name: string | null;
+  attributes: Record<string, unknown>;
+}): IntentIssue {
+  const a = node.attributes;
+  const subtasks = Array.isArray(a.subtasks)
+    ? a.subtasks
+        .map((s) => {
+          const o = (s ?? {}) as Record<string, unknown>;
+          return {
+            key: asString(o.key),
+            summary: asStringOrNull(o.summary),
+            status: asStringOrNull(o.status),
+          };
+        })
+        .filter((s) => s.key)
+    : [];
+  const comments = Array.isArray(a.comments)
+    ? a.comments
+        .map((c) => {
+          const o = (c ?? {}) as Record<string, unknown>;
+          return { author: asStringOrNull(o.author), text: asString(o.text) };
+        })
+        .filter((c) => c.text)
+    : [];
+  return {
+    id: node.id,
+    key: asString(a.key) || node.name || "",
+    url: asStringOrNull(a.url),
+    summary: asString(a.summary) || node.name || "",
+    description: asString(a.description),
+    subtasks,
+    comments,
+  };
+}
+
 @Injectable()
 export class AiService {
   constructor(
@@ -85,6 +134,7 @@ export class AiService {
     @Inject(ENV) private readonly env: Env,
     private readonly rateLimit: RateLimitService,
     private readonly edgeSuggest: EdgeSuggestionService,
+    private readonly graph: GraphService,
   ) {}
 
   /**
@@ -127,6 +177,58 @@ export class AiService {
       scannedRuntimes: ctx.input.runtimes.length,
       overCap: ctx.runtimesOverCap,
     };
+  }
+
+  /**
+   * Intent-coverage review for a PR (IV-3, docs/plans/intent-verification.md §3). Assembles the
+   * judge's inputs from the graph — the PR node, its linked Jira issue (via the R18 `IMPLEMENTS`
+   * edge → the issue's captured intent attributes), and the on-demand PR diff — then runs the
+   * `@atlas/ai` coverage judge. Everything is org-scoped (GraphService/port enforce RLS, R8). The
+   * judge itself owns the honesty: it short-circuits to `no-intent`/`no-diff` and never fabricates a
+   * gap (its suppression gate). A non-PR / cross-tenant / absent id → 404 via GraphService.getNode.
+   */
+  async coverageForPr(orgId: string, prNodeId: string): Promise<CoverageAssessment> {
+    // Spends model budget + reads a diff from the source API → per-org rate limit (mirrors the AI
+    // ask/suggest limits; generous enough that reviewing PRs interactively never trips it).
+    await this.rateLimit.enforce(
+      orgId,
+      "ai_coverage",
+      30,
+      60,
+      "You're reviewing PRs quickly — give it a moment before the next coverage check.",
+    );
+
+    const pr = await this.graph.getNode(orgId, prNodeId); // 404 if absent / cross-tenant (R8)
+    if (!PR_KINDS.includes(pr.kind)) {
+      throw ApiException.invalidState(
+        "Intent coverage can only be reviewed for a pull request. Open a PR node and try again.",
+      );
+    }
+
+    // The linked intent: the R18 IMPLEMENTS(pr → jira.issue) edge. No edge = no stated intent to
+    // check against (the judge returns an honest `no-intent`, not a failure).
+    const edges = await this.graph.nodeEdges(orgId, prNodeId, {
+      direction: "out",
+      type: "IMPLEMENTS",
+      limit: 10,
+    });
+    const issueEdge = edges.find((e) => e.to.kind === "jira.issue");
+    let issue: IntentIssue | null = null;
+    if (issueEdge) {
+      const node = await this.graph.getNode(orgId, issueEdge.to.id);
+      issue = toIntentIssue(node);
+    }
+
+    // Only fetch the (rate-limited, remote) diff when there's an issue to judge it against.
+    const diff = issue ? await this.port.prDiff(orgId, prNodeId, 16_000) : null;
+
+    const { llm } = await this.resolveProvider(orgId);
+    const inputs: CoverageInputs = {
+      pr: { id: pr.id, name: pr.name },
+      issue,
+      diff,
+    };
+    return judgeCoverage({ llm }, inputs);
   }
 
   /** The org's LLM config for the settings UI — never the key (BR-CONN-1). */

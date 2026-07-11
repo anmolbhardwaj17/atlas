@@ -9,6 +9,7 @@ import { GraphRetrievalPort } from "./graph-retrieval.port";
 import { AiService } from "./ai.service";
 import { EdgeSuggestionService } from "./edge-suggestion.service";
 import { AiController } from "./ai.controller";
+import { IntentController } from "./intent.controller";
 import { LLM_PROVIDER } from "./tokens";
 
 /**
@@ -35,7 +36,7 @@ const searchProvider: Provider = {
 @Module({
   // ConnectionsModule exports SECRET_BROKER (for per-org BYO-LLM key resolution).
   imports: [AuthModule, ConnectionsModule],
-  controllers: [AiController],
+  controllers: [AiController, IntentController],
   providers: [
     GraphService,
     searchProvider,

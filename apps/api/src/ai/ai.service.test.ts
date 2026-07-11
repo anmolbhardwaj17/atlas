@@ -54,6 +54,7 @@ suite("G3.5 AiService", () => {
       loadEnv({}),
       new RateLimitService(app),
       new EdgeSuggestionService(app),
+      new GraphService(app),
     );
   };
 
