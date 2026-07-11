@@ -17,6 +17,7 @@
     "@atlas/connector-bitbucket": "workspace:*",
     "@atlas/connector-github": "workspace:*",
     "@atlas/connector-jenkins": "workspace:*",
+    "@atlas/connector-jira": "workspace:*",
     "@atlas/connector-sdk": "workspace:*",
     "@atlas/db": "workspace:*",
     "@atlas/inference": "workspace:*",

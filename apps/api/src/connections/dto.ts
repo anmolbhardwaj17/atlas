@@ -13,6 +13,7 @@ export const CreateConnectionSchema = z
       "gitlab",
       "datadog",
       "jenkins",
+      "jira",
     ]),
     displayName: z.string().trim().min(1).max(120),
     config: z.record(z.unknown()).optional(),

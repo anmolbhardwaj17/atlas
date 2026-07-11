@@ -11,6 +11,7 @@ import { createAwsConnector } from "@atlas/connector-aws";
 import { createGithubConnector } from "@atlas/connector-github";
 import { createBitbucketConnector } from "@atlas/connector-bitbucket";
 import { createJenkinsConnector } from "@atlas/connector-jenkins";
+import { createJiraConnector } from "@atlas/connector-jira";
 import { AuthModule } from "../auth/auth.module";
 import { GraphModule } from "../graph/graph.module";
 import { IncidentsModule } from "../incidents/incidents.module";
@@ -62,6 +63,7 @@ const connectorRegistryProvider: Provider = {
     registry.register("github", createGithubConnector({ secrets }));
     registry.register("bitbucket", createBitbucketConnector({ secrets }));
     registry.register("jenkins", createJenkinsConnector({ secrets }));
+    registry.register("jira", createJiraConnector({ secrets }));
     return registry;
   },
   inject: [SECRET_BROKER],
