@@ -347,6 +347,9 @@ export interface ControlResult {
   detail: string;
   count: number;
   evidence: EvidenceRef[];
+  /** For a `not-assessable` control blocked by a missing cloud permission: the IAM action(s) to
+   *  grant. Empty/absent when the gap is "not crawled yet" (a roadmap item, not a permission fix). */
+  missingActions?: string[];
 }
 
 function appliesInEstate(control: Control, inventory: Record<string, number>): boolean {

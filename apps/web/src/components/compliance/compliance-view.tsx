@@ -34,6 +34,8 @@ export interface ControlResult {
   detail: string;
   count: number;
   evidence: Array<{ id: string; label: string; kind?: string }>;
+  /** IAM actions to grant when a control is not-assessable because the AWS role lacks permission. */
+  missingActions?: string[];
 }
 export interface FrameworkSummary {
   framework: FrameworkMeta;
@@ -335,7 +337,9 @@ function NotAssessable({ rows, framework }: { rows: ControlResult[]; framework: 
           {rows.length}
         </span>
         <span className="ml-1 hidden text-xs text-muted-foreground sm:inline">
-          controls that need data Atlas doesn&apos;t crawl yet — not a pass or a fail
+          {rows.some((r) => r.missingActions?.length)
+            ? "some just need an AWS permission — grant it and they light up"
+            : "controls that need data Atlas doesn't crawl yet — not a pass or a fail"}
         </span>
         <ChevronRight
           className={cn(
@@ -346,22 +350,50 @@ function NotAssessable({ rows, framework }: { rows: ControlResult[]; framework: 
       </button>
       {open ? (
         <ul className="divide-y divide-border border-t border-border">
-          {rows.map((r) => {
-            const ids = r.control.mappings[framework] ?? [];
-            return (
-              <li key={r.control.id} className="px-4 py-3">
-                <div className="text-sm font-medium text-foreground">{r.control.title}</div>
-                <p className="mt-0.5 max-w-2xl text-[11px] leading-relaxed text-muted-foreground">
-                  {r.detail}
-                </p>
-                {ids.length > 0 ? (
-                  <span className="mt-2 inline-flex rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                    {framework.toUpperCase()} {ids.join(", ")}
-                  </span>
-                ) : null}
-              </li>
-            );
-          })}
+          {/* Permission gaps first — they're one grant away from being assessed. */}
+          {[...rows]
+            .sort((a, b) => (b.missingActions?.length ?? 0) - (a.missingActions?.length ?? 0))
+            .map((r) => {
+              const ids = r.control.mappings[framework] ?? [];
+              const perms = r.missingActions ?? [];
+              return (
+                <li key={r.control.id} className="px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium text-foreground">{r.control.title}</span>
+                    <span
+                      className={cn(
+                        "rounded-full px-1.5 py-px text-[10px] font-medium uppercase tracking-wide ring-1 ring-inset",
+                        perms.length > 0
+                          ? "bg-amber-500/10 text-amber-700 ring-amber-500/25 dark:text-amber-400"
+                          : "bg-muted text-muted-foreground ring-border",
+                      )}
+                    >
+                      {perms.length > 0 ? "Grant permission" : "Not yet crawled"}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 max-w-2xl text-[11px] leading-relaxed text-muted-foreground">
+                    {r.detail}
+                  </p>
+                  {perms.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      {perms.map((a) => (
+                        <code
+                          key={a}
+                          className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground/80"
+                        >
+                          {a}
+                        </code>
+                      ))}
+                    </div>
+                  ) : null}
+                  {ids.length > 0 ? (
+                    <span className="mt-2 inline-flex rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                      {framework.toUpperCase()} {ids.join(", ")}
+                    </span>
+                  ) : null}
+                </li>
+              );
+            })}
         </ul>
       ) : null}
     </Card>
