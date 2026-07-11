@@ -41,6 +41,43 @@ Derive `repo —DEPLOYS_TO→ service` with tiered confidence (docs/05 disciplin
 
 Deliverables: pipeline-yml fetch in the Bitbucket connector (we already fetch file content for manifests — same mechanism), inference rules in the existing engine (they're just new R-rules), edges on map/Explore/impact. **Exit:** clicking `calsaws-chat-*` shows *which repo ships it*, cited to the evidence.
 
+#### Compute is plural — design for **all runtimes, all clouds** (not ECS/Lambda-specific)
+
+`DEPLOYS_TO` must NOT be an ECS rule. The invariant across every runtime and cloud: **code reaches
+runtime through an *artifact* that carries *provenance* (a git SHA / repo ref / build id).** So the
+bridge is a rule over two abstractions, not over service names:
+
+```
+compute_target --RUNS_ARTIFACT--> artifact --BUILT_FROM--> repo@sha
+                └──────────────── compose ────────────────┘
+                  repo --DEPLOYS_TO--> compute_target   (derived, tiered)
+```
+
+Each connector/service-module contributes **witnesses** through one shared interface — "the artifact
+this node runs" + "the provenance on that artifact." Adding a runtime = write a witness extractor; the
+bridge rule is written **once**. (Note: **Fargate is not a separate service** — it's an ECS/EKS launch
+type; the task-def + image URI are identical, so ECS coverage includes Fargate for free.)
+
+Coverage is a **confidence gradient** (P3 — tier reflects how directly the artifact is knowable):
+
+| Compute target | Artifact / provenance path | Tier |
+|---|---|---|
+| ECS (EC2 **or** Fargate) | task-def image URI → ECR; SHA in image tag | high (have the data) |
+| Lambda | zip/image; `CodeSha256`, image tag, SHA in description | high |
+| App Runner / Beanstalk / Batch | image, or a **direct repo reference** | high when a repo link exists |
+| EKS / Kubernetes | pod images — AWS IAM alone can't see *running* pod images; needs cluster RBAC, or infer from the ECR-push side | medium/low, flagged |
+| Raw EC2 | AMI provenance (Packer tags) / SSM inventory / `repo`/stack tags | low — often `unknown`, stated |
+| **Azure** (App Service / Container Apps / AKS / Functions / VMs) | ACR image, or App Service deployment-center **direct repo link** | same model |
+| **GCP** (Cloud Run / GKE / Cloud Functions / GCE / App Engine) | Artifact Registry image; **Cloud Build native git provenance** (often the strongest signal) | same model |
+
+`unknown` stays first-class — a bare EC2 box with no tags/SSM gets **no fabricated edge** (P3).
+
+**Build discipline:** v1 *implements the witness extractors* for ECS(+Fargate) + Lambda (what the live
+calsaws estate has data to verify against), but the **abstraction — `compute_target`/`artifact` node
+roles, `RUNS_ARTIFACT`/`BUILT_FROM`/`DEPLOYS_TO` edges, the witness interface, and the tiered inference
+rule — is general from day one.** EC2, EKS, App Runner, Azure, GCP are each "add one extractor," never a
+redesign.
+
 ### Phase B — Health layer: the map turns red *(can build in parallel with A)*
 
 New read-only collectors, same crawl pattern as I1.3 modules:

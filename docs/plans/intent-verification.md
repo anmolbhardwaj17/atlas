@@ -13,6 +13,14 @@
 > **Why it's separate & later:** it needs a **new Jira connector**, and its output is the **softest
 > truth-claim Atlas would ever make** — a judgment, not a graph fact. It needs the most careful honesty
 > framing + its own adversarial eval. Do NOT bolt it onto op-intel; it's its own epic.
+>
+> **The deep code review is SIFT, not us.** The pre-merge (and post-merge) *code review* — reading the
+> diff/code and understanding whether the logic is correct — is delivered by **SIFT**, a partner product
+> (a friend of the product owner). It's already surfaced on the Atlas platform as **"Coming soon"** and
+> integrates with Bitbucket (reviews the PR; can run once a PR is merged, walking the code to understand
+> it). We will **use SIFT for the code-review layer, not rebuild it** — his code isn't available yet
+> (timeline TBD). So Atlas owns the **intent linkage + coverage** (PR↔Jira, story/comments, "was the
+> ticket's intent implemented"); SIFT owns **code-logic review**. See "Division of labour" below.
 
 ## The boundary it fills (why runtime observation can't)
 
@@ -42,8 +50,9 @@ criteria + subtasks + comments** (intent frequently lives in the clarifying comm
 the summary). "Just another connector" in the SDK — same shape as Bitbucket. Also: GitHub/Bitbucket +
 Jira native dev-panel links can seed the deterministic tier.
 
-### 3. Judge coverage (the hard, soft-truth part)
-Model reads the intent bundle + the PR diff (+ surrounding code at the deployed/HEAD SHA, L1 retrieval)
+### 3. Judge **intent coverage** (Atlas) — not code quality (that's SIFT)
+This is *"did the PR implement what the ticket asked?"*, **not** *"is the code good?"* (SIFT does the
+latter). Model reads the intent bundle + the PR diff (+ surrounding code at the deployed/HEAD SHA, L1 retrieval)
 and produces a **coverage assessment**, per acceptance criterion:
 - *"AC #2 ('email verified before X') — I don't see a verification check in the diff. Possibly
   unimplemented?"* — a **hedged reviewer question, cited to the AC line + the diff hunk (or its
@@ -51,9 +60,24 @@ and produces a **coverage assessment**, per acceptance criterion:
 - Bias to **questions over verdicts.** False "you didn't build X" (when built differently) is a
   trust-killer → high precision, honest "can't tell from what's stated" when the AC is vague/missing.
 
+## Division of labour — SIFT reviews the code, Atlas owns the intent
+
+| Concern | Owner | Why |
+|---|---|---|
+| Read the diff/code, judge **code-logic correctness / quality**, review the PR (pre- and post-merge) | **SIFT** (partner, "Coming soon" on the platform, Bitbucket-integrated) | it's his product; don't rebuild code review |
+| Link PR ↔ **Jira intent** (even without the key), read story/subtasks/comments | **Atlas** | needs the graph + connector SDK + tiered linking |
+| Judge **intent coverage** ("was the ticket's stated intent actually built?") | **Atlas** | it's an *intent* claim, not a code-quality one; cites AC↔diff |
+| Hold it all in one cited graph: intent ↔ code ↔ deploy ↔ runtime | **Atlas** | P1 — the traversal is the product |
+
+**Composition (integration OQ, when SIFT lands):** likely bidirectional — Atlas feeds SIFT the **intent
+context** (the linked ticket + acceptance criteria) so its review is intent-aware; SIFT feeds Atlas its
+**review findings** as first-class nodes/edges on the PR so they show in the graph + Ask AI. Exact
+contract TBD with the SIFT author. Until SIFT is available, Atlas's intent-coverage judgment stands
+alone (hedged, cited) and does **not** attempt deep code-quality review.
+
 ## Positioning
-- **Pre-merge review assist** (higher value): surface gaps on the *open* PR before the bug ships.
-- **Post-merge intent-drift audit**: "these merged PRs have unaddressed acceptance criteria."
+- **Pre-merge code review** → **SIFT** (his engine). Atlas adds **intent-coverage** gaps on the open PR.
+- **Post-merge intent-drift audit** (Atlas): "these merged PRs have unaddressed acceptance criteria."
 
 ## Honesty / eval (non-negotiable, P3/P4)
 - Every claim cites the specific AC/comment/subtask + the specific diff hunk. No un-sourced judgment.
