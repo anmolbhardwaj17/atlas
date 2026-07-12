@@ -62,19 +62,33 @@ export function SeverityTrend({ data }: { data: TrendPoint[] }) {
         role="img"
         aria-label="Severity trend"
       >
-        {SERIES.map((s) => {
+        {SERIES.map((s, si) => {
           const lastPt = last ? { x: x(n - 1), y: y(last[s.key]) } : null;
+          // Each line draws in turn (staggered), and its end dot pops once that line finishes.
+          const drawDelay = si * 0.14;
           return (
-            <g key={s.key} className="chart-fade">
+            <g key={s.key}>
               <path
                 d={line(s.key)}
+                pathLength={1}
+                className="chart-line-draw"
+                style={{ animationDelay: `${drawDelay}s` }}
                 fill="none"
                 stroke={s.color}
                 strokeWidth={2}
                 strokeLinejoin="round"
                 strokeLinecap="round"
               />
-              {lastPt ? <circle cx={lastPt.x} cy={lastPt.y} r={2.5} fill={s.color} /> : null}
+              {lastPt ? (
+                <circle
+                  cx={lastPt.x}
+                  cy={lastPt.y}
+                  r={2.5}
+                  fill={s.color}
+                  className="chart-line-dot"
+                  style={{ animationDelay: `${drawDelay + 0.9}s` }}
+                />
+              ) : null}
             </g>
           );
         })}

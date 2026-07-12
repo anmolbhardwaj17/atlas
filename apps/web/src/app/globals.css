@@ -222,12 +222,31 @@
     transform: scale(1);
   }
 }
+/* Line-draw: a normalized path (pathLength=1) is hidden (dashoffset 1) then drawn to full (0). Only
+   inside no-preference, so reduced-motion users get the full line with no dasharray at all. */
+@keyframes chart-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
 @media (prefers-reduced-motion: no-preference) {
   .chart-tick {
     animation: chart-fade-in 0.45s ease-out both;
   }
   .chart-grow {
     animation: chart-grow-in 0.65s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  .chart-line-draw {
+    stroke-dasharray: 1;
+    animation: chart-draw 0.9s cubic-bezier(0.65, 0, 0.35, 1) both;
+  }
+  .chart-line-dot {
+    animation: chart-grow-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
     transform-box: fill-box;
     transform-origin: center;
   }
