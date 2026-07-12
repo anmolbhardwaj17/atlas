@@ -261,11 +261,74 @@ export class ConnectionService {
       );
     }
 
+    // Reference-driven Jira crawl: before syncing, point the crawl at the specific tickets our PRs
+    // reference but that a recent-N crawl would miss — so linking scales to any backlog (IV, scale).
+    if (row.provider === "jira") {
+      const n = await this.refreshJiraBackfillKeys(orgId, id).catch((e: unknown) => {
+        this.logger.warn(`jira backfill-key refresh failed for ${id}: ${(e as Error).message}`);
+        return 0;
+      });
+      if (n > 0) this.logger.log(`jira reference-driven crawl: ${n} referenced ticket(s) queued`);
+    }
+
     const { runId, alreadyRunning } = await this.enqueueSyncRun(orgId, id, "manual");
     if (!alreadyRunning && !runId) {
       throw new ApiException(500, "internal_error", "Couldn't start a sync - please retry.");
     }
     return { status: alreadyRunning ? "already_running" : "queued", runId: runId ?? null };
+  }
+
+  /**
+   * Set `config.backfillKeys` to the Jira ticket keys our PRs reference but haven't been crawled yet
+   * (filtered to real project prefixes, so fake timestamp-branches drop out). The next crawl fetches
+   * exactly those by key — reference-driven, so it fetches what the code touches, not the whole
+   * backlog (scales to enterprise Jira). Returns how many keys were queued.
+   */
+  private async refreshJiraBackfillKeys(orgId: string, connectionId: string): Promise<number> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      const projects = new Set(
+        (
+          await c.query<{ k: string }>(
+            `SELECT upper(attributes->>'key') k FROM nodes WHERE kind='jira.project' AND status='active'`,
+          )
+        ).rows
+          .map((r) => r.k)
+          .filter(Boolean),
+      );
+      if (projects.size === 0) return 0;
+      const crawled = new Set(
+        (
+          await c.query<{ k: string }>(
+            `SELECT upper(attributes->>'key') k FROM nodes WHERE kind='jira.issue' AND status='active'`,
+          )
+        ).rows
+          .map((r) => r.k)
+          .filter(Boolean),
+      );
+      const prs = (
+        await c.query<{ name: string | null; br: string | null }>(
+          `SELECT name, attributes->>'sourceBranch' br FROM nodes
+            WHERE kind IN ('bitbucket.pullrequest','github.pull_request') AND status='active'`,
+        )
+      ).rows;
+      const KEY = /[A-Z][A-Z0-9]{1,9}-\d+/g;
+      const missing = new Set<string>();
+      for (const pr of prs) {
+        const text = `${pr.name ?? ""} ${pr.br ?? ""}`.toUpperCase();
+        for (const k of text.match(KEY) ?? []) {
+          const prefix = k.split("-")[0] ?? "";
+          if (projects.has(prefix) && !crawled.has(k)) missing.add(k);
+        }
+      }
+      const keys = [...missing].slice(0, 1000);
+      await c.query(
+        `UPDATE connections
+            SET config = jsonb_set(coalesce(config,'{}'::jsonb), '{backfillKeys}', $2::jsonb)
+          WHERE id = $1`,
+        [connectionId, JSON.stringify(keys)],
+      );
+      return keys.length;
+    });
   }
 
   /**

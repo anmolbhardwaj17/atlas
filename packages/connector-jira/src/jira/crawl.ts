@@ -88,6 +88,57 @@ export async function* discoverProjects(
   }
 }
 
+/** JQL length is bounded, so fetch backfill keys in chunks. */
+const KEY_CHUNK = 50;
+
+/**
+ * Reference-driven backfill: fetch SPECIFIC issues by key (the tickets our PRs reference but a
+ * recent-N crawl missed — often old, but exactly what deterministic linking needs). Keys are already
+ * validated + project-filtered by the caller, so a chunk should resolve; a 400/40x on a chunk (a
+ * deleted/inaccessible key) is skipped, never fatal. This is what makes the crawl scale to any
+ * backlog — we fetch what the code touches, not the whole history (IV / long-term scale).
+ */
+export async function* discoverIssuesByKeys(
+  client: JiraClient,
+  site: string,
+  keys: string[],
+  scopeKey: string,
+  intentFields: IntentField[] = [],
+): AsyncIterable<Discovered> {
+  const fields = intentFields.length
+    ? `${ISSUE_FIELDS},${intentFields.map((f) => f.id).join(",")}`
+    : ISSUE_FIELDS;
+  for (let i = 0; i < keys.length; i += KEY_CHUNK) {
+    const chunk = keys.slice(i, i + KEY_CHUNK);
+    const jql = `key in (${chunk.map((k) => `"${k}"`).join(",")})`;
+    let nextPageToken: string | undefined;
+    for (;;) {
+      let res;
+      try {
+        res = await client.request<Json>("/search/jql", {
+          params: { jql, fields, maxResults: 100, ...(nextPageToken ? { nextPageToken } : {}) },
+        });
+      } catch (err) {
+        // A bad key (400) or forbidden project (40x) → skip this chunk, keep the rest.
+        if (err instanceof JiraHttpError && err.status >= 400 && err.status < 500) break;
+        throw err;
+      }
+      const issues = (res.data.issues as Json[] | undefined) ?? [];
+      for (const issue of issues) {
+        const key = s(issue.key);
+        if (!key) continue;
+        yield {
+          ref: { scopeKey, externalId: `issue:${key}`, kind: "jira.issue" },
+          payload: withContext(issue, { site, ...(intentFields.length ? { intentFields } : {}) }),
+        };
+      }
+      const token = typeof res.data.nextPageToken === "string" ? res.data.nextPageToken : undefined;
+      if (res.data.isLast === true || !token || issues.length === 0) break;
+      nextPageToken = token;
+    }
+  }
+}
+
 export async function* discoverIssues(
   client: JiraClient,
   site: string,

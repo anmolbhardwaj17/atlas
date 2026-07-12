@@ -9,7 +9,14 @@ export interface JiraConfig {
   site: string;
   /** Restrict the crawl to these project keys (e.g. ["ENG","OPS"]); empty = all. */
   projectKeys?: string[];
+  /** Reference-driven backfill: specific issue keys to fetch this run regardless of the recency
+   *  window/cap — the tickets our PRs reference but that a recent-N crawl would miss. Set per sync by
+   *  the API from the graph, so the crawl scales to any backlog (fetch what the code touches). */
+  backfillKeys?: string[];
 }
+
+/** A Jira issue key: 1–10 upper-alnum project code, a dash, digits. */
+const KEY_RE = /^[A-Z][A-Z0-9]{1,9}-\d+$/;
 
 /** Accept a full URL or a bare subdomain and return the site slug. */
 function toSite(raw: string): string {
@@ -32,7 +39,21 @@ export function parseJiraConfig(config: Record<string, unknown>): JiraConfig {
         .filter((k): k is string => typeof k === "string" && k.trim().length > 0)
         .map((k) => k.trim().toUpperCase())
     : [];
-  return projectKeys.length > 0 ? { site, projectKeys } : { site };
+  const backfillRaw = config.backfillKeys;
+  const backfillKeys = Array.isArray(backfillRaw)
+    ? [
+        ...new Set(
+          backfillRaw
+            .filter((k): k is string => typeof k === "string")
+            .map((k) => k.trim().toUpperCase())
+            .filter((k) => KEY_RE.test(k)), // valid Jira keys only (drops fake timestamp branches)
+        ),
+      ].slice(0, 1000)
+    : [];
+  const out: JiraConfig = { site };
+  if (projectKeys.length > 0) out.projectKeys = projectKeys;
+  if (backfillKeys.length > 0) out.backfillKeys = backfillKeys;
+  return out;
 }
 
 /** Credential shape resolved from the Secrets Broker for HTTP Basic auth (Atlassian). */

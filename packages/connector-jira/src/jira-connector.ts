@@ -29,6 +29,7 @@ import {
   resolveProjectKeys,
   discoverProjects,
   discoverIssues,
+  discoverIssuesByKeys,
   discoverIntentFields,
 } from "./jira/crawl";
 import { MODULE_BY_KIND, type JiraModule } from "./modules";
@@ -131,6 +132,15 @@ export class JiraConnector implements Connector {
         params: { site: cfg.site, projectKey: key },
       })),
     ];
+    // Reference-driven backfill: fetch the specific tickets our PRs reference that a recent-N crawl
+    // would miss (set per run by the API from the graph). Part of the SAME full plan, so reconcile
+    // still sees every issue and won't stale the rest.
+    if (cfg.backfillKeys && cfg.backfillKeys.length > 0) {
+      scopes.push({
+        key: `issues-by-key:${cfg.site}`,
+        params: { site: cfg.site, keys: cfg.backfillKeys.join(",") },
+      });
+    }
     return { scopes };
   }
 
@@ -144,6 +154,12 @@ export class JiraConnector implements Connector {
       const keys =
         typeof scope.params?.keys === "string" ? scope.params.keys.split(",").filter(Boolean) : [];
       source = discoverProjects(client, site, keys, scope.key);
+    } else if (scope.key.startsWith("issues-by-key:")) {
+      const keys =
+        typeof scope.params?.keys === "string" ? scope.params.keys.split(",").filter(Boolean) : [];
+      if (keys.length === 0) return;
+      const intentFields = this.intentFieldsByRun.get(ctx.run.id) ?? [];
+      source = discoverIssuesByKeys(client, site, keys, scope.key, intentFields);
     } else if (scope.key.startsWith("issues:")) {
       const projectKey =
         typeof scope.params?.projectKey === "string" ? scope.params.projectKey : "";
