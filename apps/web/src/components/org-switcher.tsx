@@ -92,6 +92,7 @@ export function OrgSwitcher({
                 name={current.orgName}
                 logoUrl={current.orgLogoUrl}
                 size={52}
+                bordered={false}
                 className="rounded-xl"
               />
             </div>
