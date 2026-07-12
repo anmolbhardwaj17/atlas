@@ -120,6 +120,38 @@ describe("R17 lambda_commit_provenance", () => {
     expect(edges.every((e) => e.tier === "inferred-low")).toBe(true);
   });
 
+  it("a git SHA in a commit-keyed ENV VAR matches (cited by key, not value)", () => {
+    const input = buildInput([repo("chat"), pr("chat", [FULL_SHA]), lambda("chat-fn", {})]);
+    // The env lives in the `aws.lambda.env` signal, not on the node.
+    input.signalsByKind.set("aws.lambda.env", [
+      {
+        subjectUrn: `aws:us-east-1:${ACCT}:lambda:chat-fn`,
+        kind: "aws.lambda.env",
+        data: { variables: { GIT_SHA: SHORT, DB_PASSWORD: "s3cr3tdeadbeef" } },
+      },
+    ]);
+    const edges = lambdaCommitProvenanceRule.evaluate(input).edges;
+    expect(edges).toHaveLength(1);
+    expect(edges[0]).toMatchObject({
+      tier: "inferred-high",
+      evidence: { match: "env-sha", from: "GIT_SHA" }, // key only; value never stored
+    });
+    // The unrelated secret env value is never treated as a SHA (its key isn't commit-ish).
+    expect(JSON.stringify(edges[0]?.evidence)).not.toContain("s3cr3t");
+  });
+
+  it("a hex value under a NON-commit env key is ignored (precision)", () => {
+    const input = buildInput([repo("chat"), pr("chat", [FULL_SHA]), lambda("chat-fn", {})]);
+    input.signalsByKind.set("aws.lambda.env", [
+      {
+        subjectUrn: `aws:us-east-1:${ACCT}:lambda:chat-fn`,
+        kind: "aws.lambda.env",
+        data: { variables: { API_KEY: FULL_SHA } }, // hex, but not a commit key → not a SHA candidate
+      },
+    ]);
+    expect(lambdaCommitProvenanceRule.evaluate(input).edges).toHaveLength(0);
+  });
+
   it("no SHA anywhere on the function → no edges", () => {
     const input = buildInput([
       repo("chat"),

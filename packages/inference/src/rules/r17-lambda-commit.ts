@@ -20,6 +20,11 @@ import { shasFromImage } from "./r12-images";
 const PR_KINDS = ["bitbucket.pullrequest", "github.pull_request"];
 /** Git SHA token (7–40 hex, word-bounded) — the ≥1-letter guard excludes pure-numeric build dates. */
 const SHA_WORD = /\b[0-9a-f]{7,40}\b/gi;
+/** Env-var names that CI uses to stamp the deployed commit. We only read a git SHA out of a value
+ *  under one of these keys — a precise gate that avoids treating a random hex secret as a commit
+ *  (P3), and lets us cite the KEY without ever storing the raw value (some env values are secrets). */
+const COMMIT_ENV_KEY =
+  /(^|[_-])(commit|revision|rev|sha|version|release|build)([_-]|$)|git[_-]?sha|commit[_-]?(sha|hash|id)|source[_-]?version/i;
 
 /** Extract candidate git SHAs from free text (a description / tag value). */
 export function shasFromText(text: string): string[] {
@@ -31,8 +36,13 @@ export function shasFromText(text: string): string[] {
   return out;
 }
 
-/** All candidate SHAs a Lambda node exposes, tagged with where each came from (for the citation). */
-function lambdaShaCandidates(fn: NodeLite): Array<{ sha: string; via: string; raw: string }> {
+/** All candidate SHAs a Lambda node exposes, tagged with where each came from (for the citation).
+ *  `env` = the function's env vars (from the `aws.lambda.env` signal), read only under commit-ish
+ *  keys and cited by KEY only — the value can be a secret, and a git SHA isn't sensitive anyway. */
+function lambdaShaCandidates(
+  fn: NodeLite,
+  env: Record<string, string>,
+): Array<{ sha: string; via: string; raw: string }> {
   const out: Array<{ sha: string; via: string; raw: string }> = [];
   const image = fn.attributes.imageUri;
   if (typeof image === "string") {
@@ -49,7 +59,25 @@ function lambdaShaCandidates(fn: NodeLite): Array<{ sha: string; via: string; ra
       for (const sha of shasFromText(v)) out.push({ sha, via: "tag-sha", raw: `${k}=${v}` });
     }
   }
+  // Env-stamped commit (the common CI pattern: GIT_SHA / GIT_COMMIT / SOURCE_VERSION=…). Cite the
+  // key, never the raw value.
+  for (const [k, v] of Object.entries(env)) {
+    if (!COMMIT_ENV_KEY.test(k)) continue;
+    for (const sha of shasFromText(v)) out.push({ sha, via: "env-sha", raw: k });
+  }
   return out;
+}
+
+/** Lambda urn → its env vars, from the `aws.lambda.env` signal (values kept in-memory only). */
+function envByLambda(input: InferenceInput): Map<string, Record<string, string>> {
+  const map = new Map<string, Record<string, string>>();
+  for (const sig of input.signalsByKind.get("aws.lambda.env") ?? []) {
+    const vars = (sig.data as { variables?: Record<string, unknown> }).variables ?? {};
+    const rec: Record<string, string> = {};
+    for (const [k, v] of Object.entries(vars)) if (typeof v === "string") rec[k] = v;
+    map.set(sig.subjectUrn, rec);
+  }
+  return map;
 }
 
 export const lambdaCommitProvenanceRule: Rule = {
@@ -98,8 +126,9 @@ export const lambdaCommitProvenanceRule: Rule = {
       if (!prev || (prev.tier === "inferred-low" && e.tier === "inferred-high")) best.set(k, e);
     };
 
+    const envByUrn = envByLambda(input);
     for (const fn of lambdas) {
-      for (const cand of lambdaShaCandidates(fn)) {
+      for (const cand of lambdaShaCandidates(fn, envByUrn.get(fn.urn) ?? {})) {
         // Prefix match: the token may be a 7-char short SHA, the commit stores the full 40.
         const matchedShas = commitShas.filter(
           (c) => c.startsWith(cand.sha) || cand.sha.startsWith(c),
