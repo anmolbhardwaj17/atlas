@@ -262,6 +262,44 @@ describe("assessment + suppression gate", () => {
     expect(a.criteria.some((c) => c.status === "possibly-missing")).toBe(false);
   });
 
+  it("TICKET-LEVEL: judges across all a ticket's PRs, tagging each hunk with its PR", async () => {
+    const prA = `diff --git a/src/verify.ts b/src/verify.ts
+@@ -1,1 +1,3 @@
++  if (!user.emailVerified) throw new Error("nope");`;
+    const prB = `diff --git a/src/session.ts b/src/session.ts
+@@ -1,1 +1,3 @@
++  clearSession(session);`;
+    const a = await judgeCoverage(
+      {
+        llm: new MockLLMProvider(
+          [
+            "[AC1] status=implemented cite=[H1] :: PR #100 adds the email-verified check.",
+            "[AC2] status=implemented cite=[H2] :: PR #200 clears the session.",
+            "[AC3] status=possibly-missing cite=[AC3] :: rate limiting isn't in any of these PRs.",
+          ].join("\n"),
+        ),
+      },
+      {
+        pr: { id: "issue-1", name: "ENG-142 (2 PRs)" },
+        issue: ISSUE,
+        diff: null,
+        mode: "ticket",
+        prDiffs: [
+          { prName: "#100", text: prA, truncated: false },
+          { prName: "#200", text: prB, truncated: false },
+        ],
+      },
+    );
+    expect(a.status).toBe("assessed");
+    expect(a.mode).toBe("ticket");
+    expect(a.prs).toEqual(["#100", "#200"]);
+    // Each AC's diff citation resolves to the PR that addresses it (graph-smart "handled elsewhere").
+    expect(a.criteria[0]?.citations.find((c) => c.kind === "diff-hunk")?.ref).toContain("#100");
+    expect(a.criteria[1]?.citations.find((c) => c.kind === "diff-hunk")?.ref).toContain("#200");
+    expect(a.summary).toMatch(/across this ticket's 2 PRs/);
+    expect(a.caveats.some((c) => /delivered across 2 PRs/.test(c))).toBe(true);
+  });
+
   it("flags the no-explicit-AC caveat when assessing against the description only", async () => {
     const bare: IntentIssue = {
       ...ISSUE,

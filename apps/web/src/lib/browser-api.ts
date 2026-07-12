@@ -533,20 +533,18 @@ export interface CoverageAssessment {
   summary: string;
   caveats: string[];
   reviewNote: string;
+  /** `pr` = one PR vs its ticket; `ticket` = the ticket vs ALL its PRs. */
+  mode: "pr" | "ticket";
+  /** PR name(s) covered (one for `pr`, several for `ticket`). */
+  prs: string[];
+  /** How many PRs implement the linked ticket; >1 in `pr` mode → offer a ticket-level review. */
+  ticketPrCount?: number;
 }
 
-/**
- * Review whether a PR implements the intent of its linked Jira issue (IV-3). On-demand (spends
- * model budget), so it's button-triggered, not run on load. Throws with the API's message on
- * failure (rate limit, non-PR, unreachable) so the caller can surface it inline.
- */
-export async function reviewIntentCoverage(
-  orgId: string,
-  prId: string,
-): Promise<CoverageAssessment> {
+async function postCoverage(orgId: string, path: string): Promise<CoverageAssessment> {
   const token = await getClientToken();
   if (!token) throw new Error("You're not signed in.");
-  const res = await fetch(`${apiUrl()}/intent/prs/${prId}/coverage`, {
+  const res = await fetch(`${apiUrl()}${path}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
   });
@@ -558,6 +556,20 @@ export async function reviewIntentCoverage(
     throw new Error(body?.error?.message ?? `Couldn't review coverage (${res.status}).`);
   }
   return body.data;
+}
+
+/**
+ * Review whether a PR implements the intent of its linked Jira issue (IV-3). On-demand (spends
+ * model budget), so it's button-triggered, not run on load.
+ */
+export function reviewIntentCoverage(orgId: string, prId: string): Promise<CoverageAssessment> {
+  return postCoverage(orgId, `/intent/prs/${prId}/coverage`);
+}
+
+/** Ticket-level review: judge a Jira issue against ALL the PRs that implement it (the accurate
+ *  unit when a Story is delivered across several PRs). */
+export function reviewTicketCoverage(orgId: string, issueId: string): Promise<CoverageAssessment> {
+  return postCoverage(orgId, `/intent/issues/${issueId}/coverage`);
 }
 
 export interface LlmSettings {

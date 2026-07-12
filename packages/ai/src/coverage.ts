@@ -63,13 +63,29 @@ export interface CoveragePr {
   name: string | null;
 }
 
+/** One PR's diff, labelled — for ticket-level review a ticket is judged against ALL its PRs at once. */
+export interface IntentPrDiff {
+  prName: string;
+  text: string;
+  truncated: boolean;
+}
+
+export type CoverageMode = "pr" | "ticket";
+
 /** Everything the judge needs, assembled by the caller (API in IV-3b). */
 export interface CoverageInputs {
+  /** The review subject: a single PR, or (ticket mode) a synthetic subject naming the ticket. */
   pr: CoveragePr;
   /** The linked intent, or null if the PR has no IMPLEMENTS edge to a crawled issue. */
   issue: IntentIssue | null;
-  /** The on-demand PR diff (unified diff text), or null if unavailable. */
+  /** The on-demand PR diff (single-PR mode). Superseded by `prDiffs` when that is set. */
   diff: { text: string; truncated: boolean } | null;
+  /** Ticket-level review: every PR that implements the ticket, judged together — a Story is delivered
+   *  across many PRs, so judging one against the whole ticket is misleading. Each hunk stays tagged
+   *  with its PR, so "handled elsewhere?" resolves to a sibling PR (graph-smart; deep code = SIFT). */
+  prDiffs?: IntentPrDiff[];
+  /** `pr` (one PR vs its ticket) or `ticket` (the ticket vs all its PRs). Default `pr`. */
+  mode?: CoverageMode;
 }
 
 export type CriterionStatus = "implemented" | "possibly-missing" | "cannot-tell";
@@ -108,6 +124,13 @@ export interface CoverageAssessment {
   caveats: string[];
   /** The standing hedge shown with every assessment - what this is and is not. */
   reviewNote: string;
+  /** `pr` = one PR vs its ticket; `ticket` = the ticket vs ALL its PRs (the accurate unit). */
+  mode: CoverageMode;
+  /** The PR name(s) this review covered (one for `pr` mode, several for `ticket`). */
+  prs: string[];
+  /** How many PRs implement the linked ticket (set by the API). >1 in `pr` mode → offer a
+   *  ticket-level review, since a single PR rarely delivers the whole ticket. */
+  ticketPrCount?: number;
 }
 
 export interface CoverageDeps {
@@ -301,6 +324,8 @@ export interface DiffHunk {
   file: string;
   header: string; // the @@ ... @@ line (or a synthetic file header)
   body: string;
+  /** Which PR this hunk came from (ticket-level review spans several PRs). */
+  pr?: string;
 }
 
 const MAX_HUNKS = 40;
@@ -309,9 +334,11 @@ const MAX_HUNK_CHARS = 1_500;
 /**
  * Split a unified (git) diff into per-hunk segments, each with a stable [H#] marker the model can
  * cite. Tracks the current file from `diff --git`/`+++` headers; a `@@` line starts a new hunk.
- * Bounded (hunk count + per-hunk chars) so a huge PR can't blow the context budget.
+ * `startAt` continues the global [H#] numbering across several PRs (ticket mode); `pr` tags each
+ * hunk with its source PR so a citation resolves to the right PR. Bounded (hunk count + per-hunk
+ * chars) so a huge PR can't blow the context budget.
  */
-export function segmentDiff(diffText: string): DiffHunk[] {
+export function segmentDiff(diffText: string, startAt = 0, pr?: string): DiffHunk[] {
   const hunks: DiffHunk[] = [];
   let file = "unknown";
   let current: DiffHunk | null = null;
@@ -336,14 +363,30 @@ export function segmentDiff(diffText: string): DiffHunk[] {
     }
     if (line.startsWith("@@")) {
       flush();
-      if (hunks.length >= MAX_HUNKS) break;
-      current = { id: `H${hunks.length + 1}`, file, header: line.trim(), body: "" };
+      if (startAt + hunks.length >= MAX_HUNKS) break;
+      current = {
+        id: `H${startAt + hunks.length + 1}`,
+        file,
+        header: line.trim(),
+        body: "",
+        ...(pr ? { pr } : {}),
+      };
       continue;
     }
     if (current) current.body += `${line}\n`;
   }
   flush();
   return hunks;
+}
+
+/** Segment several PRs' diffs into one globally-numbered, PR-tagged hunk list (ticket-level). */
+export function segmentDiffs(prDiffs: IntentPrDiff[]): DiffHunk[] {
+  const all: DiffHunk[] = [];
+  for (const d of prDiffs) {
+    if (all.length >= MAX_HUNKS) break;
+    all.push(...segmentDiff(d.text, all.length, prDiffs.length > 1 ? d.prName : undefined));
+  }
+  return all;
 }
 
 // ---- context assembly --------------------------------------------------------------------------
@@ -363,12 +406,16 @@ function trim(s: string, max: number): string {
   return s.length > max ? `${s.slice(0, max)}…` : s;
 }
 
-function prepare(inputs: CoverageInputs, issue: IntentIssue, diffText: string): Prepared {
+function prepare(issue: IntentIssue, prDiffs: IntentPrDiff[], mode: CoverageMode): Prepared {
   const { seeds, explicit } = extractAcceptanceCriteria(issue);
   const caveats: string[] = [];
   if (!explicit)
     caveats.push(
-      "This ticket has no explicit acceptance criteria; the diff was assessed against its stated goal, which is coarser.",
+      "This ticket has no explicit acceptance criteria; the change was assessed against its stated goal, which is coarser.",
+    );
+  if (mode === "ticket" && prDiffs.length > 1)
+    caveats.push(
+      `This ticket is delivered across ${prDiffs.length} PRs; coverage is judged over all of them together.`,
     );
 
   const criteria: CoverageCriterion[] = seeds.map((s, i) => ({
@@ -380,11 +427,11 @@ function prepare(inputs: CoverageInputs, issue: IntentIssue, diffText: string): 
     citations: [],
   }));
 
-  const hunks = segmentDiff(diffText);
+  const hunks = segmentDiffs(prDiffs);
   if (hunks.length === 0)
     caveats.push("No file hunks were parsed from the diff; coverage could not be located in code.");
   if (hunks.length >= MAX_HUNKS)
-    caveats.push(`The diff is large; only the first ${MAX_HUNKS} hunks were reviewed.`);
+    caveats.push(`The change is large; only the first ${MAX_HUNKS} hunks were reviewed.`);
 
   const intentLines: string[] = [
     `ISSUE: ${issue.key} - ${issue.summary}`,
@@ -395,7 +442,7 @@ function prepare(inputs: CoverageInputs, issue: IntentIssue, diffText: string): 
     if (f.text.trim()) intentLines.push(`${f.label.toUpperCase()}: ${trim(f.text.trim(), 800)}`);
   }
   intentLines.push(
-    "ACCEPTANCE CRITERIA (judge the diff against each; cite its [AC#] when you flag a gap):",
+    "ACCEPTANCE CRITERIA (judge the change against each; cite its [AC#] when you flag a gap):",
     ...criteria.map((c) => `  ${c.id} (${c.source}) ${c.text}`),
   );
   const comments = issue.comments.slice(0, MAX_COMMENTS).filter((c) => c.text.trim());
@@ -405,18 +452,25 @@ function prepare(inputs: CoverageInputs, issue: IntentIssue, diffText: string): 
       intentLines.push(`  - ${c.author ?? "someone"}: ${trim(c.text.trim(), MAX_COMMENT_CHARS)}`);
   }
 
+  // Each hunk is labelled with its PR (ticket mode), so the model can attribute an AC to the PR
+  // that addresses it - that's the "handled elsewhere?" answer, from the graph, not code-reading.
   const diffLines: string[] = hunks.map(
-    (h) => `${h.id} (file: ${h.file} ${h.header})\n${h.body.trimEnd()}`,
+    (h) =>
+      `${h.id} (${h.pr ? `PR ${h.pr} · ` : ""}file: ${h.file} ${h.header})\n${h.body.trimEnd()}`,
   );
+  const diffHeader =
+    mode === "ticket" && prDiffs.length > 1
+      ? `[CHANGE - the code across all ${prDiffs.length} PRs that implement this ticket; cite a hunk's [H#] (each is tagged with its PR) when a criterion is addressed]`
+      : "[DIFF - the actual code change; cite a hunk's [H#] when a criterion is addressed by it]";
 
   const context = [
     "[INTENT - the stated goal of this change; the ONLY intent you may judge against]",
     ...intentLines,
     "[END INTENT]",
     "",
-    "[DIFF - the actual code change; cite a hunk's [H#] when a criterion is addressed by it]",
+    diffHeader,
     ...(diffLines.length ? diffLines : ["(no diff hunks)"]),
-    inputs.diff?.truncated ? "(diff truncated - later hunks not shown)" : "",
+    prDiffs.some((d) => d.truncated) ? "(some diffs truncated - later hunks not shown)" : "",
     "[END DIFF]",
   ]
     .filter((l) => l !== "")
@@ -528,7 +582,11 @@ function applyJudgments(
           : "Reported as implemented, but no specific code location was cited, so it can't be confirmed.";
       } else {
         for (const h of hunkCites)
-          citations.push({ marker: h.id, kind: "diff-hunk", ref: `${h.file} ${h.header}` });
+          citations.push({
+            marker: h.id,
+            kind: "diff-hunk",
+            ref: `${h.pr ? `${h.pr} · ` : ""}${h.file} ${h.header}`,
+          });
       }
     }
 
@@ -562,13 +620,20 @@ function fallbackNote(status: CriterionStatus, c: CoverageCriterion): string {
   return "Couldn't determine from the diff whether this is addressed.";
 }
 
-function summarise(criteria: CoverageCriterion[], modelSummary: string): string {
+function summarise(
+  criteria: CoverageCriterion[],
+  modelSummary: string,
+  mode: CoverageMode,
+  prCount: number,
+): string {
   const impl = criteria.filter((c) => c.status === "implemented").length;
   const miss = criteria.filter((c) => c.status === "possibly-missing").length;
   const unk = criteria.filter((c) => c.status === "cannot-tell").length;
-  const head = `${impl} of ${criteria.length} acceptance criteria appear addressed by this diff${
+  const over =
+    mode === "ticket" && prCount > 1 ? `across this ticket's ${prCount} PRs` : "by this diff";
+  const head = `${impl} of ${criteria.length} acceptance criteria appear addressed ${over}${
     miss ? `; ${miss} look${miss === 1 ? "s" : ""} worth a closer look` : ""
-  }${unk ? `; ${unk} couldn't be judged from the diff alone` : ""}.`;
+  }${unk ? `; ${unk} couldn't be judged from the change alone` : ""}.`;
   return modelSummary ? `${head} ${modelSummary}` : head;
 }
 
@@ -582,11 +647,20 @@ export async function judgeCoverage(
   deps: CoverageDeps,
   inputs: CoverageInputs,
 ): Promise<CoverageAssessment> {
+  const mode: CoverageMode = inputs.mode ?? "pr";
+  // Resolve the diffs to judge: ticket-level passes every implementing PR (`prDiffs`); single-PR
+  // wraps the one `diff`. Empty/blank texts are dropped so `no-diff` is honest.
+  const prDiffs: IntentPrDiff[] = (
+    inputs.prDiffs ?? (inputs.diff ? [{ prName: inputs.pr.name ?? "this PR", ...inputs.diff }] : [])
+  ).filter((d) => d.text.trim());
+  const prs = prDiffs.map((d) => d.prName);
   const base = {
     pr: inputs.pr,
     reviewNote: REVIEW_NOTE,
     criteria: [] as CoverageCriterion[],
     caveats: [] as string[],
+    mode,
+    prs,
   };
   if (!inputs.issue) {
     return {
@@ -599,27 +673,26 @@ export async function judgeCoverage(
   }
   const issue = inputs.issue;
   const issueRef = { id: issue.id, key: issue.key, url: issue.url, summary: issue.summary };
-  if (!inputs.diff || !inputs.diff.text.trim()) {
+  if (prDiffs.length === 0) {
     return {
       ...base,
       status: "no-diff",
       issue: issueRef,
-      summary: `The diff for this PR isn't available, so its coverage of ${issue.key} can't be checked right now.`,
+      summary: `No diff is available${mode === "ticket" ? " for this ticket's PRs" : " for this PR"}, so coverage of ${issue.key} can't be checked right now.`,
     };
   }
 
-  const prep = prepare(inputs, issue, inputs.diff.text);
+  const prep = prepare(issue, prDiffs, mode);
   const raw = await complete(deps, prep.context);
   const parsed = parseCoverageLines(raw);
   applyJudgments(prep.criteria, prep.hunks, parsed, issue);
 
   return {
+    ...base,
     status: "assessed",
-    pr: inputs.pr,
     issue: issueRef,
     criteria: prep.criteria,
-    summary: summarise(prep.criteria, extractSummary(raw)),
+    summary: summarise(prep.criteria, extractSummary(raw), mode, prDiffs.length),
     caveats: prep.caveats,
-    reviewNote: REVIEW_NOTE,
   };
 }

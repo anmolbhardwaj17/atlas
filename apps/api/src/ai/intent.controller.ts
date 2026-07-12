@@ -27,6 +27,17 @@ export class IntentController {
     return this.ai.coverageForPr(org(req).id, id);
   }
 
+  /** Ticket-level coverage: judge a Jira issue against ALL the PRs that implement it (a Story is
+   *  delivered across many PRs, so this is the accurate unit). */
+  @Post("issues/:id/coverage")
+  @Roles("Member")
+  async issueCoverage(
+    @Req() req: AuthedRequest,
+    @Param("id") id: string,
+  ): Promise<CoverageAssessment> {
+    return this.ai.coverageForIssue(org(req).id, id);
+  }
+
   /** Propose fuzzy (no-key) PR→issue links as `ai_suggested` IMPLEMENTS edges for confirm/reject
    *  in the graph (IV-4). Admin — it scans the estate + writes suggestions. */
   @Post("suggest-links")

@@ -16,6 +16,7 @@ import {
   type FuzzyIssue,
   type FuzzyPr,
   type IntentIssue,
+  type IntentPrDiff,
   type LLMProvider,
 } from "@atlas/ai";
 import type { SecretBroker } from "@atlas/ingest";
@@ -255,7 +256,79 @@ export class AiService {
       issue,
       diff,
     };
-    return judgeCoverage({ llm }, inputs);
+    const assessment = await judgeCoverage({ llm }, inputs);
+    // How many PRs implement this ticket — the UI offers a ticket-level review when >1, since a
+    // single PR rarely delivers the whole ticket (a Story is split across several PRs).
+    if (issueEdge) {
+      assessment.ticketPrCount = await this.countImplementingPrs(orgId, issueEdge.to.id);
+    }
+    return assessment;
+  }
+
+  /** Count the PRs that implement a ticket (IMPLEMENTS edges into the issue node). */
+  private async countImplementingPrs(orgId: string, issueNodeId: string): Promise<number> {
+    const edges = await this.graph.nodeEdges(orgId, issueNodeId, {
+      direction: "in",
+      type: "IMPLEMENTS",
+      limit: 50,
+    });
+    return edges.filter((e) => PR_KINDS.includes(e.from.kind)).length;
+  }
+
+  /**
+   * TICKET-LEVEL intent coverage (IV, ticket-aware). A Story is delivered across MANY PRs, so judging
+   * one PR against the whole ticket is misleading. This judges the ticket against the UNION of ALL
+   * its implementing PRs' diffs — each hunk tagged with its PR, so "handled elsewhere?" resolves to a
+   * sibling PR. This is the graph-smart part; the deep code↔AC match stays SIFT's job. Org-scoped.
+   */
+  async coverageForIssue(orgId: string, issueNodeId: string): Promise<CoverageAssessment> {
+    await this.rateLimit.enforce(
+      orgId,
+      "ai_coverage",
+      30,
+      60,
+      "You're reviewing tickets quickly — give it a moment before the next coverage check.",
+    );
+
+    const node = await this.graph.getNode(orgId, issueNodeId); // 404 if absent / cross-tenant
+    if (node.kind !== "jira.issue") {
+      throw ApiException.invalidState(
+        "Ticket coverage can only be reviewed for a Jira issue. Open a jira.issue node and try again.",
+      );
+    }
+    const issue = toIntentIssue(node);
+
+    // Every PR that implements this ticket.
+    const edges = await this.graph.nodeEdges(orgId, issueNodeId, {
+      direction: "in",
+      type: "IMPLEMENTS",
+      limit: 50,
+    });
+    const prEdges = edges.filter((e) => PR_KINDS.includes(e.from.kind));
+
+    // Fetch each PR's diff (bounded PR count + per-PR chars; segmentDiffs caps total hunks anyway).
+    const MAX_PRS = 10;
+    const prDiffs: IntentPrDiff[] = [];
+    for (const e of prEdges.slice(0, MAX_PRS)) {
+      const d = await this.port.prDiff(orgId, e.from.id, 10_000);
+      if (d && d.text.trim()) {
+        prDiffs.push({ prName: e.from.name ?? e.from.urn, text: d.text, truncated: d.truncated });
+      }
+    }
+
+    const { llm } = await this.resolveProvider(orgId);
+    const assessment = await judgeCoverage(
+      { llm },
+      {
+        pr: { id: issue.id, name: `${issue.key} (${prEdges.length} PR${prEdges.length === 1 ? "" : "s"})` },
+        issue,
+        diff: null,
+        prDiffs,
+        mode: "ticket",
+      },
+    );
+    assessment.ticketPrCount = prEdges.length;
+    return assessment;
   }
 
   /**

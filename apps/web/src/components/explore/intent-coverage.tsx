@@ -7,6 +7,7 @@ import {
   ExternalLink,
   FileDiff,
   HelpCircle,
+  Layers,
   Loader2,
   Target,
 } from "lucide-react";
@@ -14,6 +15,7 @@ import { AtlasAiMark } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import {
   reviewIntentCoverage,
+  reviewTicketCoverage,
   type CoverageAssessment,
   type CoverageCriterion,
 } from "@/lib/browser-api";
@@ -96,7 +98,13 @@ function CriterionRow({ c }: { c: CoverageCriterion }) {
   );
 }
 
-function Assessment({ a }: { a: CoverageAssessment }) {
+function Assessment({
+  a,
+  onReviewTicket,
+}: {
+  a: CoverageAssessment;
+  onReviewTicket?: (issueId: string) => void;
+}) {
   if (a.status === "no-intent") {
     return (
       <p className="px-4 py-4 text-sm text-muted-foreground">
@@ -119,16 +127,43 @@ function Assessment({ a }: { a: CoverageAssessment }) {
     implemented: a.criteria.filter((c) => c.status === "implemented").length,
     missing: a.criteria.filter((c) => c.status === "possibly-missing").length,
   };
+  // A Story is delivered across many PRs — offer a ticket-level review when this PR isn't the whole
+  // story. Bind `issue` to a const so its non-null narrowing survives into the click handler closure.
+  const issue = a.issue;
+  const offerTicket = a.mode === "pr" && (a.ticketPrCount ?? 0) > 1 && !!issue && !!onReviewTicket;
   return (
     <div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 pb-3">
         {a.issue ? <IssueChip issue={a.issue} /> : null}
+        {a.mode === "ticket" ? (
+          <span className="inline-flex items-center gap-1 rounded border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+            <Layers className="size-3" />
+            Ticket-level · {a.prs.length} PR{a.prs.length === 1 ? "" : "s"}
+          </span>
+        ) : null}
         <span className="text-xs tabular-nums text-muted-foreground">
           {counts.implemented}/{a.criteria.length} addressed
           {counts.missing > 0 ? ` · ${counts.missing} to check` : ""}
         </span>
       </div>
       {a.summary ? <p className="px-4 pb-3 text-sm text-muted-foreground">{a.summary}</p> : null}
+      {offerTicket && issue ? (
+        <div className="mx-4 mb-3 flex flex-wrap items-center gap-2 rounded-md border border-primary/25 bg-primary/5 px-3 py-2">
+          <Layers className="size-4 shrink-0 text-primary" />
+          <span className="min-w-0 flex-1 text-xs text-muted-foreground">
+            This ticket is built across{" "}
+            <strong className="text-foreground">{a.ticketPrCount} PRs</strong> — this review covers
+            only this one, so gaps may be handled in a sibling PR.
+          </span>
+          <Button
+            size="sm"
+            className="h-7 gap-1.5 text-xs"
+            onClick={() => onReviewTicket?.(issue.id)}
+          >
+            <Layers className="size-3.5" /> Review the whole ticket
+          </Button>
+        </div>
+      ) : null}
       <ul className="divide-y divide-border border-y border-border">
         {a.criteria.map((c) => (
           <CriterionRow key={c.id} c={c} />
@@ -180,9 +215,9 @@ export function IntentCoverage({ orgId, prId }: { orgId: string; prId: string })
     | { phase: "error"; message: string }
   >({ phase: "idle" });
 
-  const run = (): void => {
+  const review = (fn: () => Promise<CoverageAssessment>): void => {
     setState({ phase: "loading" });
-    void reviewIntentCoverage(orgId, prId)
+    void fn()
       .then((a) => setState({ phase: "done", a }))
       .catch((e: unknown) =>
         setState({
@@ -191,6 +226,8 @@ export function IntentCoverage({ orgId, prId }: { orgId: string; prId: string })
         }),
       );
   };
+  const run = (): void => review(() => reviewIntentCoverage(orgId, prId));
+  const runTicket = (issueId: string): void => review(() => reviewTicketCoverage(orgId, issueId));
 
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card">
@@ -236,7 +273,7 @@ export function IntentCoverage({ orgId, prId }: { orgId: string; prId: string })
         <p className="px-4 py-4 text-sm text-danger">{state.message}</p>
       ) : null}
 
-      {state.phase === "done" ? <Assessment a={state.a} /> : null}
+      {state.phase === "done" ? <Assessment a={state.a} onReviewTicket={runTicket} /> : null}
     </div>
   );
 }

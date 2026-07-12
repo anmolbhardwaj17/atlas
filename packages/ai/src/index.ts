@@ -107,6 +107,8 @@ export type {
   IntentField,
   IntentSubtask,
   IntentComment,
+  IntentPrDiff,
+  CoverageMode,
   DiffHunk,
 } from "./coverage";
 export { COVERAGE_SYSTEM, COVERAGE_PROMPT_VERSION } from "./prompt";
