@@ -47,7 +47,7 @@ const SOURCE_LABEL: Record<CoverageCriterion["source"], string> = {
 function CriterionRow({ c }: { c: CoverageCriterion }) {
   const s = STATUS[c.status];
   return (
-    <li className="flex items-start gap-3 px-4 py-3">
+    <li className="flex items-start gap-3 px-5 py-3">
       <span
         className={cn("mt-1 grid size-5 shrink-0 place-items-center rounded-full", `${s.text}`)}
       >
@@ -73,7 +73,7 @@ function CriterionRow({ c }: { c: CoverageCriterion }) {
                 </>
               );
               const className =
-                "inline-flex max-w-full items-center gap-1 rounded border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground";
+                "inline-flex max-w-full items-center gap-1 rounded border border-border bg-muted/50 px-2 py-1 font-mono text-[10px] text-muted-foreground";
               return cite.url ? (
                 <a
                   key={cite.marker + cite.ref}
@@ -107,7 +107,7 @@ function Assessment({
 }) {
   if (a.status === "no-intent") {
     return (
-      <p className="px-4 py-4 text-sm text-muted-foreground">
+      <p className="px-5 py-4 text-sm text-muted-foreground">
         No linked Jira issue, so there's no stated intent to check this against. Reference a ticket
         key in the PR (or connect Jira) to enable a coverage review.
       </p>
@@ -115,7 +115,7 @@ function Assessment({
   }
   if (a.status === "no-diff") {
     return (
-      <div className="px-4 py-4 text-sm text-muted-foreground">
+      <div className="px-5 py-4 text-sm text-muted-foreground">
         {a.issue ? <IssueChip issue={a.issue} /> : null}
         <p className="mt-2">
           The diff for this PR isn't available right now, so its coverage couldn't be checked.
@@ -133,7 +133,7 @@ function Assessment({
   const offerTicket = a.mode === "pr" && (a.ticketPrCount ?? 0) > 1 && !!issue && !!onReviewTicket;
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 pb-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 pb-3">
         {a.issue ? <IssueChip issue={a.issue} /> : null}
         {a.mode === "ticket" ? (
           <span className="inline-flex items-center gap-1 rounded border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
@@ -146,9 +146,9 @@ function Assessment({
           {counts.missing > 0 ? ` · ${counts.missing} to check` : ""}
         </span>
       </div>
-      {a.summary ? <p className="px-4 pb-3 text-sm text-muted-foreground">{a.summary}</p> : null}
+      {a.summary ? <p className="px-5 pb-3 text-sm text-muted-foreground">{a.summary}</p> : null}
       {offerTicket && issue ? (
-        <div className="mx-4 mb-3 flex flex-wrap items-center gap-2 rounded-md border border-primary/25 bg-primary/5 px-3 py-2">
+        <div className="mx-5 mb-3 flex flex-wrap items-center gap-2 rounded-md border border-primary/25 bg-primary/5 px-3 py-2">
           <Layers className="size-4 shrink-0 text-primary" />
           <span className="min-w-0 flex-1 text-xs text-muted-foreground">
             This ticket is built across{" "}
@@ -170,7 +170,7 @@ function Assessment({
         ))}
       </ul>
       {a.caveats.length > 0 ? (
-        <ul className="space-y-1 px-4 pt-3">
+        <ul className="space-y-1 px-5 pt-3">
           {a.caveats.map((cav) => (
             <li key={cav} className="text-xs text-muted-foreground">
               · {cav}
@@ -178,7 +178,7 @@ function Assessment({
           ))}
         </ul>
       ) : null}
-      <p className="px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">{a.reviewNote}</p>
+      <p className="px-5 py-3 text-[11px] leading-relaxed text-muted-foreground">{a.reviewNote}</p>
     </div>
   );
 }
@@ -231,7 +231,7 @@ export function IntentCoverage({ orgId, prId }: { orgId: string; prId: string })
 
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card">
-      <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+      <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
         <AtlasAiMark size={16} className="size-4" />
         <span className="text-sm font-semibold">Intent coverage</span>
         <span className="text-xs text-muted-foreground">
@@ -250,7 +250,7 @@ export function IntentCoverage({ orgId, prId }: { orgId: string; prId: string })
       </div>
 
       {state.phase === "idle" ? (
-        <div className="px-4 py-4">
+        <div className="px-5 py-4">
           <p className="mb-3 text-sm text-muted-foreground">
             Atlas reads the linked Jira ticket (its acceptance criteria, subtasks, and comments) and
             checks the diff against each — as questions for you to confirm, not a code review.
@@ -263,14 +263,14 @@ export function IntentCoverage({ orgId, prId }: { orgId: string; prId: string })
       ) : null}
 
       {state.phase === "loading" ? (
-        <p className="flex items-center gap-2 px-4 py-4 text-sm text-muted-foreground">
+        <p className="flex items-center gap-2 px-5 py-4 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
           Reading the ticket and reviewing the diff…
         </p>
       ) : null}
 
       {state.phase === "error" ? (
-        <p className="px-4 py-4 text-sm text-danger">{state.message}</p>
+        <p className="px-5 py-4 text-sm text-danger">{state.message}</p>
       ) : null}
 
       {state.phase === "done" ? <Assessment a={state.a} onReviewTicket={runTicket} /> : null}

@@ -4,6 +4,7 @@ import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
 import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
 import { AtlasAiMark } from "@/components/brand";
+import { UserAvatar } from "@/components/user-avatar";
 import { NodeConnections } from "@/components/explore/node-connections";
 import { NodeRisks } from "@/components/explore/node-risks";
 import { IntentCoverage } from "@/components/explore/intent-coverage";
@@ -207,7 +208,16 @@ export function NodeDetailView({
                     className="grid grid-cols-[minmax(0,140px)_1fr] items-baseline gap-x-4 py-2 first:pt-0 last:pb-0"
                   >
                     <dt className="truncate text-muted-foreground">{label}</dt>
-                    <dd className="min-w-0 break-words text-right font-medium">{value}</dd>
+                    <dd className="min-w-0 break-words text-right font-medium">
+                      {label === "Author" ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <UserAvatar name={value} email={value} size={18} />
+                          {value}
+                        </span>
+                      ) : (
+                        value
+                      )}
+                    </dd>
                   </div>
                 ))}
               </dl>
