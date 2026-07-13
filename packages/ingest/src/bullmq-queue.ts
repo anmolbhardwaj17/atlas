@@ -1,19 +1,36 @@
-import { Queue, Worker, type ConnectionOptions } from "bullmq";
+import { Queue, Worker, type ConnectionOptions, type JobsOptions } from "bullmq";
+import type { ConnectorLogger } from "@atlas/connector-sdk";
 import type { JobHandler, JobQueue } from "./queue";
 
 /**
  * Production JobQueue on BullMQ/Redis (docs/02 DD-6). One named queue per stage;
- * `jobId` gives idempotent dedupe; BullMQ supplies retries/backoff/rate-limiting.
- * Requires a running Redis — wired in deploy (docs/17). The in-memory driver covers
- * dev/test; this adapter is intentionally thin.
+ * `jobId` gives idempotent dedupe. Requires a running Redis — wired in deploy (docs/17).
+ * The in-memory driver covers dev/test; this adapter is intentionally thin.
+ *
+ * Resilience defaults (do NOT drop these — without them a worker crash or a thrown handler is a
+ * PERMANENTLY lost job, silently): every job gets bounded retries with exponential backoff, and
+ * finished/failed job records are trimmed so Redis doesn't grow without bound. A `failed` listener
+ * surfaces terminal failures (after the last attempt) to the logger so production failures aren't
+ * invisible outside Redis.
  */
+export const DEFAULT_JOB_OPTIONS: JobsOptions = {
+  attempts: 3,
+  backoff: { type: "exponential", delay: 5_000 },
+  removeOnComplete: { count: 500 },
+  removeOnFail: { count: 1_000 },
+};
+
 export class BullMQQueue implements JobQueue {
   private readonly queues = new Map<string, Queue>();
   private readonly workers: Worker[] = [];
 
-  constructor(private readonly connection: ConnectionOptions) {}
+  constructor(
+    private readonly connection: ConnectionOptions,
+    private readonly logger?: ConnectorLogger,
+  ) {}
 
   async enqueue<T>(name: string, data: T, opts?: { jobId?: string }): Promise<void> {
+    // jobId (when given) dedupes; retries/backoff/cleanup come from the queue's defaultJobOptions.
     await this.queue(name).add(name, data, opts?.jobId ? { jobId: opts.jobId } : undefined);
   }
 
@@ -25,6 +42,18 @@ export class BullMQQueue implements JobQueue {
       },
       { connection: this.connection },
     );
+    // Terminal failure (BullMQ retries internally up to `attempts`; this fires on the last one).
+    worker.on("failed", (job, err) => {
+      this.logger?.error(`job ${name} failed`, {
+        jobId: job?.id,
+        attempts: job?.attemptsMade,
+        error: err?.message,
+      });
+    });
+    // Infra-level worker error (Redis connection, etc.) — distinct from a job throwing.
+    worker.on("error", (err) => {
+      this.logger?.error(`worker ${name} error`, { error: err.message });
+    });
     this.workers.push(worker);
   }
 
@@ -36,7 +65,7 @@ export class BullMQQueue implements JobQueue {
   private queue(name: string): Queue {
     let q = this.queues.get(name);
     if (!q) {
-      q = new Queue(name, { connection: this.connection });
+      q = new Queue(name, { connection: this.connection, defaultJobOptions: DEFAULT_JOB_OPTIONS });
       this.queues.set(name, q);
     }
     return q;
