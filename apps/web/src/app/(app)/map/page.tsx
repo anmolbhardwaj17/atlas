@@ -22,9 +22,14 @@ async function MapContent({
   const focusId = (Array.isArray(focusRaw) ? focusRaw[0] : focusRaw) || undefined;
   const lensRaw = params.lens;
   const lens = (Array.isArray(lensRaw) ? lensRaw[0] : lensRaw) || undefined;
+  // "Load full map" (?full=1) raises the node budget to the server max; the default keeps the
+  // canvas fast on the most-recent slice. React Flow can't usefully render tens of thousands of
+  // nodes, so "full" is the 1000-node cap, which covers the whole estate for typical orgs.
+  const full = (Array.isArray(params.full) ? params.full[0] : params.full) === "1";
+  const limit = full ? 1000 : 400;
 
   const data =
-    (await apiGet<ApiOk<MapData>>("/graph?limit=400", { token, orgId })).body?.data ?? null;
+    (await apiGet<ApiOk<MapData>>(`/graph?limit=${limit}`, { token, orgId })).body?.data ?? null;
 
   if (!data || data.nodes.length === 0) {
     return (
@@ -49,6 +54,7 @@ async function MapContent({
     <InfraMapLazy
       data={data}
       orgId={orgId}
+      full={full}
       {...(focusId ? { focusId } : {})}
       {...(lens ? { lens } : {})}
     />

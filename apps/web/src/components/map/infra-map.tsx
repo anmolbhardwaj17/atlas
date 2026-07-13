@@ -90,6 +90,7 @@ export function InfraMap({
   orgId,
   focusId,
   lens,
+  full,
 }: {
   data: MapData;
   orgId: string;
@@ -97,6 +98,8 @@ export function InfraMap({
   focusId?: string;
   /** Open with a lens pre-activated (e.g. `/map?lens=exposed` from the exposed-vulnerable finding). */
   lens?: string;
+  /** Whether this render already requested the full (higher-limit) graph — drives the cap banner. */
+  full?: boolean;
 }) {
   // Drop only the granular code activity (projects/pipelines/PRs/users) - a project fanning
   // out to its PRs is what buried the flow. EVERY repository stays: a repo that deploys joins
@@ -404,10 +407,29 @@ export function InfraMap({
       </div>
 
       {data.truncated && (
-        <p className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-          Showing the most recent {data.nodes.length} resources - the graph is larger. Filter to
-          focus.
-        </p>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+          {full ? (
+            // Already loaded the full budget and it's STILL over the cap — filtering is the only lever.
+            <span>
+              Showing the first {data.nodes.length} resources — the graph is larger still. Filter to
+              focus.
+            </span>
+          ) : (
+            <>
+              <span>
+                Showing the {data.nodes.length} most recent resources — the graph is larger.
+              </span>
+              <Link
+                href={`/map?full=1${focusId ? `&node=${focusId}` : ""}${lens ? `&lens=${lens}` : ""}`}
+                prefetch={false}
+                className="ml-auto inline-flex items-center gap-1 rounded-md border border-warning/50 bg-warning/10 px-2 py-1 font-medium text-warning transition-colors hover:bg-warning/20"
+              >
+                <MapIcon className="size-3.5" /> Load full map
+              </Link>
+              <span className="w-full text-warning/70 sm:w-auto">(larger — may render slower)</span>
+            </>
+          )}
+        </div>
       )}
 
       <div className="relative h-[calc(100dvh-14rem)] min-h-[480px] overflow-hidden rounded-xl border border-border bg-background">
