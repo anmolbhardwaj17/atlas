@@ -20,3 +20,16 @@ export function supabaseAnonKey(): string {
 export function apiUrl(): string {
   return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 }
+
+/**
+ * Atlas's fixed outbound IP(s) — the ECS NAT / Elastic IP the connectors egress from. Shown in the
+ * connector setup so customers behind a firewall / IP-allowlist (or an internal network reachable
+ * only over VPN) can whitelist us. Comma-separated in `NEXT_PUBLIC_ATLAS_EGRESS_IPS`; empty when
+ * unconfigured (the setup note then falls back to a neutral "your Atlas admin can provide it").
+ */
+export function egressIps(): string[] {
+  return (process.env.NEXT_PUBLIC_ATLAS_EGRESS_IPS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}

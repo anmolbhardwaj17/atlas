@@ -2,8 +2,37 @@ import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { InMemorySecretBroker, InMemoryQueue } from "@atlas/ingest";
-import { ConnectionService } from "./connection.service";
+import { ConnectionService, classifyConnError } from "./connection.service";
 import { ConnectorRegistry } from "./connector-registry";
+
+/** Pure (no DB) — classifies reachability failures so the UI shows the "whitelist our IP" hint. */
+describe("classifyConnError", () => {
+  it("flags network/reachability failures as 'unreachable'", () => {
+    for (const m of [
+      "connect ECONNREFUSED 10.0.0.5:443",
+      "getaddrinfo ENOTFOUND jira.internal.corp",
+      "request to https://x timed out",
+      "fetch failed",
+      "socket hang up",
+      "connect ETIMEDOUT",
+      "No route to host",
+    ]) {
+      expect(classifyConnError(m), m).toBe("unreachable");
+    }
+  });
+
+  it("leaves auth/permission failures unclassified", () => {
+    for (const m of [
+      "401 Unauthorized",
+      "Invalid API token",
+      "missing permission ecr:DescribeRepositories",
+      "403 Forbidden",
+      undefined,
+    ]) {
+      expect(classifyConnError(m), String(m)).toBeUndefined();
+    }
+  });
+});
 
 /**
  * F2.8 + purge-on-delete (docs/03, docs/04): disconnecting a source purges its graph data

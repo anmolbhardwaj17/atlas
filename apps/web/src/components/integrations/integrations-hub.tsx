@@ -8,12 +8,14 @@ import {
   Trash2,
   RefreshCw,
   ShieldAlert,
+  Network,
   Search,
   Check,
   Send,
   Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
+import { egressIps } from "@/lib/env";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
@@ -48,6 +50,7 @@ import {
   TeamsSetup,
 } from "@/components/integrations/provider-setup";
 import { PROVIDERS, ProviderLogo, type ProviderMeta } from "@/components/integrations/providers";
+import { EgressIpNote } from "@/components/integrations/egress-ip-note";
 import {
   createConnection,
   verifyConnection,
@@ -1035,6 +1038,34 @@ function ConnectionBlock({
         </div>
       ) : null}
 
+      {/* Reachability failure — we couldn't reach the target at all (firewall / IP allowlist / VPN).
+          The fix is to whitelist Atlas's egress IP, so surface it right here on the failing card. */}
+      {conn.status !== "connected" && conn.health?.errorKind === "unreachable" ? (
+        <div className="mt-3 rounded-md border border-warning/30 bg-warning/5 p-3">
+          <p className="flex items-center gap-1.5 text-xs font-medium text-warning">
+            <Network className="size-3.5 shrink-0" />
+            Couldn&rsquo;t reach {conn.provider} — likely a firewall, IP allowlist, or VPN
+          </p>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Atlas connects from {egressIps().length > 1 ? "these fixed IPs" : "a fixed IP"}; add{" "}
+            {egressIps().length > 1 ? "them" : "it"} to your allowlist (or your VPN’s), then
+            re-verify.
+          </p>
+          {egressIps().length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {egressIps().map((ip) => (
+                <code
+                  key={ip}
+                  className="rounded border border-warning/30 bg-warning/10 px-1.5 py-0.5 font-mono text-[11px] text-warning"
+                >
+                  {ip}
+                </code>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {/* Missing permissions — the detail, with room to breathe. */}
       {conn.status === "degraded" && missingPerms.length > 0 ? (
         <div className="mt-3 rounded-md border border-warning/30 bg-warning/5 p-3">
@@ -1322,6 +1353,8 @@ function ConnectSheet({
 
             <div className="mt-6 space-y-6">
               <ProviderSetup providerId={provider.id} />
+
+              <EgressIpNote providerId={provider.id} />
 
               <div className="space-y-3 border-t border-border pt-4">
                 <div className="space-y-2">

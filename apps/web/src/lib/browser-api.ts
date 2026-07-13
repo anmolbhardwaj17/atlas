@@ -390,8 +390,9 @@ export interface ConnectionSummary {
   status: string;
   /** Sample/demo connection - not a real syncable source (skip in Fetch latest). */
   demo?: boolean;
-  /** Connector health from verify/sync probes - `missingPermissions` drives the degraded hint. */
-  health?: { missingPermissions?: string[] };
+  /** Connector health from verify/sync probes - `missingPermissions` drives the degraded hint;
+   *  `errorKind: 'unreachable'` means we couldn't reach the target (firewall/allowlist/VPN). */
+  health?: { missingPermissions?: string[]; errorKind?: string };
   /** A sync run is queued/running right now. */
   syncing?: boolean;
   /** Most recent finished run, or null if none has completed yet. */

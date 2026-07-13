@@ -19,6 +19,21 @@ const SELECT_COLS = `id, org_id, provider, display_name, status, config, secret_
   last_error, last_synced_at, created_at, updated_at, deleted_at`;
 
 /**
+ * Classify a verify/sync failure so the UI can hint the right fix. `unreachable` = we couldn't reach
+ * the target at all (DNS failure / timeout / connection refused / no route) — almost always a
+ * firewall / IP-allowlist / VPN issue, so the fix is "whitelist Atlas's egress IP", not "fix your
+ * credentials". Auth/permission failures are left unclassified (their message already explains them).
+ */
+export function classifyConnError(message: string | undefined): "unreachable" | undefined {
+  const m = (message ?? "").toLowerCase();
+  return /econnrefused|etimedout|enotfound|eai_again|getaddrinfo|timed?\s?out|timeout|fetch failed|socket hang up|network error|no route to host|connection refused|could ?n['o]t (?:reach|connect)|unable to connect/.test(
+    m,
+  )
+    ? "unreachable"
+    : undefined;
+}
+
+/**
  * Connection lifecycle (docs/08 §8, docs/03 §5.1). Org-scoped via withOrgScope (RLS).
  * Credentials go to the Secrets Broker (only the opaque secret_ref is stored, BR-CONN-1).
  * `verify` resolves the provider's connector from the registry; on success it enqueues
@@ -196,7 +211,12 @@ export class ConnectionService {
         secretRef,
       };
       const result = await connector.verify(sdkConn);
-      const health = { missingPermissions: result.missingPermissions ?? [] };
+      const errorKind = result.status === "error" ? classifyConnError(result.message) : undefined;
+      const health = {
+        missingPermissions: result.missingPermissions ?? [],
+        // Only present on a reachability failure, so the UI can show the "whitelist our IP" hint.
+        ...(errorKind ? { errorKind } : {}),
+      };
 
       if (result.status === "error") {
         await c.query(
