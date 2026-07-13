@@ -1,4 +1,6 @@
+import * as React from "react";
 import { CloudIcon } from "@/components/cloud-icon";
+import { cn } from "@/lib/cn";
 
 /**
  * Decorative backdrop for the Sift page, split to match the pairing:
@@ -73,33 +75,49 @@ function twinkleFor(i: number): { on: boolean; delay: string; dur: string } {
   };
 }
 
+/**
+ * The "contribution graph" of green cells — Sift's GitHub-native world. Standalone so the Sift setup
+ * screen can reuse it as a left-hand backdrop. Deterministic (SSR-stable); ~1 in 7 cells twinkles.
+ */
+export function SiftContributionGrid({
+  className,
+  style,
+}: {
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <div aria-hidden className={cn("overflow-hidden", className)} style={style}>
+      <div
+        className="grid gap-1.5"
+        style={{ gridTemplateColumns: "repeat(auto-fill, 26px)", gridAutoRows: "26px" }}
+      >
+        {Array.from({ length: CELLS }).map((_, i) => {
+          const t = twinkleFor(i);
+          return (
+            <span
+              key={i}
+              className={t.on ? "sift-cell rounded-[5px]" : "rounded-[5px]"}
+              style={{
+                backgroundColor: `rgba(${GREEN}, ${alphaFor(i)})`,
+                ...(t.on ? { animationDelay: t.delay, animationDuration: t.dur } : {}),
+              }}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function SiftBackdrop() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
       {/* Left — contribution grid */}
-      <div
-        className="absolute inset-y-0 left-0 w-[42%] overflow-hidden"
+      <SiftContributionGrid
+        className="absolute inset-y-0 left-0 w-[42%]"
         style={{ maskImage: GRID_MASK, WebkitMaskImage: GRID_MASK }}
-      >
-        <div
-          className="grid gap-1.5"
-          style={{ gridTemplateColumns: "repeat(auto-fill, 26px)", gridAutoRows: "26px" }}
-        >
-          {Array.from({ length: CELLS }).map((_, i) => {
-            const t = twinkleFor(i);
-            return (
-              <span
-                key={i}
-                className={t.on ? "sift-cell rounded-[5px]" : "rounded-[5px]"}
-                style={{
-                  backgroundColor: `rgba(${GREEN}, ${alphaFor(i)})`,
-                  ...(t.on ? { animationDelay: t.delay, animationDuration: t.dur } : {}),
-                }}
-              />
-            );
-          })}
-        </div>
-      </div>
+      />
 
       {/* Right — infra-map slice (dotted canvas + dashed, flowing edges + real resource cards) */}
       <div
