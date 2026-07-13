@@ -437,9 +437,16 @@ export class ConnectionService {
                                  WHERE e.from_node_id = n.id OR e.to_node_id = n.id)`,
         )
       ).rowCount ?? 0;
-    // Sweep provenance no surviving edge references (provenance is referenced only by edges).
+    // Sweep provenance that is now truly orphaned — referenced by NEITHER a surviving edge
+    // (edge provenance) NOR a surviving snapshot (node provenance). The `raw_snapshot_id IS NULL`
+    // guard is essential: node provenance is snapshot-linked (never edge-linked), so a plain
+    // "no edge" sweep would delete EVERY other connection's node provenance in the org (P4 data
+    // loss). This connection's own node provenance was detached above (raw_snapshot_id → NULL), so
+    // it still gets swept; other connections' node provenance keeps its live snapshot and survives.
     await c.query(
-      `DELETE FROM provenance p WHERE NOT EXISTS (SELECT 1 FROM edges e WHERE e.provenance_id = p.id)`,
+      `DELETE FROM provenance p
+         WHERE p.raw_snapshot_id IS NULL
+           AND NOT EXISTS (SELECT 1 FROM edges e WHERE e.provenance_id = p.id)`,
     );
     return { nodes, edges, signals, derivedNodes };
   }

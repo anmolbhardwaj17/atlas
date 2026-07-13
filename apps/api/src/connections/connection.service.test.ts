@@ -198,4 +198,56 @@ suite("F2.8 ConnectionService.disconnect purge", () => {
     await svc.disconnect(orgId, connId);
     expect(await countIn("nodes", otherOrgId)).toBe(1);
   });
+
+  it("does NOT delete a SIBLING connection's node provenance (P4 regression)", async () => {
+    // A second connection B in the SAME org, with a node whose provenance is snapshot-linked —
+    // i.e. node provenance (raw_snapshot_id set, never referenced by an edge). The old purge swept
+    // "provenance with no edge" org-wide, which wiped exactly this. Disconnecting A must leave it.
+    const connB = await mkConn(orgId);
+    const nB = await mkNode(orgId, connB, "aws:us-east-1:9:lambda/keep", "aws.lambda.function");
+    const snapB = one(
+      (
+        await admin.query<{ id: string }>(
+          `INSERT INTO raw_snapshots (org_id, node_id, storage_ref, content_hash)
+           VALUES ($1,$2,'bucket/keep','hkeep') RETURNING id`,
+          [orgId, nB],
+        )
+      ).rows,
+    ).id;
+    const provB = one(
+      (
+        await admin.query<{ id: string }>(
+          `INSERT INTO provenance (org_id, source, confidence, raw_snapshot_id)
+           VALUES ($1,'observed','observed',$2) RETURNING id`,
+          [orgId, snapB],
+        )
+      ).rows,
+    ).id;
+
+    await svc.disconnect(orgId, connId);
+
+    // Connection B's node provenance (and its node + snapshot) all survive.
+    const provAlive = Number(
+      one(
+        (
+          await admin.query<{ n: string }>(
+            "SELECT count(*)::text AS n FROM provenance WHERE id = $1",
+            [provB],
+          )
+        ).rows,
+      ).n,
+    );
+    expect(provAlive).toBe(1);
+    const nodeAlive = Number(
+      one(
+        (
+          await admin.query<{ n: string }>(
+            "SELECT count(*)::text AS n FROM nodes WHERE connection_id = $1",
+            [connB],
+          )
+        ).rows,
+      ).n,
+    );
+    expect(nodeAlive).toBe(1);
+  });
 });
