@@ -25,12 +25,7 @@ import { CloudIcon } from "@/components/cloud-icon";
 import { Steps, Step } from "@/components/patterns/steps";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { providerMeta } from "@/lib/taxonomy";
 import { cn } from "@/lib/cn";
 
@@ -189,7 +184,8 @@ export function SiftSetup({ repos }: { repos: RepoOption[] }) {
       <SiftContributionGrid
         className="pointer-events-none absolute bottom-0 left-0 h-full w-[60%] opacity-70"
         style={{
-          maskImage: "radial-gradient(115% 115% at bottom left, #000 0%, #000 22%, transparent 78%)",
+          maskImage:
+            "radial-gradient(115% 115% at bottom left, #000 0%, #000 22%, transparent 78%)",
           WebkitMaskImage:
             "radial-gradient(115% 115% at bottom left, #000 0%, #000 22%, transparent 78%)",
         }}
@@ -232,9 +228,9 @@ export function SiftSetup({ repos }: { repos: RepoOption[] }) {
                 code lives.
               </Step>
               <Step title="See reviews in context">
-                Sift's findings appear on each pull request and inside the War Room trace, right next
-                to the ticket intent Atlas already checks — code correctness and intent coverage,
-                together.
+                Sift's findings appear on each pull request and inside the War Room trace, right
+                next to the ticket intent Atlas already checks — code correctness and intent
+                coverage, together.
               </Step>
             </Steps>
           </div>
@@ -243,188 +239,179 @@ export function SiftSetup({ repos }: { repos: RepoOption[] }) {
               column. */}
           <div className="relative z-10 space-y-5">
             <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-sm font-semibold">Configure Sift</h2>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {step === "config"
-                      ? "Choose how Sift reviews your code. You can change this later."
-                      : "Pick which repositories Sift should review."}
-                  </p>
-                </div>
-                <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
-                  Step {step === "config" ? "1" : "2"} of 2
-                </span>
+              <div>
+                <h2 className="text-sm font-semibold">Configure Sift</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {step === "config"
+                    ? "Choose how Sift reviews your code. You can change this later."
+                    : "Pick which repositories Sift should review."}
+                </p>
               </div>
+              <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+                Step {step === "config" ? "1" : "2"} of 2
+              </span>
+            </div>
 
-              <TooltipProvider delayDuration={150}>
-                {step === "config" ? (
-                  <form
-                    className="space-y-5"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      setStep("repos");
-                    }}
+            <TooltipProvider delayDuration={150}>
+              {step === "config" ? (
+                <form
+                  className="space-y-5"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    setStep("repos");
+                  }}
+                >
+                  <Field label="Model" hint="Which model powers each review.">
+                    <ChoiceGroup options={MODELS} value={model} onChange={setModel} cols={3} />
+                  </Field>
+
+                  <Field label="Review effort" hint="How hard Sift works on every diff.">
+                    <ChoiceGroup options={EFFORTS} value={effort} onChange={setEffort} cols={3} />
+                  </Field>
+
+                  <Field label="Test depth" hint="How thoroughly Sift reviews test coverage.">
+                    <ChoiceGroup options={TEST_DEPTHS} value={tests} onChange={setTests} cols={2} />
+                  </Field>
+
+                  <div className="flex justify-end">
+                    <Button type="submit" className="w-1/2 gap-1.5">
+                      Continue <ArrowRight className="size-4" />
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <form
+                  className="space-y-4"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    setSubmitted(true);
+                  }}
+                >
+                  {/* Carry the step-1 picks forward — a compact recap that jumps back to edit. */}
+                  <button
+                    type="button"
+                    onClick={() => setStep("config")}
+                    className="group flex w-full flex-wrap items-center gap-1.5 rounded-md border border-border bg-muted/20 px-2.5 py-2 text-left transition-colors hover:border-foreground/25"
                   >
-                    <Field label="Model" hint="Which model powers each review.">
-                      <ChoiceGroup options={MODELS} value={model} onChange={setModel} cols={3} />
-                    </Field>
-
-                    <Field label="Review effort" hint="How hard Sift works on every diff.">
-                      <ChoiceGroup options={EFFORTS} value={effort} onChange={setEffort} cols={3} />
-                    </Field>
-
-                    <Field label="Test depth" hint="How thoroughly Sift reviews test coverage.">
-                      <ChoiceGroup
-                        options={TEST_DEPTHS}
-                        value={tests}
-                        onChange={setTests}
-                        cols={2}
-                      />
-                    </Field>
-
-                    <div className="flex justify-end">
-                      <Button type="submit" className="w-1/2 gap-1.5">
-                        Continue <ArrowRight className="size-4" />
-                      </Button>
-                    </div>
-                  </form>
-                ) : (
-                  <form
-                    className="space-y-4"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      setSubmitted(true);
-                    }}
-                  >
-                    {/* Carry the step-1 picks forward — a compact recap that jumps back to edit. */}
-                    <button
-                      type="button"
-                      onClick={() => setStep("config")}
-                      className="group flex w-full flex-wrap items-center gap-1.5 rounded-md border border-border bg-muted/20 px-2.5 py-2 text-left transition-colors hover:border-foreground/25"
-                    >
-                      {summary.map((o) => (
-                        <span
-                          key={o.label}
-                          className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
-                        >
-                          <o.Icon className="size-3 text-success" />
-                          {o.label}
-                        </span>
-                      ))}
-                      <span className="ml-auto text-[11px] text-muted-foreground group-hover:text-foreground">
-                        Edit
+                    {summary.map((o) => (
+                      <span
+                        key={o.label}
+                        className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
+                      >
+                        <o.Icon className="size-3 text-success" />
+                        {o.label}
                       </span>
-                    </button>
+                    ))}
+                    <span className="ml-auto text-[11px] text-muted-foreground group-hover:text-foreground">
+                      Edit
+                    </span>
+                  </button>
 
-                    {/* Repositories — every repo Atlas knows, host-agnostic; searchable, select-all
+                  {/* Repositories — every repo Atlas knows, host-agnostic; searchable, select-all
                         or pick individually. */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Repositories</span>
-                        {repos.length > 0 ? (
-                          <button
-                            type="button"
-                            onClick={toggleAll}
-                            className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-                          >
-                            {allSelected ? "Clear all" : "Select all"}
-                          </button>
-                        ) : null}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Every repository Atlas has discovered — pick what Sift reviews.
-                      </p>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Repositories</span>
+                      {repos.length > 0 ? (
+                        <button
+                          type="button"
+                          onClick={toggleAll}
+                          className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                          {allSelected ? "Clear all" : "Select all"}
+                        </button>
+                      ) : null}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Every repository Atlas has discovered — pick what Sift reviews.
+                    </p>
 
-                      {repos.length === 0 ? (
-                        <p className="rounded-md border border-border px-3 py-6 text-center text-xs text-muted-foreground">
-                          No repositories yet. Connect a code host in Integrations and they&rsquo;ll
-                          show up here.
-                        </p>
-                      ) : (
-                        <>
-                          <div className="relative">
-                            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                              value={query}
-                              onChange={(e) => setQuery(e.target.value)}
-                              placeholder="Search repositories…"
-                              autoComplete="off"
-                              className="pl-8"
-                            />
-                          </div>
-                          <div className="max-h-[calc(100dvh-27rem)] min-h-64 space-y-0.5 overflow-y-auto rounded-md border border-border p-1">
-                            {filtered.length === 0 ? (
-                              <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-                                No repositories match “{query}”.
-                              </p>
-                            ) : (
-                              filtered.map((r) => {
-                                const on = selected.has(r.id);
-                                const logo = providerMeta(r.provider ?? "")?.logo;
-                                return (
-                                  <button
-                                    type="button"
-                                    key={r.id}
-                                    onClick={() => toggleRepo(r.id)}
-                                    aria-pressed={on}
-                                    className="flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left transition-colors hover:bg-accent"
-                                  >
-                                    <span
-                                      className={cn(
-                                        "grid size-4 shrink-0 place-items-center rounded border transition-colors",
-                                        on
-                                          ? "border-foreground bg-foreground text-background"
-                                          : "border-border",
-                                      )}
-                                    >
-                                      {on ? <Check className="size-3" /> : null}
-                                    </span>
-                                    {logo ? (
-                                      <CloudIcon name={logo} className="size-4 shrink-0" />
-                                    ) : (
-                                      <GitBranch className="size-4 shrink-0 text-muted-foreground" />
+                    {repos.length === 0 ? (
+                      <p className="rounded-md border border-border px-3 py-6 text-center text-xs text-muted-foreground">
+                        No repositories yet. Connect a code host in Integrations and they&rsquo;ll
+                        show up here.
+                      </p>
+                    ) : (
+                      <>
+                        <div className="relative">
+                          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder="Search repositories…"
+                            autoComplete="off"
+                            className="pl-8"
+                          />
+                        </div>
+                        <div className="max-h-[calc(100dvh-27rem)] min-h-64 space-y-0.5 overflow-y-auto rounded-md border border-border p-1">
+                          {filtered.length === 0 ? (
+                            <p className="px-2 py-6 text-center text-xs text-muted-foreground">
+                              No repositories match “{query}”.
+                            </p>
+                          ) : (
+                            filtered.map((r) => {
+                              const on = selected.has(r.id);
+                              const logo = providerMeta(r.provider ?? "")?.logo;
+                              return (
+                                <button
+                                  type="button"
+                                  key={r.id}
+                                  onClick={() => toggleRepo(r.id)}
+                                  aria-pressed={on}
+                                  className="flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left transition-colors hover:bg-accent"
+                                >
+                                  <span
+                                    className={cn(
+                                      "grid size-4 shrink-0 place-items-center rounded border transition-colors",
+                                      on
+                                        ? "border-foreground bg-foreground text-background"
+                                        : "border-border",
                                     )}
-                                    <span className="min-w-0 flex-1 truncate text-[13px]">
-                                      {r.name}
-                                    </span>
-                                  </button>
-                                );
-                              })
-                            )}
-                          </div>
-                          <p className="text-xs tabular-nums text-muted-foreground">
-                            {selected.size} of {repos.length} selected
-                          </p>
-                        </>
-                      )}
-                    </div>
+                                  >
+                                    {on ? <Check className="size-3" /> : null}
+                                  </span>
+                                  {logo ? (
+                                    <CloudIcon name={logo} className="size-4 shrink-0" />
+                                  ) : (
+                                    <GitBranch className="size-4 shrink-0 text-muted-foreground" />
+                                  )}
+                                  <span className="min-w-0 flex-1 truncate text-[13px]">
+                                    {r.name}
+                                  </span>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                        <p className="text-xs tabular-nums text-muted-foreground">
+                          {selected.size} of {repos.length} selected
+                        </p>
+                      </>
+                    )}
+                  </div>
 
-                    {submitted ? (
-                      <p className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-                        Sift onboarding isn&rsquo;t wired up yet — this is the layout. We&rsquo;ll
-                        connect it to the backend next.
-                      </p>
-                    ) : null}
+                  {submitted ? (
+                    <p className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+                      Sift onboarding isn&rsquo;t wired up yet — this is the layout. We&rsquo;ll
+                      connect it to the backend next.
+                    </p>
+                  ) : null}
 
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setStep("config")}
-                        className="gap-1.5"
-                      >
-                        <ArrowLeft className="size-4" /> Back
-                      </Button>
-                      <Button
-                        type="submit"
-                        disabled={selected.size === 0}
-                        className="flex-1 gap-1.5"
-                      >
-                        <SiftMark className="size-4" /> Connect Sift
-                      </Button>
-                    </div>
-                  </form>
-                )}
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setStep("config")}
+                      className="gap-1.5"
+                    >
+                      <ArrowLeft className="size-4" /> Back
+                    </Button>
+                    <Button type="submit" disabled={selected.size === 0} className="flex-1 gap-1.5">
+                      <SiftMark className="size-4" /> Connect Sift
+                    </Button>
+                  </div>
+                </form>
+              )}
             </TooltipProvider>
           </div>
         </div>

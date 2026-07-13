@@ -2048,8 +2048,8 @@ function WarRoomCta({ orgId, nodeId }: { orgId: string; nodeId: string }) {
       }}
       className="mt-4 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-danger px-3 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
     >
-      {busy ? <Loader2 className="size-4 animate-spin" /> : <Crosshair className="size-4" />} Take to
-      War Room
+      {busy ? <Loader2 className="size-4 animate-spin" /> : <Crosshair className="size-4" />} Take
+      to War Room
     </button>
   );
 }

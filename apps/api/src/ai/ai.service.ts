@@ -320,7 +320,10 @@ export class AiService {
     const assessment = await judgeCoverage(
       { llm },
       {
-        pr: { id: issue.id, name: `${issue.key} (${prEdges.length} PR${prEdges.length === 1 ? "" : "s"})` },
+        pr: {
+          id: issue.id,
+          name: `${issue.key} (${prEdges.length} PR${prEdges.length === 1 ? "" : "s"})`,
+        },
         issue,
         diff: null,
         prDiffs,

@@ -7,12 +7,7 @@
   "_plugins_comment": "Declare the runner plugin by name — pnpm's symlinked node_modules defeats Stryker's default '@stryker-mutator/*' auto-glob, so it must be resolved explicitly (else: 'Cannot find TestRunner plugin vitest').",
   "plugins": ["@stryker-mutator/vitest-runner"],
   "coverageAnalysis": "perTest",
-  "mutate": [
-    "src/rules/*.ts",
-    "src/evaluate.ts",
-    "!src/rules/index.ts",
-    "!src/**/*.test.ts"
-  ],
+  "mutate": ["src/rules/*.ts", "src/evaluate.ts", "!src/rules/index.ts", "!src/**/*.test.ts"],
   "ignoreStatic": true,
   "reporters": ["clear-text", "html", "progress"],
   "htmlReporter": { "fileName": "reports/mutation/index.html" },
