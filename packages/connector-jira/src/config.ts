@@ -17,13 +17,35 @@ export interface JiraConfig {
 
 /** A Jira issue key: 1–10 upper-alnum project code, a dash, digits. */
 const KEY_RE = /^[A-Z][A-Z0-9]{1,9}-\d+$/;
+/** A Jira project key: a leading letter + up to 9 upper-alnum. Enforced so a configured key can't
+ *  break out of the `project = "<key>"` JQL literal in the crawl (crawl.ts) — a `"` would inject. */
+const PROJECT_KEY_RE = /^[A-Z][A-Z0-9]{1,9}$/;
 
-/** Accept a full URL or a bare subdomain and return the site slug. */
+/** A single valid DNS label — the shape an Atlassian Cloud site slug must take. */
+const SITE_SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+
+/**
+ * Extract the Atlassian Cloud site slug from a bare slug (`acme`) or a `<slug>.atlassian.net` value
+ * (with or without scheme/path). STRICT by design: the result is interpolated into
+ * `https://<slug>.atlassian.net/…`, so anything other than a clean single label is REJECTED. This
+ * closes an SSRF where a `:`/`#`/`/` in `site` relocated the request host — e.g. `169.254.169.254:80#`
+ * (`#` opens a URL fragment) reaching cloud instance metadata, or `evil.com#` exfiltrating the Jira
+ * Basic-auth credentials off-platform. A bad `site` now throws at config-parse time.
+ */
 function toSite(raw: string): string {
-  const v = raw.trim().replace(/^https?:\/\//, "");
-  const host = v.split("/")[0] ?? v;
-  const m = /^([a-z0-9-]+)\.atlassian\.net$/i.exec(host);
-  return (m?.[1] ?? host).trim().toLowerCase();
+  const host = (
+    raw
+      .trim()
+      .replace(/^https?:\/\//i, "")
+      .split("/")[0] ?? ""
+  ).toLowerCase();
+  const slug = host.endsWith(".atlassian.net") ? host.slice(0, -".atlassian.net".length) : host;
+  if (!SITE_SLUG_RE.test(slug)) {
+    throw new Error(
+      "jira config: `site` must be an Atlassian Cloud site slug (e.g. `acme` or `acme.atlassian.net`)",
+    );
+  }
+  return slug;
 }
 
 export function parseJiraConfig(config: Record<string, unknown>): JiraConfig {
@@ -38,6 +60,7 @@ export function parseJiraConfig(config: Record<string, unknown>): JiraConfig {
     ? keysRaw
         .filter((k): k is string => typeof k === "string" && k.trim().length > 0)
         .map((k) => k.trim().toUpperCase())
+        .filter((k) => PROJECT_KEY_RE.test(k)) // charset-validate (JQL-injection guard)
     : [];
   const backfillRaw = config.backfillKeys;
   const backfillKeys = Array.isArray(backfillRaw)
