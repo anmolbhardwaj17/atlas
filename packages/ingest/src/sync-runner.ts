@@ -172,14 +172,7 @@ export async function runStagedSync(
 
   const anyFailed = failedScopes.length > 0;
   if (!anyFailed) {
-    await withOrgScope(db, run.orgId, async (c) => {
-      const r = await c.query(
-        `UPDATE nodes SET status = 'stale'
-         WHERE connection_id = $1 AND status = 'active' AND last_sync_run_id IS DISTINCT FROM $2`,
-        [run.connectionId, run.id],
-      );
-      stats.staled = r.rowCount ?? 0;
-    });
+    stats.staled = await reconcileStaleNodes(db, run);
   }
   const status: SyncResult["status"] = anyFailed
     ? stats.scopesOk > 0
@@ -188,6 +181,29 @@ export async function runStagedSync(
     : "succeeded";
   await finalize(db, run, status, stats, [...completed], failedScopes);
   return { status, stats, completedScopes: [...completed], failedScopes };
+}
+
+/**
+ * Reconcile (BR-SYNC-2): after a SUCCEEDED run, mark this connection's `active` nodes that the run
+ * did NOT re-observe (last_sync_run_id ≠ this run) as `stale`. Returns the count staled.
+ *
+ * GUARD (`EXISTS ... status='running'`): only reconcile while THIS run is still the authoritative
+ * running run. A run that stalled >15 min, got reaped to `failed`, and only NOW finished crawling
+ * must NOT stale the FRESH nodes of its replacement run B (whose last_sync_run_id ≠ this run) — a
+ * false delete (violates the "never delete-mark on a non-succeeding/superseded run" invariant).
+ * `uq_sync_inflight` guarantees at most one *running* run per connection, so a live `running` status
+ * here means no replacement exists yet; a reaped run makes the EXISTS fail → 0 rows, harmlessly.
+ */
+export async function reconcileStaleNodes(db: Db, run: SyncRunRecord): Promise<number> {
+  return withOrgScope(db, run.orgId, async (c) => {
+    const r = await c.query(
+      `UPDATE nodes SET status = 'stale'
+         WHERE connection_id = $1 AND status = 'active' AND last_sync_run_id IS DISTINCT FROM $2
+           AND EXISTS (SELECT 1 FROM sync_runs WHERE id = $2 AND status = 'running')`,
+      [run.connectionId, run.id],
+    );
+    return r.rowCount ?? 0;
+  });
 }
 
 async function loadCompletedScopes(db: Db, run: SyncRunRecord): Promise<string[]> {

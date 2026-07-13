@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import type { Connection } from "@atlas/connector-sdk";
-import { runStagedSync, type SyncRunRecord } from "./sync-runner";
+import { runStagedSync, reconcileStaleNodes, type SyncRunRecord } from "./sync-runner";
 import { MockConnector, type MockControl } from "./mock-connector";
 import { InMemorySnapshotStore } from "./snapshot-store";
 import { nullSecretAccessor, silentLogger } from "./runtime";
@@ -195,5 +195,58 @@ suite("F2 staged sync runner", () => {
     expect(mock.discoverCalls.s1).toBe(1); // s1 skipped on resume (not re-discovered)
     expect(mock.discoverCalls.s2).toBe(2);
     expect(await count("active")).toBe(2);
+  });
+
+  // Reaper-race guard (BR-SYNC-2): a stalled-then-reaped run that only NOW finishes must not
+  // stale the fresh nodes written by its replacement run.
+  const mkRun = async (status: string): Promise<string> =>
+    one(
+      (
+        await admin.query<{ id: string }>(
+          `INSERT INTO sync_runs (org_id, connection_id, type, trigger, status)
+           VALUES ($1, $2, 'full', 'manual', $3) RETURNING id`,
+          [orgId, connId, status],
+        )
+      ).rows,
+    ).id;
+  const seedNode = async (lastRun: string): Promise<void> => {
+    await admin.query(
+      `INSERT INTO nodes (org_id, connection_id, urn, kind, provider, confidence, status, last_sync_run_id)
+       VALUES ($1, $2, 'aws:x:1:lambda/n', 'aws.lambda.function', 'aws', 'observed', 'active', $3)`,
+      [orgId, connId, lastRun],
+    );
+  };
+
+  it("reconcile does NOT stale a replacement run's fresh nodes when this run was reaped", async () => {
+    const reaped = await mkRun("failed"); // this run: stalled >15min → reaped to failed
+    const replacement = await mkRun("running"); // run B: authoritative, writing fresh nodes
+    await seedNode(replacement); // a fresh node stamped by B
+
+    const staled = await reconcileStaleNodes(app, {
+      id: reaped,
+      orgId,
+      connectionId: connId,
+      type: "full",
+    });
+
+    expect(staled).toBe(0); // guard: reaped run isn't 'running' → EXISTS fails → no-op
+    expect(await count("active")).toBe(1); // B's node survives
+    expect(await count("stale")).toBe(0);
+  });
+
+  it("reconcile stales unobserved nodes when this run is genuinely running", async () => {
+    const older = await mkRun("succeeded");
+    const current = await mkRun("running"); // this run, authoritative
+    await seedNode(older); // node last touched by an older run, not re-observed now
+
+    const staled = await reconcileStaleNodes(app, {
+      id: current,
+      orgId,
+      connectionId: connId,
+      type: "full",
+    });
+
+    expect(staled).toBe(1);
+    expect(await count("stale")).toBe(1);
   });
 });
