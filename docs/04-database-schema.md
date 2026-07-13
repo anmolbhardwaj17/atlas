@@ -563,26 +563,43 @@ CREATE TABLE ai_conversations (
 
 ---
 
-### 5.7 Platform: org_profile & analytics_events *(added 0040)*
+### 5.7 Platform: org_settings & analytics_events *(added 0040; profile/LLM/alerts consolidated into `org_settings` in 0054, DD-13)*
 
-Product/business data about the **account** — collected at onboarding (`12` §6.3) and the activation
-funnel. This is a **separate category from the knowledge graph**: SEC-10 minimization governs what we
-ingest from a customer's cloud/repos, not what an account voluntarily tells us about itself. Both are
-org-scoped by RLS (R8); collection is disclosed in the privacy policy and GDPR-deletable (cascades on
-org delete). `analytics_events` is append-only like `audit_events`.
+`org_settings` is the **single per-org configuration row** (one per org, created lazily on first
+write). It consolidates three former 1:1 satellites — the onboarding profile (`0040`), BYO-LLM config
+(`0019`/`0020`) and the proactive-alert policy (`0051`) — so `organizations` stays a lean, hot
+identity row while all per-org config lives in one place (DD-13). Org-scoped by RLS (R8); collection
+is disclosed in the privacy policy and GDPR-deletable (cascades on org delete). The onboarding-profile
+subset is product/business data about the **account** — a **separate category from the knowledge
+graph** (SEC-10 minimization governs what we *ingest* from a customer's cloud/repos, not what an
+account tells us about itself). `analytics_events` stays separate and append-only like `audit_events`.
 
 ```sql
--- ORG_PROFILE — the onboarding answers (one row per org). All optional; the step is skippable.
-CREATE TABLE org_profile (
-    org_id          uuid PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
-    role            text,                                    -- creator persona (00 §8 A–E), stable key
-    team_size       text,                                    -- 'solo' | '2-20' | '20-100' | '100-500' | '500+'
-    use_cases       text[] NOT NULL DEFAULT '{}',            -- intent keys (blast_radius, architecture, …)
-    stack           text[] NOT NULL DEFAULT '{}',            -- self-reported tools (provider ids)
-    industry        text,
-    referral_source text,
-    created_at      timestamptz NOT NULL DEFAULT now(),
-    updated_at      timestamptz NOT NULL DEFAULT now()
+-- ORG_SETTINGS — one config row per org. `profile_updated_at` distinguishes "profile captured" from a
+-- row that exists only because an alert/LLM value was set. BYO-LLM is all-or-nothing; `llm_secret_ref`
+-- points at the encrypted broker, never the key (BR-CONN-1).
+CREATE TABLE org_settings (
+    org_id             uuid PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
+    -- onboarding profile (disclosed account analytics; 12 §6.3, 13). All optional; step is skippable.
+    role               text,                                 -- creator persona (00 §8 A–E), stable key
+    team_size          text,                                 -- 'solo' | '2-20' | '20-100' | '100-500' | '500+'
+    use_cases          text[] NOT NULL DEFAULT '{}',         -- intent keys (blast_radius, architecture, …)
+    stack              text[] NOT NULL DEFAULT '{}',         -- self-reported tools (provider ids)
+    industry           text,
+    referral_source    text,
+    profile_updated_at timestamptz,                          -- set when profile saved; NULL = never captured
+    -- proactive-incidents alert policy (docs/plans/proactive-incidents.md)
+    alert_policy       text NOT NULL DEFAULT 'prod' CHECK (alert_policy IN ('off','prod','all')),
+    -- BYO-LLM (10 §3); all-or-nothing; secret_ref → encrypted broker (never the key)
+    llm_provider       text CHECK (llm_provider IS NULL OR llm_provider IN ('openrouter','openai','anthropic')),
+    llm_model          text,
+    llm_secret_ref     text,
+    CONSTRAINT org_settings_llm_all_or_none CHECK (
+        (llm_provider IS NULL AND llm_model IS NULL AND llm_secret_ref IS NULL) OR
+        (llm_provider IS NOT NULL AND llm_model IS NOT NULL AND llm_secret_ref IS NOT NULL)
+    ),
+    created_at         timestamptz NOT NULL DEFAULT now(),
+    updated_at         timestamptz NOT NULL DEFAULT now()
 );
 
 -- ANALYTICS_EVENTS — append-only product-analytics stream (activation funnel). INSERT+SELECT only
@@ -641,6 +658,18 @@ CREATE INDEX ix_audit_org_action   ON audit_events(org_id, action, occurred_at D
 - **Bidirectional edge indexes** (`ix_edges_from` / `ix_edges_to`) are *the* enabler of fast graph traversal in both directions — outbound (dependencies) and inbound (dependents/blast-radius) — within NFR-1. This is the relational stand-in for a graph DB's adjacency lists (§7, `02` DD-8).
 - **Partial indexes** (`WHERE status='active'` / `<> 'deleted'`) keep the hot working set small as soft-deleted history accumulates (SP-4).
 - **GIN on JSONB** supports inference/search filters on the attribute long tail (DD-3) without a column per provider field.
+
+### 6.1 Coverage verification (methodology + result)
+
+Index coverage is validated by shape, not by dev-scale `idx_scan` counts (a small table is *correctly* seq-scanned, so those counts mislead). For each dominant query, run `EXPLAIN` under **`SET LOCAL enable_seqscan = off`** — a `Seq Scan` that survives the penalty means **no usable index exists** for that access path (a real gap), independent of table size.
+
+Result (2026-07-13): **every hot read path resolves to its intended index** — `listNodes` → `ix_nodes_org_kind`; status/`last_seen` → `ix_nodes_org_status_seen`; region → `ix_nodes_org_region`; name search → `ix_nodes_name_trgm`; edge traversal → `ix_edges_from`/`ix_edges_to`; node timeline → `ix_node_events_node`; snapshots → `ix_snapshots_node`; audit/analytics feeds → their `(org_id, created_at DESC)` composites.
+
+### 6.2 FK-index hygiene *(migration 0055)*
+
+PostgreSQL does **not** auto-index FK columns, so a parent `DELETE` Seq-Scans the child to enforce the constraint. The probe found five such FK columns Seq-Scanning: `provenance.raw_snapshot_id`, `provenance.sync_run_id`, `edges.provenance_id`, `nodes.last_sync_run_id`, `edges.last_sync_run_id`. Migration 0055 indexes them. These are **not** for current reads — they keep cascade deletes and the **retention purges (§11)** from degrading to O(rows), and enable "what did this sync touch" reverse lookups.
+
+> **Exception to SP-9 (org-prefix):** these five indexes **lead with the FK column**, not `org_id`. A cascade check starts from one parent row (by its single-column PK), so an org-prefixed index can't serve it. SP-9 governs *tenant-scoped read paths*; FK-cascade support is a distinct access pattern.
 
 ---
 
@@ -762,6 +791,29 @@ CREATE POLICY tenant_isolation_nodes ON nodes
 
 **Reconciliation writes** (the `stale`/`deleted`/`retired` transitions) happen only in the reconcile stage (`02` §5.2) and only for **scopes that were actually scanned** in a `succeeded` run (BR-SYNC-2) — a `partial` run never delete-marks unscanned scope (prevents false deletions, US-13).
 
+### 11.1 Partitioning & retention posture (growth playbook — gated, not MVP)
+
+Two growth classes decide what ever needs partitioning:
+
+- **Bounded per org** — `nodes` and `edges` grow with the *estate*, not time (A18: ≤ ~50k nodes/org). A single well-indexed instance serves this; partition **only if a mega-tenant emerges**, by `HASH(org_id)`. No time dimension, so no retention.
+- **Unbounded append-only** — `provenance`, `raw_snapshots`, `node_events`, `audit_events`, `analytics_events`, `sync_runs` grow with *time × activity* (every sync appends). These are the partition + retention targets.
+
+**Trigger (resolves OQ-DB-5):** gated on metrics, never a calendar. Partition + enable retention on a table when it crosses **~10M rows or ~10 GB** (whichever first), watched by the ops metrics (`17`). Everything is KB-sized today — nothing to build, only to keep ready.
+
+| Table | Growth driver | Partition when triggered | Retention (default; exact in `13`) |
+|---|---|---|---|
+| `provenance` | per edge / per sync | `RANGE (created_at)`, monthly | lives with the edge it justifies; purged when the edge is |
+| `raw_snapshots` | per sync × node | `RANGE (captured_at)`, monthly + S3 lifecycle | latest N per node + age cap (NFR-15) |
+| `node_events` | per node event | `RANGE (occurred_at)` | rolling window (~12–18 mo) |
+| `audit_events` | per action | `RANGE (created_at)` | long (compliance, `13`) |
+| `analytics_events` | per product event | `RANGE (created_at)` | short; may offload to an analytics sink |
+| `sync_runs` | per crawl | roll up / aggregate old runs | keep terminal states; aggregate history |
+
+**Mechanics (why it's ready, not risky):**
+- **Already partition-ready** — every key is org-prefixed and every append-only table carries a `created_at`/`occurred_at`/`captured_at`, so conversion to RANGE partitioning is an expand/contract migration (DD-6), not a redesign.
+- **Purges depend on the FK indexes (§6.2 / migration 0055)** — deleting an aged `sync_run` / `raw_snapshot` / `provenance` cascade-checks children; unindexed that's O(rows). Prerequisite now in place, which is why 0055 lands *before* any retention job.
+- **At-scale index builds** use `CREATE INDEX CONCURRENTLY` out-of-band (the transactional runner can't); on a partitioned table, index the parent so partitions inherit.
+
 ---
 
 ## 12. Design Decisions Recap
@@ -775,6 +827,7 @@ CREATE POLICY tenant_isolation_nodes ON nodes
 | DD-5 | Precomputed `node_closure` kept as escape hatch | Avoid premature optimization; ready if NFR-1 pressed (P10) |
 | DD-6 | Forward-only expand/contract migrations + background backfills | Zero-downtime with stateless autoscaled deploys (P7) |
 | DD-7 | RLS as backstop beneath app-layer scoping | Defense-in-depth for existential tenancy risk (R8) |
+| DD-13 | One `org_settings` row consolidates the per-org 1:1 config satellites (profile, alert policy, BYO-LLM) instead of a table each | Keeps the hot `organizations` row lean while grouping all per-org config in one place; fewer tiny 1:1 tables/joins without an EAV/god-table (0054) |
 | (impl) | Composite FKs make cross-tenant edges impossible | Structural isolation (BR-EDGE-1/BR-TENANT-1) |
 
 ## 13. Risks
@@ -793,7 +846,7 @@ CREATE POLICY tenant_isolation_nodes ON nodes
 
 - **NULL `inference_rule_id` in `uq_edge`:** PostgreSQL treats NULLs as distinct in unique constraints. For **observed** edges (rule = NULL) we add a dedicated partial unique index `UNIQUE (org_id, from_node_id, to_node_id, type) WHERE inference_rule_id IS NULL` to prevent duplicate observed edges (SR-5).
 - **Self-edges:** disallowed by default (`no_self_edge`); if a future edge type legitimately needs self-reference, it's whitelisted explicitly (revisit in `05`).
-- **Partitioning posture (future, not MVP):** if `nodes`/`edges`/`audit_events` grow large, partition by `org_id` (hash) or by time (`audit_events`, `sync_runs`). Schema is partition-ready (org-prefixed keys); deferred until volume warrants (P6/A18).
+- **Partitioning posture (future, not MVP):** the full growth playbook — which tables partition, the trigger metric, retention windows, and mechanics — is **§11.1**. In short: `nodes`/`edges` are bounded-per-org (hash by `org_id` only for a mega-tenant); the append-only tables are `RANGE`-by-time on a ~10M-row/~10 GB trigger. Schema is partition-ready (org-prefixed keys + timestamps); deferred until volume warrants (P6/A18).
 - **Read replicas:** exploration/search/AI reads can target replicas; writes (crawl/reconcile) hit primary. Repository layer routes reads vs. writes (`02` §3.4).
 - **`citext` for email/slug:** ensures case-insensitive uniqueness without app normalization bugs.
 - **Cascade deletes:** Org deletion cascades through the whole tree; for large orgs, cascade is executed as a batched background purge (§11), not a single statement (SR-7).
@@ -804,7 +857,7 @@ CREATE POLICY tenant_isolation_nodes ON nodes
 - **OQ-DB-2** Whether `node_closure` ships in MVP or stays an escape hatch (§7.3) — gated on load tests (`14`).
 - **OQ-DB-3** Embedding metadata in PG vs. OpenSearch-only (§8, `02` OQ-ARCH-2) — decided in `11`.
 - **OQ-DB-4** Exact retention windows for `stale→deleted`, `retired`, raw snapshots (`03` OQ-DOM-4) — set in `13`.
-- **OQ-DB-5** When to introduce table partitioning (§14) — gated on `nodes`/`audit_events` growth metrics (`17`).
+- **OQ-DB-5** ~~When to introduce table partitioning~~ — **resolved (§11.1):** gated on **~10M rows or ~10 GB** per table (whichever first), watched via `17`; append-only tables `RANGE`-by-time, `nodes`/`edges` hash-by-`org_id` only for a mega-tenant.
 
 ## 16. References
 
@@ -817,3 +870,5 @@ CREATE POLICY tenant_isolation_nodes ON nodes
 | Version | Date | Author | Change |
 |---|---|---|---|
 | 1.0 | 2026-06-30 | Founding Principal Architect | Initial authoritative PostgreSQL schema from `00`–`03` v1.0 |
+| 1.1 | 2026-07-13 | — | Consolidated the per-org 1:1 config satellites (`org_profile`, `org_llm_config`, `org_alert_settings`) into a single `org_settings` table (DD-13, migration 0054); §5.7 updated |
+| 1.2 | 2026-07-13 | — | Phase 2 schema hardening: index-coverage verification methodology + result (§6.1); FK-index hygiene, migration 0055 (§6.2); partition + retention growth playbook resolving OQ-DB-5 (§11.1) |
