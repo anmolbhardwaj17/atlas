@@ -70,7 +70,7 @@ export function NodeDetailView({
   const healthSince = events.find((e) => e.kind === "health_transition")?.occurredAt ?? null;
 
   return (
-    <div className="space-y-6">
+    <div className="motion-stagger space-y-6">
       {/* ── Header ─────────────────────────────────────────────── */}
       <div>
         <div className="flex flex-wrap items-start justify-between gap-3">

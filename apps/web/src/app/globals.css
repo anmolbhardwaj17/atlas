@@ -252,6 +252,105 @@
   }
 }
 
+/* ── Motion system ────────────────────────────────────────────────────────────────────────────
+   A small, shared vocabulary for "content arriving" and "state changing". Subtle + fast to match
+   the restrained design; transform/opacity only (GPU-friendly). All entrances live under
+   prefers-reduced-motion:no-preference, so reduced-motion users get the final state instantly with
+   NO animation (the classes are inert outside the query — elements simply appear). Stagger is done
+   at the call site with an inline `animation-delay` (works in server components), or via the
+   `.motion-stagger` container which auto-delays its first children. */
+@keyframes motion-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes motion-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes motion-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .motion-rise {
+    animation: motion-rise 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .motion-fade {
+    animation: motion-fade 0.38s ease-out both;
+  }
+  .motion-pop {
+    animation: motion-pop 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  /* Auto-stagger the direct children of a container (first 16); beyond that they animate together. */
+  .motion-stagger > * {
+    animation: motion-rise 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .motion-stagger > *:nth-child(1) {
+    animation-delay: 0.02s;
+  }
+  .motion-stagger > *:nth-child(2) {
+    animation-delay: 0.05s;
+  }
+  .motion-stagger > *:nth-child(3) {
+    animation-delay: 0.08s;
+  }
+  .motion-stagger > *:nth-child(4) {
+    animation-delay: 0.11s;
+  }
+  .motion-stagger > *:nth-child(5) {
+    animation-delay: 0.14s;
+  }
+  .motion-stagger > *:nth-child(6) {
+    animation-delay: 0.17s;
+  }
+  .motion-stagger > *:nth-child(7) {
+    animation-delay: 0.2s;
+  }
+  .motion-stagger > *:nth-child(8) {
+    animation-delay: 0.23s;
+  }
+  .motion-stagger > *:nth-child(9) {
+    animation-delay: 0.26s;
+  }
+  .motion-stagger > *:nth-child(10) {
+    animation-delay: 0.29s;
+  }
+  .motion-stagger > *:nth-child(11) {
+    animation-delay: 0.32s;
+  }
+  .motion-stagger > *:nth-child(12) {
+    animation-delay: 0.35s;
+  }
+  .motion-stagger > *:nth-child(13) {
+    animation-delay: 0.38s;
+  }
+  .motion-stagger > *:nth-child(14) {
+    animation-delay: 0.41s;
+  }
+  .motion-stagger > *:nth-child(15) {
+    animation-delay: 0.44s;
+  }
+  .motion-stagger > *:nth-child(16) {
+    animation-delay: 0.47s;
+  }
+}
+
 /* Sift backdrop — flowing dashes along the infra-map edges (dash cycle = 12 user units). */
 @keyframes sift-dash {
   to {

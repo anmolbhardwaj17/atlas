@@ -164,7 +164,7 @@ function Assessment({
           </Button>
         </div>
       ) : null}
-      <ul className="divide-y divide-border border-y border-border">
+      <ul className="motion-stagger divide-y divide-border border-y border-border">
         {a.criteria.map((c) => (
           <CriterionRow key={c.id} c={c} />
         ))}

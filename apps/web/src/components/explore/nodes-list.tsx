@@ -71,11 +71,15 @@ export function NodesList({ nodes, filtered = false }: { nodes: NodeDto[]; filte
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
-          {nodes.map((n) => {
+          {nodes.map((n, i) => {
             const Icon = kindIcon(n.kind);
             const logo = rowLogo(n.kind);
             return (
-              <tr key={n.id} className="hover:bg-card/60">
+              <tr
+                key={n.id}
+                className="motion-rise transition-colors hover:bg-card/60"
+                style={{ animationDelay: `${Math.min(i, 14) * 30}ms` }}
+              >
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-2.5">
                     <span

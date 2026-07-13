@@ -132,7 +132,7 @@ export function ComplianceView({ report }: { report: ComplianceReport | null }) 
   }, [current]);
 
   return (
-    <div className="w-full space-y-6">
+    <div className="motion-stagger w-full space-y-6">
       <header className="space-y-1.5">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Compliance</h1>

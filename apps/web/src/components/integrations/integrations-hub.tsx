@@ -248,7 +248,7 @@ export function IntegrationsHub({
   ).sort((a, b) => rank(a) - rank(b));
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="motion-stagger flex flex-col gap-8">
       {/* Header: title on the left, a decorative wall of everything we connect on the right. */}
       <div className="flex flex-col gap-4 pb-1 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-1.5">

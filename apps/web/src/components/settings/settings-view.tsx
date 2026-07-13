@@ -62,7 +62,7 @@ export function SettingsView({
   const isOwner = role === "Owner";
 
   return (
-    <div className="space-y-6">
+    <div className="motion-stagger space-y-6">
       <div className="space-y-1.5">
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="text-sm text-muted-foreground">Manage your organization, team, and access.</p>

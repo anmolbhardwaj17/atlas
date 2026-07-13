@@ -143,7 +143,7 @@ export async function Dashboard({
   const codeLogos = uniq(providers.map((p) => CODE_LOGO[p]).filter(isStr));
 
   return (
-    <div className="space-y-6">
+    <div className="motion-stagger space-y-6">
       {isSampleData && canManage ? <SampleDataBanner orgId={orgId} /> : null}
 
       {/* Hero band — a greeting with personality + the estate pulse, the way in. */}

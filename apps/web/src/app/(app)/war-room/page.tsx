@@ -72,7 +72,7 @@ async function WarRoomContent() {
   const closed = incidents.filter((i) => i.status === "resolved" || i.status === "dismissed");
 
   return (
-    <div className="space-y-6">
+    <div className="motion-stagger space-y-6">
       <div className="space-y-1.5">
         <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
           <Crosshair className="size-6 text-danger" /> War Room
