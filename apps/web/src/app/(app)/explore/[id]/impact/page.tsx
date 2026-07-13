@@ -33,7 +33,7 @@ export default async function ImpactPage({ params }: { params: Promise<{ id: str
       />
 
       {node ? (
-        <div className="space-y-6">
+        <div className="motion-stagger space-y-6">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">
               Impact · {node.name ?? node.urn}

@@ -842,7 +842,7 @@ function EmptyState({
           </p>
         </div>
       </div>
-      <div className="flex max-w-2xl flex-wrap justify-center gap-2 px-6">
+      <div className="motion-stagger flex max-w-2xl flex-wrap justify-center gap-2 px-6">
         {questions.map((q) => (
           <button
             key={q}

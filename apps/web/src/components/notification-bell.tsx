@@ -163,7 +163,7 @@ export function NotificationBell({ orgId }: { orgId: string }) {
                   </p>
                 </div>
               ) : (
-                <ul className="divide-y divide-border">
+                <ul className="motion-stagger divide-y divide-border">
                   {items.map((item) => {
                     const sev = SEVERITY_ICON[item.severity];
                     const SevIcon = sev.icon;

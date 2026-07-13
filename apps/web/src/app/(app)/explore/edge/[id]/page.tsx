@@ -28,7 +28,7 @@ export default async function EdgePage({ params }: { params: Promise<{ id: strin
         items={[{ label: "Explore", href: "/explore" }, { label: edge?.type ?? "Relationship" }]}
       />
       {edge ? (
-        <div className="space-y-6">
+        <div className="motion-stagger space-y-6">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-semibold tracking-tight">{edge.type}</h1>

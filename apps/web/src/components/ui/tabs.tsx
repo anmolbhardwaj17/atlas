@@ -45,6 +45,8 @@ const TabsContent = React.forwardRef<
     ref={ref}
     className={cn(
       "mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      // Fade + slight lift the panel in when its tab becomes active (reduced-motion: instant).
+      "data-[state=active]:motion-fade motion-reduce:data-[state=active]:animate-none",
       className,
     )}
     {...props}
