@@ -11,11 +11,17 @@ export const dynamic = "force-dynamic";
  * it no longer blocks the RSC flush. The fallback is the route's own skeleton, so the hand-off from
  * the navigation loading state to the streamed content is a single continuous skeleton (no flash).
  */
-export default async function DashboardPage() {
-  const shell = await requireShell();
+export default function DashboardPage() {
   return (
     <Suspense fallback={<DashboardLoading />}>
-      <Dashboard orgId={shell.orgId} token={shell.token} role={shell.role} name={shell.name} />
+      <DashboardContent />
     </Suspense>
   );
+}
+
+/** Auth + the heavy `/summary` both live inside the boundary so the page returns its skeleton
+ *  synchronously. Dashboard needs the member's role + name, so it uses the full shell (one `/me`). */
+async function DashboardContent() {
+  const shell = await requireShell();
+  return <Dashboard orgId={shell.orgId} token={shell.token} role={shell.role} name={shell.name} />;
 }

@@ -1,10 +1,12 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { Crosshair, ChevronRight } from "lucide-react";
-import { requireShell } from "@/lib/shell";
+import { getPageAuth } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { timeAgo } from "@/components/war-room/war-room-context";
 import type { Incident } from "@/lib/browser-api";
+import WarRoomLoading from "./loading";
 
 export const dynamic = "force-dynamic";
 
@@ -52,8 +54,16 @@ function IncidentRow({ i }: { i: Incident }) {
  * distinct from Insights (posture). Active investigations up top, closed history below. Start one from
  * a red map node, an alert, or an Insights finding.
  */
-export default async function WarRoomHome() {
-  const { token, orgId } = await requireShell();
+export default function WarRoomHome() {
+  return (
+    <Suspense fallback={<WarRoomLoading />}>
+      <WarRoomContent />
+    </Suspense>
+  );
+}
+
+async function WarRoomContent() {
+  const { token, orgId } = await getPageAuth();
   const incidents =
     (await apiGet<ApiOk<{ incidents: Incident[] }>>("/incidents?limit=100", { token, orgId })).body
       ?.data?.incidents ?? [];

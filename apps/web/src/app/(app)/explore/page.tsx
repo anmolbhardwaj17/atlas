@@ -1,10 +1,12 @@
+import { Suspense } from "react";
 import Link from "next/link";
-import { requireShell } from "@/lib/shell";
+import { getPageAuth } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
 import { ExploreControls } from "@/components/explore/explore-controls";
 import { NodesList } from "@/components/explore/nodes-list";
 import { ErrorState } from "@/components/patterns/empty-state";
 import type { NodeDto } from "@/lib/graph-types";
+import ExploreLoading from "./loading";
 
 export const dynamic = "force-dynamic";
 
@@ -29,12 +31,16 @@ interface OverviewFacets {
   byCategory?: Array<{ category: string; n: number }>;
 }
 
-export default async function ExplorePage({
-  searchParams,
-}: {
-  searchParams: Promise<SearchParams>;
-}) {
-  const shell = await requireShell();
+export default function ExplorePage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  return (
+    <Suspense fallback={<ExploreLoading />}>
+      <ExploreContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function ExploreContent({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const { token, orgId } = await getPageAuth();
   const sp = await searchParams;
 
   const q = first(sp.q);
@@ -59,7 +65,7 @@ export default async function ExplorePage({
   if (kind) params.set("kind", kind);
   if (cursor) params.set("cursor", cursor);
 
-  const auth = { token: shell.token, orgId: shell.orgId };
+  const auth = { token, orgId };
   const [res, overview] = await Promise.all([
     apiGet<ApiOk<NodeDto[]>>(`/nodes?${params.toString()}`, auth),
     apiGet<ApiOk<OverviewFacets>>("/overview", auth),

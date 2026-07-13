@@ -159,8 +159,10 @@ function ConnectAppsCard() {
 
 export function AppSidebar() {
   const pathname = usePathname();
-  // Dynamic routes wait for a server round-trip before the URL/loading boundary changes, so a
-  // click can feel frozen. Show an instant spinner on the clicked item until the route commits.
+  // Prefetched loading boundaries (next.config `staleTimes`) make the URL + destination skeleton
+  // commit instantly, so this is just honest in-flight feedback: the clicked item shows a spinner
+  // until the route commits, then the pathname change clears it (usually a single frame). It also
+  // covers the rare cold navigation (no prefetch yet) so a click is never silent.
   const [pendingHref, setPendingHref] = React.useState<string | null>(null);
   React.useEffect(() => setPendingHref(null), [pathname]);
 
@@ -215,11 +217,6 @@ export function AppSidebar() {
                           <AtlasAiMark size={20} className="size-5 shrink-0" />
                         )}
                         <span>{item.label}</span>
-                        {item.href === "/sift" ? (
-                          <span className="ml-auto shrink-0 text-[9px] font-medium uppercase tracking-wide text-muted-foreground/70 group-data-[collapsible=icon]:hidden">
-                            Coming Soon
-                          </span>
-                        ) : null}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

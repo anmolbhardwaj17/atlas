@@ -5,6 +5,7 @@ import { CommandTrigger } from "@/components/command-trigger";
 import { NotificationBell } from "@/components/notification-bell";
 import { HeaderUserMenu } from "@/components/header-user-menu";
 import { OrgSwitcher } from "@/components/org-switcher";
+import { PersistActiveOrg } from "@/components/persist-active-org";
 import type { MyOrg } from "@/lib/browser-api";
 import { BreadcrumbProvider } from "@/components/breadcrumb-context";
 import { HeaderBreadcrumbs } from "@/components/header-breadcrumbs";
@@ -67,6 +68,8 @@ export function AppShell({
         </BreadcrumbProvider>
       </SidebarInset>
       {orgId && <CommandPalette orgId={orgId} />}
+      {/* Primes the active-org cookie so page navigations resolve auth without a /me round-trip. */}
+      {orgId && <PersistActiveOrg orgId={orgId} />}
     </SidebarProvider>
   );
 }

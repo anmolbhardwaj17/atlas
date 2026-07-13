@@ -26,6 +26,20 @@ export async function getSession(): Promise<Session | null> {
   return { token: session.access_token, userId: user.id, email: user.email ?? "" };
 }
 
+/**
+ * The caller's access token straight from the Supabase session cookie — no getUser() network
+ * round-trip (unlike getSession() above, which validates against the auth server). The Atlas API
+ * validates the JWT itself (ES256/JWKS), so this is safe for org-scoped reads and keeps page
+ * navigations network-free (see getPageAuth). Returns null when unauthenticated.
+ */
+export async function getAccessToken(): Promise<string | null> {
+  const supabase = await createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return session?.access_token ?? null;
+}
+
 export interface ApiOk<T> {
   data: T;
   page?: { nextCursor: string | null; hasMore: boolean; limit: number };

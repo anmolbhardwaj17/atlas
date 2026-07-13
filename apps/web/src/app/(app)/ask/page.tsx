@@ -1,7 +1,9 @@
-import { requireShell } from "@/lib/shell";
+import { Suspense } from "react";
+import { getPageAuth } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
 import { AskWorkspace } from "@/components/ask/ask-workspace";
 import type { ConversationSummary } from "@/lib/browser-api";
+import AskLoading from "./loading";
 
 export const dynamic = "force-dynamic";
 
@@ -45,16 +47,24 @@ function suggestions(s: SummaryLite | undefined): string[] {
   return out.slice(0, 4);
 }
 
-export default async function AskPage({
+export default function AskPage({
   searchParams,
 }: {
   searchParams: Promise<{ q?: string | string[] }>;
 }) {
-  const shell = await requireShell();
+  return (
+    <Suspense fallback={<AskLoading />}>
+      <AskContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function AskContent({ searchParams }: { searchParams: Promise<{ q?: string | string[] }> }) {
+  const { token, orgId } = await getPageAuth();
   const { q } = await searchParams;
   const initial = Array.isArray(q) ? q[0] : q;
 
-  const auth = { token: shell.token, orgId: shell.orgId };
+  const auth = { token, orgId };
   const [summaryRes, convosRes] = await Promise.all([
     apiGet<ApiOk<SummaryLite>>("/summary", auth),
     apiGet<ApiOk<ConversationSummary[]>>("/ai/conversations", auth),
@@ -62,7 +72,7 @@ export default async function AskPage({
 
   return (
     <AskWorkspace
-      orgId={shell.orgId}
+      orgId={orgId}
       initialQuestion={initial}
       suggestions={suggestions(summaryRes.body?.data)}
       initialConversations={convosRes.body?.data ?? []}

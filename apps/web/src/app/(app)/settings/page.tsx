@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
 import { SettingsView } from "@/components/settings/settings-view";
 import { AuditLog } from "@/components/settings/audit-log";
 import type { LlmSettings } from "@/lib/browser-api";
+import SettingsLoading from "./loading";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +24,15 @@ interface InvitationDto {
   expiresAt: string;
 }
 
-export default async function SettingsPage() {
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<SettingsLoading />}>
+      <SettingsContent />
+    </Suspense>
+  );
+}
+
+async function SettingsContent() {
   const shell = await requireShell();
   const auth = { token: shell.token, orgId: shell.orgId };
   const isAdmin = shell.role === "Owner" || shell.role === "Admin";

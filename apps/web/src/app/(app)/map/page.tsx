@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { Waypoints } from "lucide-react";
-import { requireShell } from "@/lib/shell";
+import { getPageAuth } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
 import { InfraMapLazy } from "@/components/map/infra-map-lazy";
 import { EmptyState } from "@/components/patterns/empty-state";
@@ -12,16 +12,17 @@ export const dynamic = "force-dynamic";
 /** The data-bound part: the bounded `/graph` fetch + the empty-state/canvas branch. Split out so the
  *  heaviest fetch in the app streams behind <Suspense> instead of blocking the RSC flush (perf P3). */
 async function MapContent({
-  token,
-  orgId,
-  focusId,
-  lens,
+  searchParams,
 }: {
-  token: string;
-  orgId: string;
-  focusId?: string;
-  lens?: string;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const { token, orgId } = await getPageAuth();
+  const params = await searchParams;
+  const focusRaw = params.node;
+  const focusId = (Array.isArray(focusRaw) ? focusRaw[0] : focusRaw) || undefined;
+  const lensRaw = params.lens;
+  const lens = (Array.isArray(lensRaw) ? lensRaw[0] : lensRaw) || undefined;
+
   const data =
     (await apiGet<ApiOk<MapData>>("/graph?limit=400", { token, orgId })).body?.data ?? null;
 
@@ -58,26 +59,14 @@ async function MapContent({
  * Infrastructure map (docs/09 §5.4). Server-fetches the bounded graph (secrets stay
  * server-side) and hands it to the client canvas. Empty graph → the onboarding CTA.
  */
-export default async function MapPage({
+export default function MapPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const shell = await requireShell();
-  const params = await searchParams;
-  const focusRaw = params.node;
-  const focusId = (Array.isArray(focusRaw) ? focusRaw[0] : focusRaw) || undefined;
-  const lensRaw = params.lens;
-  const lens = (Array.isArray(lensRaw) ? lensRaw[0] : lensRaw) || undefined;
-
   return (
     <Suspense fallback={<MapLoading />}>
-      <MapContent
-        token={shell.token}
-        orgId={shell.orgId}
-        {...(focusId ? { focusId } : {})}
-        {...(lens ? { lens } : {})}
-      />
+      <MapContent searchParams={searchParams} />
     </Suspense>
   );
 }

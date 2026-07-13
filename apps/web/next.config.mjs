@@ -37,6 +37,16 @@ const securityHeaders = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    // Navigation feel: <Link> prefetches each route's loading.tsx shell, but Next's default
+    // `staleTimes.dynamic` of 0 throws that prefetch away immediately — so clicking a dynamic
+    // (force-dynamic) route waited for a full server round-trip before the URL/skeleton changed,
+    // which read as a "frozen" click. A short client-cache window lets the prefetched destination
+    // skeleton appear the instant you navigate. It also keeps a just-visited page cached for the
+    // window, so quick back/forward is instant; first visits always render fresh, and an org switch
+    // or router.refresh() busts the cache. 30s is short enough that graph data never reads as stale.
+    staleTimes: { dynamic: 30, static: 180 },
+  },
   // Monorepo: pin the file-tracing root to the repo root so Next doesn't warn
   // about inferring it from multiple lockfiles.
   outputFileTracingRoot: path.join(import.meta.dirname, "../../"),

@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { requireShell } from "@/lib/shell";
+import { getPageAuth } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
 import {
   InsightsView,
@@ -21,7 +21,8 @@ interface InsightsData {
 
 /** The data-bound part: the live `/insights` fetch + the view. Split out so it can stream behind a
  *  <Suspense> boundary while the shell paints immediately (perf P3). */
-async function InsightsContent({ token, orgId }: { token: string; orgId: string }) {
+async function InsightsContent() {
+  const { token, orgId } = await getPageAuth();
   const res = await apiGet<ApiOk<InsightsData>>("/insights", { token, orgId });
   const data = res.body?.data;
   return (
@@ -40,11 +41,10 @@ async function InsightsContent({ token, orgId }: { token: string; orgId: string 
  * findings + posture summary and hands them to InsightsView for the scannable, filterable UI.
  * The heavy `/insights` fetch streams behind <Suspense> so the page commits on auth, not on data.
  */
-export default async function InsightsPage() {
-  const shell = await requireShell();
+export default function InsightsPage() {
   return (
     <Suspense fallback={<InsightsLoading />}>
-      <InsightsContent token={shell.token} orgId={shell.orgId} />
+      <InsightsContent />
     </Suspense>
   );
 }
