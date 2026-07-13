@@ -32,7 +32,7 @@ suite("org hard-delete cascade sweep (docs/12 §6.4)", () => {
     "connections",
     "audit_events",
     "analytics_events",
-    "org_profile",
+    "org_settings",
   ];
 
   const countFor = async (table: string, org: string): Promise<number> =>
@@ -85,7 +85,10 @@ suite("org hard-delete cascade sweep (docs/12 §6.4)", () => {
       await admin.query("INSERT INTO analytics_events (org_id, event) VALUES ($1,'org.created')", [
         org,
       ]);
-      await admin.query("INSERT INTO org_profile (org_id, role) VALUES ($1,'on_call_sre')", [org]);
+      await admin.query(
+        "INSERT INTO org_settings (org_id, role, profile_updated_at) VALUES ($1,'on_call_sre', now())",
+        [org],
+      );
     }
   });
 

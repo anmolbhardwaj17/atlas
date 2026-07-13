@@ -79,18 +79,19 @@ export class OrgService {
   async saveProfile(orgId: string, body: OrgProfileBody): Promise<OrgProfileDto> {
     return withOrgScope(this.db, orgId, async (c) => {
       const { rows } = await c.query<OrgProfileRow>(
-        `INSERT INTO org_profile
-           (org_id, role, team_size, use_cases, stack, industry, referral_source, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+        `INSERT INTO org_settings
+           (org_id, role, team_size, use_cases, stack, industry, referral_source, profile_updated_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, now(), now())
          ON CONFLICT (org_id) DO UPDATE SET
-           role            = EXCLUDED.role,
-           team_size       = EXCLUDED.team_size,
-           use_cases       = EXCLUDED.use_cases,
-           stack           = EXCLUDED.stack,
-           industry        = EXCLUDED.industry,
-           referral_source = EXCLUDED.referral_source,
-           updated_at      = now()
-         RETURNING role, team_size, use_cases, stack, industry, referral_source, updated_at`,
+           role               = EXCLUDED.role,
+           team_size          = EXCLUDED.team_size,
+           use_cases          = EXCLUDED.use_cases,
+           stack              = EXCLUDED.stack,
+           industry           = EXCLUDED.industry,
+           referral_source    = EXCLUDED.referral_source,
+           profile_updated_at = now(),
+           updated_at         = now()
+         RETURNING role, team_size, use_cases, stack, industry, referral_source, profile_updated_at AS updated_at`,
         [
           orgId,
           body.role ?? null,
@@ -109,8 +110,8 @@ export class OrgService {
   async getProfile(orgId: string): Promise<OrgProfileDto | null> {
     return withOrgScope(this.db, orgId, async (c) => {
       const { rows } = await c.query<OrgProfileRow>(
-        `SELECT role, team_size, use_cases, stack, industry, referral_source, updated_at
-           FROM org_profile WHERE org_id = $1`,
+        `SELECT role, team_size, use_cases, stack, industry, referral_source, profile_updated_at AS updated_at
+           FROM org_settings WHERE org_id = $1 AND profile_updated_at IS NOT NULL`,
         [orgId],
       );
       return rows[0] ? toOrgProfileDto(rows[0]) : null;
@@ -304,7 +305,7 @@ interface OrgProfileRow {
 }
 
 function toOrgProfileDto(row: OrgProfileRow | undefined): OrgProfileDto {
-  if (!row) throw new Error("expected an org_profile row");
+  if (!row) throw new Error("expected an org_settings row");
   return {
     role: row.role,
     teamSize: row.team_size,

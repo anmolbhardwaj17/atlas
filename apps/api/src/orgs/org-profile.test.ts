@@ -4,9 +4,10 @@ import { Pool } from "pg";
 import { withOrgScope } from "@atlas/db";
 
 /**
- * org_profile + analytics_events (migration 0040, docs/04 §5.7): the onboarding profile and the
- * product-analytics stream are org-scoped (R8) and analytics_events is append-only. Verifies the
- * RLS policy hides another tenant's rows and that UPDATE/DELETE on analytics_events is refused.
+ * org_settings + analytics_events (migrations 0040/0053, docs/04 §5.7): the onboarding profile now
+ * lives in the consolidated org_settings table; the product-analytics stream is separate. Both are
+ * org-scoped (R8) and analytics_events is append-only. Verifies the RLS policy hides another
+ * tenant's rows and that UPDATE/DELETE on analytics_events is refused.
  * Env-gated on TEST_DATABASE_URL (atlas_app) + TEST_ADMIN_DATABASE_URL (owner).
  */
 const appUrl = process.env.TEST_DATABASE_URL;
@@ -19,7 +20,7 @@ function one<T>(rows: T[]): T {
   return r;
 }
 
-suite("org_profile + analytics_events (0040): RLS + append-only", () => {
+suite("org_settings + analytics_events (0053): RLS + append-only", () => {
   let admin: Pool;
   let app: Pool;
   let orgA: string;
@@ -48,11 +49,11 @@ suite("org_profile + analytics_events (0040): RLS + append-only", () => {
     await app.end();
   });
 
-  it("org_profile: writes and reads back within the org scope", async () => {
+  it("org_settings: writes and reads back the profile within the org scope", async () => {
     await withOrgScope(app, orgA, (c) =>
       c.query(
-        `INSERT INTO org_profile (org_id, role, team_size, use_cases, stack)
-         VALUES ($1,'on_call_sre','20-100',$2,$3)`,
+        `INSERT INTO org_settings (org_id, role, team_size, use_cases, stack, profile_updated_at)
+         VALUES ($1,'on_call_sre','20-100',$2,$3, now())`,
         [orgA, ["blast_radius"], ["aws", "github"]],
       ),
     );
@@ -62,7 +63,7 @@ suite("org_profile + analytics_events (0040): RLS + append-only", () => {
       async (c) =>
         (
           await c.query<{ role: string; team_size: string; use_cases: string[] }>(
-            `SELECT role, team_size, use_cases FROM org_profile WHERE org_id = $1`,
+            `SELECT role, team_size, use_cases FROM org_settings WHERE org_id = $1`,
             [orgA],
           )
         ).rows,
@@ -72,11 +73,11 @@ suite("org_profile + analytics_events (0040): RLS + append-only", () => {
     expect(one(rows).use_cases).toEqual(["blast_radius"]);
   });
 
-  it("org_profile: RLS hides another org's profile (cross-tenant → 0 rows)", async () => {
+  it("org_settings: RLS hides another org's row (cross-tenant → 0 rows)", async () => {
     const rows = await withOrgScope(
       app,
       orgB,
-      async (c) => (await c.query(`SELECT * FROM org_profile WHERE org_id = $1`, [orgA])).rows,
+      async (c) => (await c.query(`SELECT * FROM org_settings WHERE org_id = $1`, [orgA])).rows,
     );
     expect(rows).toHaveLength(0);
   });

@@ -17,19 +17,19 @@ export class AlertPolicyService {
 
   async get(orgId: string): Promise<AlertPolicy> {
     return withOrgScope(this.db, orgId, async (c) => {
-      const { rows } = await c.query<{ policy: AlertPolicy }>(
-        `SELECT policy FROM org_alert_settings LIMIT 1`,
+      const { rows } = await c.query<{ alert_policy: AlertPolicy }>(
+        `SELECT alert_policy FROM org_settings LIMIT 1`,
       );
-      return rows[0]?.policy ?? DEFAULT_POLICY;
+      return rows[0]?.alert_policy ?? DEFAULT_POLICY;
     });
   }
 
   async set(orgId: string, policy: AlertPolicy): Promise<AlertPolicy> {
     return withOrgScope(this.db, orgId, async (c) => {
       await c.query(
-        `INSERT INTO org_alert_settings (org_id, policy)
+        `INSERT INTO org_settings (org_id, alert_policy)
          VALUES (NULLIF(current_setting('atlas.current_org', true), '')::uuid, $1)
-         ON CONFLICT (org_id) DO UPDATE SET policy = EXCLUDED.policy, updated_at = now()`,
+         ON CONFLICT (org_id) DO UPDATE SET alert_policy = EXCLUDED.alert_policy, updated_at = now()`,
         [policy],
       );
       return policy;
