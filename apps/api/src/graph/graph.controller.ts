@@ -11,6 +11,7 @@ import type { AuthedRequest } from "../auth/auth.types";
 import { guidanceFor } from "@atlas/ai";
 import { GraphService } from "./graph.service";
 import {
+  CreateEdgeSchema,
   EdgesQuerySchema,
   GraphQuerySchema,
   NeighborsQuerySchema,
@@ -290,6 +291,27 @@ export class GraphController {
   @Roles("Member")
   async rejectEdge(@Req() req: AuthedRequest, @Param("id") id: string): Promise<{ ok: true }> {
     return this.graph.rejectSuggestedEdge(org(req).id, id, req.auth?.userId ?? null);
+  }
+
+  /** Create a MANUAL edge — a human hand-drawing a link the graph missed ("fix the flow"). */
+  @Post("edges")
+  @Roles("Member")
+  async createEdge(
+    @Req() req: AuthedRequest,
+    @Body() body: unknown,
+  ): Promise<{ ok: true; id: string }> {
+    return this.graph.createManualEdge(
+      org(req).id,
+      parseBody(CreateEdgeSchema, body),
+      req.auth?.userId ?? null,
+    );
+  }
+
+  /** Remove a wrong edge — retire it + remember the "no" so it isn't re-added (observed edges 422). */
+  @Post("edges/:id/remove")
+  @Roles("Member")
+  async removeEdge(@Req() req: AuthedRequest, @Param("id") id: string): Promise<{ ok: true }> {
+    return this.graph.removeEdge(org(req).id, id, req.auth?.userId ?? null);
   }
 
   @Get("edges/:id")

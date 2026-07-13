@@ -7,6 +7,7 @@ import { PG_POOL } from "../core/tokens";
 import { ApiException } from "../common/errors";
 import {
   confidenceRank,
+  type CreateEdgeBody,
   decodeCursor,
   encodeCursor,
   IMPACT_EDGE_TYPES,
@@ -2087,6 +2088,101 @@ export class GraphService {
         [orgId, e.from_node_id, e.to_node_id, e.type, userId],
       );
       await c.query(`DELETE FROM edges WHERE id = $1`, [id]);
+      return { ok: true };
+    });
+  }
+
+  /**
+   * Create a MANUAL edge (docs/05) — a human hand-drawing a link the connectors/inference missed
+   * (e.g. wiring a bottom-shelf repo to the service it deploys to). `origin='manual'`,
+   * `confidence='observed'` (a person vouched), provenance-backed (source='manual', by=userId). If
+   * the pair was previously rejected, adding it now clears that "no". Idempotent: an already-active
+   * link returns as-is (its origin is left untouched); a retired same-(from,to,type) row is revived.
+   */
+  async createManualEdge(
+    orgId: string,
+    body: CreateEdgeBody,
+    userId: string | null,
+  ): Promise<{ ok: true; id: string }> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      if (body.fromId === body.toId) {
+        throw ApiException.invalidState("A link can't start and end at the same resource.");
+      }
+      // Both endpoints must be live nodes in THIS org (RLS scopes; a cross-tenant id → 404).
+      const nodes = await c.query(
+        `SELECT id FROM nodes WHERE id = ANY($1::uuid[]) AND status <> 'deleted'`,
+        [[body.fromId, body.toId]],
+      );
+      if (nodes.rowCount !== 2) throw ApiException.notFound();
+
+      // Already linked? Respect the existing edge (keep its observed/inferred origin) — success, no-op.
+      const active = await c.query<{ id: string }>(
+        `SELECT id FROM edges
+          WHERE from_node_id = $1 AND to_node_id = $2 AND type = $3 AND status = 'active' LIMIT 1`,
+        [body.fromId, body.toId, body.type],
+      );
+      if (active.rows[0]) return { ok: true, id: active.rows[0].id };
+
+      // Changed their mind about a pair they'd rejected → forget the "no".
+      await c.query(
+        `DELETE FROM edge_suggestion_rejections WHERE from_node_id = $1 AND to_node_id = $2 AND type = $3`,
+        [body.fromId, body.toId, body.type],
+      );
+      const prov = await c.query<{ id: string }>(
+        `INSERT INTO provenance (org_id, source, confidence, evidence)
+         VALUES ($1, 'manual', 'observed', $2) RETURNING id`,
+        [orgId, JSON.stringify({ by: userId })],
+      );
+      // Revive-on-conflict: uq_edge includes inference_rule_id (NULL here), so a RETIRED same-key row
+      // (an old observed/manual edge) is re-activated AS manual — the human now vouches for it.
+      const ins = await c.query<{ id: string }>(
+        `INSERT INTO edges
+           (org_id, from_node_id, to_node_id, type, origin, confidence, provenance_id, last_seen)
+         VALUES ($1, $2, $3, $4, 'manual', 'observed', $5, now())
+         ON CONFLICT ON CONSTRAINT uq_edge DO UPDATE
+           SET status = 'active', origin = 'manual', confidence = 'observed',
+               provenance_id = EXCLUDED.provenance_id, retired_at = NULL, last_seen = now()
+         RETURNING id`,
+        [orgId, body.fromId, body.toId, body.type, prov.rows[0]?.id],
+      );
+      const id = ins.rows[0]?.id;
+      if (!id) throw ApiException.invalidState("Could not create the link.");
+      return { ok: true, id };
+    });
+  }
+
+  /**
+   * Remove an edge the user says is wrong ("fix the flow"). Retires it (soft — history kept) and
+   * remembers the pair in `edge_suggestion_rejections` so inference / AI-suggestion never re-adds
+   * it. OBSERVED edges are refused: they're ground truth from a connector (a re-sync would just
+   * re-add them), so the fix belongs at the source. 404 on an unknown/already-gone edge.
+   */
+  async removeEdge(orgId: string, id: string, userId: string | null): Promise<{ ok: true }> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      if (!UUID_RE.test(id)) throw ApiException.notFound();
+      const { rows } = await c.query<{
+        from_node_id: string;
+        to_node_id: string;
+        type: string;
+        origin: string;
+      }>(
+        `SELECT from_node_id, to_node_id, type, origin FROM edges WHERE id = $1 AND status = 'active'`,
+        [id],
+      );
+      const e = rows[0];
+      if (!e) throw ApiException.notFound();
+      if (e.origin === "observed") {
+        throw ApiException.invalidState(
+          "This link is observed directly from the source, so it can't be removed here — fix it at the source.",
+        );
+      }
+      await c.query(
+        `INSERT INTO edge_suggestion_rejections (org_id, from_node_id, to_node_id, type, rejected_by)
+         VALUES (NULLIF(current_setting('atlas.current_org', true), '')::uuid, $1, $2, $3, $4)
+         ON CONFLICT (org_id, from_node_id, to_node_id, type) DO NOTHING`,
+        [e.from_node_id, e.to_node_id, e.type, userId],
+      );
+      await c.query(`UPDATE edges SET status = 'retired', retired_at = now() WHERE id = $1`, [id]);
       return { ok: true };
     });
   }

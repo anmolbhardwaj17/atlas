@@ -176,6 +176,28 @@ export const IMPACT_EDGE_TYPES = [
   "DEPLOYS_TO",
 ] as const;
 
+/** Relationship types a human may hand-draw to fix the flow (manual edges). A curated subset — the
+ *  provider/inference-owned types (AFFECTS, DEPENDS_ON_PKG, EXPOSED_VIA, PROTECTS, OWNED_BY, …) are
+ *  derived from real data, not user-authored, so they're intentionally excluded. */
+export const MANUAL_EDGE_TYPES = [
+  "DEPLOYS_TO",
+  "CONNECTS_TO",
+  "ROUTES_TO",
+  "STORES_IN",
+  "DEPENDS_ON",
+  "TRIGGERS",
+  "IMPLEMENTS",
+  "USES",
+] as const;
+
+/** Body for creating a manual edge (POST /edges). */
+export const CreateEdgeSchema = z.object({
+  fromId: z.string().uuid(),
+  toId: z.string().uuid(),
+  type: z.enum(MANUAL_EDGE_TYPES),
+});
+export type CreateEdgeBody = z.infer<typeof CreateEdgeSchema>;
+
 const RANK: Record<string, number> = { observed: 3, "inferred-high": 2, "inferred-low": 1 };
 /** Confidence → numeric rank (higher = more trustworthy). */
 export function confidenceRank(confidence: string | undefined): number {

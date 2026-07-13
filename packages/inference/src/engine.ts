@@ -79,6 +79,9 @@ export async function runInference(
         const from = input.nodesByUrn.get(cand.fromUrn);
         const to = input.nodesByUrn.get(cand.toUrn);
         if (!from || !to || from.id === to.id) continue; // unresolved endpoint / self-edge
+        // The user removed/rejected this exact link — don't re-infer it (it stays retired via the
+        // convergence pass below, since we never add it to `kept`).
+        if (input.rejectedEdgeKeys?.has(`${from.id}→${to.id}→${cand.type}`)) continue;
         const { id, wrote } = await upsertInferredEdge(
           c,
           orgId,
@@ -167,12 +170,22 @@ async function buildInput(c: PoolClient): Promise<InferenceInput> {
     )
   ).rows.map((e) => ({ type: e.type, fromUrn: e.from_urn, toUrn: e.to_urn }));
 
+  // Pairs the user explicitly removed/rejected — the engine must not re-infer them (docs/05).
+  const rejectedEdgeKeys = new Set(
+    (
+      await c.query<{ from_node_id: string; to_node_id: string; type: string }>(
+        `SELECT from_node_id, to_node_id, type FROM edge_suggestion_rejections`,
+      )
+    ).rows.map((r) => `${r.from_node_id}→${r.to_node_id}→${r.type}`),
+  );
+
   return {
     orgSlug,
     nodesByUrn,
     nodesByKind,
     signals,
     signalsByKind,
+    rejectedEdgeKeys,
     observedEdges,
     inferredEdges: [],
   };

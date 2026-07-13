@@ -323,4 +323,115 @@ suite("G2.1 GraphService", () => {
     expect(new Set(g.nodes.map((n) => n.id))).toEqual(new Set([lambdaId, rdsId, repoId]));
     expect(g.edges.map((e) => e.type).sort()).toEqual(["CONNECTS_TO", "DEPLOYS_TO"]);
   });
+
+  // ── Manual graph editing (add/remove links to "fix the flow") ───────────────
+  const edgeRow = (id: string) =>
+    admin
+      .query<{ origin: string; confidence: string; status: string; source: string | null }>(
+        `SELECT e.origin, e.confidence, e.status, p.source
+           FROM edges e LEFT JOIN provenance p ON p.id = e.provenance_id WHERE e.id = $1`,
+        [id],
+      )
+      .then((r) => r.rows[0]);
+
+  it("createManualEdge writes a manual/observed, provenance-backed edge; idempotent", async () => {
+    const { id } = await graph.createManualEdge(
+      orgId,
+      { fromId: lambdaId, toId: rdsId, type: "DEPENDS_ON" },
+      null,
+    );
+    expect(await edgeRow(id)).toMatchObject({
+      origin: "manual",
+      confidence: "observed",
+      status: "active",
+      source: "manual",
+    });
+    // Re-adding the same link is a no-op that returns the same edge (convergent, no duplicate row).
+    const again = await graph.createManualEdge(
+      orgId,
+      { fromId: lambdaId, toId: rdsId, type: "DEPENDS_ON" },
+      null,
+    );
+    expect(again.id).toBe(id);
+  });
+
+  it("createManualEdge respects an existing observed edge (no origin downgrade)", async () => {
+    // CONNECTS_TO(lambda→rds) is already observed+active; asking to add it returns that edge as-is.
+    const observedId = one(
+      (
+        await admin.query<{ id: string }>(
+          "SELECT id FROM edges WHERE org_id=$1 AND type='CONNECTS_TO'",
+          [orgId],
+        )
+      ).rows,
+    ).id;
+    const { id } = await graph.createManualEdge(
+      orgId,
+      { fromId: lambdaId, toId: rdsId, type: "CONNECTS_TO" },
+      null,
+    );
+    expect(id).toBe(observedId);
+    expect((await edgeRow(id))?.origin).toBe("observed"); // untouched
+  });
+
+  it("createManualEdge rejects self-links and 404s on cross-tenant / missing nodes (R8)", async () => {
+    await expect(
+      graph.createManualEdge(orgId, { fromId: lambdaId, toId: lambdaId, type: "USES" }, null),
+    ).rejects.toBeInstanceOf(ApiException);
+    await expect(
+      graph.createManualEdge(orgId, { fromId: lambdaId, toId: randomUUID(), type: "USES" }, null),
+    ).rejects.toBeInstanceOf(ApiException);
+    // Another org can't link this org's nodes — they're invisible under RLS (→ 404, never 403).
+    await expect(
+      graph.createManualEdge(otherOrgId, { fromId: lambdaId, toId: rdsId, type: "USES" }, null),
+    ).rejects.toBeInstanceOf(ApiException);
+  });
+
+  it("removeEdge retires a manual edge and remembers the rejection (never re-inferred)", async () => {
+    const { id } = await graph.createManualEdge(
+      orgId,
+      { fromId: lambdaId, toId: rdsId, type: "DEPENDS_ON" },
+      null,
+    );
+    await graph.removeEdge(orgId, id, null);
+    expect((await edgeRow(id))?.status).toBe("retired");
+    const rej = await admin.query(
+      "SELECT 1 FROM edge_suggestion_rejections WHERE org_id=$1 AND from_node_id=$2 AND to_node_id=$3 AND type='DEPENDS_ON'",
+      [orgId, lambdaId, rdsId],
+    );
+    expect(rej.rowCount).toBe(1);
+    // Adding it back clears the "no".
+    await graph.createManualEdge(
+      orgId,
+      { fromId: lambdaId, toId: rdsId, type: "DEPENDS_ON" },
+      null,
+    );
+    const cleared = await admin.query(
+      "SELECT 1 FROM edge_suggestion_rejections WHERE org_id=$1 AND from_node_id=$2 AND to_node_id=$3 AND type='DEPENDS_ON'",
+      [orgId, lambdaId, rdsId],
+    );
+    expect(cleared.rowCount).toBe(0);
+  });
+
+  it("removeEdge refuses observed edges and 404s on unknown / cross-tenant (R8)", async () => {
+    const observedId = one(
+      (
+        await admin.query<{ id: string }>(
+          "SELECT id FROM edges WHERE org_id=$1 AND type='CONNECTS_TO'",
+          [orgId],
+        )
+      ).rows,
+    ).id;
+    await expect(graph.removeEdge(orgId, observedId, null)).rejects.toBeInstanceOf(ApiException);
+    expect((await edgeRow(observedId))?.status).toBe("active"); // untouched
+    await expect(graph.removeEdge(orgId, randomUUID(), null)).rejects.toBeInstanceOf(ApiException);
+    await expect(graph.removeEdge(orgId, "not-a-uuid", null)).rejects.toBeInstanceOf(ApiException);
+    // A manual edge in this org is invisible to another org → 404 on remove (R8).
+    const { id: manualId } = await graph.createManualEdge(
+      orgId,
+      { fromId: lambdaId, toId: rdsId, type: "USES" },
+      null,
+    );
+    await expect(graph.removeEdge(otherOrgId, manualId, null)).rejects.toBeInstanceOf(ApiException);
+  });
 });

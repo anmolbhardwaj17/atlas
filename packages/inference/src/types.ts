@@ -43,6 +43,10 @@ export interface InferenceInput {
   signals: SignalLite[];
   signalsByKind: Map<string, SignalLite[]>;
   observedEdges: EdgeLite[];
+  /** `${fromNodeId}→${toNodeId}→${type}` pairs a user REMOVED/rejected — the engine must not
+   *  re-produce them (docs/05; manual-graph-editing). Keyed by node id, matching resolved candidates.
+   *  Optional so rule unit-tests can omit it (undefined ⇒ nothing rejected). */
+  rejectedEdgeKeys?: Set<string>;
   /** Inferred edges produced by EARLIER rules this run (dependency-ordered; e.g. R4
    *  reads R1's DEPLOYS_TO). The engine appends each rule's kept edges as it runs. */
   inferredEdges: EdgeLite[];

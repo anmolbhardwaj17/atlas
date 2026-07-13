@@ -205,6 +205,41 @@ export async function searchNodes(
   return body.data ?? [];
 }
 
+async function edgeError(res: Response, fallback: string): Promise<string> {
+  const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+  return body?.error?.message ?? fallback;
+}
+
+/** Create a MANUAL edge — a human hand-drawing a link the graph missed ("fix the flow"). */
+export async function createEdge(
+  orgId: string,
+  fromId: string,
+  toId: string,
+  type: string,
+): Promise<void> {
+  const token = await getClientToken();
+  const res = await fetch(`${apiUrl()}/edges`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "X-Atlas-Org": orgId,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ fromId, toId, type }),
+  });
+  if (!res.ok) throw new Error(await edgeError(res, "Couldn't create the link."));
+}
+
+/** Remove a wrong edge — retires it + remembers the "no" so it isn't re-added. */
+export async function removeEdge(orgId: string, edgeId: string): Promise<void> {
+  const token = await getClientToken();
+  const res = await fetch(`${apiUrl()}/edges/${encodeURIComponent(edgeId)}/remove`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) throw new Error(await edgeError(res, "Couldn't remove the link."));
+}
+
 /** A finding (risk) that names a specific node — the node detail's Risks section. */
 export interface NodeFinding {
   id: string;

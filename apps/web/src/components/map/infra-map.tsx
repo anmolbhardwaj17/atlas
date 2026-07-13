@@ -43,8 +43,14 @@ import {
   Square,
   Stethoscope,
   Loader2,
+  Link2,
+  Unlink,
+  Lock,
+  ArrowRight,
+  ArrowLeft,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { buildLayout, containmentChildren } from "@/lib/map-layout";
 import { kindShort, kindIcon, KIND_LOGO } from "@/lib/kind-visual";
 import {
@@ -54,10 +60,11 @@ import {
   type MapData,
   type MapNode,
 } from "@/lib/map-types";
-import { createConversation, streamAskWS, openIncident } from "@/lib/browser-api";
+import { createConversation, streamAskWS, openIncident, removeEdge } from "@/lib/browser-api";
 import { CloudIcon } from "@/components/cloud-icon";
 import { AtlasAiMark } from "@/components/brand";
 import { ResourceNode, EnvLaneNode } from "@/components/map/resource-node";
+import { ConnectNodeDialog } from "@/components/map/connect-node-dialog";
 import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
 import { cn } from "@/lib/cn";
 
@@ -1062,6 +1069,25 @@ function Flow({
 
   const selected = selectedId ? (data.nodes.find((n) => n.id === selectedId) ?? null) : null;
 
+  // The selected node's links, both directions, for the detail panel's "Links" list — the place you
+  // fix a wrong edge. EXPOSED_VIA is a node-level fact (shown as a chip), not a drawn link, so skip it.
+  const selectedLinks = useMemo<NodeLink[]>(() => {
+    if (!selectedId) return [];
+    const out: NodeLink[] = [];
+    for (const e of data.edges) {
+      if (e.type === "EXPOSED_VIA") continue;
+      if (e.from === selectedId) {
+        const other = nodeById.get(e.to);
+        if (other) out.push({ id: e.id, type: e.type, origin: e.origin, dir: "out", other });
+      } else if (e.to === selectedId) {
+        const other = nodeById.get(e.from);
+        if (other) out.push({ id: e.id, type: e.type, origin: e.origin, dir: "in", other });
+      }
+    }
+    // Removable (hand-made / inferred / suggested) first — the ones you're here to prune.
+    return out.sort((a, b) => Number(a.origin === "observed") - Number(b.origin === "observed"));
+  }, [selectedId, data.edges, nodeById]);
+
   return (
     <div className="flex h-full w-full">
       {/* Canvas column — shrinks when the chat docks so nothing hides behind it. */}
@@ -1123,6 +1149,7 @@ function Flow({
             node={selected}
             orgId={orgId}
             protectedBy={protectedBy.get(selected.id) ?? []}
+            links={selectedLinks}
             onClose={() => onSelect(null)}
           />
         )}
@@ -1965,17 +1992,31 @@ function MonitoringRow({ node }: { node: MapNode }) {
   );
 }
 
+/** One connection touching the selected node — the other endpoint + which way it points + where the
+ *  edge came from (observed edges are read-only; the rest can be removed by hand). */
+interface NodeLink {
+  id: string;
+  type: string;
+  origin: string;
+  dir: "out" | "in";
+  other: MapNode;
+}
+
 function DetailPanel({
   node,
   orgId,
   protectedBy,
+  links,
   onClose,
 }: {
   node: MapNode;
   orgId: string;
   protectedBy: string[];
+  links: NodeLink[];
   onClose: () => void;
 }) {
+  const router = useRouter();
+  const [connecting, setConnecting] = useState(false);
   const kindShort = node.kind.replace(/^aws\.|^github\.|^external\.|^atlas\.|^bitbucket\./, "");
   const facts = keyFacts(node);
 
@@ -2043,13 +2084,115 @@ function DetailPanel({
         <WarRoomCta orgId={orgId} nodeId={node.id} />
       ) : null}
 
+      {/* Links: what this node connects to, and where you prune a wrong one. Observed edges (seen in
+          your cloud) are read-only; hand-made / inferred / suggested edges get a remove control. */}
+      {links.length > 0 ? (
+        <div className="mt-4">
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+            Links · {links.length}
+          </div>
+          <ul className="-mx-1 max-h-44 space-y-0.5 overflow-y-auto">
+            {links.map((l) => (
+              <LinkRow key={l.id} link={l} orgId={orgId} onRemoved={() => router.refresh()} />
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {/* Fix the flow: hand-draw a link from this node (works for shelf nodes with no links yet). */}
+      <button
+        type="button"
+        onClick={() => setConnecting(true)}
+        className="mt-2 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium transition-colors hover:border-foreground/40"
+      >
+        <Link2 className="size-3.5" /> Connect to…
+      </button>
+
       <Link
         href={`/explore/${node.id}`}
         className="mt-2 inline-flex h-8 w-full items-center justify-center rounded-md border border-border px-3 text-xs font-medium transition-colors hover:border-foreground/40"
       >
         View details
       </Link>
+
+      {connecting ? (
+        <ConnectNodeDialog
+          fromNode={{ id: node.id, name: node.name ?? null, kind: node.kind }}
+          orgId={orgId}
+          onClose={() => setConnecting(false)}
+          onDone={() => {
+            setConnecting(false);
+            router.refresh(); // re-fetch the graph → the newly-linked node joins the flow
+          }}
+        />
+      ) : null}
     </div>
+  );
+}
+
+/** One row in the detail panel's Links list: direction + relationship + the other resource, with a
+ *  remove control on editable edges. Observed edges (mirrored from the cloud) can't be hand-removed —
+ *  they'd just reappear on the next sync — so they show a lock instead (matches the backend's 422). */
+function LinkRow({
+  link,
+  orgId,
+  onRemoved,
+}: {
+  link: NodeLink;
+  orgId: string;
+  onRemoved: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const removable = link.origin !== "observed";
+  const rel = link.type.replace(/_/g, " ").toLowerCase();
+  const remove = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await removeEdge(orgId, link.id);
+      toast.success("Link removed");
+      onRemoved();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't remove the link.");
+      setBusy(false);
+    }
+  };
+  return (
+    <li className="group flex items-center gap-1.5 rounded-md px-1 py-1 text-xs hover:bg-muted/50">
+      {link.dir === "out" ? (
+        <ArrowRight className="size-3 shrink-0 text-muted-foreground/70" />
+      ) : (
+        <ArrowLeft className="size-3 shrink-0 text-muted-foreground/70" />
+      )}
+      <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
+        {rel}
+      </span>
+      <span
+        className="min-w-0 flex-1 truncate font-medium"
+        title={link.other.name ?? link.other.kind}
+      >
+        {link.other.name ?? kindShort(link.other.kind)}
+      </span>
+      {removable ? (
+        <button
+          type="button"
+          onClick={remove}
+          disabled={busy}
+          aria-label={`Remove ${rel} link`}
+          title="Remove this link"
+          className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-danger focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-100"
+        >
+          {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Unlink className="size-3.5" />}
+        </button>
+      ) : (
+        <span
+          title="Observed from your cloud — can’t be removed by hand"
+          className="shrink-0 p-0.5"
+        >
+          <Lock className="size-3 text-muted-foreground/40" aria-hidden />
+        </span>
+      )}
+    </li>
   );
 }
 
