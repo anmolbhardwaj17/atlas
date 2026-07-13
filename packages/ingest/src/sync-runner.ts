@@ -33,6 +33,8 @@ export interface SyncStats {
   /** Inference-input signals persisted (docs/05 §6.3). */
   signals: number;
   staled: number;
+  /** Observed edges retired because this SUCCEEDED run no longer saw them (BR-SYNC-2). */
+  retiredEdges: number;
   scopesOk: number;
   scopesFailed: number;
 }
@@ -83,6 +85,7 @@ export async function runStagedSync(
     edges: 0,
     signals: 0,
     staled: 0,
+    retiredEdges: 0,
     scopesOk: 0,
     scopesFailed: 0,
   };
@@ -173,6 +176,7 @@ export async function runStagedSync(
   const anyFailed = failedScopes.length > 0;
   if (!anyFailed) {
     stats.staled = await reconcileStaleNodes(db, run);
+    stats.retiredEdges = await reconcileObservedEdges(db, run);
   }
   const status: SyncResult["status"] = anyFailed
     ? stats.scopesOk > 0
@@ -199,6 +203,29 @@ export async function reconcileStaleNodes(db: Db, run: SyncRunRecord): Promise<n
     const r = await c.query(
       `UPDATE nodes SET status = 'stale'
          WHERE connection_id = $1 AND status = 'active' AND last_sync_run_id IS DISTINCT FROM $2
+           AND EXISTS (SELECT 1 FROM sync_runs WHERE id = $2 AND status = 'running')`,
+      [run.connectionId, run.id],
+    );
+    return r.rowCount ?? 0;
+  });
+}
+
+/**
+ * Reconcile OBSERVED edges (BR-SYNC-2, docs/05): after a SUCCEEDED run, retire this connection's
+ * `active` observed edges that the run no longer saw (`last_sync_run_id ≠ this run`) — a relationship
+ * that vanished from source. Mirrors the node reconcile above; only `origin='observed'` edges are
+ * touched (the inference engine owns retirement of `origin='inferred'` edges via convergence). Same
+ * reaper guard as `reconcileStaleNodes` so a reaped-but-late run can't retire a replacement run's
+ * fresh edges. `persistEdge` re-stamps `last_sync_run_id` on every re-observed edge, so a still-valid
+ * edge is never retired. Returns the count retired.
+ */
+export async function reconcileObservedEdges(db: Db, run: SyncRunRecord): Promise<number> {
+  return withOrgScope(db, run.orgId, async (c) => {
+    const r = await c.query(
+      `UPDATE edges SET status = 'retired', retired_at = now()
+         WHERE origin = 'observed' AND status = 'active' AND last_sync_run_id IS DISTINCT FROM $2
+           AND (from_node_id IN (SELECT id FROM nodes WHERE connection_id = $1)
+                OR to_node_id IN (SELECT id FROM nodes WHERE connection_id = $1))
            AND EXISTS (SELECT 1 FROM sync_runs WHERE id = $2 AND status = 'running')`,
       [run.connectionId, run.id],
     );

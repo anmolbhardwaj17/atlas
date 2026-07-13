@@ -2,7 +2,12 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import type { Connection } from "@atlas/connector-sdk";
-import { runStagedSync, reconcileStaleNodes, type SyncRunRecord } from "./sync-runner";
+import {
+  runStagedSync,
+  reconcileStaleNodes,
+  reconcileObservedEdges,
+  type SyncRunRecord,
+} from "./sync-runner";
 import { MockConnector, type MockControl } from "./mock-connector";
 import { InMemorySnapshotStore } from "./snapshot-store";
 import { nullSecretAccessor, silentLogger } from "./runtime";
@@ -248,5 +253,100 @@ suite("F2 staged sync runner", () => {
 
     expect(staled).toBe(1);
     expect(await count("stale")).toBe(1);
+  });
+
+  // Observed-edge reconcile (BR-SYNC-2): a succeeded run retires observed edges it no longer saw,
+  // but never re-observed ones, inference-engine-owned ones, or (reaped run) a replacement's edges.
+  const mkNodeRow = async (): Promise<string> =>
+    one(
+      (
+        await admin.query<{ id: string }>(
+          `INSERT INTO nodes (org_id, connection_id, urn, kind, provider, confidence, status)
+           VALUES ($1, $2, $3, 'aws.lambda.function', 'aws', 'observed', 'active') RETURNING id`,
+          [orgId, connId, `aws:x:${randomUUID().slice(0, 8)}:l`],
+        )
+      ).rows,
+    ).id;
+  const mkProvRow = async (conf: string): Promise<string> =>
+    one(
+      (
+        await admin.query<{ id: string }>(
+          "INSERT INTO provenance (org_id, source, confidence) VALUES ($1, 'e', $2) RETURNING id",
+          [orgId, conf],
+        )
+      ).rows,
+    ).id;
+  const mkEdgeRow = async (
+    from: string,
+    to: string,
+    type: string,
+    origin: string,
+    conf: string,
+    lastRun: string,
+    rule: string | null,
+  ): Promise<string> =>
+    one(
+      (
+        await admin.query<{ id: string }>(
+          `INSERT INTO edges (org_id, from_node_id, to_node_id, type, origin, confidence, provenance_id, status, last_sync_run_id, inference_rule_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', $8, $9) RETURNING id`,
+          [orgId, from, to, type, origin, conf, await mkProvRow(conf), lastRun, rule],
+        )
+      ).rows,
+    ).id;
+  const edgeStatus = async (id: string): Promise<string> =>
+    one(
+      (await admin.query<{ status: string }>("SELECT status FROM edges WHERE id = $1", [id])).rows,
+    ).status;
+
+  it("reconcile retires vanished observed edges, not re-seen or inferred ones", async () => {
+    const running = await mkRun("running");
+    const older = await mkRun("succeeded");
+    const ruleId = one(
+      (await admin.query<{ id: string }>("SELECT id FROM inference_rules LIMIT 1")).rows,
+    ).id;
+    const n1 = await mkNodeRow();
+    const n2 = await mkNodeRow();
+    const vanished = await mkEdgeRow(n1, n2, "CONNECTS_TO", "observed", "observed", older, null);
+    const reseen = await mkEdgeRow(n1, n2, "ROUTES_TO", "observed", "observed", running, null);
+    const inferred = await mkEdgeRow(
+      n1,
+      n2,
+      "IMPLEMENTS",
+      "inferred",
+      "inferred-high",
+      older,
+      ruleId,
+    );
+
+    const retired = await reconcileObservedEdges(app, {
+      id: running,
+      orgId,
+      connectionId: connId,
+      type: "full",
+    });
+
+    expect(retired).toBe(1);
+    expect(await edgeStatus(vanished)).toBe("retired"); // gone from source → retired
+    expect(await edgeStatus(reseen)).toBe("active"); // re-observed this run → kept
+    expect(await edgeStatus(inferred)).toBe("active"); // engine-owned → untouched
+  });
+
+  it("does NOT retire observed edges when this run was reaped", async () => {
+    const reaped = await mkRun("failed");
+    const older = await mkRun("succeeded");
+    const n1 = await mkNodeRow();
+    const n2 = await mkNodeRow();
+    const edge = await mkEdgeRow(n1, n2, "CONNECTS_TO", "observed", "observed", older, null);
+
+    const retired = await reconcileObservedEdges(app, {
+      id: reaped,
+      orgId,
+      connectionId: connId,
+      type: "full",
+    });
+
+    expect(retired).toBe(0);
+    expect(await edgeStatus(edge)).toBe("active");
   });
 });
