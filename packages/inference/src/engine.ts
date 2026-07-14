@@ -49,6 +49,13 @@ export async function runInference(
 
     const input = await buildInput(c);
     const ruleIdByKey = await loadRuleIds(c);
+    // Preload every existing rule-produced edge once, keyed by (from,to,type,rule). In steady state
+    // (IE-4) almost every candidate is already converged, so the old per-candidate existence SELECT
+    // was N sequential round-trips to a remote DB that returned "already there, no-op". This collapses
+    // those N reads into one, turning the convergence check into an in-memory lookup. Writes still
+    // happen per changed edge (each needs its own provenance row); the INSERT's ON CONFLICT still
+    // guards against a concurrent writer the preload couldn't have seen.
+    const existingInferred = await loadExistingInferredEdges(c);
     const stats: InferenceStats = { candidates: 0, upserted: 0, retired: 0, derivedNodes: 0 };
     const keptByRule = new Map<string, string[]>();
 
@@ -90,6 +97,7 @@ export async function runInference(
           from.id,
           to.id,
           cand,
+          existingInferred.get(`${from.id}|${to.id}|${cand.type}|${ruleId}`),
         );
         kept.push(id);
         if (wrote) stats.upserted++;
@@ -222,6 +230,45 @@ async function loadRuleIds(c: PoolClient): Promise<Map<string, string>> {
   return new Map(rows.map((r) => [r.key, r.id]));
 }
 
+/** A rule-produced edge as the convergence check needs it (id + current status/tier). */
+interface ExistingEdge {
+  id: string;
+  status: string;
+  confidence: string;
+}
+
+/**
+ * Preload every rule-produced edge for the org (any status), keyed `${from}|${to}|${type}|${ruleId}`
+ * — the same tuple {@link upsertInferredEdge} matched with a per-candidate SELECT. `uq_edge` makes the
+ * key unique, and only inferred edges carry `inference_rule_id`, so this is exactly the set that
+ * per-edge query could have returned. RLS scopes to the current org.
+ */
+async function loadExistingInferredEdges(c: PoolClient): Promise<Map<string, ExistingEdge>> {
+  const rows = (
+    await c.query<{
+      id: string;
+      from_node_id: string;
+      to_node_id: string;
+      type: string;
+      inference_rule_id: string;
+      status: string;
+      confidence: string;
+    }>(
+      `SELECT id, from_node_id, to_node_id, type, inference_rule_id, status, confidence
+         FROM edges WHERE inference_rule_id IS NOT NULL`,
+    )
+  ).rows;
+  const m = new Map<string, ExistingEdge>();
+  for (const r of rows) {
+    m.set(`${r.from_node_id}|${r.to_node_id}|${r.type}|${r.inference_rule_id}`, {
+      id: r.id,
+      status: r.status,
+      confidence: r.confidence,
+    });
+  }
+  return m;
+}
+
 /**
  * Upsert one inferred edge. If an identical active edge already exists (same rule, from,
  * to, type, confidence) it's a no-op — the key to convergence (IE-4). Otherwise a fresh
@@ -235,15 +282,8 @@ async function upsertInferredEdge(
   fromId: string,
   toId: string,
   cand: InferredEdge,
+  existing: ExistingEdge | undefined,
 ): Promise<{ id: string; wrote: boolean }> {
-  const existing = (
-    await c.query<{ id: string; status: string; confidence: string }>(
-      `SELECT id, status, confidence FROM edges
-        WHERE org_id=$1 AND from_node_id=$2 AND to_node_id=$3 AND type=$4 AND inference_rule_id=$5`,
-      [orgId, fromId, toId, cand.type, ruleId],
-    )
-  ).rows[0];
-
   if (existing && existing.status === "active" && existing.confidence === cand.tier) {
     return { id: existing.id, wrote: false }; // already converged
   }
