@@ -5,6 +5,7 @@ import type { PoolClient } from "pg";
 import { guidanceFor } from "@atlas/ai";
 import { PG_POOL } from "../core/tokens";
 import { ApiException } from "../common/errors";
+import { TtlCache } from "../common/ttl-cache";
 import {
   confidenceRank,
   type CreateEdgeBody,
@@ -29,6 +30,9 @@ import { inferEnvironment } from "./environment";
 
 const MAX_DEPTH = 6;
 const MAX_NODE_BUDGET = 500;
+/** How long a per-org dashboard summary stays cached (see {@link GraphService.summary}). Short
+ *  enough that a cross-instance write shows within seconds; long enough to absorb navigation bursts. */
+const SUMMARY_TTL_MS = 30_000;
 
 /** Trust ranking for collapsing duplicate edges to their strongest witness (observed ≫ inferred ≫
  *  ai-suggested). Higher wins. Unknown confidence sorts lowest. */
@@ -373,12 +377,14 @@ export class GraphService {
         [orgId, findingId, reason, userId],
       ),
     );
+    this.summaryCache.invalidate(orgId); // muting hides a finding — reflect it on this instance now
   }
 
   async unmuteFinding(orgId: string, findingId: string): Promise<void> {
     await withOrgScope(this.db, orgId, (c) =>
       c.query(`DELETE FROM muted_findings WHERE finding_id = $1`, [findingId]),
     );
+    this.summaryCache.invalidate(orgId);
   }
 
   /**
@@ -389,7 +395,9 @@ export class GraphService {
    * lifecycle can never drift from what the UI shows.
    */
   async reconcileFindings(orgId: string): Promise<{ active: number; resolved: number }> {
-    const { findings } = await this.summary(orgId);
+    // Reconciles the persisted lifecycle against the JUST-synced graph, so it must read fresh, not a
+    // possibly-pre-sync cached summary (the worker runs this immediately after a sync completes).
+    const { findings } = await this.computeSummary(orgId);
     const activeIds = findings.map((f) => f.id);
     return withOrgScope(this.db, orgId, async (c) => {
       for (const f of findings) {
@@ -513,7 +521,29 @@ export class GraphService {
    * itself, not from graph internals. Findings are precision-first + cited (P3/P4): each is a
    * fact the graph proves, with a click-through to its evidence.
    */
+  /**
+   * The dashboard summary is a heavy read — ~15 full-estate aggregates across four parallel
+   * org-scoped connections, all round-tripping to a remote DB. It's hit on every dashboard load and
+   * reused by the compliance/insights controllers, and its inputs change only on a sync or a graph
+   * mutation. So the result is cached per-org for {@link SUMMARY_TTL_MS} (single-flight: a burst of
+   * loads collapses to one DB pass). Staleness is bounded by the TTL; local mutators invalidate their
+   * org's entry so a user's own action (mute/connect/edit) reflects immediately on this instance.
+   */
+  private readonly summaryCache = new TtlCache<DashboardSummary>(SUMMARY_TTL_MS);
+
   async summary(orgId: string): Promise<DashboardSummary> {
+    return this.summaryCache.get(orgId, () => this.computeSummary(orgId));
+  }
+
+  /** Run an org-scoped write, then drop that org's cached summary so the writer's own change (edge
+   *  added/removed/confirmed/rejected) shows on the next dashboard read on this instance. */
+  private async mutate<T>(orgId: string, fn: (c: PoolClient) => Promise<T>): Promise<T> {
+    const r = await withOrgScope(this.db, orgId, fn);
+    this.summaryCache.invalidate(orgId);
+    return r;
+  }
+
+  private async computeSummary(orgId: string): Promise<DashboardSummary> {
     const impact = [...IMPACT_EDGE_TYPES];
     const now = Date.now();
     // PR insight window: PRs *raised* in the last 30 days (created_on). Captures recent
@@ -2054,7 +2084,7 @@ export class GraphService {
   /** Confirm an AI-suggested edge → `origin='confirmed'` (human-vouched, protected from the
    *  inference retire pass, promoted to inferred-high). 404 if not a live ai_suggested edge. */
   async confirmSuggestedEdge(orgId: string, id: string): Promise<{ ok: true }> {
-    return withOrgScope(this.db, orgId, async (c) => {
+    return this.mutate(orgId, async (c) => {
       if (!UUID_RE.test(id)) throw ApiException.notFound();
       const { rowCount } = await c.query(
         `UPDATE edges SET origin = 'confirmed', confidence = 'inferred-high', updated_at = now()
@@ -2072,7 +2102,7 @@ export class GraphService {
     id: string,
     userId: string | null,
   ): Promise<{ ok: true }> {
-    return withOrgScope(this.db, orgId, async (c) => {
+    return this.mutate(orgId, async (c) => {
       if (!UUID_RE.test(id)) throw ApiException.notFound();
       const { rows } = await c.query<{ from_node_id: string; to_node_id: string; type: string }>(
         `SELECT from_node_id, to_node_id, type FROM edges
@@ -2104,7 +2134,7 @@ export class GraphService {
     body: CreateEdgeBody,
     userId: string | null,
   ): Promise<{ ok: true; id: string }> {
-    return withOrgScope(this.db, orgId, async (c) => {
+    return this.mutate(orgId, async (c) => {
       if (body.fromId === body.toId) {
         throw ApiException.invalidState("A link can't start and end at the same resource.");
       }
@@ -2158,7 +2188,7 @@ export class GraphService {
    * re-add them), so the fix belongs at the source. 404 on an unknown/already-gone edge.
    */
   async removeEdge(orgId: string, id: string, userId: string | null): Promise<{ ok: true }> {
-    return withOrgScope(this.db, orgId, async (c) => {
+    return this.mutate(orgId, async (c) => {
       if (!UUID_RE.test(id)) throw ApiException.notFound();
       const { rows } = await c.query<{
         from_node_id: string;
