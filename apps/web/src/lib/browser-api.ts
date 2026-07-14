@@ -1246,3 +1246,45 @@ export async function setAlertPolicy(orgId: string, policy: AlertPolicy): Promis
   });
   return res.ok;
 }
+
+/** A member's per-org email preferences, positive "wants this mail" booleans. */
+export interface EmailPrefs {
+  incidentEmail: boolean;
+  weeklyDigest: boolean;
+}
+
+export async function getEmailPrefs(orgId: string): Promise<EmailPrefs> {
+  const token = await getClientToken();
+  const fallback: EmailPrefs = { incidentEmail: true, weeklyDigest: true };
+  if (!token) return fallback;
+  const res = await fetch(`${apiUrl()}/notifications/email-prefs`, {
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) return fallback;
+  const body = (await res.json().catch(() => null)) as { data?: Partial<EmailPrefs> } | null;
+  return {
+    incidentEmail: body?.data?.incidentEmail ?? true,
+    weeklyDigest: body?.data?.weeklyDigest ?? true,
+  };
+}
+
+/** Update whichever prefs are provided; returns the fresh set (null on failure). */
+export async function setEmailPrefs(
+  orgId: string,
+  prefs: Partial<EmailPrefs>,
+): Promise<EmailPrefs | null> {
+  const token = await getClientToken();
+  if (!token) return null;
+  const res = await fetch(`${apiUrl()}/notifications/email-prefs`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "X-Atlas-Org": orgId,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(prefs),
+  });
+  if (!res.ok) return null;
+  const body = (await res.json().catch(() => null)) as { data?: EmailPrefs } | null;
+  return body?.data ?? null;
+}

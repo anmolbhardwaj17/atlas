@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { AuthGuard } from "../auth/auth.guard";
 import { TenantScopeGuard } from "../auth/tenant-scope.guard";
@@ -12,6 +12,7 @@ import {
   CHANNEL_KINDS,
   type ChannelKind,
   type ChannelSummary,
+  type EmailPrefs,
   type NotificationItem,
 } from "./notification.service";
 
@@ -19,6 +20,18 @@ function org(req: AuthedRequest): { id: string } {
   if (!req.org) throw ApiException.orgAccessDenied("Missing org context.");
   return req.org;
 }
+
+function userId(req: AuthedRequest): string {
+  if (!req.auth?.userId) throw ApiException.orgAccessDenied("Missing user context.");
+  return req.auth.userId;
+}
+
+const EmailPrefsSchema = z
+  .object({
+    incidentEmail: z.boolean().optional(),
+    weeklyDigest: z.boolean().optional(),
+  })
+  .strict();
 
 function asChannelKind(kind: string): ChannelKind {
   if (!(CHANNEL_KINDS as string[]).includes(kind)) {
@@ -47,6 +60,21 @@ export class NotificationController {
   @Roles("Member")
   async channels(@Req() req: AuthedRequest): Promise<ChannelSummary[]> {
     return this.notifications.listChannels(org(req).id);
+  }
+
+  // ── Per-user email preferences. Self-scoped — any member manages their own mail. ──
+
+  @Get("email-prefs")
+  @Roles("Member")
+  async emailPrefs(@Req() req: AuthedRequest): Promise<EmailPrefs> {
+    return this.notifications.getEmailPrefs(org(req).id, userId(req));
+  }
+
+  @Patch("email-prefs")
+  @Roles("Member")
+  async setEmailPrefs(@Req() req: AuthedRequest, @Body() body: unknown): Promise<EmailPrefs> {
+    const prefs = parseBody(EmailPrefsSchema, body);
+    return this.notifications.setEmailPrefs(org(req).id, userId(req), prefs);
   }
 
   // ── In-app notification feed (the bell). Any member can read + mark their inbox. ──

@@ -29,6 +29,12 @@ export interface ChannelSummary {
   createdAt: string;
 }
 
+/** A member's per-org email preferences, as positive "wants this mail" booleans. */
+export interface EmailPrefs {
+  incidentEmail: boolean;
+  weeklyDigest: boolean;
+}
+
 /** Per-kind webhook validation + labels. All three take a simple incoming-webhook POST. */
 const CHANNEL_META: Record<ChannelKind, { label: string; validate: (url: string) => boolean }> = {
   slack: {
@@ -107,6 +113,60 @@ export class NotificationService {
             createdAt: new Date(r.created_at).toISOString(),
           };
         });
+    });
+  }
+
+  // ── Per-user email preferences (self-scoped to the caller's membership in this org) ──
+
+  /** The caller's email prefs for THIS org. Exposed as positive booleans ("wants X"); stored
+   *  inverted as `*_opt_out` columns on the membership. RLS scopes memberships to the current org,
+   *  so `user_id = $1` targets exactly the caller's membership here. */
+  async getEmailPrefs(orgId: string, userId: string): Promise<EmailPrefs> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      const row = (
+        await c.query<{ incident_email_opt_out: boolean; digest_opt_out: boolean }>(
+          `SELECT incident_email_opt_out, digest_opt_out FROM memberships WHERE user_id = $1`,
+          [userId],
+        )
+      ).rows[0];
+      return {
+        incidentEmail: !(row?.incident_email_opt_out ?? false),
+        weeklyDigest: !(row?.digest_opt_out ?? false),
+      };
+    });
+  }
+
+  /** Update whichever prefs are provided, then return the fresh set. */
+  async setEmailPrefs(
+    orgId: string,
+    userId: string,
+    prefs: { incidentEmail?: boolean | undefined; weeklyDigest?: boolean | undefined },
+  ): Promise<EmailPrefs> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      const sets: string[] = [];
+      const vals: unknown[] = [userId];
+      if (prefs.incidentEmail !== undefined) {
+        vals.push(!prefs.incidentEmail);
+        sets.push(`incident_email_opt_out = $${vals.length}`);
+      }
+      if (prefs.weeklyDigest !== undefined) {
+        vals.push(!prefs.weeklyDigest);
+        sets.push(`digest_opt_out = $${vals.length}`);
+      }
+      if (sets.length > 0) {
+        sets.push(`updated_at = now()`);
+        await c.query(`UPDATE memberships SET ${sets.join(", ")} WHERE user_id = $1`, vals);
+      }
+      const row = (
+        await c.query<{ incident_email_opt_out: boolean; digest_opt_out: boolean }>(
+          `SELECT incident_email_opt_out, digest_opt_out FROM memberships WHERE user_id = $1`,
+          [userId],
+        )
+      ).rows[0];
+      return {
+        incidentEmail: !(row?.incident_email_opt_out ?? false),
+        weeklyDigest: !(row?.digest_opt_out ?? false),
+      };
     });
   }
 

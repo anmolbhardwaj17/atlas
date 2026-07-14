@@ -7,6 +7,7 @@ import { OrgCard } from "@/components/settings/org-card";
 import { DangerZoneCard } from "@/components/settings/danger-zone-card";
 import { LlmSettingsCard } from "@/components/settings/llm-settings";
 import { AlertSettingsCard } from "@/components/settings/alert-settings";
+import { EmailPrefsCard } from "@/components/settings/email-prefs";
 import type { LlmSettings } from "@/lib/browser-api";
 
 interface MemberDto {
@@ -77,6 +78,9 @@ export function SettingsView({
       {isAdmin ? <LlmSettingsCard orgId={orgId} initial={llm} /> : null}
 
       {isAdmin ? <AlertSettingsCard orgId={orgId} /> : null}
+
+      {/* Per-user email prefs — self-scoped, so every member sees this (not admin-gated). */}
+      <EmailPrefsCard orgId={orgId} />
 
       <OrgPanel
         orgId={orgId}

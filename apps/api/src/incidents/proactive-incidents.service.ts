@@ -191,7 +191,8 @@ export class ProactiveIncidentsService {
       const rows = (
         await c.query<{ email: string }>(
           `SELECT u.email FROM memberships m JOIN users u ON u.id = m.user_id
-            WHERE m.status = 'active' AND u.email IS NOT NULL`,
+            WHERE m.status = 'active' AND u.email IS NOT NULL
+              AND m.incident_email_opt_out = false`,
         )
       ).rows;
       return { orgName: org?.name ?? "your team", recipients: rows.map((r) => r.email) };
