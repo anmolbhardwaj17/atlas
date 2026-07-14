@@ -10,6 +10,7 @@ import {
   Crosshair,
   ArrowLeft,
   RotateCw,
+  SkipForward,
   CornerDownLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,15 @@ interface Turn {
 }
 
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+
+// Reveal one replayed diagnosis step every ~420ms — brisk enough to not feel slow, slow enough to read.
+const REPLAY_STEP_MS = 420;
+// Run the replay reset BEFORE paint so a reopened incident never flashes its full trace first. Falls
+// back to useEffect during SSR (no `document`), where layout effects don't apply anyway.
+const useIsoLayoutEffect =
+  typeof document !== "undefined" ? React.useLayoutEffect : React.useEffect;
+const prefersReducedMotion = (): boolean =>
+  typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function toolLabel(tool: string): string {
   const t = tool.toLowerCase();
@@ -175,6 +185,69 @@ export function WarRoomView({
     if (changed) setActiveIds([...citedRef.current]);
   }, []);
 
+  // ── Replay-on-open ────────────────────────────────────────────────────────
+  // A reopened incident already has its whole investigation saved; dumping it instantly loses the
+  // sense of the trace unfolding. Replay it: reveal the first diagnosis's steps one-by-one while the
+  // map lights the nodes each step touched, then settle into the full thread + verdict. Purely
+  // client-side (the data's all in `saved`), skippable, and off under reduced-motion (instant, as before).
+  const [replaying, setReplaying] = React.useState(false);
+  const replayTimers = React.useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const finishReplay = React.useCallback(() => {
+    replayTimers.current.forEach(clearTimeout);
+    replayTimers.current = [];
+    if (!saved) return;
+    citedRef.current = new Set(saved.citedIds);
+    citedEdgesRef.current = new Set(saved.citedEdgeIds);
+    turnsRef.current = saved.turns;
+    setTurns(saved.turns);
+    setActiveIds(saved.citedIds);
+    setCitedEdgeIds(saved.citedEdgeIds);
+    setReplaying(false);
+  }, [saved]);
+
+  useIsoLayoutEffect(() => {
+    if (!saved || started.current || prefersReducedMotion()) return;
+    const firstIdx = saved.turns.findIndex((t) => t.role === "assistant");
+    if (firstIdx < 0) return; // nothing to replay
+    started.current = true;
+    setReplaying(true);
+
+    // Reset to the pre-diagnosis state before the browser paints (no flash of the full trace).
+    citedRef.current = new Set([incident.nodeId]);
+    citedEdgesRef.current = new Set();
+    setActiveIds([incident.nodeId]);
+    setCitedEdgeIds([]);
+    const head = saved.turns.slice(0, firstIdx); // any leading user turn(s), shown immediately
+    const firstAsst = saved.turns[firstIdx];
+    const steps = firstAsst?.steps ?? [];
+    const shell: Turn = { role: "assistant", text: "", steps: [], streaming: true };
+    setTurns([...head, shell]);
+
+    const timers = replayTimers.current;
+    const shown: Step[] = [];
+    let t = 260;
+    for (const s of steps) {
+      timers.push(
+        setTimeout(() => {
+          shown.push(s);
+          setTurns([...head, { role: "assistant", text: "", steps: [...shown], streaming: true }]);
+          light(s.summary.match(UUID_RE) ?? []);
+        }, t),
+      );
+      t += REPLAY_STEP_MS;
+    }
+    // Settle: the prose, verdict, follow-ups and all cited nodes land together.
+    timers.push(setTimeout(finishReplay, t + 260));
+
+    return () => {
+      timers.forEach(clearTimeout);
+      replayTimers.current = [];
+    };
+    // Mount-only (deps intentionally empty): a re-run would clear in-flight timers mid-replay; the
+    // `started` ref guards against it. All closed-over values are from the first render and stable.
+  }, []);
+
   const ask = React.useCallback(
     async (question: string, opts?: { initial?: boolean }) => {
       if (asking.current || !question.trim()) return;
@@ -261,6 +334,7 @@ export function WarRoomView({
     e.preventDefault();
     const q = input.trim();
     if (!q || sending) return;
+    if (replaying) finishReplay(); // land the saved thread before appending a new turn
     setInput("");
     await ask(q);
   }
@@ -283,7 +357,10 @@ export function WarRoomView({
   }
 
   const terminal = incident.status === "resolved" || incident.status === "dismissed";
-  const diagnosed = turns.some((t) => t.role === "assistant" && t.text);
+  // While replaying, present the same "tracing" state as a live run so the verdict doesn't spoil the
+  // steps unfolding beneath it — it lands when the replay settles.
+  const inProgress = sending || replaying;
+  const diagnosed = !replaying && turns.some((t) => t.role === "assistant" && t.text);
   const firstAsst = turns.find((t) => t.role === "assistant");
   const liveVerdict = firstAsst?.text ? parseVerdict(firstAsst.text) : null;
   // A proactively-opened incident carries a deterministic headline (no LLM) — show it immediately in
@@ -294,15 +371,17 @@ export function WarRoomView({
       ? { type: v.classification ?? "unknown", cause: v.summary }
       : null;
   }, [incident.verdict]);
-  const verdict = liveVerdict ?? preliminaryVerdict;
-  const heroConfidence = firstAsst?.confidence ?? null;
+  const verdict = replaying ? null : (liveVerdict ?? preliminaryVerdict);
+  const heroConfidence = replaying ? null : (firstAsst?.confidence ?? null);
   const statusLabel = terminal
     ? incident.status
-    : sending
-      ? "analyzing…"
-      : diagnosed
-        ? "diagnosed"
-        : incident.status;
+    : replaying
+      ? "replaying…"
+      : sending
+        ? "analyzing…"
+        : diagnosed
+          ? "diagnosed"
+          : incident.status;
 
   return (
     <div className="space-y-4">
@@ -348,7 +427,7 @@ export function WarRoomView({
       <VerdictHero
         verdict={verdict}
         confidence={heroConfidence}
-        sending={sending}
+        sending={inProgress}
         diagnosed={diagnosed}
         node={focalNode}
         impactCount={impactCount}
@@ -383,7 +462,11 @@ export function WarRoomView({
         <div className="flex min-h-[520px] flex-col rounded-xl border border-border bg-background lg:min-h-0">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <h2 className="text-sm font-semibold">Investigation</h2>
-            {sending ? (
+            {replaying ? (
+              <Button variant="ghost" size="sm" onClick={finishReplay}>
+                <SkipForward className="mr-1.5 size-3.5" /> Skip replay
+              </Button>
+            ) : sending ? (
               <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Loader2 className="size-3.5 animate-spin" /> Tracing…
               </span>
