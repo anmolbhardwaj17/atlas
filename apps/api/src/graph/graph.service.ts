@@ -1623,7 +1623,16 @@ export class GraphService {
         }
       }
 
-      const nodes = frontier.length ? [...budget, ...frontier] : budget;
+      // Slim the shipped attributes to scalars only. The canvas RENDERS nothing else — keyFacts
+      // skips objects/arrays and the CloudWatch deep-link reads specific scalar keys — while a raw
+      // resource's JSONB can carry nested policy documents, subnet/SG lists and tag maps that are
+      // pure payload here (env + health are already derived server-side into their own fields). This
+      // materially trims /graph on config-heavy estates without changing anything the map can show.
+      const slim = (n: GraphNodeDto): GraphNodeDto => ({
+        ...n,
+        attributes: mapScalarAttributes(n.attributes),
+      });
+      const nodes = (frontier.length ? [...budget, ...frontier] : budget).map(slim);
       // Collapse duplicate edges to ONE per (from,to,type) at the highest confidence. `uq_edge`
       // includes `inference_rule_id`, so several rules (e.g. R1 name-match + R12/R17 SHA-match) each
       // persist their own DEPLOYS_TO row for the same pair — correct for provenance, but the map must
@@ -2539,6 +2548,16 @@ export class GraphService {
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Keep only top-level scalar attributes — see the call site in {@link GraphService.graph}. Objects
+ *  and arrays are dropped: the map never renders them, and they're the bulk of a raw resource's JSONB. */
+function mapScalarAttributes(attrs: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(attrs ?? {})) {
+    if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") out[k] = v;
+  }
+  return out;
+}
 
 interface EdgeRow {
   id: string;

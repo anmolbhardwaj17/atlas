@@ -282,6 +282,30 @@ suite("G2.1 GraphService", () => {
     expect((await graph.graph(orgId, { limit: 400, environment: "dev" })).nodes.length).toBe(0);
   });
 
+  it("graph() ships only scalar attributes — nested objects/arrays are stripped from the payload", async () => {
+    // A node whose attributes mix scalars (the map renders these) with heavy nested JSONB (it never does).
+    await admin.query(`UPDATE nodes SET attributes = $2 WHERE id = $1`, [
+      lambdaId,
+      JSON.stringify({
+        runtime: "nodejs20.x", // scalar — kept
+        timeout: 30, // scalar — kept
+        tracingEnabled: true, // scalar — kept
+        policy: { Version: "2012-10-17", Statement: [{ Effect: "Allow" }] }, // object — dropped
+        layers: ["arn:a", "arn:b"], // array — dropped
+        env: { GIT_SHA: "abc123" }, // object — dropped
+      }),
+    ]);
+    const g = await graph.graph(orgId, { limit: 400 });
+    const lambda = g.nodes.find((n) => n.id === lambdaId);
+    expect(lambda?.attributes).toEqual({
+      runtime: "nodejs20.x",
+      timeout: 30,
+      tracingEnabled: true,
+    });
+    expect(lambda?.attributes).not.toHaveProperty("policy");
+    expect(lambda?.attributes).not.toHaveProperty("layers");
+  });
+
   it("graph() keeps a repo linked to its runtime when the budget truncates between them", async () => {
     // A repo that deploys to the lambda, but is older (last_seen) than the freshly-synced runtimes,
     // so a small last_seen-ordered budget would cut it. The edge-aware frontier must pull it back in
