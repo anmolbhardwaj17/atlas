@@ -165,6 +165,19 @@ export function AskChat({
   // The cited node being previewed in the side drawer (null = closed).
   const [peekId, setPeekId] = useState<string | null>(null);
 
+  // Announce answer completion to screen readers ONCE, when the stream settles — announcing per
+  // streamed token would spam. The visible bubble carries the full text; this is just the "ready" cue.
+  const [announce, setAnnounce] = useState("");
+  const prevStreaming = useRef(false);
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    const streaming = !!last?.streaming;
+    if (prevStreaming.current && !streaming && last?.role === "assistant") {
+      setAnnounce(last.error ? "Atlas couldn't answer that." : "Atlas answered.");
+    }
+    prevStreaming.current = streaming;
+  }, [messages]);
+
   const stop = () => abortRef.current?.abort();
 
   // Reopen a past conversation: load its persisted turns.
@@ -306,6 +319,11 @@ export function AskChat({
             ),
           )
         )}
+      </div>
+
+      {/* Screen-reader completion cue (visually hidden; announced once per settled answer). */}
+      <div className="sr-only" role="status" aria-live="polite">
+        {announce}
       </div>
 
       <CitationPeek orgId={orgId} nodeId={peekId} onClose={() => setPeekId(null)} />

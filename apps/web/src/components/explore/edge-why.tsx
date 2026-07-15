@@ -5,6 +5,7 @@ import { ChevronDown, Loader2, Sparkles, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { getEdgeDetail, confirmSuggestedEdge, rejectSuggestedEdge } from "@/lib/browser-api";
 import type { EdgeDetail } from "@/lib/graph-types";
+import { AI_SUGGESTED_COLOR } from "@/lib/map-types";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 
@@ -99,11 +100,14 @@ export function EdgeWhy({
               {detail.origin === "ai_suggested" && !resolved ? (
                 <div
                   className="mb-3 rounded-md border p-2.5"
-                  style={{ borderColor: "#06b6d466", background: "#06b6d40f" }}
+                  style={{
+                    borderColor: `${AI_SUGGESTED_COLOR}66`,
+                    background: `${AI_SUGGESTED_COLOR}0f`,
+                  }}
                 >
                   <p className="flex items-center gap-1.5 font-medium text-foreground">
-                    <Sparkles className="size-3.5" style={{ color: "#06b6d4" }} /> Atlas suggests
-                    this link
+                    <Sparkles className="size-3.5" style={{ color: AI_SUGGESTED_COLOR }} /> Atlas
+                    suggests this link
                   </p>
                   {typeof detail.evidence?.reasoning === "string" ? (
                     <p className="mt-1 text-muted-foreground">{detail.evidence.reasoning}</p>
