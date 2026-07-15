@@ -12,7 +12,7 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -125,7 +125,23 @@ export function InfraMap({
   // refreshed. `router.refresh()` re-runs the server component and reconciles new nodes/edges in
   // place, so freshly-linked repos leave the "no infra link" shelf without losing pan/zoom.
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [isRefreshing, startRefresh] = useTransition();
+
+  // Lens/filter view is URL-backed: initialise from the query so a shared link (or a refresh)
+  // restores the exact map — `?lens=health,exposed&kinds=lambda,ecs_service`. The `lens` prop is
+  // the SSR fallback for the same value (and keeps the old single-value `?lens=exposed` deep link).
+  const initLenses = new Set(
+    (searchParams.get("lens") ?? lens ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+  const initKinds = (searchParams.get("kinds") ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
   const [selectedId, setSelectedId] = useState<string | null>(focusId ?? null);
   // Security overlay: OFF = the clean traffic flow (protection as shield chips only);
@@ -136,20 +152,20 @@ export function InfraMap({
   // Health lens (operational-intelligence north star): OFF = normal map; ON = recolour the whole
   // graph by runtime health — broken/degraded nodes stay lit, everything healthy recedes, so
   // "what's on fire" reads in one glance. Default off.
-  const [healthLens, setHealthLens] = useState(false);
+  const [healthLens, setHealthLens] = useState(initLenses.has("health"));
 
   // "What changed" lens: highlight recently-observed (new) or drifted (stale/deleted) nodes; the
   // rest recede. Answers "what moved lately" at a glance.
-  const [changedLens, setChangedLens] = useState(false);
+  const [changedLens, setChangedLens] = useState(initLenses.has("changed"));
 
   // Exposed lens: keep only internet-reachable resources (R16 EXPOSED_VIA) lit, recede the rest —
   // "what can the internet touch". Deep-linked from the exposed-vulnerable finding (?lens=exposed).
-  const [exposedLens, setExposedLens] = useState(lens === "exposed");
+  const [exposedLens, setExposedLens] = useState(initLenses.has("exposed"));
 
   // Kind filter: pick one or more resource kinds to focus (empty = show everything). Non-matching
   // nodes recede, same as the Health lens. The chip list is the kinds actually present.
-  const [showFilters, setShowFilters] = useState(false);
-  const [kindFilter, setKindFilter] = useState<Set<string>>(new Set());
+  const [showFilters, setShowFilters] = useState(initKinds.length > 0);
+  const [kindFilter, setKindFilter] = useState<Set<string>>(new Set(initKinds));
   const kinds = useMemo(
     () => [...new Set(data.nodes.map((n) => n.kind))].sort((a, b) => a.localeCompare(b)),
     [data.nodes],
@@ -164,6 +180,24 @@ export function InfraMap({
       }),
     [],
   );
+
+  // Mirror the active lenses + kind filter back into the URL (shallow replace, no scroll) so the
+  // current view is shareable and survives a refresh. We read the freshest query via a ref (not a
+  // dep) so we preserve unrelated params (?full, ?node) without re-firing when our own write lands.
+  const spRef = useRef(searchParams);
+  spRef.current = searchParams;
+  useEffect(() => {
+    const params = new URLSearchParams(spRef.current.toString());
+    const lensList = [healthLens && "health", changedLens && "changed", exposedLens && "exposed"]
+      .filter(Boolean)
+      .join(",");
+    if (lensList) params.set("lens", lensList);
+    else params.delete("lens");
+    if (kindFilter.size) params.set("kinds", [...kindFilter].sort().join(","));
+    else params.delete("kinds");
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [healthLens, changedLens, exposedLens, kindFilter, pathname, router]);
 
   // Protection is a PROPERTY, not a flow: a security group fanning out to five resources
   // drew the longest, noisiest rails on the canvas. By default PROTECTS edges become a
@@ -427,7 +461,7 @@ export function InfraMap({
                 Showing the {data.nodes.length} most recent resources — the graph is larger.
               </span>
               <Link
-                href={`/map?full=1${focusId ? `&node=${focusId}` : ""}${lens ? `&lens=${lens}` : ""}`}
+                href={`/map?full=1${focusId ? `&node=${focusId}` : ""}${searchParams.get("lens") ? `&lens=${searchParams.get("lens")}` : ""}${searchParams.get("kinds") ? `&kinds=${searchParams.get("kinds")}` : ""}`}
                 prefetch={false}
                 className="ml-auto inline-flex items-center gap-1 rounded-md border border-warning/50 bg-warning/10 px-2 py-1 font-medium text-warning transition-colors hover:bg-warning/20"
               >
