@@ -3,19 +3,19 @@
  * palette, so "medium" and "low" rendered in different hues across the dashboard, insights,
  * compliance, and the War Room. Everything severity-coloured now imports from here.
  *
- * Two tiers, both token-based (mono theme + semantic status hues only):
- *  - CHART FILLS use the muted `--sev-*` data-viz tokens (deliberately desaturated — the dashboard
- *    reads serious, not candy-bright).
- *  - BADGES / TEXT use the brighter semantic status tokens for emphasis (danger / warning), with the
- *    muted slate `--sev-low` for low (an informational, not-alarming tone).
+ * One vivid triad — red (high) → amber (medium) → sky (low) — shared everywhere so severity reads
+ * the same on a chart, a chip, and a finding-row dot (matches `severityMeta` in taxonomy):
+ *  - CHART FILLS are concrete hsl() literals (recharts sets `fill` as an SVG attribute, where CSS
+ *    `var()` wouldn't resolve). Tuned to stay legible on both the light and dark ground.
+ *  - BADGES / TEXT use the `--sev-*` tokens (theme-aware) via Tailwind colour classes.
  */
 export type Severity = "high" | "medium" | "low";
 
-/** Muted fill colours (the `--sev-*` tokens) for chart `color`/`fill` props (SVG / recharts). */
+/** Vivid fill colours for chart `color`/`fill` props (SVG / recharts). Kept in step with `--sev-*`. */
 export const SEVERITY_COLOR: Record<Severity, string> = {
-  high: "hsl(4 55% 49%)",
-  medium: "hsl(32 48% 46%)",
-  low: "hsl(214 18% 55%)",
+  high: "hsl(0 79% 58%)",
+  medium: "hsl(35 92% 52%)",
+  low: "hsl(200 85% 51%)",
 };
 
 /** Severity as a soft tinted pill — the one badge shape everywhere. */

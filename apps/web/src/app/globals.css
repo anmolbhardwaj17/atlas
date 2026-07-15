@@ -57,12 +57,12 @@
     --brand: 142 42% 45%;
     --brand-foreground: 0 0% 100%;
 
-    /* Data-viz severity FILLS — deliberately muted/desaturated (enterprise data-viz convention:
-       IBM Carbon / Radix). Distinct from the brighter --danger/--warning text tokens; these are
-       for bars/dots so the dashboard reads serious, not candy-bright. */
-    --sev-high: 4 55% 49%;
-    --sev-medium: 32 48% 46%;
-    --sev-low: 214 18% 55%;
+    /* Severity ramp — one vivid triad (red → amber → sky) shared by chart fills, chips, and the
+       finding-row dots so severity reads the same everywhere. Light values run a touch deeper for
+       legibility on the near-white ground; the dark overrides below brighten to pop on near-black. */
+    --sev-high: 0 74% 51%;
+    --sev-medium: 35 92% 44%;
+    --sev-low: 200 88% 43%;
 
     /* Sidebar. */
     --sidebar-background: 0 0% 97.3%; /* #F8F8F8 */
@@ -118,9 +118,9 @@
     --brand: 142 46% 52%;
     --brand-foreground: 0 0% 100%;
 
-    --sev-high: 4 58% 60%;
-    --sev-medium: 36 52% 56%;
-    --sev-low: 214 20% 64%;
+    --sev-high: 0 84% 65%;
+    --sev-medium: 38 94% 58%;
+    --sev-low: 199 89% 58%;
 
     --sidebar-background: 0 0% 9%;
     --sidebar-foreground: 0 0% 82%;

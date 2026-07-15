@@ -5,8 +5,8 @@ import { Label, Pie, PieChart, Tooltip } from "recharts";
 import { Card, CardContent } from "@/components/ui/card";
 import { SEVERITY_COLOR } from "@/lib/severity";
 
-// Severity fills from the shared --sev-* tokens (muted data-viz palette), so this donut matches the
-// severity colour used everywhere else (dashboard bars, trend, badges).
+// Severity fills from the shared vivid ramp (red → amber → sky), so this donut matches the severity
+// colour used everywhere else (dashboard bars, trend, badges, finding-row dots).
 const SEVERITIES = [
   { key: "high", label: "High", color: SEVERITY_COLOR.high },
   { key: "medium", label: "Medium", color: SEVERITY_COLOR.medium },
