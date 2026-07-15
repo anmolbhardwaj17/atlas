@@ -28,8 +28,8 @@ function mockDb(orgForTeam: string | null) {
 
 const secrets = () => ({
   put: vi.fn().mockResolvedValue("secret-ref-1"),
-  get: vi.fn(),
-  delete: vi.fn(),
+  get: vi.fn().mockResolvedValue({}),
+  delete: vi.fn().mockResolvedValue(undefined),
 });
 
 const answer = {
@@ -197,6 +197,30 @@ describe("SlackService — OAuth install", () => {
     expect(sec.put).toHaveBeenCalledWith(ORG, { botToken: "xoxb-123" }); // encrypted, not stored raw
     const insert = client.query.mock.calls.map((c) => String(c[0])).join("\n");
     expect(insert).toContain("INSERT INTO slack_installations");
+  });
+
+  it("builds an install URL carrying client_id, the commands scope, and a signed state", () => {
+    const { svc } = make(null);
+    const url = svc.buildInstallUrl("org-1", "user-1");
+    expect(url).toBeTruthy();
+    const u = new URL(url as string);
+    expect(u.searchParams.get("client_id")).toBe("client-id");
+    expect(u.searchParams.get("scope")).toBe("commands");
+    expect(u.searchParams.get("redirect_uri")).toBe("https://api.atlas.dev/slack/oauth/callback");
+    // The state must verify back to the same org (round-trip through the signer).
+    expect(svc.verifyInstallState(u.searchParams.get("state") as string)?.orgId).toBe("org-1");
+  });
+
+  it("disconnect drops the install row AND shreds the stored bot token", async () => {
+    const ORG = "22222222-2222-2222-2222-222222222222";
+    const { svc, sec, client } = make(null);
+    client.query.mockResolvedValue({ rows: [{ bot_secret_ref: "secret-ref-9" }] });
+
+    const r = await svc.uninstall(ORG);
+    expect(r).toEqual({ disconnected: true });
+    const sql = client.query.mock.calls.map((c) => String(c[0])).join("\n");
+    expect(sql).toContain("DELETE FROM slack_installations");
+    expect(sec.delete).toHaveBeenCalledWith("secret-ref-9");
   });
 
   it("refuses to re-point a workspace already bound to a DIFFERENT org (R8)", async () => {

@@ -65,7 +65,9 @@ import {
   type ConnectionSummary,
   type ChannelSummary,
   type ChannelKind,
+  type SlackAskStatus,
 } from "@/lib/browser-api";
+import { SlackAskCard } from "@/components/integrations/slack-ask-card";
 import { cn } from "@/lib/cn";
 
 /** Per-channel webhook setup copy (mirrors Settings → Notifications). */
@@ -123,11 +125,13 @@ export function IntegrationsHub({
   connections,
   channels = [],
   canManage,
+  slack = null,
 }: {
   orgId: string;
   connections: ConnectionSummary[];
   channels?: ChannelSummary[];
   canManage: boolean;
+  slack?: SlackAskStatus | null;
 }) {
   const [connectProvider, setConnectProvider] = React.useState<ProviderMeta | null>(null);
   const [tab, setTab] = React.useState<(typeof TABS)[number]>("All");
@@ -313,6 +317,9 @@ export function IntegrationsHub({
           <LogoShowcase />
         </div>
       </div>
+
+      {/* Ask Atlas in Slack — the flagship inbound chat integration (grounded /atlas answers). */}
+      <SlackAskCard orgId={orgId} status={slack} canManage={canManage} />
 
       {/* Category tabs (segmented control) + search — the row list below filters live. */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

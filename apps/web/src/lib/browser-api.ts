@@ -1079,6 +1079,24 @@ export async function unmuteFinding(orgId: string, findingId: string): Promise<v
   if (!res.ok) throw new Error(`Couldn't unmute (${res.status}).`);
 }
 
+/** Slack "Ask Atlas" connection status (for the Integrations hub). */
+export interface SlackAskStatus {
+  connected: boolean;
+  teamName: string | null;
+  installUrl: string | null;
+}
+
+/** Disconnect the Slack "Ask Atlas" workspace (shreds the stored bot token server-side). */
+export async function disconnectSlackAsk(orgId: string): Promise<void> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/integrations/slack`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) throw new Error(`Couldn't disconnect Slack (${res.status}).`);
+}
+
 /** Current active finding ids (used to confirm whether a finding cleared after a recheck). */
 export async function getActiveFindingIds(orgId: string): Promise<string[]> {
   const token = await getClientToken();

@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { AiModule } from "../ai/ai.module";
 import { ConnectionsModule } from "../connections/connections.module";
 import { SlackController } from "./slack.controller";
+import { SlackAdminController } from "./slack-admin.controller";
 import { SlackService } from "./slack.service";
 
 /**
@@ -12,7 +13,7 @@ import { SlackService } from "./slack.service";
  */
 @Module({
   imports: [AiModule, ConnectionsModule],
-  controllers: [SlackController],
+  controllers: [SlackController, SlackAdminController],
   providers: [SlackService],
   exports: [SlackService],
 })

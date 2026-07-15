@@ -261,6 +261,19 @@ export class SlackService {
     });
   }
 
+  /** Disconnect the workspace: drop the install row and shred the stored bot token. Idempotent. */
+  async uninstall(orgId: string): Promise<{ disconnected: boolean }> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      const { rows } = await c.query<{ bot_secret_ref: string | null }>(
+        "DELETE FROM slack_installations WHERE org_id = $1 RETURNING bot_secret_ref",
+        [orgId],
+      );
+      const ref = rows[0]?.bot_secret_ref;
+      if (ref) await this.secrets.delete(ref).catch(() => {});
+      return { disconnected: rows.length > 0 };
+    });
+  }
+
   // --- Outbound (isolated for tests + host-guarded) -----------------------------------------------
 
   /** Exchange an OAuth code for a bot token. Isolated so tests can stub the Slack round-trip. */
