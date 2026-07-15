@@ -1,4 +1,5 @@
 import { Body, Controller, HttpCode, Post } from "@nestjs/common";
+import { Public } from "../auth/public.decorator";
 import { WeeklyDigestService } from "./weekly-digest.service";
 
 interface UnsubscribeBody {
@@ -13,6 +14,7 @@ interface UnsubscribeBody {
  * before anything is written). Always returns 200 with `{ ok }` so the page can render a clean state
  * either way and we never leak whether a given (user, org) pair exists.
  */
+@Public()
 @Controller("email")
 export class DigestController {
   constructor(private readonly digest: WeeklyDigestService) {}

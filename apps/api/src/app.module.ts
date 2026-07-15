@@ -1,7 +1,8 @@
 import { Module } from "@nestjs/common";
-import { APP_FILTER, APP_INTERCEPTOR } from "@nestjs/core";
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { CoreModule } from "./core/core.module";
 import { AuthModule } from "./auth/auth.module";
+import { AuthGuard } from "./auth/auth.guard";
 import { OrgsModule } from "./orgs/orgs.module";
 import { ConnectionsModule } from "./connections/connections.module";
 import { NotificationsModule } from "./notifications/notifications.module";
@@ -43,6 +44,10 @@ import { HttpExceptionFilter } from "./common/http-exception.filter";
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
     { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
+    // Global authentication: every route requires a valid bearer token unless marked @Public()
+    // (webhook / digest-unsubscribe / health). Removes the "forgot AuthGuard on a new controller"
+    // failure mode; per-controller TenantScope/Roles guards still apply where declared.
+    { provide: APP_GUARD, useExisting: AuthGuard },
   ],
 })
 export class AppModule {}

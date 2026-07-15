@@ -1,4 +1,5 @@
 import { Controller, HttpCode, Param, Post, Req } from "@nestjs/common";
+import { Public } from "../auth/public.decorator";
 import { WebhookService, type WebhookResult } from "./webhook.service";
 
 /** The raw request shape the webhook needs: raw body (for HMAC) + GitHub headers. */
@@ -14,6 +15,7 @@ interface RawRequest {
  * the handler knows which source to re-sync without a cross-org installation lookup. Always
  * returns 2xx once the signature is valid (so GitHub doesn't retry a handled event).
  */
+@Public()
 @Controller("webhooks/github")
 export class WebhookController {
   constructor(private readonly webhooks: WebhookService) {}
