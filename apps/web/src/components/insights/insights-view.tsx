@@ -3,8 +3,10 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, History, RotateCcw, Search, Download } from "lucide-react";
+import { ChevronRight, History, RotateCcw, Search, Download, BellOff } from "lucide-react";
+import { toast } from "sonner";
 import { toCsv, downloadCsv } from "@/lib/csv";
+import { muteFinding, unmuteFinding } from "@/lib/browser-api";
 import { Card, CardContent } from "@/components/ui/card";
 import { AtlasAiMark } from "@/components/brand";
 import { PostureRadar, type Posture } from "@/components/dashboard/posture-radar";
@@ -92,12 +94,14 @@ function ageLabel(iso: string | null | undefined): string | null {
  * lifecycle actions. Findings are derived live from the graph, so a real fix auto-resolves them.
  */
 export function InsightsView({
+  orgId,
   summary,
   findings,
   resolved = [],
   mutes = [],
   lastSyncedAt = null,
 }: {
+  orgId: string;
   summary: InsightsSummary | null;
   findings: Finding[];
   resolved?: Finding[];
@@ -202,6 +206,62 @@ export function InsightsView({
     setSev("all");
     setPillar("all");
   };
+
+  // Bulk selection — only in the actionable tabs (fixed history isn't). In the active tab the bulk
+  // action mutes; in the muted tab it un-mutes. Selections are keyed by finding id and pruned the
+  // moment a row leaves the visible set (tab/filter/data change), so you never act on what you can't see.
+  const selectable = tab !== "fixed";
+  const [selected, setSelected] = React.useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = React.useState(false);
+  const shownKey = shown.map((f) => f.id).join(",");
+  React.useEffect(() => {
+    const visible = new Set(shownKey ? shownKey.split(",") : []);
+    setSelected((prev) => {
+      const next = new Set([...prev].filter((id) => visible.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [shownKey]);
+  const allShownSelected = shown.length > 0 && shown.every((f) => selected.has(f.id));
+  const toggleAll = () =>
+    setSelected(allShownSelected ? new Set() : new Set(shown.map((f) => f.id)));
+  const toggleOne = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  async function bulkMute(mute: boolean) {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    const t = toast.loading(mute ? `Muting ${ids.length}…` : `Unmuting ${ids.length}…`);
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) => (mute ? muteFinding(orgId, id) : unmuteFinding(orgId, id))),
+      );
+      const failed = results.filter((r) => r.status === "rejected").length;
+      const ok = ids.length - failed;
+      if (failed === 0) {
+        toast.success(mute ? `Muted ${ok}` : `Unmuted ${ok}`, {
+          id: t,
+          description: mute
+            ? "Accepted as known risks — you can undo this."
+            : "Back in your active findings.",
+        });
+      } else {
+        toast.error(`${failed} of ${ids.length} didn't update`, {
+          id: t,
+          description: ok > 0 ? `${ok} updated; the rest failed.` : undefined,
+        });
+      }
+      setSelected(new Set());
+      router.refresh();
+    } finally {
+      setBulkBusy(false);
+    }
+  }
 
   return (
     <div className="motion-stagger w-full space-y-6">
@@ -381,6 +441,39 @@ export function InsightsView({
         </div>
       </div>
 
+      {/* Bulk action bar — appears once you select rows. Mutes (active tab) or un-mutes (muted tab)
+          the whole selection in one call, so accepting a batch of known-risk findings isn't N clicks. */}
+      {selectable && selected.size > 0 ? (
+        <div className="motion-rise flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
+          <span className="font-medium tabular-nums">{selected.size} selected</span>
+          <div className="flex items-center gap-2 sm:ml-auto">
+            <button
+              type="button"
+              disabled={bulkBusy}
+              onClick={() => bulkMute(tab !== "muted")}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium transition-colors hover:border-foreground/40 disabled:opacity-50"
+            >
+              {tab === "muted" ? (
+                <>
+                  <RotateCcw className="size-3.5" /> Unmute selected
+                </>
+              ) : (
+                <>
+                  <BellOff className="size-3.5" /> Mute selected
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelected(new Set())}
+              className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {/* Findings table - dense + scannable; a row opens its detail page. */}
       {shown.length === 0 ? (
         <Card>
@@ -414,6 +507,17 @@ export function InsightsView({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                  {selectable ? (
+                    <th className="w-9 px-3 py-2.5">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all shown findings"
+                        checked={allShownSelected}
+                        onChange={toggleAll}
+                        className="size-3.5 cursor-pointer align-middle accent-[hsl(var(--brand))]"
+                      />
+                    </th>
+                  ) : null}
                   <th className="w-24 px-4 py-2.5 font-medium">
                     {tab === "fixed" ? "Status" : "Severity"}
                   </th>
@@ -439,6 +543,17 @@ export function InsightsView({
                         isFixed ? "" : "cursor-pointer hover:bg-muted/40",
                       )}
                     >
+                      {selectable ? (
+                        <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${it.title}`}
+                            checked={selected.has(it.id)}
+                            onChange={() => toggleOne(it.id)}
+                            className="size-3.5 cursor-pointer align-middle accent-[hsl(var(--brand))]"
+                          />
+                        </td>
+                      ) : null}
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1.5">
                           <span

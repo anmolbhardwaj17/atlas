@@ -30,6 +30,7 @@ async function InsightsContent() {
   const data = res.body.data;
   return (
     <InsightsView
+      orgId={orgId}
       summary={data.summary ?? null}
       findings={data.findings ?? []}
       resolved={data.resolved ?? []}
