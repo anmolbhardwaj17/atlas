@@ -28,9 +28,19 @@ function suggestions(s: SummaryLite | undefined): string[] {
   const inv = s.inventory;
   const hasCode = inv.repositories > 0;
   const hasInfra = inv.services + inv.datastores + inv.clouds > 0;
+  const findingText = s.findings.map((f) => f.title).join(" · ");
+
+  // Operational + security hooks first (only when there's actually something to look at), so the most
+  // useful question surfaces when the estate needs attention.
+  if (/unhealthy|degraded|broken|down|failing|error rate|incident/i.test(findingText)) {
+    out.push("What's unhealthy right now, and what's the likely cause?");
+  }
+  if (/vulnerab|\bCVE\b|exposed|outdated/i.test(findingText)) {
+    out.push("Which internet-exposed services are running a vulnerable dependency?");
+  }
 
   if (hasCode) {
-    if (s.findings.some((f) => /pipeline|ci\/cd|\bci\b/i.test(f.title))) {
+    if (/pipeline|ci\/cd|\bci\b/i.test(findingText)) {
       out.push("Which repositories have no CI/CD pipeline?");
     }
     if (inv.contributors > 0) out.push("Who are the top contributors this month?");
@@ -43,8 +53,10 @@ function suggestions(s: SummaryLite | undefined): string[] {
       out.push("What spans a cloud or account boundary?");
     }
     out.push("What would a failure of my most-connected service impact?");
+    out.push("What changed across the estate this week?");
   }
-  return out.slice(0, 4);
+  // De-dupe (a title could match two probes) and cap at 4.
+  return [...new Set(out)].slice(0, 4);
 }
 
 export default function AskPage({
