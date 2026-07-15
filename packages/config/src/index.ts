@@ -43,6 +43,13 @@ export const EnvSchema = z.object({
   // deliveries (fail-closed) — periodic reconcile still heals the graph (DD-2).
   GITHUB_WEBHOOK_SECRET: optionalString,
 
+  // Slack "Ask Atlas" chat integration. CLIENT_ID/SECRET drive the OAuth install (workspace ↔ org
+  // binding); SIGNING_SECRET HMAC-verifies every inbound slash command (the request signature IS the
+  // auth). All optional: unset ⇒ the /slack endpoints reject/no-op (fail-closed), feature simply off.
+  SLACK_CLIENT_ID: optionalString,
+  SLACK_CLIENT_SECRET: optionalString,
+  SLACK_SIGNING_SECRET: optionalString,
+
   // AES-256-GCM key (32 bytes, hex or base64) for the DB-backed Secrets Broker (docs/13 §7).
   // When set, connector credentials are stored encrypted in `connection_secrets` (durable, so
   // they survive restarts). Unset ⇒ fall back to the in-memory broker (dev-only, wiped on boot).
@@ -65,6 +72,10 @@ export const EnvSchema = z.object({
   // Browser origin allowed to call the API (CORS). The web app calls the API
   // client-side (Bearer token), so this must list the web origin. Default = local web.
   WEB_ORIGIN: z.string().url().default("http://localhost:4291"),
+
+  // Public base URL of THIS API — used to build OAuth redirect URIs that a third party (Slack) posts
+  // back to (`/slack/oauth/callback`). Must be the internet-reachable API origin in prod.
+  PUBLIC_API_URL: z.string().url().default("http://localhost:4290"),
 
   // Transactional email (invitations). Resend API key (resend.com). Optional: when unset, invite
   // emails aren't sent — the accept link is logged + surfaced as a copyable link instead, so the

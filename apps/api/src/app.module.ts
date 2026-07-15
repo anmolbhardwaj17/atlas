@@ -15,6 +15,7 @@ import { AiModule } from "./ai/ai.module";
 import { DemoModule } from "./demo/demo.module";
 import { AuditModule } from "./audit/audit.module";
 import { WebhookModule } from "./webhooks/webhook.module";
+import { SlackModule } from "./slack/slack.module";
 import { HealthController } from "./health/health.controller";
 import { ResponseInterceptor } from "./common/response.interceptor";
 import { LoggingInterceptor } from "./common/logging.interceptor";
@@ -37,6 +38,7 @@ import { HttpExceptionFilter } from "./common/http-exception.filter";
     DemoModule,
     AuditModule,
     WebhookModule,
+    SlackModule,
   ],
   controllers: [HealthController],
   providers: [

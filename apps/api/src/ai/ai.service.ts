@@ -9,6 +9,7 @@ import {
   suggestIntentLinks,
   OpenRouterProvider,
   ClaudeProvider,
+  type Answer,
   type AnswerCitation,
   type AnswerEvent,
   type CoverageAssessment,
@@ -579,6 +580,18 @@ export class AiService {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * One-shot grounded answer for an external integration (Slack "Ask Atlas"). Same retrieval-first,
+   * cited, honest-absence pipeline as the in-app Ask — org-scoped — but returns the full Answer for
+   * the caller to format (no conversation is persisted; a chat message isn't a saved transcript).
+   * Read-only. The mock provider (dev/CI) still answers via the fast path, so this is testable
+   * without a live key.
+   */
+  async answerForIntegration(orgId: string, question: string): Promise<Answer> {
+    const { llm } = await this.resolveProvider(orgId);
+    return answerQuestion({ port: this.port, llm }, orgId, question);
   }
 
   async createConversation(

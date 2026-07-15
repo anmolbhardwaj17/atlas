@@ -58,6 +58,7 @@ import { up as up0056 } from "./migrations/0056_manual_edges";
 import { up as up0057 } from "./migrations/0057_incident_email_pref";
 import { up as up0058 } from "./migrations/0058_retention";
 import { up as up0059 } from "./migrations/0059_erased_identities";
+import { up as up0060 } from "./migrations/0060_slack_installations";
 
 /**
  * Forward-only SQL migration runner (docs/04 §9). Plain `pg`, no ORM. Each
@@ -127,6 +128,7 @@ const MIGRATIONS: ReadonlyArray<{ version: string; statements: string[] }> = [
   { version: "0057_incident_email_pref", statements: up0057 },
   { version: "0058_retention", statements: up0058 },
   { version: "0059_erased_identities", statements: up0059 },
+  { version: "0060_slack_installations", statements: up0060 },
 ];
 
 async function main(): Promise<void> {
