@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { streamAsk, createConversation, updateIncident, type Incident } from "@/lib/browser-api";
 import type { MapData, MapNode } from "@/lib/map-types";
+import { SEVERITY_TEXT } from "@/lib/severity";
 import { WarRoomMap } from "./war-room-map";
 import { MarkdownLite } from "./markdown-lite";
 import { ContextBar, Timeline, type NodeEvent } from "./war-room-context";
@@ -57,11 +58,7 @@ function toolLabel(tool: string): string {
   return tool.replace(/[_-]+/g, " ");
 }
 
-const SEV_TEXT: Record<string, string> = {
-  high: "text-danger",
-  medium: "text-warning",
-  low: "text-yellow-600 dark:text-yellow-500",
-};
+const SEV_TEXT: Record<string, string> = SEVERITY_TEXT;
 
 // The structured verdict the model appends (parsed client-side; no AI-backend change). Classifies the
 // likely cause so the "Likely cause" card leads with a definite answer, not a wall of prose (P3/P4 —

@@ -3,12 +3,14 @@
 import { CheckCircle2 } from "lucide-react";
 import { Label, Pie, PieChart, Tooltip } from "recharts";
 import { Card, CardContent } from "@/components/ui/card";
+import { SEVERITY_COLOR } from "@/lib/severity";
 
-// Warm "heat ramp" — hotter = worse — so severity reads at a glance (red → orange → yellow).
+// Severity fills from the shared --sev-* tokens (muted data-viz palette), so this donut matches the
+// severity colour used everywhere else (dashboard bars, trend, badges).
 const SEVERITIES = [
-  { key: "high", label: "High", color: "#ef4444" },
-  { key: "medium", label: "Medium", color: "#f97316" },
-  { key: "low", label: "Low", color: "#eab308" },
+  { key: "high", label: "High", color: SEVERITY_COLOR.high },
+  { key: "medium", label: "Medium", color: SEVERITY_COLOR.medium },
+  { key: "low", label: "Low", color: SEVERITY_COLOR.low },
 ] as const;
 
 /** Open findings as a donut by severity (High/Medium/Low), total in the centre; hover a wedge to

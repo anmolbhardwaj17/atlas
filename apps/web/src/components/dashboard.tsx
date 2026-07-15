@@ -23,6 +23,7 @@ import { PostureRadar, type Posture } from "@/components/dashboard/posture-radar
 import { pillarMeta } from "@/components/insights/pillars";
 import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/cn";
+import { SEVERITY_PILL } from "@/lib/severity";
 import { Onboarding } from "@/components/onboarding";
 import { AskLauncher } from "@/components/dashboard/ask-launcher";
 import { RefreshLatest } from "@/components/dashboard/refresh-latest";
@@ -430,12 +431,8 @@ function NeedsAttention({ findings }: { findings: Finding[] }) {
   );
 }
 
-// Severity as a soft tinted pill (not bare text) — reads as a designed badge next to the chip.
-const SEV_PILL: Record<string, string> = {
-  high: "bg-red-500/10 text-red-600 dark:text-red-400",
-  medium: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  low: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
-};
+// Severity as a soft tinted pill (not bare text) — the shared, token-based severity badge.
+const SEV_PILL: Record<string, string> = SEVERITY_PILL;
 
 function FindingRow({ f }: { f: Finding }) {
   // Same pillar chip the Insights page renders — driven by the pillar the API tags dynamically.

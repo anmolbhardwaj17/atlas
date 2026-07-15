@@ -1,3 +1,5 @@
+import { SEVERITY_COLOR } from "@/lib/severity";
+
 export interface TrendPoint {
   t: number;
   high: number;
@@ -5,11 +7,11 @@ export interface TrendPoint {
   low: number;
 }
 
-// Severity hues, matching the shared severityMeta (red / amber / sky).
+// Severity fills from the shared --sev-* tokens, so the trend matches the donut/bars/badges.
 const SERIES: Array<{ key: "high" | "medium" | "low"; label: string; color: string }> = [
-  { key: "high", label: "High", color: "#ef4444" },
-  { key: "medium", label: "Medium", color: "#f59e0b" },
-  { key: "low", label: "Low", color: "#0ea5e9" },
+  { key: "high", label: "High", color: SEVERITY_COLOR.high },
+  { key: "medium", label: "Medium", color: SEVERITY_COLOR.medium },
+  { key: "low", label: "Low", color: SEVERITY_COLOR.low },
 ];
 
 const W = 320;

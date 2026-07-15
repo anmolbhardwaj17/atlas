@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { kindIcon, KIND_LOGO } from "@/lib/kind-visual";
 import { CloudIcon } from "@/components/cloud-icon";
 import { cn } from "@/lib/cn";
+import { SEVERITY_TEXT } from "@/lib/severity";
 
 export type Framework = "pci" | "nist" | "iso" | "hipaa" | "cis" | "gdpr";
 export type ControlStatus = "pass" | "fail" | "not-applicable" | "not-assessable";
@@ -80,12 +81,8 @@ const STATUS: Record<
 
 const SEV_ORDER: Record<ControlSeverity, number> = { high: 0, medium: 1, low: 2 };
 
-/** Severity as coloured text — the dashboard donut's warm heat-ramp (red → orange → yellow). */
-const SEV_TEXT: Record<ControlSeverity, string> = {
-  high: "text-red-600 dark:text-red-400",
-  medium: "text-orange-600 dark:text-orange-400",
-  low: "text-yellow-700 dark:text-yellow-400",
-};
+/** Severity as coloured text — the shared, token-based severity colour (matches every other surface). */
+const SEV_TEXT: Record<ControlSeverity, string> = SEVERITY_TEXT;
 
 function pct(n: number | null): string {
   return n === null ? "—" : `${Math.round(n * 100)}%`;
