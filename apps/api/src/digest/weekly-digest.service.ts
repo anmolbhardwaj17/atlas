@@ -34,7 +34,15 @@ export class WeeklyDigestService {
     private readonly email: EmailService,
   ) {
     this.webOrigin = env.WEB_ORIGIN;
-    this.secret = env.SECRET_ENCRYPTION_KEY ?? "atlas-digest-dev";
+    // The unsubscribe token is HMAC-signed with this key. A hardcoded fallback in prod would let
+    // anyone forge a valid unsubscribe for any address — fail fast instead (the secret broker does
+    // the same). Dev keeps a clearly-labelled placeholder so local runs work.
+    if (!env.SECRET_ENCRYPTION_KEY && process.env.NODE_ENV === "production") {
+      throw new Error(
+        "SECRET_ENCRYPTION_KEY is required in production (it signs digest unsubscribe tokens).",
+      );
+    }
+    this.secret = env.SECRET_ENCRYPTION_KEY ?? "atlas-digest-dev-only-insecure";
   }
 
   /** Build one org's digest from the live dashboard summary (same findings, same posture). */

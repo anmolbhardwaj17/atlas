@@ -3,7 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { withOrgScope, type Db, type Role } from "@atlas/db";
 import type { Env } from "@atlas/config";
 import { ENV, PG_POOL } from "../core/tokens";
-import { EmailService } from "../core/email.service";
+import { EmailService, maskEmail } from "../core/email.service";
 import { RateLimitService } from "../core/rate-limit.service";
 import { UserMirrorService } from "../auth/user-mirror.service";
 import { ApiException } from "../common/errors";
@@ -113,7 +113,9 @@ export class InvitationService {
         inviterEmail: inviter?.email ?? null,
         expiresAt,
       });
-      this.logger.log(`Invitation ${dto.id} for ${dto.email} created (emailed: ${emailed}).`);
+      this.logger.log(
+        `Invitation ${dto.id} for ${maskEmail(dto.email)} created (emailed: ${emailed}).`,
+      );
       return { ...dto, acceptUrl, emailed };
     } catch (e) {
       if (isPgUnique(e)) {

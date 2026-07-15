@@ -203,7 +203,7 @@ export class EmailService {
    *  reported as `false` so the caller can fall back (e.g. surface a copy-link) without breaking. */
   private async send(to: string, subject: string, html: string): Promise<boolean> {
     if (!this.apiKey) {
-      this.logger.warn(`RESEND_API_KEY unset - email "${subject}" to ${to} NOT sent.`);
+      this.logger.warn(`RESEND_API_KEY unset - email "${subject}" to ${maskEmail(to)} NOT sent.`);
       return false;
     }
     try {
@@ -215,14 +215,14 @@ export class EmailService {
       if (!res.ok) {
         const body = await res.text().catch(() => "");
         this.logger.error(
-          `Resend "${subject}" to ${to} failed (${res.status}): ${body.slice(0, 200)}`,
+          `Resend "${subject}" to ${maskEmail(to)} failed (${res.status}): ${body.slice(0, 200)}`,
         );
         return false;
       }
-      this.logger.log(`Email "${subject}" sent to ${to}.`);
+      this.logger.log(`Email "${subject}" sent to ${maskEmail(to)}.`);
       return true;
     } catch (e) {
-      this.logger.error(`Email "${subject}" to ${to} errored: ${(e as Error).message}`);
+      this.logger.error(`Email "${subject}" to ${maskEmail(to)} errored: ${(e as Error).message}`);
       return false;
     }
   }
@@ -258,6 +258,14 @@ interface Shell {
   linkFallback?: string;
   /** Trusted HTML footnote (security/context). */
   security?: string;
+}
+
+/** Mask an email for logs — keep the first local char + the domain (`f***@bar.com`), so a log line
+ *  is debuggable without spilling the full address (PII minimization in logs). */
+export function maskEmail(email: string): string {
+  const at = email.indexOf("@");
+  if (at <= 0) return "***";
+  return `${email[0]}***${email.slice(at)}`;
 }
 
 function escapeHtml(s: string): string {
