@@ -5,6 +5,7 @@ import { TenantScopeGuard } from "../auth/tenant-scope.guard";
 import { RolesGuard } from "../auth/roles.guard";
 import { Roles } from "../auth/roles.decorator";
 import { RateLimitService } from "../core/rate-limit.service";
+import { AuditService } from "../core/audit.service";
 import { ApiException } from "../common/errors";
 import { parseBody } from "../common/validation";
 import type { AuthedRequest } from "../auth/auth.types";
@@ -32,6 +33,7 @@ export class GraphController {
   constructor(
     private readonly graph: GraphService,
     private readonly rateLimit: RateLimitService,
+    private readonly audit: AuditService,
   ) {}
 
   /** Shared per-user backstop for the heavy dashboard reads (summary/insights): each opens several
@@ -318,6 +320,24 @@ export class GraphController {
   @Roles("Member")
   async getEdge(@Req() req: AuthedRequest, @Param("id") id: string): Promise<unknown> {
     return this.graph.getEdge(org(req).id, id);
+  }
+
+  /** Erase a person (GDPR right to be forgotten): redact their identity node + scrub their name from
+   *  author/assignee/reporter fields, durably (re-applied after each sync). Admin-only, audited. */
+  @Post("people/:id/erase")
+  @Roles("Admin")
+  async erasePerson(
+    @Req() req: AuthedRequest,
+    @Param("id") id: string,
+  ): Promise<{ ok: true; redactedNodes: number }> {
+    const result = await this.graph.erasePerson(org(req).id, id, req.auth?.userId ?? null);
+    await this.audit.fromRequest(req, {
+      action: "person.erase",
+      targetType: "node",
+      targetId: id,
+      metadata: { redactedNodes: result.redactedNodes },
+    });
+    return result;
   }
 
   @Get("timeline")

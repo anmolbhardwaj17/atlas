@@ -50,6 +50,9 @@ export class SyncWorkerBootstrap implements OnModuleInit {
       onSyncComplete: async (orgId) => {
         const { active, resolved } = await this.graph.reconcileFindings(orgId);
         this.logger.log(`finding lifecycle reconciled: ${active} open, ${resolved} newly resolved`);
+        // Re-apply GDPR erasures — a re-crawl may have re-ingested an erased person's name.
+        const rr = await this.graph.reapplyErasures(orgId);
+        if (rr > 0) this.logger.log(`re-applied ${rr} identity erasure(s) after sync`);
       },
     });
     this.logger.log("In-process sync worker registered (dev).");

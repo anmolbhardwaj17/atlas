@@ -2227,6 +2227,87 @@ export class GraphService {
   }
 
   /**
+   * Erase a person (GDPR Art. 17). Redacts the person's identity node + scrubs their name from every
+   * author/assignee/reporter attribute in the org's graph, and records the erasure (by stable URN +
+   * the display names) so {@link reapplyErasures} re-applies it after each sync — a re-crawl can't
+   * bring the name back. `nodeId` must be a person identity node (`*.user`). 404 if unknown/cross-org.
+   */
+  async erasePerson(
+    orgId: string,
+    nodeId: string,
+    userId: string | null,
+  ): Promise<{ ok: true; redactedNodes: number }> {
+    if (!UUID_RE.test(nodeId)) throw ApiException.notFound();
+    return withOrgScope(this.db, orgId, async (c) => {
+      const { rows } = await c.query<{
+        urn: string;
+        kind: string;
+        name: string | null;
+        attributes: Record<string, unknown>;
+      }>(`SELECT urn, kind, name, attributes FROM nodes WHERE id = $1 AND status <> 'deleted'`, [
+        nodeId,
+      ]);
+      const node = rows[0];
+      if (!node) throw ApiException.notFound();
+      if (!/\.user$/.test(node.kind)) {
+        throw ApiException.invalidState(
+          "Erasure applies to a person — pick a user/contributor identity, not a resource.",
+        );
+      }
+      const names = collectIdentityNames(node.name, node.attributes);
+      await c.query(
+        `INSERT INTO erased_identities (org_id, urn, display_names, erased_by)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (org_id, urn) DO UPDATE SET display_names = EXCLUDED.display_names, erased_by = EXCLUDED.erased_by`,
+        [orgId, node.urn, names, userId],
+      );
+      const redactedNodes = await this.applyErasure(c, [node.urn], names);
+      return { ok: true, redactedNodes };
+    });
+  }
+
+  /** Re-apply every recorded erasure for the org — run after each sync (onSyncComplete) so a
+   *  re-ingested name is scrubbed again. Idempotent. */
+  async reapplyErasures(orgId: string): Promise<number> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      const { rows } = await c.query<{ urn: string; display_names: string[] }>(
+        `SELECT urn, display_names FROM erased_identities`,
+      );
+      if (rows.length === 0) return 0;
+      const urns = rows.map((r) => r.urn);
+      const names = [...new Set(rows.flatMap((r) => r.display_names))];
+      return this.applyErasure(c, urns, names);
+    });
+  }
+
+  /** Redact identity nodes (by URN) + scrub matching author/assignee/reporter display names. Returns
+   *  the number of identity nodes redacted. Runs inside the caller's org-scoped tx (RLS). */
+  private async applyErasure(c: PoolClient, urns: string[], names: string[]): Promise<number> {
+    let redacted = 0;
+    if (urns.length > 0) {
+      const r = await c.query(
+        `UPDATE nodes SET name = '[erased]',
+           attributes = attributes - 'login' - 'username' - 'displayName' - 'display_name'
+                         - 'email' - 'nickname' - 'name'
+         WHERE urn = ANY($1::text[])`,
+        [urns],
+      );
+      redacted += r.rowCount ?? 0;
+    }
+    if (names.length > 0) {
+      // Fixed key allowlist — safe to inline (never user input).
+      for (const key of ERASE_ATTR_KEYS) {
+        await c.query(
+          `UPDATE nodes SET attributes = jsonb_set(attributes, '{${key}}', '"[erased]"')
+             WHERE attributes->>'${key}' = ANY($1::text[])`,
+          [names],
+        );
+      }
+    }
+    return redacted;
+  }
+
+  /**
    * "What changed since" (docs/08 §10.3, US-5): new/updated nodes + new edges since a
    * timestamp, merged and ordered newest-first. `kinds` filters node changes.
    */
@@ -2548,6 +2629,31 @@ export class GraphService {
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Attributes that carry a person's display name (scrubbed on erasure). Fixed allowlist. */
+const ERASE_ATTR_KEYS = ["author", "assignee", "reporter"] as const;
+
+/** The display names a person is known by (their node name + identity attributes) — used to scrub
+ *  their name from author/assignee/reporter fields on other nodes during erasure. Deduped, non-empty. */
+function collectIdentityNames(name: string | null, attributes: Record<string, unknown>): string[] {
+  const out = new Set<string>();
+  const add = (v: unknown): void => {
+    if (typeof v === "string" && v.trim()) out.add(v);
+  };
+  add(name);
+  for (const k of [
+    "login",
+    "username",
+    "displayName",
+    "display_name",
+    "email",
+    "nickname",
+    "name",
+  ]) {
+    add(attributes?.[k]);
+  }
+  return [...out];
+}
 
 /** Keep only top-level scalar attributes — see the call site in {@link GraphService.graph}. Objects
  *  and arrays are dropped: the map never renders them, and they're the bulk of a raw resource's JSONB. */
