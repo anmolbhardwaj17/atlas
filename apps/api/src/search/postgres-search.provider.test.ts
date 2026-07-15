@@ -107,6 +107,25 @@ suite("G2.4 PostgresSearchProvider", () => {
     expect(hit?.highlights[0]).toContain("<em>orders</em>");
   });
 
+  it("ranks exact > prefix > mid-name substring", async () => {
+    // Alongside the seeded "prod-orders" (a mid-name substring of "orders"):
+    await insertNode(orgId, "aws:us-east-1:1:rds:orders", "aws.rds.instance", "orders"); // exact
+    await insertNode(
+      orgId,
+      "aws:us-east-1:1:rds:orders-replica",
+      "aws.rds.instance",
+      "orders-replica",
+    ); // prefix
+
+    const res = await search.search(orgId, { q: "orders", type: "keyword", limit: 10 });
+    const names = res.data.map((r) => r.node.name);
+    expect(names[0]).toBe("orders"); // exact match ranks first
+    // prefix ("orders-replica") outranks a mid-name substring ("prod-orders")
+    expect(names.indexOf("orders-replica")).toBeLessThan(names.indexOf("prod-orders"));
+    // and the exact match scores highest
+    expect(res.data[0]?.score).toBeGreaterThan(res.data[1]?.score ?? 0);
+  });
+
   it("filters by kind", async () => {
     const res = await search.search(orgId, {
       q: "checkout",

@@ -15,11 +15,16 @@ export class PostgresSearchProvider implements SearchProvider {
 
   async search(orgId: string, query: SearchQuery): Promise<SearchResponse> {
     const like = `%${query.q}%`;
+    const prefix = `${query.q}%`;
     return withOrgScope(this.db, orgId, async (c) => {
-      const params: unknown[] = [query.q, like];
+      // $1 = raw query (exact/trigram), $2 = %q% (substring), $3 = q% (prefix).
+      const params: unknown[] = [query.q, like, prefix];
       let kindFilter = "";
       if (query.kind) kindFilter = ` AND kind = $${params.push(query.kind)}`;
 
+      // Relevance ramp: an exact name outranks a prefix, which outranks a mid-name substring, then a
+      // urn hit, then a fuzzy trigram near-miss, then an attribute-only hit. Typing a full resource
+      // name now lands it at the top instead of tying with every substring match at ~0.6.
       const { rows } = await c.query<{
         id: string;
         kind: string;
@@ -28,15 +33,18 @@ export class PostgresSearchProvider implements SearchProvider {
       }>(
         `SELECT id, kind, name,
                 GREATEST(
+                  CASE WHEN lower(name) = lower($1) THEN 1.0 ELSE 0 END,
+                  CASE WHEN name ILIKE $3 THEN 0.85 ELSE 0 END,
+                  CASE WHEN name ILIKE $2 THEN 0.65 ELSE 0 END,
+                  CASE WHEN urn ILIKE $2 THEN 0.55 ELSE 0 END,
                   similarity(name, $1),
-                  CASE WHEN name ILIKE $2 OR urn ILIKE $2 THEN 0.6 ELSE 0 END,
                   CASE WHEN attributes::text ILIKE $2 THEN 0.3 ELSE 0 END
                 ) AS score
            FROM nodes
           WHERE status <> 'deleted'
             AND (name % $1 OR name ILIKE $2 OR urn ILIKE $2 OR attributes::text ILIKE $2)
             ${kindFilter}
-          ORDER BY score DESC NULLS LAST, last_seen DESC
+          ORDER BY score DESC NULLS LAST, length(coalesce(name, '')) ASC, last_seen DESC
           LIMIT ${query.limit}`,
         params,
       );
