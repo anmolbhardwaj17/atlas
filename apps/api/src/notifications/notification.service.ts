@@ -35,21 +35,66 @@ export interface EmailPrefs {
   weeklyDigest: boolean;
 }
 
+/**
+ * Validate an incoming-webhook URL by PARSING it and checking the hostname — never a regex over the
+ * whole string. A regex like `https://\S+\.webhook\.office\.com/…` is bypassable because `\S+` in a
+ * host position also matches `/` and `@`, so `https://169.254.169.254/.webhook.office.com/x` and
+ * `https://evil.com/.webhook.office.com/x` both slip past it → SSRF from our egress + notification
+ * exfiltration. `new URL()` puts the real host in `.hostname`, which is the security boundary. https
+ * only, no userinfo, host must be (a subdomain of) the provider's own domain.
+ */
+export function isWebhookUrl(
+  u: string,
+  hostOk: (hostname: string) => boolean,
+  pathPrefix: string,
+): boolean {
+  let url: URL;
+  try {
+    url = new URL(u);
+  } catch {
+    return false;
+  }
+  return (
+    url.protocol === "https:" &&
+    url.username === "" &&
+    url.password === "" &&
+    hostOk(url.hostname) &&
+    url.pathname.startsWith(pathPrefix)
+  );
+}
+
 /** Per-kind webhook validation + labels. All three take a simple incoming-webhook POST. */
 const CHANNEL_META: Record<ChannelKind, { label: string; validate: (url: string) => boolean }> = {
   slack: {
     label: "Slack",
-    validate: (u) => /^https:\/\/hooks\.slack\.com\/services\/\S+$/.test(u),
+    validate: (u) => isWebhookUrl(u, (h) => h === "hooks.slack.com", "/services/"),
   },
   discord: {
     label: "Discord",
-    validate: (u) => /^https:\/\/(canary\.|ptb\.)?discord(app)?\.com\/api\/webhooks\/\S+$/.test(u),
+    validate: (u) =>
+      isWebhookUrl(
+        u,
+        (h) =>
+          h === "discord.com" ||
+          h === "discordapp.com" ||
+          h.endsWith(".discord.com") ||
+          h.endsWith(".discordapp.com"),
+        "/api/webhooks/",
+      ),
   },
   msteams: {
     label: "Microsoft Teams",
-    validate: (u) => /^https:\/\/\S+\.webhook\.office\.com\/\S+$/.test(u),
+    // Any Microsoft-owned Teams webhook host (`<tenant>.webhook.office.com`); the leading label must
+    // be non-empty so the bare domain / a spoofed path can't pass.
+    validate: (u) =>
+      isWebhookUrl(u, (h) => h.endsWith(".webhook.office.com") && h !== ".webhook.office.com", "/"),
   },
 };
+
+/** Whether a webhook URL is valid for a given channel kind (SSRF-safe host check). Exported for tests. */
+export function validateChannelUrl(kind: ChannelKind, url: string): boolean {
+  return CHANNEL_META[kind].validate(url);
+}
 
 /** One row in the in-app notification feed (the bell). */
 export interface NotificationItem {
