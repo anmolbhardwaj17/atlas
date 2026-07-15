@@ -29,6 +29,8 @@ import { SyncWorkerBootstrap } from "./sync-worker.bootstrap";
 import { HealthPollerBootstrap } from "./health-poller.bootstrap";
 import { SyncSchedulerBootstrap } from "./sync-scheduler.bootstrap";
 import { SyncReaperBootstrap } from "./sync-reaper.bootstrap";
+import { RetentionService } from "./retention.service";
+import { RetentionBootstrap } from "./retention.bootstrap";
 import { SECRET_BROKER, JOB_QUEUE, SNAPSHOT_STORE } from "./tokens";
 
 /**
@@ -106,6 +108,8 @@ const connectorRegistryProvider: Provider = {
     SyncSchedulerBootstrap,
     SyncReaperBootstrap,
     HealthPollerBootstrap,
+    RetentionService,
+    RetentionBootstrap,
   ],
   // SECRET_BROKER: so the AI module can resolve per-org BYO-LLM keys through the same broker.
   // ConnectionService: so the demo module can reuse disconnect()'s graph purge to clear sample data.
