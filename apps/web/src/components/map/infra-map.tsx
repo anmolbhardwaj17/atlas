@@ -344,7 +344,7 @@ export function InfraMap({
             {showFilters ? (
               <div className="absolute left-0 top-full z-20 mt-1.5 max-h-72 w-56 overflow-auto rounded-lg border border-border bg-background/95 p-1.5 shadow-md backdrop-blur">
                 <div className="flex items-center justify-between px-1.5 pb-1.5">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Filter by kind
                   </span>
                   {kindFilter.size > 0 ? (
@@ -1515,7 +1515,7 @@ function AssistantTurn({
 
         {!thinking && sources.length > 0 ? (
           <div className="space-y-1 pt-0.5">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               On the map
             </span>
             <div className="flex flex-wrap gap-1">
@@ -1754,7 +1754,7 @@ function MapSearch({
           </li>
           {matches.length > 0 ? (
             <>
-              <li className="px-2.5 pb-0.5 pt-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60">
+              <li className="px-2.5 pb-0.5 pt-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Jump to a resource
               </li>
               {matches.map((m, i) => (
@@ -1810,13 +1810,13 @@ function Legend() {
       <button
         type="button"
         onClick={() => setOpen(false)}
-        className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70 hover:text-foreground"
+        className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
       >
         Legend
         <ChevronDown className="size-3.5 rotate-180" />
       </button>
       <div className="flex flex-col gap-1.5 border-t border-border pt-2">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           Edges
         </span>
         <span className="flex items-center gap-1.5">
@@ -1838,7 +1838,7 @@ function Legend() {
         </span>
       </div>
       <div className="flex flex-col gap-1.5 border-t border-border pt-2">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           Nodes
         </span>
         <span className="flex items-center gap-1.5">
@@ -2089,7 +2089,7 @@ function DetailPanel({
           your cloud) are read-only; hand-made / inferred / suggested edges get a remove control. */}
       {links.length > 0 ? (
         <div className="mt-4">
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             Links · {links.length}
           </div>
           <ul className="-mx-1 max-h-44 space-y-0.5 overflow-y-auto">

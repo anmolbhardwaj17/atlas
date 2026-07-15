@@ -347,7 +347,7 @@ export function CommandPalette({ orgId }: { orgId: string }) {
                       <span className="shrink-0 text-xs text-muted-foreground">{item.sub}</span>
                     ) : null}
                     {item.type === "nav" && item.href === "/sift" ? (
-                      <span className="shrink-0 text-[9px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                      <span className="shrink-0 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
                         Soon
                       </span>
                     ) : null}

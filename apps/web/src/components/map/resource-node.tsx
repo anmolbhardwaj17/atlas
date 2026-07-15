@@ -232,9 +232,7 @@ export function EnvLaneNode({ data }: NodeProps) {
           {d.count}
         </span>
         {d.collapsed && d.hint ? (
-          <span className="truncate text-[11px] normal-case text-muted-foreground/70">
-            · {d.hint}
-          </span>
+          <span className="truncate text-[11px] normal-case text-muted-foreground">· {d.hint}</span>
         ) : null}
       </button>
     </div>

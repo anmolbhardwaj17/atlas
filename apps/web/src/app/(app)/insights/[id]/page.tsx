@@ -311,7 +311,7 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
                   </p>
                 );
               })()}
-              <p className="text-[11px] text-muted-foreground/70">
+              <p className="text-[11px] text-muted-foreground">
                 General guidance — ask Atlas above for the exact steps on your resources.
               </p>
             </CardContent>

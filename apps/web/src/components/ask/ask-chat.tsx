@@ -515,7 +515,7 @@ function AssistantBubble({
             click to peek without leaving the chat. */}
         {showExtras && nodeCites.length > 0 ? (
           <div className="space-y-1.5 pt-0.5">
-            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               {nodeCites.length === 1 ? "Referenced resource" : "Referenced resources"}
             </span>
             <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">

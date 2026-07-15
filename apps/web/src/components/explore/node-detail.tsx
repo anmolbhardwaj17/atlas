@@ -390,7 +390,7 @@ function Row({
         className={cn(
           "min-w-0 break-all",
           mono && "font-mono text-xs",
-          subtle && "text-[11px] text-muted-foreground/70",
+          subtle && "text-[11px] text-muted-foreground",
         )}
       >
         {value}

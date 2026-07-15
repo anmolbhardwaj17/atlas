@@ -42,7 +42,7 @@ export function SeverityTrend({ data }: { data: TrendPoint[] }) {
     return (
       <div className="flex h-full min-h-32 flex-col items-center justify-center gap-1 text-center">
         <p className="text-xs text-muted-foreground/70">Not enough history to trend yet.</p>
-        <p className="text-[11px] text-muted-foreground/50">
+        <p className="text-[11px] text-muted-foreground">
           As findings open and clear across syncs, the trend fills in.
         </p>
       </div>
