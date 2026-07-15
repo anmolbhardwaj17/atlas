@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
 /**
  * P2 — read-only by construction (a cardinal rule: no code path may mutate a customer's cloud). This
@@ -17,7 +16,8 @@ const READ_ONLY_PREFIXES = ["Describe", "Get", "List", "Lookup"];
 // Non-read commands that are auth/identity (STS), never a customer-resource mutation.
 const ALLOWED_EXACT = new Set(["AssumeRoleCommand", "GetCallerIdentityCommand"]);
 
-const SRC_DIR = dirname(fileURLToPath(import.meta.url));
+// This test file lives in the connector's `src/`, so its own directory is exactly what we scan.
+const SRC_DIR = __dirname;
 
 function collectTsFiles(dir: string): string[] {
   const out: string[] = [];
@@ -34,7 +34,9 @@ describe("P2 — AWS connector is read-only by construction", () => {
     const commands = new Set<string>();
     for (const file of collectTsFiles(SRC_DIR)) {
       const text = readFileSync(file, "utf8");
-      for (const m of text.matchAll(/\b([A-Z][A-Za-z0-9]+Command)\b/g)) commands.add(m[1]);
+      for (const m of text.matchAll(/\b([A-Z][A-Za-z0-9]+Command)\b/g)) {
+        if (m[1]) commands.add(m[1]);
+      }
     }
 
     // Sanity: we actually found the commands (guards against the scan silently matching nothing).
