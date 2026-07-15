@@ -114,7 +114,7 @@ export function FindingActions({
         variant="outline"
         onClick={() => void recheck()}
         disabled={busy !== null}
-        className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+        className="border-success/30 bg-success/10 text-success hover:bg-success/20 hover:text-success"
       >
         {busy === "recheck" ? (
           <Loader2 className="size-3.5 animate-spin" />
@@ -131,7 +131,7 @@ export function FindingActions({
         className={
           muted
             ? ""
-            : "border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
+            : "border-warning/30 bg-warning/10 text-warning hover:bg-warning/20 hover:text-warning"
         }
       >
         {busy === "mute" ? (

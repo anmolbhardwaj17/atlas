@@ -37,6 +37,13 @@ export function AppShell({
 }) {
   return (
     <SidebarProvider>
+      {/* Skip link — first tab stop; lets keyboard users bypass the sidebar nav to the page content. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-50 focus:rounded-md focus:border focus:border-border focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:shadow-md focus:ring-2 focus:ring-ring"
+      >
+        Skip to content
+      </a>
       <AppSidebar />
       {/* min-w-0: this is a flex item; without it, a page with intrinsically-wide content (e.g. the
           onboarding carousel's marquee row) forces <main> to grow to its content width and spills a
@@ -66,7 +73,7 @@ export function AppShell({
               <HeaderUserMenu email={email} name={name} avatarUrl={avatarUrl} />
             </div>
           </header>
-          <div className="flex-1 p-4 md:p-6">
+          <div id="main-content" tabIndex={-1} className="flex-1 p-4 outline-none md:p-6">
             <div className="w-full">{children}</div>
           </div>
         </BreadcrumbProvider>
