@@ -14,8 +14,8 @@ export default function PrivacyPage() {
     <article className="space-y-8">
       <header className="space-y-2">
         <h1 className="text-3xl font-semibold tracking-tight">Privacy Policy</h1>
-        <p className="text-sm text-neutral-500">Last updated: 15 July 2026 · DRAFT</p>
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <p className="text-sm text-muted-foreground">Last updated: 15 July 2026 · DRAFT</p>
+        <p className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
           Draft for legal review. The facts below match how the platform works today; your counsel
           must confirm the legal framing and finalize before you rely on it.
         </p>
@@ -84,7 +84,7 @@ export default function PrivacyPage() {
         The Service is hosted in Australia (Sydney). AI processing may occur in the United States
         via our model provider. Where personal data is transferred across borders, we rely on
         appropriate safeguards as required by applicable law.{" "}
-        <em className="text-amber-700">
+        <em className="text-warning">
           [Legal to confirm the transfer mechanism — e.g. Standard Contractual Clauses — and data-
           residency commitments.]
         </em>
@@ -104,7 +104,7 @@ export default function PrivacyPage() {
         export the personal data we hold for the organization from the app; deletion requests are
         honored by disconnecting a source or deleting the organization, and we can assist with
         individual requests. We respond within the timeframes required by applicable law.{" "}
-        <em className="text-amber-700">[Legal to set the committed response window.]</em>
+        <em className="text-warning">[Legal to set the committed response window.]</em>
       </Section>
 
       <Section title="9. Contact">
@@ -112,7 +112,7 @@ export default function PrivacyPage() {
         <a href="mailto:privacy@atlas.example" className="underline underline-offset-2">
           privacy@atlas.example
         </a>
-        . <em className="text-amber-700">[Replace with your monitored privacy contact address.]</em>
+        . <em className="text-warning">[Replace with your monitored privacy contact address.]</em>
       </Section>
     </article>
   );
@@ -122,7 +122,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <section className="space-y-2">
       <h2 className="text-lg font-semibold">{title}</h2>
-      <div className="leading-relaxed text-neutral-600">{children}</div>
+      <div className="leading-relaxed text-muted-foreground">{children}</div>
     </section>
   );
 }

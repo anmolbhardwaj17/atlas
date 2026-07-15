@@ -12,8 +12,8 @@ export default function TermsPage() {
     <article className="space-y-8">
       <header className="space-y-2">
         <h1 className="text-3xl font-semibold tracking-tight">Terms of Service</h1>
-        <p className="text-sm text-neutral-500">Last updated: 8 July 2026</p>
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <p className="text-sm text-muted-foreground">Last updated: 8 July 2026</p>
+        <p className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
           This is a template for review. Replace it with terms approved by your legal counsel before
           launch.
         </p>
@@ -79,7 +79,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <section className="space-y-2">
       <h2 className="text-lg font-semibold">{title}</h2>
-      <p className="leading-relaxed text-neutral-600">{children}</p>
+      <p className="leading-relaxed text-muted-foreground">{children}</p>
     </section>
   );
 }
