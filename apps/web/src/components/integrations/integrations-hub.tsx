@@ -340,7 +340,8 @@ export function IntegrationsHub({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search integrations…"
-            className="h-9 w-full rounded-md border border-border bg-transparent pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground/40"
+            aria-label="Search integrations"
+            className="h-9 w-full rounded-md border border-border bg-transparent pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-foreground/40 focus-visible:ring-2 focus-visible:ring-ring"
           />
         </div>
       </div>

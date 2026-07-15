@@ -1675,6 +1675,7 @@ function MapSearch({
               setTimeout(() => setOpen(false), 120);
             }}
             placeholder=""
+            aria-label="Search or ask the map"
             className="w-full bg-transparent text-xs outline-none"
           />
           {/* Placeholder. Idle+empty → crossfade the two hints; focused+empty → a plain static hint

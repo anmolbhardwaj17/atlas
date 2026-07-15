@@ -48,6 +48,20 @@ export function ConnectNodeDialog({
   const [searching, setSearching] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
 
+  // Close on Escape, and restore focus to whatever was focused before the dialog opened (a11y:
+  // a keyboard user isn't stranded after the modal closes).
+  React.useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      opener?.focus?.();
+    };
+  }, [onClose]);
+
   // Debounced, abortable search; never returns the source node as a target.
   React.useEffect(() => {
     const q = query.trim();

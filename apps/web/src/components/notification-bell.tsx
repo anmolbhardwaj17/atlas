@@ -123,7 +123,9 @@ export function NotificationBell({ orgId }: { orgId: string }) {
         type="button"
         onClick={() => void toggle()}
         aria-label={unread > 0 ? `Notifications (${unread} unread)` : "Notifications"}
-        className="relative grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="relative grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <Bell className="size-4" />
         {unread > 0 ? (

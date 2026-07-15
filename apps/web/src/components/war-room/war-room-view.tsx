@@ -509,6 +509,7 @@ export function WarRoomView({
                     if (e.key === "Enter" && !e.shiftKey) void submit(e);
                   }}
                   rows={1}
+                  aria-label="Ask a follow-up question"
                   placeholder="Ask a follow-up — e.g. “what did that PR change?”"
                   className="max-h-28 flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                 />
