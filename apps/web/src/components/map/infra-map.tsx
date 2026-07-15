@@ -1156,7 +1156,7 @@ function Flow({
       </div>
       {/* Docked chat — the map's conversational sidekick (P4: citations light the canvas). */}
       {chatOpen ? (
-        <aside className="flex w-[340px] max-w-[42%] shrink-0 flex-col border-l border-border bg-card">
+        <aside className="flex shrink-0 flex-col border-l border-border bg-card max-sm:absolute max-sm:inset-y-0 max-sm:right-0 max-sm:z-20 max-sm:w-[88%] max-sm:shadow-xl sm:w-[340px] sm:max-w-[42%]">
           <MapChat
             messages={messages}
             streaming={streaming}
@@ -2022,7 +2022,7 @@ function DetailPanel({
   const facts = keyFacts(node);
 
   return (
-    <div className="absolute right-3 top-3 z-10 w-80 rounded-lg border border-border bg-card p-4 shadow-lg">
+    <div className="absolute right-3 top-3 z-10 w-80 max-w-[calc(100%-1.5rem)] rounded-lg border border-border bg-card p-4 shadow-lg">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold">{node.name ?? kindShort}</div>

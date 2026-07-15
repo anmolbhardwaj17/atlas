@@ -48,14 +48,18 @@ export function AppShell({
             {/* Org switcher (multi-org) lives top-left, next to the toggle — the standard spot. */}
             {orgId && <OrgSwitcher initialOrgs={orgs} initialCurrentId={orgId} />}
             {/* Page breadcrumb (published per-page); falls back to an optional title. It renders its
-                own leading divider when present, so we don't add one here (avoids a double rule). */}
-            <HeaderBreadcrumbs />
-            {title ? (
-              <>
-                <Separator orientation="vertical" className="mr-1 h-4" />
-                <span className="text-sm font-medium">{title}</span>
-              </>
-            ) : null}
+                own leading divider when present, so we don't add one here (avoids a double rule).
+                Hidden on phones — the sidebar + the page's own H1 give context, and it would crowd the
+                header against the right-side controls. */}
+            <div className="hidden min-w-0 items-center gap-2 sm:flex">
+              <HeaderBreadcrumbs />
+              {title ? (
+                <>
+                  <Separator orientation="vertical" className="mr-1 h-4" />
+                  <span className="text-sm font-medium">{title}</span>
+                </>
+              ) : null}
+            </div>
             <div className="ml-auto flex items-center gap-2.5">
               {orgId && <CommandTrigger />}
               {orgId && <NotificationBell orgId={orgId} />}
