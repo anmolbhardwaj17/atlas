@@ -1,12 +1,12 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { withOrgScope, type Db, type ConnectionRow } from "@atlas/db";
 import type { Connection } from "@atlas/connector-sdk";
-import { enqueueSync, type SecretBroker, type JobQueue } from "@atlas/ingest";
+import { enqueueSync, type SecretBroker, type JobQueue, type SnapshotStore } from "@atlas/ingest";
 import { runInference, ALL_RULES, type InferenceStats } from "@atlas/inference";
 import { PG_POOL } from "../core/tokens";
 import { ApiException } from "../common/errors";
 import { ConnectorRegistry } from "./connector-registry";
-import { SECRET_BROKER, JOB_QUEUE } from "./tokens";
+import { SECRET_BROKER, JOB_QUEUE, SNAPSHOT_STORE } from "./tokens";
 import type {
   ConnectionDto,
   CreateConnectionBody,
@@ -48,6 +48,7 @@ export class ConnectionService {
     @Inject(PG_POOL) private readonly db: Db,
     @Inject(SECRET_BROKER) private readonly secrets: SecretBroker,
     @Inject(JOB_QUEUE) private readonly queue: JobQueue,
+    @Inject(SNAPSHOT_STORE) private readonly snapshots: SnapshotStore,
     private readonly registry: ConnectorRegistry,
   ) {}
 
@@ -439,6 +440,14 @@ export class ConnectionService {
         )
       ).rows[0]?.n ?? "0",
     );
+    // Capture the blob refs before deleting the DB rows, so we can erase the actual Storage objects
+    // too (the DB row is only a pointer — deleting it alone leaves the raw payload behind).
+    const snapshotRefs = (
+      await c.query<{ storage_ref: string }>(
+        `SELECT storage_ref FROM raw_snapshots WHERE node_id IN (SELECT id FROM nodes WHERE connection_id = $1)`,
+        [connectionId],
+      )
+    ).rows.map((r) => r.storage_ref);
     // Detach provenance from the snapshots we're about to delete - the FK is RESTRICT, so a
     // referencing provenance row would block the delete (the row itself is swept below).
     await c.query(
@@ -479,6 +488,15 @@ export class ConnectionService {
          WHERE p.raw_snapshot_id IS NULL
            AND NOT EXISTS (SELECT 1 FROM edges e WHERE e.provenance_id = p.id)`,
     );
+    // Erase the raw payload blobs from the object store (best-effort — the DB rows are already gone;
+    // a Storage hiccup shouldn't fail the purge, but log it so an orphan is visible).
+    if (snapshotRefs.length > 0) {
+      await this.snapshots
+        .delete(snapshotRefs)
+        .catch((e) =>
+          this.logger.warn(`snapshot blob purge failed (${connectionId}): ${String(e)}`),
+        );
+    }
     return { nodes, edges, signals, derivedNodes };
   }
 

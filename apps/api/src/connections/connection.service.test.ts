@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
-import { InMemorySecretBroker, InMemoryQueue } from "@atlas/ingest";
+import { InMemorySecretBroker, InMemoryQueue, InMemorySnapshotStore } from "@atlas/ingest";
 import { ConnectionService, classifyConnError } from "./connection.service";
 import { ConnectorRegistry } from "./connector-registry";
 
@@ -55,6 +55,8 @@ suite("F2.8 ConnectionService.disconnect purge", () => {
   let app: Pool;
   let svc: ConnectionService;
   let broker: InMemorySecretBroker;
+  let snapshots: InMemorySnapshotStore;
+  let snapshotRef: string;
   let orgId: string;
   let otherOrgId: string;
   let connId: string;
@@ -141,7 +143,14 @@ suite("F2.8 ConnectionService.disconnect purge", () => {
     admin = new Pool({ connectionString: adminUrl });
     app = new Pool({ connectionString: appUrl });
     broker = new InMemorySecretBroker();
-    svc = new ConnectionService(app, broker, new InMemoryQueue(), new ConnectorRegistry());
+    snapshots = new InMemorySnapshotStore();
+    svc = new ConnectionService(
+      app,
+      broker,
+      new InMemoryQueue(),
+      snapshots,
+      new ConnectorRegistry(),
+    );
     ruleId = one(
       (await admin.query<{ id: string }>("SELECT id FROM inference_rules LIMIT 1")).rows,
     ).id;
@@ -183,10 +192,12 @@ suite("F2.8 ConnectionService.disconnect purge", () => {
        VALUES ($1,$2,$3,'github.workflow.deploy','{}'::jsonb)`,
       [orgId, connId, "aws:us-east-1:1:lambda/checkout"],
     );
+    // Store a real blob so we can assert the object (not just the DB row) is erased on disconnect.
+    snapshotRef = await snapshots.put(orgId, "h", '{"raw":"payload"}');
     await admin.query(
       `INSERT INTO raw_snapshots (org_id, node_id, storage_ref, content_hash)
-       VALUES ($1,$2,'bucket/x','h')`,
-      [orgId, n1],
+       VALUES ($1,$2,$3,'h')`,
+      [orgId, n1, snapshotRef],
     );
 
     // Untouched other-org data.
@@ -218,6 +229,8 @@ suite("F2.8 ConnectionService.disconnect purge", () => {
     expect(await countIn("signals", orgId)).toBe(0);
     expect(await countIn("provenance", orgId)).toBe(0);
     expect(await countIn("raw_snapshots", orgId)).toBe(0);
+    // The raw payload BLOB is erased from the store too (not just the DB pointer).
+    expect(await snapshots.get(snapshotRef)).toBeNull();
   });
 
   it("is org-scoped - another org's graph is untouched", async () => {

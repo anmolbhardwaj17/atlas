@@ -1,8 +1,10 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { withOrgScope, type Db, type Role } from "@atlas/db";
+import type { SnapshotStore } from "@atlas/ingest";
 import { PG_POOL } from "../core/tokens";
+import { SNAPSHOT_STORE } from "../connections/tokens";
 import { UserMirrorService } from "../auth/user-mirror.service";
 import { ApiException } from "../common/errors";
 import type { AuthClaims } from "../auth/auth.types";
@@ -37,8 +39,11 @@ function isPgUnique(e: unknown): boolean {
 
 @Injectable()
 export class OrgService {
+  private readonly logger = new Logger(OrgService.name);
+
   constructor(
     @Inject(PG_POOL) private readonly db: Db,
+    @Inject(SNAPSHOT_STORE) private readonly snapshots: SnapshotStore,
     private readonly users: UserMirrorService,
     private readonly logos: OrgLogoService,
   ) {}
@@ -129,6 +134,16 @@ export class OrgService {
     await withOrgScope(this.db, orgId, (c) =>
       c.query(`DELETE FROM organizations WHERE id = $1`, [orgId]),
     );
+    // The DB cascade only removes rows; objects in Storage (raw-snapshot blobs that embed author
+    // names / PR / Jira contents, and the org logo) are pointers, so erase those too — otherwise
+    // "delete my org" leaves the raw payloads in the bucket, defeating GDPR erasure. Best-effort
+    // after the cascade: a Storage hiccup shouldn't fail the delete, but it's logged.
+    await this.snapshots
+      .deleteByOrg(orgId)
+      .catch((e) => this.logger.warn(`snapshot blob purge failed (org ${orgId}): ${String(e)}`));
+    await this.logos
+      .delete(orgId)
+      .catch((e) => this.logger.warn(`logo purge failed (org ${orgId}): ${String(e)}`));
   }
 
   async get(orgId: string): Promise<OrgDto> {

@@ -1,15 +1,15 @@
 import { Inject, Injectable, Logger, type OnModuleInit } from "@nestjs/common";
 import { withOrgScope, type Db } from "@atlas/db";
 import {
-  InMemorySnapshotStore,
   registerSyncWorker,
   type JobQueue,
   type SecretBroker,
+  type SnapshotStore,
 } from "@atlas/ingest";
 import type { Connection, ConnectorLogger } from "@atlas/connector-sdk";
 import { PG_POOL } from "../core/tokens";
 import { GraphService } from "../graph/graph.service";
-import { SECRET_BROKER, JOB_QUEUE } from "./tokens";
+import { SECRET_BROKER, JOB_QUEUE, SNAPSHOT_STORE } from "./tokens";
 import { ConnectorRegistry } from "./connector-registry";
 
 /**
@@ -28,6 +28,7 @@ export class SyncWorkerBootstrap implements OnModuleInit {
     @Inject(PG_POOL) private readonly db: Db,
     @Inject(JOB_QUEUE) private readonly queue: JobQueue,
     @Inject(SECRET_BROKER) private readonly secrets: SecretBroker,
+    @Inject(SNAPSHOT_STORE) private readonly snapshots: SnapshotStore,
     private readonly registry: ConnectorRegistry,
     private readonly graph: GraphService,
   ) {}
@@ -41,7 +42,7 @@ export class SyncWorkerBootstrap implements OnModuleInit {
     };
     registerSyncWorker(this.queue, {
       db: this.db,
-      snapshots: new InMemorySnapshotStore(),
+      snapshots: this.snapshots,
       secrets: this.secrets,
       logger: log,
       resolveConnector: (provider) => this.registry.get(provider),

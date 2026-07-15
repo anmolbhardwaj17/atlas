@@ -42,6 +42,28 @@ suite(
     it("returns null for a missing object", async () => {
       expect(await store.get(`${BUCKET}/${randomUUID()}/missing.json`)).toBeNull();
     });
+
+    it("delete removes specific objects by ref (disconnect path)", async () => {
+      const orgId = randomUUID();
+      const ref = await store.put(orgId, "h1", '{"a":1}');
+      expect(await store.get(ref)).not.toBeNull();
+      await store.delete([ref]);
+      expect(await store.get(ref)).toBeNull();
+    });
+
+    it("deleteByOrg erases every object under the org prefix (org-delete path)", async () => {
+      const orgId = randomUUID();
+      const refA = await store.put(orgId, "ha", '{"a":1}');
+      const refB = await store.put(orgId, "hb", '{"b":2}');
+      const other = randomUUID();
+      const refOther = await store.put(other, "hc", '{"c":3}');
+
+      await store.deleteByOrg(orgId);
+
+      expect(await store.get(refA)).toBeNull();
+      expect(await store.get(refB)).toBeNull();
+      expect(await store.get(refOther)).not.toBeNull(); // another org untouched
+    });
   },
   30000,
 );

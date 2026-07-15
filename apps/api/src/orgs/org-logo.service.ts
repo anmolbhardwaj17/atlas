@@ -17,4 +17,9 @@ export class OrgLogoService {
   upload(orgId: string, dataUrl: string): Promise<string> {
     return this.images.upload(BUCKET, orgId, dataUrl);
   }
+
+  /** Erase an org's logo object(s) — called on org deletion so nothing is left in Storage. */
+  delete(orgId: string): Promise<void> {
+    return this.images.deleteByPrefix(BUCKET, orgId);
+  }
 }

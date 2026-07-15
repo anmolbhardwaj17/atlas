@@ -20,6 +20,7 @@ export {
   SupabaseStorageSnapshotStore,
   createServiceClient,
   ensureBucket,
+  RAW_SNAPSHOT_BUCKET,
 } from "./supabase-storage";
 export { nullSecretAccessor, EnvSecretAccessor, silentLogger, consoleLogger } from "./runtime";
 export { InMemorySecretBroker, DbSecretBroker } from "./secret-broker";

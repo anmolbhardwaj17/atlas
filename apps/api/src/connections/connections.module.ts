@@ -3,7 +3,12 @@ import {
   InMemorySecretBroker,
   DbSecretBroker,
   InMemoryQueue,
+  InMemorySnapshotStore,
+  SupabaseStorageSnapshotStore,
+  createServiceClient,
+  RAW_SNAPSHOT_BUCKET,
   type SecretBroker,
+  type SnapshotStore,
 } from "@atlas/ingest";
 import type { Env } from "@atlas/config";
 import type { Db } from "@atlas/db";
@@ -24,7 +29,7 @@ import { SyncWorkerBootstrap } from "./sync-worker.bootstrap";
 import { HealthPollerBootstrap } from "./health-poller.bootstrap";
 import { SyncSchedulerBootstrap } from "./sync-scheduler.bootstrap";
 import { SyncReaperBootstrap } from "./sync-reaper.bootstrap";
-import { SECRET_BROKER, JOB_QUEUE } from "./tokens";
+import { SECRET_BROKER, JOB_QUEUE, SNAPSHOT_STORE } from "./tokens";
 
 /**
  * Connections (docs/08 §8). Imports AuthModule for the guards.
@@ -55,6 +60,25 @@ const jobQueueProvider: Provider = {
   useFactory: (): InMemoryQueue => new InMemoryQueue(),
 };
 
+// Supabase Storage when the service-role key is configured (the durable prod store), else the
+// in-memory dev store. One shared instance so writes (sync worker) and deletes (disconnect /
+// org-delete) hit the same place — the erasure paths depend on it.
+const snapshotStoreProvider: Provider = {
+  provide: SNAPSHOT_STORE,
+  useFactory: (env: Env): SnapshotStore => {
+    if (env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY) {
+      new Logger("SnapshotStore").log("Using Supabase Storage for raw snapshots.");
+      const client = createServiceClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
+      return new SupabaseStorageSnapshotStore(client, RAW_SNAPSHOT_BUCKET);
+    }
+    new Logger("SnapshotStore").warn(
+      "Supabase Storage unset - using in-memory snapshot store (dev).",
+    );
+    return new InMemorySnapshotStore();
+  },
+  inject: [ENV],
+};
+
 const connectorRegistryProvider: Provider = {
   provide: ConnectorRegistry,
   useFactory: (secrets: SecretBroker): ConnectorRegistry => {
@@ -76,6 +100,7 @@ const connectorRegistryProvider: Provider = {
     ConnectionService,
     secretBrokerProvider,
     jobQueueProvider,
+    snapshotStoreProvider,
     connectorRegistryProvider,
     SyncWorkerBootstrap,
     SyncSchedulerBootstrap,
@@ -84,6 +109,7 @@ const connectorRegistryProvider: Provider = {
   ],
   // SECRET_BROKER: so the AI module can resolve per-org BYO-LLM keys through the same broker.
   // ConnectionService: so the demo module can reuse disconnect()'s graph purge to clear sample data.
-  exports: [SECRET_BROKER, ConnectionService],
+  // SNAPSHOT_STORE: so the orgs module can erase an org's raw snapshots on delete.
+  exports: [SECRET_BROKER, SNAPSHOT_STORE, ConnectionService],
 })
 export class ConnectionsModule {}

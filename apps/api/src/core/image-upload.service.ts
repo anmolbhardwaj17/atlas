@@ -118,6 +118,19 @@ export class ImageUploadService {
     return client.storage.from(bucket).getPublicUrl(path).data.publicUrl;
   }
 
+  /** Remove every object under `<keyPrefix>/` in a bucket (e.g. an org's logos on org deletion).
+   *  No-op when upload isn't configured. Best-effort: throws only on a hard Storage error. */
+  async deleteByPrefix(bucket: string, keyPrefix: string): Promise<void> {
+    if (!this.enabled) return;
+    const client = this.getClient();
+    const { data, error } = await client.storage.from(bucket).list(keyPrefix, { limit: 1000 });
+    if (error) throw new Error(`image list failed (${bucket}/${keyPrefix}): ${error.message}`);
+    if (!data || data.length === 0) return;
+    const paths = data.map((o) => `${keyPrefix}/${o.name}`);
+    const { error: rmErr } = await client.storage.from(bucket).remove(paths);
+    if (rmErr) throw new Error(`image delete failed (${bucket}/${keyPrefix}): ${rmErr.message}`);
+  }
+
   private getClient(): ServiceClient {
     if (!this.client) {
       this.client = createServiceClient(

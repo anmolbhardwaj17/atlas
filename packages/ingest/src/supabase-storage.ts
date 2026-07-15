@@ -1,6 +1,10 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { SnapshotStore } from "./snapshot-store";
 
+/** The private bucket holding verbatim raw connector payloads (P4 click-through). Shared by the
+ *  writer (sync worker) and the deleters (disconnect / org-delete) so they agree on the location. */
+export const RAW_SNAPSHOT_BUCKET = "atlas-raw-snapshots";
+
 /**
  * Supabase Storage-backed SnapshotStore (docs/04 §5.4, docs/13). Stores the verbatim
  * provider payload in a PRIVATE bucket, content-addressed (`<orgId>/<hash>.json`) and
@@ -11,12 +15,22 @@ import type { SnapshotStore } from "./snapshot-store";
  * later (click-through to raw, P4).
  */
 export class SupabaseStorageSnapshotStore implements SnapshotStore {
+  private ensured = false;
+
   constructor(
     private readonly client: SupabaseClient,
     private readonly bucket: string,
   ) {}
 
+  /** Create the private bucket on first write if it doesn't exist (idempotent, once per process). */
+  private async ensure(): Promise<void> {
+    if (this.ensured) return;
+    await ensureBucket(this.client, this.bucket);
+    this.ensured = true;
+  }
+
   async put(orgId: string, contentHash: string, payload: string): Promise<string> {
+    await this.ensure();
     const path = `${orgId}/${contentHash}.json`;
     const { error } = await this.client.storage.from(this.bucket).upload(path, payload, {
       contentType: "application/json",
@@ -27,11 +41,39 @@ export class SupabaseStorageSnapshotStore implements SnapshotStore {
   }
 
   async get(storageRef: string): Promise<string | null> {
-    const prefix = `${this.bucket}/`;
-    const path = storageRef.startsWith(prefix) ? storageRef.slice(prefix.length) : storageRef;
+    const path = this.pathOf(storageRef);
     const { data, error } = await this.client.storage.from(this.bucket).download(path);
     if (error || !data) return null;
     return data.text();
+  }
+
+  async delete(storageRefs: string[]): Promise<void> {
+    if (storageRefs.length === 0) return;
+    const paths = storageRefs.map((r) => this.pathOf(r));
+    const { error } = await this.client.storage.from(this.bucket).remove(paths);
+    if (error) throw new Error(`snapshot delete failed: ${error.message}`);
+  }
+
+  async deleteByOrg(orgId: string): Promise<void> {
+    // Objects live under `<orgId>/`; Storage `remove` takes explicit paths, so list-then-remove in
+    // pages until the prefix is empty (each remove shrinks the next listing — bounded loop).
+    for (let page = 0; page < 1000; page++) {
+      const { data, error } = await this.client.storage
+        .from(this.bucket)
+        .list(orgId, { limit: 1000 });
+      if (error) throw new Error(`snapshot list failed: ${error.message}`);
+      if (!data || data.length === 0) return;
+      const paths = data.map((o) => `${orgId}/${o.name}`);
+      const { error: rmErr } = await this.client.storage.from(this.bucket).remove(paths);
+      if (rmErr) throw new Error(`snapshot delete failed: ${rmErr.message}`);
+      if (data.length < 1000) return;
+    }
+  }
+
+  /** storage_ref (`<bucket>/<path>`) → object path within the bucket. */
+  private pathOf(storageRef: string): string {
+    const prefix = `${this.bucket}/`;
+    return storageRef.startsWith(prefix) ? storageRef.slice(prefix.length) : storageRef;
   }
 }
 
