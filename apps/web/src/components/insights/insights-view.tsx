@@ -3,7 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, History, RotateCcw, Search } from "lucide-react";
+import { ChevronRight, History, RotateCcw, Search, Download } from "lucide-react";
+import { toCsv, downloadCsv } from "@/lib/csv";
 import { Card, CardContent } from "@/components/ui/card";
 import { AtlasAiMark } from "@/components/brand";
 import { PostureRadar, type Posture } from "@/components/dashboard/posture-radar";
@@ -340,9 +341,44 @@ export function InsightsView({
             </button>
           ))}
         </div>
-        <p className="text-xs tabular-nums text-muted-foreground sm:ml-auto">
-          {shown.length} of {base.length}
-        </p>
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <p className="text-xs tabular-nums text-muted-foreground">
+            {shown.length} of {base.length}
+          </p>
+          <button
+            type="button"
+            disabled={shown.length === 0}
+            title="Download the findings you're viewing as CSV"
+            onClick={() => {
+              const csv = toCsv(
+                [
+                  "Severity",
+                  "Category",
+                  "Title",
+                  "Detail",
+                  "Count",
+                  "Pillar",
+                  "First seen",
+                  "Status",
+                ],
+                shown.map((f) => [
+                  f.severity,
+                  f.category,
+                  f.title,
+                  f.detail,
+                  f.count ?? 1,
+                  f.guidance?.pillar ?? "",
+                  f.firstSeenAt ? f.firstSeenAt.slice(0, 10) : "",
+                  f.resolvedAt ? "fixed" : f.regressedAt ? "regressed" : "open",
+                ]),
+              );
+              downloadCsv(`atlas-findings-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+            }}
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground disabled:opacity-50"
+          >
+            <Download className="size-3.5" /> Export
+          </button>
+        </div>
       </div>
 
       {/* Findings table - dense + scannable; a row opens its detail page. */}

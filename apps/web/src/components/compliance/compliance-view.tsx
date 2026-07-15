@@ -3,7 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, Info, ChevronRight, Check, CircleHelp } from "lucide-react";
+import { ShieldCheck, Info, ChevronRight, Check, CircleHelp, Download } from "lucide-react";
+import { toCsv, downloadCsv } from "@/lib/csv";
 import { Card, CardContent } from "@/components/ui/card";
 import { kindIcon, KIND_LOGO } from "@/lib/kind-visual";
 import { CloudIcon } from "@/components/cloud-icon";
@@ -133,12 +134,49 @@ export function ComplianceView({ report }: { report: ComplianceReport | null }) 
       <header className="space-y-1.5">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Compliance</h1>
-          {report?.lastSyncAt ? (
-            <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-              <ShieldCheck className="size-3.5" />
-              Reflects your sync from {timeAgo(report.lastSyncAt)}
-            </span>
-          ) : null}
+          <div className="flex items-center gap-3">
+            {report?.lastSyncAt ? (
+              <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+                <ShieldCheck className="size-3.5" />
+                Reflects your sync from {timeAgo(report.lastSyncAt)}
+              </span>
+            ) : null}
+            {current ? (
+              <button
+                type="button"
+                title={`Download ${current.framework.label} controls as CSV`}
+                onClick={() => {
+                  const csv = toCsv(
+                    [
+                      "Control",
+                      "Title",
+                      "Status",
+                      "Severity",
+                      "Requirement",
+                      "Detail",
+                      "Frameworks",
+                    ],
+                    current.results.map((r) => [
+                      r.control.id,
+                      r.control.title,
+                      STATUS[r.status].label,
+                      r.severity,
+                      r.control.requirement,
+                      r.detail,
+                      Object.keys(r.control.mappings).join(" "),
+                    ]),
+                  );
+                  downloadCsv(
+                    `atlas-compliance-${current.framework.key}-${new Date().toISOString().slice(0, 10)}.csv`,
+                    csv,
+                  );
+                }}
+                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+              >
+                <Download className="size-3.5" /> Export
+              </button>
+            ) : null}
+          </div>
         </div>
         <p className="max-w-2xl text-sm text-muted-foreground">
           Continuous checks against the{" "}
