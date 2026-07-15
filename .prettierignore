@@ -9,3 +9,6 @@ pnpm-lock.yaml
 **/*.md
 # Local, per-developer Claude Code settings (untracked; not repo-managed).
 .claude/settings.local.json
+
+# Generated / hand-styled HTML docs (not prettier-managed)
+docs/*.html
