@@ -388,20 +388,31 @@ export class ConnectionService {
   }
 
   async disconnect(orgId: string, id: string): Promise<ConnectionDto> {
-    return withOrgScope(this.db, orgId, async (c) => {
-      await this.load(c, id); // 404 if absent / cross-tenant
+    const { dto, secretRef } = await withOrgScope(this.db, orgId, async (c) => {
+      const conn = await this.load(c, id); // 404 if absent / cross-tenant
       const purged = await this.purgeGraphData(c, id);
+      // Clear the credential pointer in the same tx (defence: even if the broker delete below fails,
+      // the ref no longer resolves), then delete the encrypted material after commit.
       const { rows } = await c.query<ConnectionRow>(
-        `UPDATE connections SET status = 'disconnected', deleted_at = now() WHERE id = $1
-         RETURNING ${SELECT_COLS}`,
+        `UPDATE connections SET status = 'disconnected', deleted_at = now(), secret_ref = NULL
+         WHERE id = $1 RETURNING ${SELECT_COLS}`,
         [id],
       );
       this.logger.log(
         `Disconnected ${id}: purged ${purged.nodes} nodes (+${purged.derivedNodes} orphaned derived), ` +
           `${purged.edges} edges, ${purged.signals} signals`,
       );
-      return toDto(rows[0]);
+      return { dto: toDto(rows[0]), secretRef: conn.secret_ref };
     });
+    // Disconnect means the customer wants us to forget the credential (GDPR erase-on-disconnect). Do
+    // it after the tx commits so a rollback can't leave the DB pointing at a deleted secret. Best-
+    // effort: a broker hiccup shouldn't fail the disconnect (the pointer is already nulled).
+    if (secretRef) {
+      await this.secrets
+        .delete(secretRef)
+        .catch((e) => this.logger.warn(`secret purge failed for connection ${id}: ${String(e)}`));
+    }
+    return dto;
   }
 
   /**

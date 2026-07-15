@@ -54,6 +54,7 @@ suite("F2.8 ConnectionService.disconnect purge", () => {
   let admin: Pool;
   let app: Pool;
   let svc: ConnectionService;
+  let broker: InMemorySecretBroker;
   let orgId: string;
   let otherOrgId: string;
   let connId: string;
@@ -139,12 +140,8 @@ suite("F2.8 ConnectionService.disconnect purge", () => {
   beforeAll(async () => {
     admin = new Pool({ connectionString: adminUrl });
     app = new Pool({ connectionString: appUrl });
-    svc = new ConnectionService(
-      app,
-      new InMemorySecretBroker(),
-      new InMemoryQueue(),
-      new ConnectorRegistry(),
-    );
+    broker = new InMemorySecretBroker();
+    svc = new ConnectionService(app, broker, new InMemoryQueue(), new ConnectorRegistry());
     ruleId = one(
       (await admin.query<{ id: string }>("SELECT id FROM inference_rules LIMIT 1")).rows,
     ).id;
@@ -226,6 +223,27 @@ suite("F2.8 ConnectionService.disconnect purge", () => {
   it("is org-scoped - another org's graph is untouched", async () => {
     await svc.disconnect(orgId, connId);
     expect(await countIn("nodes", otherOrgId)).toBe(1);
+  });
+
+  it("deletes the stored credential on disconnect (erase-on-disconnect) and nulls the ref", async () => {
+    // Give the connection a real credential in the broker.
+    const ref = await broker.put(orgId, { apiToken: "super-secret" });
+    await admin.query("UPDATE connections SET secret_ref = $2 WHERE id = $1", [connId, ref]);
+    expect(await broker.get(ref)).toEqual({ apiToken: "super-secret" });
+
+    await svc.disconnect(orgId, connId);
+
+    // Credential is gone from the broker, and the DB pointer is cleared.
+    expect(await broker.get(ref)).toEqual({});
+    const secretRef = one(
+      (
+        await admin.query<{ secret_ref: string | null }>(
+          "SELECT secret_ref FROM connections WHERE id = $1",
+          [connId],
+        )
+      ).rows,
+    ).secret_ref;
+    expect(secretRef).toBeNull();
   });
 
   it("does NOT delete a SIBLING connection's node provenance (P4 regression)", async () => {
