@@ -21,7 +21,7 @@ import { parseBody } from "../common/validation";
 import { AuditService } from "../core/audit.service";
 import { AnalyticsService } from "../core/analytics.service";
 import type { AuthedRequest } from "../auth/auth.types";
-import { OrgService } from "./org.service";
+import { OrgService, type PersonalDataExport } from "./org.service";
 import { InvitationService } from "./invitation.service";
 import {
   ChangeRoleSchema,
@@ -101,6 +101,23 @@ export class OrgController {
   @Roles("Member")
   async get(@Req() req: AuthedRequest): Promise<OrgDto> {
     return this.orgs.get(org(req).id);
+  }
+
+  /** Personal-data export (GDPR right of access) — the personal data Atlas holds for this org, so an
+   *  admin can answer a data-subject request. Admin-only, and the export itself is audited. */
+  @Get(":orgId/data-export")
+  @UseGuards(AuthGuard, TenantScopeGuard, RolesGuard)
+  @Roles("Admin")
+  async dataExport(@Req() req: AuthedRequest): Promise<PersonalDataExport> {
+    const orgId = org(req).id;
+    const data = await this.orgs.personalDataExport(orgId);
+    await this.audit.fromRequest(req, {
+      action: "org.data_export",
+      targetType: "org",
+      targetId: orgId,
+      metadata: { members: data.members.length, identities: data.identities.length },
+    });
+    return data;
   }
 
   @Patch(":orgId")

@@ -32,6 +32,33 @@ interface OrgRow {
 /** Shared column list so every org read returns the same DTO shape. */
 const ORG_COLS = "id, slug, name, plan, status, logo_url, created_at";
 
+/** The personal data Atlas holds for an org — the DSAR (right-of-access) deliverable. */
+export interface PersonalDataExport {
+  generatedAt: string;
+  org: { name: string; slug: string };
+  members: Array<{
+    email: string;
+    name: string | null;
+    role: string;
+    status: string;
+    joinedAt: string;
+  }>;
+  identities: Array<{
+    urn: string;
+    kind: string;
+    name: string | null;
+    login: string | null;
+    displayName: string | null;
+    email: string | null;
+  }>;
+}
+
+/** A string attribute if present + non-empty, else null (for the identity export). */
+function strAttr(attrs: Record<string, unknown>, key: string): string | null {
+  const v = attrs?.[key];
+  return typeof v === "string" && v ? v : null;
+}
+
 const UNIQUE_VIOLATION = "23505";
 function isPgUnique(e: unknown): boolean {
   return typeof e === "object" && e !== null && (e as { code?: string }).code === UNIQUE_VIOLATION;
@@ -144,6 +171,70 @@ export class OrgService {
     await this.logos
       .delete(orgId)
       .catch((e) => this.logger.warn(`logo purge failed (org ${orgId}): ${String(e)}`));
+  }
+
+  /**
+   * Personal-data export (GDPR Art. 15/20 — right of access + portability). Gathers the personal
+   * data Atlas holds for an org so an admin can answer a data-subject request: the org's members
+   * (identity we store directly) and every person/team identity node the connectors ingested (login
+   * + display name; PR/commit/ticket author names in node attributes all resolve to these). Org-
+   * scoped (RLS). Not a full graph dump — just the personal data, which is what a DSAR concerns.
+   */
+  async personalDataExport(orgId: string): Promise<PersonalDataExport> {
+    return withOrgScope(this.db, orgId, async (c) => {
+      const org = (
+        await c.query<{ name: string; slug: string }>(
+          `SELECT name, slug FROM organizations WHERE id = $1`,
+          [orgId],
+        )
+      ).rows[0];
+      if (!org) throw ApiException.notFound();
+      const members = (
+        await c.query<{
+          email: string;
+          name: string | null;
+          role: string;
+          status: string;
+          joined_at: Date;
+        }>(
+          `SELECT u.email, u.name, m.role, m.status, m.created_at AS joined_at
+             FROM memberships m JOIN users u ON u.id = m.user_id
+            ORDER BY m.created_at`,
+        )
+      ).rows.map((m) => ({
+        email: m.email,
+        name: m.name,
+        role: m.role,
+        status: m.status,
+        joinedAt: m.joined_at.toISOString(),
+      }));
+      const identities = (
+        await c.query<{
+          urn: string;
+          kind: string;
+          name: string | null;
+          attributes: Record<string, unknown>;
+        }>(
+          `SELECT urn, kind, name, attributes FROM nodes
+            WHERE (kind LIKE '%.user' OR kind LIKE '%.team') AND status <> 'deleted'
+            ORDER BY kind, name`,
+        )
+      ).rows.map((n) => ({
+        urn: n.urn,
+        kind: n.kind,
+        name: n.name,
+        // Only the identity-bearing attributes (login / display name / email), never the whole blob.
+        login: strAttr(n.attributes, "login") ?? strAttr(n.attributes, "username"),
+        displayName: strAttr(n.attributes, "displayName") ?? strAttr(n.attributes, "display_name"),
+        email: strAttr(n.attributes, "email"),
+      }));
+      return {
+        generatedAt: new Date().toISOString(),
+        org: { name: org.name, slug: org.slug },
+        members,
+        identities,
+      };
+    });
   }
 
   async get(orgId: string): Promise<OrgDto> {
