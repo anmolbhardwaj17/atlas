@@ -8,6 +8,7 @@ import { DangerZoneCard } from "@/components/settings/danger-zone-card";
 import { LlmSettingsCard } from "@/components/settings/llm-settings";
 import { AlertSettingsCard } from "@/components/settings/alert-settings";
 import { EmailPrefsCard } from "@/components/settings/email-prefs";
+import { PrivacyDataCard } from "@/components/settings/privacy-data";
 import type { LlmSettings } from "@/lib/browser-api";
 
 interface MemberDto {
@@ -89,6 +90,9 @@ export function SettingsView({
         initialMembers={members}
         initialInvites={invites}
       />
+
+      {/* DSAR admin surface (export + person erasure) — Admin-only, matching the API. */}
+      {isAdmin ? <PrivacyDataCard orgId={orgId} /> : null}
 
       {isAdmin ? securitySlot : null}
 

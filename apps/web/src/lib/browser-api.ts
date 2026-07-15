@@ -1288,3 +1288,48 @@ export async function setEmailPrefs(
   const body = (await res.json().catch(() => null)) as { data?: EmailPrefs } | null;
   return body?.data ?? null;
 }
+
+/** GDPR data-export (admin): the personal data Atlas holds for the org. */
+export interface PersonalDataExport {
+  generatedAt: string;
+  org: { name: string; slug: string };
+  members: Array<{
+    email: string;
+    name: string | null;
+    role: string;
+    status: string;
+    joinedAt: string;
+  }>;
+  identities: Array<{
+    urn: string;
+    kind: string;
+    name: string | null;
+    login: string | null;
+    displayName: string | null;
+    email: string | null;
+  }>;
+}
+
+export async function getDataExport(orgId: string): Promise<PersonalDataExport | null> {
+  const token = await getClientToken();
+  if (!token) return null;
+  const res = await fetch(`${apiUrl()}/orgs/${orgId}/data-export`, {
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) return null;
+  const body = (await res.json().catch(() => null)) as { data?: PersonalDataExport } | null;
+  return body?.data ?? null;
+}
+
+/** Erase a person (GDPR right to be forgotten). Returns the number of redacted nodes, or throws. */
+export async function erasePerson(orgId: string, nodeId: string): Promise<number> {
+  const token = await getClientToken();
+  if (!token) throw new Error("Not signed in.");
+  const res = await fetch(`${apiUrl()}/people/${nodeId}/erase`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) throw new Error(await edgeError(res, "Couldn't erase this person."));
+  const body = (await res.json().catch(() => null)) as { data?: { redactedNodes?: number } } | null;
+  return body?.data?.redactedNodes ?? 0;
+}
