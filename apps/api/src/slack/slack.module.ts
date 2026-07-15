@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { AuthModule } from "../auth/auth.module";
 import { AiModule } from "../ai/ai.module";
 import { ConnectionsModule } from "../connections/connections.module";
 import { SlackController } from "./slack.controller";
@@ -12,7 +13,7 @@ import { SlackService } from "./slack.service";
  * "Add to Slack" install URL + report connection status.
  */
 @Module({
-  imports: [AiModule, ConnectionsModule],
+  imports: [AuthModule, AiModule, ConnectionsModule],
   controllers: [SlackController, SlackAdminController],
   providers: [SlackService],
   exports: [SlackService],
