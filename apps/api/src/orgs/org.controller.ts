@@ -107,7 +107,14 @@ export class OrgController {
   @UseGuards(AuthGuard, TenantScopeGuard, RolesGuard)
   @Roles("Admin")
   async update(@Req() req: AuthedRequest, @Body() body: unknown): Promise<OrgDto> {
-    return this.orgs.update(org(req).id, parseBody(UpdateOrgSchema, body));
+    const dto = await this.orgs.update(org(req).id, parseBody(UpdateOrgSchema, body));
+    await this.audit.fromRequest(req, {
+      action: "org.update",
+      targetType: "org",
+      targetId: org(req).id,
+      metadata: { name: dto.name },
+    });
+    return dto;
   }
 
   /** Permanently delete the org and everything in it (docs/12 §6.4). **Owner-only** — the most

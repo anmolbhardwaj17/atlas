@@ -21,6 +21,7 @@ import { Roles } from "../auth/roles.decorator";
 import { ApiException } from "../common/errors";
 import { parseBody } from "../common/validation";
 import type { AuthedRequest } from "../auth/auth.types";
+import { AuditService } from "../core/audit.service";
 import { AiService } from "./ai.service";
 import { AskSchema, CreateConversationSchema, SetLlmConfigSchema } from "./dto";
 
@@ -47,6 +48,7 @@ export class AiController {
 
   constructor(
     private readonly ai: AiService,
+    private readonly audit: AuditService,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
@@ -64,13 +66,27 @@ export class AiController {
   @Roles("Admin")
   async setSettings(@Req() req: AuthedRequest, @Body() body: unknown): Promise<unknown> {
     const { provider, model, apiKey } = parseBody(SetLlmConfigSchema, body);
-    return this.ai.setLlmConfig(org(req).id, provider, model, apiKey);
+    const result = await this.ai.setLlmConfig(org(req).id, provider, model, apiKey);
+    // Security-relevant: configuring an org's LLM stores an API-key credential + redirects customer
+    // data to that provider. Audit the change (provider/model only, never the key).
+    await this.audit.fromRequest(req, {
+      action: "ai.llm_config.set",
+      targetType: "org",
+      targetId: org(req).id,
+      metadata: { provider, model },
+    });
+    return result;
   }
 
   @Delete("settings")
   @Roles("Admin")
   async deleteSettings(@Req() req: AuthedRequest): Promise<{ ok: true }> {
     await this.ai.deleteLlmConfig(org(req).id);
+    await this.audit.fromRequest(req, {
+      action: "ai.llm_config.delete",
+      targetType: "org",
+      targetId: org(req).id,
+    });
     return { ok: true };
   }
 

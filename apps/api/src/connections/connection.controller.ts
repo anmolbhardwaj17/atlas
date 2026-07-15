@@ -35,7 +35,14 @@ export class ConnectionController {
   @Post()
   @Roles("Admin")
   async create(@Req() req: AuthedRequest, @Body() body: unknown): Promise<ConnectionDto> {
-    return this.connections.create(org(req).id, parseBody(CreateConnectionSchema, body));
+    const dto = await this.connections.create(org(req).id, parseBody(CreateConnectionSchema, body));
+    await this.audit.fromRequest(req, {
+      action: "connection.create",
+      targetType: "connection",
+      targetId: dto.id,
+      metadata: { provider: dto.provider },
+    });
+    return dto;
   }
 
   @Get()

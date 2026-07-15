@@ -5,6 +5,7 @@ import { RolesGuard } from "../auth/roles.guard";
 import { Roles } from "../auth/roles.decorator";
 import type { AuthedRequest } from "../auth/auth.types";
 import { ApiException } from "../common/errors";
+import { AuditService } from "../core/audit.service";
 import { AlertPolicyService, ALERT_POLICIES, type AlertPolicy } from "./alert-policy.service";
 
 /**
@@ -14,7 +15,10 @@ import { AlertPolicyService, ALERT_POLICIES, type AlertPolicy } from "./alert-po
 @Controller("alerts")
 @UseGuards(AuthGuard, TenantScopeGuard, RolesGuard)
 export class AlertsController {
-  constructor(private readonly policy: AlertPolicyService) {}
+  constructor(
+    private readonly policy: AlertPolicyService,
+    private readonly audit: AuditService,
+  ) {}
 
   @Get("policy")
   @Roles("Member")
@@ -31,7 +35,14 @@ export class AlertsController {
     if (!body.policy || !ALERT_POLICIES.includes(body.policy as AlertPolicy)) {
       throw ApiException.validation([{ field: "policy", issue: "Invalid alert policy." }]);
     }
-    return { policy: await this.policy.set(orgOf(req), body.policy as AlertPolicy) };
+    const policy = await this.policy.set(orgOf(req), body.policy as AlertPolicy);
+    await this.audit.fromRequest(req, {
+      action: "alert_policy.set",
+      targetType: "org",
+      targetId: orgOf(req),
+      metadata: { policy },
+    });
+    return { policy };
   }
 }
 
