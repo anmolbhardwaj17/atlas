@@ -11,7 +11,9 @@ export const dynamic = "force-dynamic";
 async function ComplianceContent() {
   const { token, orgId } = await getPageAuth();
   const res = await apiGet<ApiOk<ComplianceReport>>("/compliance", { token, orgId });
-  return <ComplianceView report={res.body?.data ?? null} />;
+  // A failed fetch must not blank the page — throw to the in-shell error boundary instead.
+  if (res.body === null) throw new Error(`Failed to load compliance report (status ${res.status})`);
+  return <ComplianceView report={res.body.data} />;
 }
 
 /**

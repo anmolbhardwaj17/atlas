@@ -59,14 +59,14 @@ export function NodesList({ nodes, filtered = false }: { nodes: NodeDto[]; filte
     );
   }
   return (
-    <div className="overflow-hidden rounded-lg border border-border">
+    <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-full text-sm">
         <thead className="border-b border-border bg-card text-left text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
             <th className="px-4 py-2.5 font-medium">Resource</th>
             <th className="px-4 py-2.5 font-medium">Kind</th>
             <th className="px-4 py-2.5 font-medium">Health</th>
-            <th className="px-4 py-2.5 font-medium">Region</th>
+            <th className="hidden px-4 py-2.5 font-medium sm:table-cell">Region</th>
             <th className="px-4 py-2.5 font-medium">Status</th>
           </tr>
         </thead>
@@ -110,7 +110,9 @@ export function NodesList({ nodes, filtered = false }: { nodes: NodeDto[]; filte
                 <td className="px-4 py-2.5">
                   <HealthCell node={n} />
                 </td>
-                <td className="px-4 py-2.5 text-muted-foreground">{n.region ?? "-"}</td>
+                <td className="hidden px-4 py-2.5 text-muted-foreground sm:table-cell">
+                  {n.region ?? "-"}
+                </td>
                 <td className="px-4 py-2.5">
                   <FreshnessTag status={n.status} />
                 </td>

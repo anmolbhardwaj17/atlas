@@ -116,10 +116,15 @@ export async function Dashboard({
     apiGet<ApiOk<Summary>>("/summary", { token, orgId }),
     apiGet<ApiOk<ConnectionLite[]>>("/connections", { token, orgId }),
   ]);
-  const s = summaryRes.body?.data;
+  // A failed /summary must not masquerade as an empty graph (which would invite an existing customer
+  // to "seed sample data"). Throw to the in-shell error boundary; only a real empty graph onboards.
+  if (summaryRes.body === null) {
+    throw new Error(`Failed to load dashboard (status ${summaryRes.status})`);
+  }
+  const s = summaryRes.body.data;
 
-  // Empty graph → the onboarding first-run experience.
-  if (!s || s.inventory.resources === 0) {
+  // Genuinely empty graph → the onboarding first-run experience.
+  if (s.inventory.resources === 0) {
     return <Onboarding orgId={orgId} canSeed={role === "Owner" || role === "Admin"} name={name} />;
   }
 

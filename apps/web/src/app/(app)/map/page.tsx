@@ -28,10 +28,13 @@ async function MapContent({
   const full = (Array.isArray(params.full) ? params.full[0] : params.full) === "1";
   const limit = full ? 1000 : 400;
 
-  const data =
-    (await apiGet<ApiOk<MapData>>(`/graph?limit=${limit}`, { token, orgId })).body?.data ?? null;
+  const res = await apiGet<ApiOk<MapData>>(`/graph?limit=${limit}`, { token, orgId });
+  // A failed /graph must not read as "nothing to map yet" (which tells a connected user their estate
+  // is empty). Throw to the in-shell error boundary; a real empty graph still shows the connect CTA.
+  if (res.body === null) throw new Error(`Failed to load the map (status ${res.status})`);
+  const data = res.body.data;
 
-  if (!data || data.nodes.length === 0) {
+  if (data.nodes.length === 0) {
     return (
       <div className="space-y-6">
         <div className="space-y-1.5">

@@ -24,14 +24,17 @@ interface InsightsData {
 async function InsightsContent() {
   const { token, orgId } = await getPageAuth();
   const res = await apiGet<ApiOk<InsightsData>>("/insights", { token, orgId });
-  const data = res.body?.data;
+  // A failed fetch must NOT render as "All clear" — that fabricates a healthy estate (P4/P7). Throw
+  // to the in-shell error boundary; a genuinely empty result still has a body and renders normally.
+  if (res.body === null) throw new Error(`Failed to load insights (status ${res.status})`);
+  const data = res.body.data;
   return (
     <InsightsView
-      summary={data?.summary ?? null}
-      findings={data?.findings ?? []}
-      resolved={data?.resolved ?? []}
-      mutes={data?.mutes ?? []}
-      lastSyncedAt={data?.lastSyncedAt ?? null}
+      summary={data.summary ?? null}
+      findings={data.findings ?? []}
+      resolved={data.resolved ?? []}
+      mutes={data.mutes ?? []}
+      lastSyncedAt={data.lastSyncedAt ?? null}
     />
   );
 }
