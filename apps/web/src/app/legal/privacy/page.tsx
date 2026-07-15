@@ -3,19 +3,21 @@ import type { Metadata } from "next";
 export const metadata: Metadata = { title: "Privacy Policy · Atlas" };
 
 /**
- * Privacy Policy (template). Placeholder boilerplate reflecting how Atlas actually works
- * (read-only connectors, org-scoped isolation, sub-processors). NOT legal advice; have counsel
- * review and replace before relying on it.
+ * Privacy Policy (DRAFT). The content below is written to reflect how Atlas ACTUALLY handles data
+ * (read-only connectors, org-scoped isolation, the real sub-processor set, retention windows, and the
+ * access/erasure paths that exist in code) so counsel reviews accurate facts — NOT a generic template.
+ * It is still NOT legal advice: a lawyer must confirm the legal framing (lawful basis, transfer
+ * mechanism/SCCs, DSAR turnaround commitments, controller/processor roles) and finalize before launch.
  */
 export default function PrivacyPage() {
   return (
     <article className="space-y-8">
       <header className="space-y-2">
         <h1 className="text-3xl font-semibold tracking-tight">Privacy Policy</h1>
-        <p className="text-sm text-neutral-500">Last updated: 8 July 2026</p>
+        <p className="text-sm text-neutral-500">Last updated: 15 July 2026 · DRAFT</p>
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          This is a template for review. Replace it with a policy approved by your legal counsel
-          before launch.
+          Draft for legal review. The facts below match how the platform works today; your counsel
+          must confirm the legal framing and finalize before you rely on it.
         </p>
       </header>
 
@@ -31,7 +33,8 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Connected-system data</strong>: read-only metadata about your cloud resources,
-            repositories, deployments, and dependencies, used to build your graph.
+            repositories, deployments, and dependencies, used to build your graph. This can include
+            personal data such as commit and pull-request author names, and ticket assignees.
           </li>
           <li>
             <strong>Usage data</strong>: logs and events needed to operate, secure, and improve the
@@ -53,28 +56,63 @@ export default function PrivacyPage() {
       </Section>
 
       <Section title="5. Sub-processors">
-        We rely on a small set of vetted providers to run the Service, such as cloud hosting and
-        Supabase for managed database, authentication, and storage. Each is bound by data-protection
-        obligations consistent with this policy.
+        <p>We rely on a small set of vetted providers to run the Service:</p>
+        <ul className="ml-5 mt-2 list-disc space-y-1">
+          <li>
+            <strong>Supabase</strong> — managed Postgres database, authentication, and file storage.
+          </li>
+          <li>
+            <strong>Amazon Web Services</strong> — cloud hosting and infrastructure.
+          </li>
+          <li>
+            <strong>Anthropic</strong> — the AI model that powers cited answers and diagnosis.
+            Relevant graph context (which can include the personal data in section 2) is sent to
+            answer your questions.
+          </li>
+          <li>
+            <strong>Resend</strong> — transactional and notification email delivery.
+          </li>
+        </ul>
+        <p className="mt-2">
+          If your organization configures its own AI provider (bring-your-own key), the relevant
+          context is sent to that provider instead, under your agreement with them. Each
+          sub-processor is bound by data-protection obligations consistent with this policy.
+        </p>
       </Section>
 
-      <Section title="6. Retention & deletion">
-        We keep your data for as long as your account is active. Disconnecting a source removes the
-        data derived from it, and closing your account deletes your organization&rsquo;s data within
-        a reasonable period, subject to legal requirements.
+      <Section title="6. Where your data is processed">
+        The Service is hosted in Australia (Sydney). AI processing may occur in the United States
+        via our model provider. Where personal data is transferred across borders, we rely on
+        appropriate safeguards as required by applicable law.{" "}
+        <em className="text-amber-700">
+          [Legal to confirm the transfer mechanism — e.g. Standard Contractual Clauses — and data-
+          residency commitments.]
+        </em>
       </Section>
 
-      <Section title="7. Your rights">
-        You may access, correct, export, or delete your personal data. Contact us and we will
-        respond within the timeframes required by applicable law.
+      <Section title="7. Retention & deletion">
+        We keep your data for as long as your account is active. Raw source snapshots are kept on a
+        rolling window (typically 30 days) and activity history for a limited period; older records
+        are automatically purged. <strong>Disconnecting a source</strong> removes the data derived
+        from it — including the stored credential and the raw snapshots — and{" "}
+        <strong>closing your account</strong> deletes your organization&rsquo;s data, including
+        files in storage, subject to legal requirements.
       </Section>
 
-      <Section title="8. Contact">
+      <Section title="8. Your rights">
+        You may access, correct, export, or delete your personal data. Organization admins can
+        export the personal data we hold for the organization from the app; deletion requests are
+        honored by disconnecting a source or deleting the organization, and we can assist with
+        individual requests. We respond within the timeframes required by applicable law.{" "}
+        <em className="text-amber-700">[Legal to set the committed response window.]</em>
+      </Section>
+
+      <Section title="9. Contact">
         Privacy questions? Reach our team at{" "}
         <a href="mailto:privacy@atlas.example" className="underline underline-offset-2">
           privacy@atlas.example
         </a>
-        .
+        . <em className="text-amber-700">[Replace with your monitored privacy contact address.]</em>
       </Section>
     </article>
   );
