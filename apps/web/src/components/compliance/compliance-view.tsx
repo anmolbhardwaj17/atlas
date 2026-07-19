@@ -12,6 +12,7 @@ import { CloudIcon } from "@/components/cloud-icon";
 import { cn } from "@/lib/cn";
 import { SEVERITY_TEXT } from "@/lib/severity";
 import { SegmentedControl, Segment } from "@/components/ui/segmented-control";
+import { Table, TableHeader, TableBody, TableRow, TableHead } from "@/components/ui/table";
 
 export type Framework = "pci" | "nist" | "iso" | "hipaa" | "cis" | "gdpr";
 export type ControlStatus = "pass" | "fail" | "not-applicable" | "not-assessable";
@@ -284,35 +285,33 @@ export function ComplianceView({ report }: { report: ComplianceReport | null }) 
 
           {/* Controls table — dense + columnar, matching Insights. */}
           <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-                    <th className="w-28 px-4 py-2.5 font-medium">Status</th>
-                    <th className="w-24 px-4 py-2.5 font-medium">Severity</th>
-                    <th className="px-4 py-2.5 font-medium">Control</th>
-                    <th className="hidden px-4 py-2.5 font-medium lg:table-cell">
-                      {current.framework.label} controls
-                    </th>
-                    <th className="w-10 px-2 py-2.5" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {graded.map((r) => (
-                    <ControlRow
-                      key={r.control.id}
-                      r={r}
-                      framework={active}
-                      onOpen={
-                        r.status === "fail" && r.control.findingId
-                          ? () => router.push(`/insights/${r.control.findingId}`)
-                          : undefined
-                      }
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-28">Status</TableHead>
+                  <TableHead className="w-24">Severity</TableHead>
+                  <TableHead>Control</TableHead>
+                  <TableHead className="hidden lg:table-cell">
+                    {current.framework.label} controls
+                  </TableHead>
+                  <TableHead className="w-10 px-2" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {graded.map((r) => (
+                  <ControlRow
+                    key={r.control.id}
+                    r={r}
+                    framework={active}
+                    onOpen={
+                      r.status === "fail" && r.control.findingId
+                        ? () => router.push(`/insights/${r.control.findingId}`)
+                        : undefined
+                    }
+                  />
+                ))}
+              </TableBody>
+            </Table>
           </Card>
 
           {/* Not assessable — Atlas's crawl gaps, not the user's action items. Kept quiet + separate

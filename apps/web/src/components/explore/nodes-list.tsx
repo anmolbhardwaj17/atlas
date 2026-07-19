@@ -2,6 +2,14 @@ import Link from "next/link";
 import { SearchX, Waypoints } from "lucide-react";
 import { FreshnessTag } from "@/components/certainty";
 import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { kindIcon, kindStyle, KIND_LOGO } from "@/lib/kind-visual";
 import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
@@ -59,68 +67,66 @@ export function NodesList({ nodes, filtered = false }: { nodes: NodeDto[]; filte
     );
   }
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
-      <table className="w-full text-sm">
-        <thead className="border-b border-border bg-card text-left text-xs uppercase tracking-wide text-muted-foreground">
-          <tr>
-            <th className="px-4 py-2.5 font-medium">Resource</th>
-            <th className="px-4 py-2.5 font-medium">Kind</th>
-            <th className="px-4 py-2.5 font-medium">Health</th>
-            <th className="hidden px-4 py-2.5 font-medium sm:table-cell">Region</th>
-            <th className="px-4 py-2.5 font-medium">Status</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {nodes.map((n, i) => {
-            const Icon = kindIcon(n.kind);
-            const logo = rowLogo(n.kind);
-            return (
-              <tr
-                key={n.id}
-                className="motion-rise transition-colors hover:bg-card/60"
-                style={{ animationDelay: `${Math.min(i, 14) * 30}ms` }}
-              >
-                <td className="px-4 py-2.5">
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      className={cn(
-                        "grid size-7 shrink-0 place-items-center rounded-md",
-                        logo ? "bg-muted/60" : kindStyle(n.kind),
-                      )}
-                    >
-                      {logo ? (
-                        <CloudIcon name={logo} className="size-[18px]" />
-                      ) : (
-                        <Icon className="size-4" />
-                      )}
-                    </span>
-                    <div className="min-w-0">
-                      <Link href={`/explore/${n.id}`} className="font-medium hover:text-primary">
-                        {n.name ?? <span className="text-muted-foreground">unnamed</span>}
-                      </Link>
-                      <div className="max-w-md truncate text-xs text-muted-foreground">{n.urn}</div>
-                    </div>
+    <Table wrapperClassName="rounded-lg border border-border">
+      <TableHeader>
+        <TableRow>
+          <TableHead>Resource</TableHead>
+          <TableHead>Kind</TableHead>
+          <TableHead>Health</TableHead>
+          <TableHead className="hidden sm:table-cell">Region</TableHead>
+          <TableHead>Status</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {nodes.map((n, i) => {
+          const Icon = kindIcon(n.kind);
+          const logo = rowLogo(n.kind);
+          return (
+            <TableRow
+              key={n.id}
+              className="motion-rise transition-colors hover:bg-card/60"
+              style={{ animationDelay: `${Math.min(i, 14) * 30}ms` }}
+            >
+              <TableCell className="py-2.5">
+                <div className="flex items-center gap-2.5">
+                  <span
+                    className={cn(
+                      "grid size-7 shrink-0 place-items-center rounded-md",
+                      logo ? "bg-muted/60" : kindStyle(n.kind),
+                    )}
+                  >
+                    {logo ? (
+                      <CloudIcon name={logo} className="size-[18px]" />
+                    ) : (
+                      <Icon className="size-4" />
+                    )}
+                  </span>
+                  <div className="min-w-0">
+                    <Link href={`/explore/${n.id}`} className="font-medium hover:text-primary">
+                      {n.name ?? <span className="text-muted-foreground">unnamed</span>}
+                    </Link>
+                    <div className="max-w-md truncate text-xs text-muted-foreground">{n.urn}</div>
                   </div>
-                </td>
-                <td className="px-4 py-2.5">
-                  <Badge variant="secondary" className="font-mono text-[11px] font-normal">
-                    {n.kind}
-                  </Badge>
-                </td>
-                <td className="px-4 py-2.5">
-                  <HealthCell node={n} />
-                </td>
-                <td className="hidden px-4 py-2.5 text-muted-foreground sm:table-cell">
-                  {n.region ?? "-"}
-                </td>
-                <td className="px-4 py-2.5">
-                  <FreshnessTag status={n.status} />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+                </div>
+              </TableCell>
+              <TableCell className="py-2.5">
+                <Badge variant="secondary" className="font-mono text-[11px] font-normal">
+                  {n.kind}
+                </Badge>
+              </TableCell>
+              <TableCell className="py-2.5">
+                <HealthCell node={n} />
+              </TableCell>
+              <TableCell className="hidden py-2.5 text-muted-foreground sm:table-cell">
+                {n.region ?? "-"}
+              </TableCell>
+              <TableCell className="py-2.5">
+                <FreshnessTag status={n.status} />
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
   );
 }
