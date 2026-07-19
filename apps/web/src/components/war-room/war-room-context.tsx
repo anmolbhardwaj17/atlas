@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { MapNode } from "@/lib/map-types";
+import { timeAgo } from "@/lib/format";
 import { kindShort } from "@/lib/kind-visual";
 
 export interface NodeEvent {
@@ -21,20 +22,6 @@ export interface NodeEvent {
   actor: string | null;
   title: string;
   source: string;
-}
-
-export function timeAgo(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return "";
-  const s = Math.max(0, Math.floor((Date.now() - then) / 1000));
-  if (s < 60) return "just now";
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  if (d < 30) return `${d}d ago`;
-  return new Date(iso).toLocaleDateString();
 }
 
 const HEALTH_DOT: Record<string, string> = {

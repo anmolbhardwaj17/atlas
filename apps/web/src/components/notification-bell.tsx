@@ -13,6 +13,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { timeAgo } from "@/lib/format";
 import { CloudIcon } from "@/components/cloud-icon";
 import { kindIcon, KIND_LOGO } from "@/lib/kind-visual";
 import {
@@ -33,14 +34,6 @@ const SEVERITY_ICON: Record<NotificationItem["severity"], { icon: LucideIcon; co
 };
 
 /** Compact relative time: "just now", "5m", "3h", "2d". */
-function ago(iso: string): string {
-  const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
-  if (s < 60) return "just now";
-  if (s < 3600) return `${Math.floor(s / 60)}m`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h`;
-  return `${Math.floor(s / 86400)}d`;
-}
-
 /**
  * Notification bell (top bar). A durable in-app inbox alongside the ephemeral toasts: the
  * unread count polls quietly; opening the panel shows recent notifications (health changes and
@@ -205,7 +198,7 @@ export function NotificationBell({ orgId }: { orgId: string }) {
                                 {item.title}
                               </span>
                               <span className="shrink-0 text-[11px] text-muted-foreground">
-                                {ago(item.createdAt)}
+                                {timeAgo(item.createdAt, { suffix: false })}
                               </span>
                             </span>
                             {item.body ? (

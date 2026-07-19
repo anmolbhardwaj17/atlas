@@ -9,6 +9,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { requireShell } from "@/lib/shell";
+import { timeAgo } from "@/lib/format";
 import { apiGet, type ApiOk } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
@@ -48,18 +49,6 @@ interface FindingDetailData {
 }
 
 /** Compact relative time ("just now", "5m ago", "3h ago", "2d ago"). Server-safe (pure). */
-function timeAgo(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return "unknown";
-  const s = Math.max(0, Math.floor((Date.now() - then) / 1000));
-  if (s < 60) return "just now";
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
-
 /** A real brand/service logo for a node kind, or null (→ fall back to a lucide kind icon). */
 function nodeLogo(kind: string): string | null {
   const svc = KIND_LOGO[kind];

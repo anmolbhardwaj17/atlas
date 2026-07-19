@@ -2,6 +2,7 @@ import { ScrollText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { apiGet, type ApiOk } from "@/lib/api";
+import { timeAgo } from "@/lib/format";
 
 interface AuditEventView {
   id: string;
@@ -69,7 +70,7 @@ export async function AuditLog({ orgId, token }: { orgId: string; token: string 
                   className="shrink-0 whitespace-nowrap text-xs text-muted-foreground"
                   title={new Date(e.createdAt).toLocaleString()}
                 >
-                  {relativeTime(e.createdAt)}
+                  {timeAgo(e.createdAt)}
                 </time>
               </li>
             ))}
@@ -82,17 +83,4 @@ export async function AuditLog({ orgId, token }: { orgId: string; token: string 
 
 function shortId(id: string): string {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
-}
-
-function relativeTime(iso: string): string {
-  const then = new Date(iso).getTime();
-  const secs = Math.round((Date.now() - then) / 1000);
-  if (secs < 60) return "just now";
-  const mins = Math.round(secs / 60);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.round(hrs / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
 }

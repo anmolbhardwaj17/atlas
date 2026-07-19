@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { Label, Pie, PieChart, Tooltip } from "recharts";
 import { Card, CardContent } from "@/components/ui/card";
+import { plural } from "@/lib/format";
 
 /** Blue palette (a la shadcn's pie demo) for the contributor segments. */
 const PALETTE = ["#2684ff", "#4c9aff", "#0052cc", "#79b8ff", "#1d4ed8", "#93c5fd"];
@@ -48,7 +49,9 @@ export function ContributorsDonut({
                   return (
                     <div className="rounded-md border border-border bg-background px-2.5 py-1.5 text-xs shadow-md">
                       <span className="font-medium">{p.name}</span>{" "}
-                      <span className="tabular-nums text-muted-foreground">· {p.value} PRs</span>
+                      <span className="tabular-nums text-muted-foreground">
+                        · {p.value ?? 0} {plural(p.value ?? 0, "PR")}
+                      </span>
                     </div>
                   );
                 }}

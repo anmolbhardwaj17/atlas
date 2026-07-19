@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ChevronRight, History, RotateCcw, Search, Download, BellOff } from "lucide-react";
 import { toast } from "sonner";
 import { toCsv, downloadCsv } from "@/lib/csv";
+import { timeAgo, formatCount } from "@/lib/format";
 import { muteFinding, unmuteFinding } from "@/lib/browser-api";
 import { Card, CardContent } from "@/components/ui/card";
 import { AtlasAiMark } from "@/components/brand";
@@ -65,19 +66,6 @@ export interface Mute {
 }
 
 const SEV_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
-
-/** Compact relative time for the data-freshness line ("just now", "5m ago", "3h ago", "2d ago"). */
-function timeAgo(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return "unknown";
-  const s = Math.max(0, Math.floor((Date.now() - then) / 1000));
-  if (s < 60) return "just now";
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
 
 /** How long a finding has been open ("open 5d"), or null if under a day (not worth the noise). */
 function ageLabel(iso: string | null | undefined): string | null {
@@ -663,7 +651,7 @@ function SeverityTile({
             n > 0 ? severityMeta(sev).text : "text-muted-foreground",
           )}
         >
-          {n}
+          {formatCount(n)}
         </p>
         <div className="min-w-0">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">

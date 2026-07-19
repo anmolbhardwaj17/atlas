@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, Info, ChevronRight, Check, CircleHelp, Download } from "lucide-react";
 import { toCsv, downloadCsv } from "@/lib/csv";
+import { timeAgo } from "@/lib/format";
 import { Card, CardContent } from "@/components/ui/card";
 import { kindIcon, KIND_LOGO } from "@/lib/kind-visual";
 import { CloudIcon } from "@/components/cloud-icon";
@@ -87,18 +88,6 @@ const SEV_TEXT: Record<ControlSeverity, string> = SEVERITY_TEXT;
 
 function pct(n: number | null): string {
   return n === null ? "—" : `${Math.round(n * 100)}%`;
-}
-
-function timeAgo(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return "recently";
-  const s = Math.max(0, Math.floor((Date.now() - then) / 1000));
-  if (s < 60) return "just now";
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
 }
 
 /**

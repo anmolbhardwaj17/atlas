@@ -23,6 +23,7 @@ import { PostureRadar, type Posture } from "@/components/dashboard/posture-radar
 import { pillarMeta } from "@/components/insights/pillars";
 import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/cn";
+import { timeAgo, formatCount } from "@/lib/format";
 import { SEVERITY_PILL } from "@/lib/severity";
 import { Onboarding } from "@/components/onboarding";
 import { AskLauncher } from "@/components/dashboard/ask-launcher";
@@ -702,7 +703,7 @@ function Leaderboard({
                   />
                 </div>
                 <span className="w-8 shrink-0 text-right font-semibold tabular-nums">
-                  {it.count}
+                  {formatCount(it.count)}
                 </span>
               </li>
             ))}
@@ -797,15 +798,4 @@ function InventoryCard({
       </CardContent>
     </Card>
   );
-}
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
 }

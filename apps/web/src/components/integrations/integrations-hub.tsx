@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { egressIps } from "@/lib/env";
+import { timeAgo, formatCount, plural } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
@@ -779,7 +780,7 @@ function ProviderRow({
       const days = (Date.now() - new Date(only.lastSync.finishedAt).getTime()) / 86_400_000;
       freshLabel = `Synced ${timeAgo(only.lastSync.finishedAt)}`;
       freshTone = days > 14 ? "text-danger" : days > 7 ? "text-warning" : "text-success";
-      resourcesLabel = `${only.lastSync.resources} resources`;
+      resourcesLabel = `${formatCount(only.lastSync.resources)} ${plural(only.lastSync.resources, "resource")}`;
     } else if (only) {
       // Just the sync state (the "Connected" badge already says it's connected) — matches
       // "Synced Xago" / "Syncing…" on the other rows.
@@ -870,14 +871,6 @@ function ProviderRow({
 }
 
 /** Compact relative time for the sync line ("just now", "5m ago", "3h ago", "2d ago"). */
-function timeAgo(iso: string): string {
-  const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
-  if (s < 60) return "just now";
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
-}
-
 /** The "Manage <provider>" slide-over — lists a provider's connection(s) as full, readable
  *  blocks (status, sync, permission gaps, actions) plus an "add another" affordance. Opened by
  *  clicking a connected provider row, so the list itself stays clean and aligned. */
@@ -1043,7 +1036,7 @@ function ConnectionBlock({
           >
             {conn.lastSync.status === "failed"
               ? `Last sync failed ${timeAgo(conn.lastSync.finishedAt)}`
-              : `Last synced ${timeAgo(conn.lastSync.finishedAt)} · ${conn.lastSync.resources} resources`}
+              : `Last synced ${timeAgo(conn.lastSync.finishedAt)} · ${formatCount(conn.lastSync.resources)} ${plural(conn.lastSync.resources, "resource")}`}
             {conn.lastSync.status === "partial" && conn.lastSync.scopesFailed > 0 ? (
               <span className="text-warning">
                 {" "}

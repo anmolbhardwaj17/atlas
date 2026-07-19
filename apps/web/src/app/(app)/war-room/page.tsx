@@ -4,7 +4,7 @@ import { Crosshair, ChevronRight } from "lucide-react";
 import { getPageAuth } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
 import { EmptyState } from "@/components/patterns/empty-state";
-import { timeAgo } from "@/components/war-room/war-room-context";
+import { timeAgo } from "@/lib/format";
 import type { Incident } from "@/lib/browser-api";
 import WarRoomLoading from "./loading";
 
