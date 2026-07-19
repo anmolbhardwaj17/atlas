@@ -9,6 +9,7 @@ import { toCsv, downloadCsv } from "@/lib/csv";
 import { timeAgo, formatCount } from "@/lib/format";
 import { muteFinding, unmuteFinding } from "@/lib/browser-api";
 import { Card, CardContent } from "@/components/ui/card";
+import { SegmentedControl, Segment } from "@/components/ui/segmented-control";
 import { AtlasAiMark } from "@/components/brand";
 import { PostureRadar, type Posture } from "@/components/dashboard/posture-radar";
 import { SeverityTrend, type TrendPoint } from "./severity-trend";
@@ -343,20 +344,20 @@ export function InsightsView({
 
       {/* Pillar filter (segmented control, matching the Integrations tabs). */}
       {pillars.length > 1 ? (
-        <div className="inline-flex flex-wrap gap-1 rounded-lg border border-border bg-muted p-1">
-          <Chip active={pillar === "all"} onClick={() => setPillar("all")}>
+        <SegmentedControl>
+          <Segment active={pillar === "all"} onClick={() => setPillar("all")}>
             All <span className="text-muted-foreground">{base.length}</span>
-          </Chip>
+          </Segment>
           {pillars.map(([p, n]) => {
             const m = pillarMeta(p);
             return (
-              <Chip key={p} active={pillar === p} onClick={() => setPillar(p)}>
+              <Segment key={p} active={pillar === p} onClick={() => setPillar(p)}>
                 <m.icon className={cn("size-3.5", pillar === p ? m.tone : "")} /> {m.label}{" "}
                 <span className="text-muted-foreground">{n}</span>
-              </Chip>
+              </Segment>
             );
           })}
-        </div>
+        </SegmentedControl>
       ) : null}
 
       {/* Search + severity filter. */}
@@ -372,23 +373,13 @@ export function InsightsView({
             className="h-9 w-full rounded-md border border-border bg-transparent pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-foreground/40 focus-visible:ring-2 focus-visible:ring-ring"
           />
         </div>
-        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted p-1">
+        <SegmentedControl>
           {(["all", "high", "medium", "low"] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setSev(s)}
-              className={cn(
-                "rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors",
-                sev === s
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
+            <Segment key={s} active={sev === s} onClick={() => setSev(s)} className="capitalize">
               {s === "all" ? "All" : s}
-            </button>
+            </Segment>
           ))}
-        </div>
+        </SegmentedControl>
         <div className="flex items-center gap-2 sm:ml-auto">
           <p className="text-xs tabular-nums text-muted-foreground">
             {shown.length} of {base.length}
@@ -682,31 +673,6 @@ function TabButton({
         active
           ? "border-foreground text-foreground"
           : "border-transparent text-muted-foreground hover:text-foreground",
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Chip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors",
-        active
-          ? "bg-background text-foreground shadow-sm"
-          : "text-muted-foreground hover:text-foreground",
       )}
     >
       {children}

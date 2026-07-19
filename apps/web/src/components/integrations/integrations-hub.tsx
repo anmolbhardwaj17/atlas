@@ -72,6 +72,7 @@ import {
   type DiscordAskStatus,
 } from "@/lib/browser-api";
 import { ChatAskCard, CHAT_PLATFORMS } from "@/components/integrations/chat-ask-card";
+import { SegmentedControl, Segment } from "@/components/ui/segmented-control";
 import { cn } from "@/lib/cn";
 
 /** Per-channel webhook setup copy (mirrors Settings → Notifications). */
@@ -356,23 +357,13 @@ export function IntegrationsHub({
 
       {/* Category tabs (segmented control) + search — the row list below filters live. */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="inline-flex flex-wrap gap-1 rounded-lg border border-border bg-muted/50 p-1">
+        <SegmentedControl>
           {TABS.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
-              className={cn(
-                "rounded-md px-3 py-1 text-sm font-medium transition-colors",
-                tab === t
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
+            <Segment key={t} active={tab === t} onClick={() => setTab(t)}>
               {t}
-            </button>
+            </Segment>
           ))}
-        </div>
+        </SegmentedControl>
         <div className="relative w-full sm:w-64">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <input

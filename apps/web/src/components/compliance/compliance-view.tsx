@@ -11,6 +11,7 @@ import { kindIcon, KIND_LOGO } from "@/lib/kind-visual";
 import { CloudIcon } from "@/components/cloud-icon";
 import { cn } from "@/lib/cn";
 import { SEVERITY_TEXT } from "@/lib/severity";
+import { SegmentedControl, Segment } from "@/components/ui/segmented-control";
 
 export type Framework = "pci" | "nist" | "iso" | "hipaa" | "cis" | "gdpr";
 export type ControlStatus = "pass" | "fail" | "not-applicable" | "not-assessable";
@@ -176,21 +177,11 @@ export function ComplianceView({ report }: { report: ComplianceReport | null }) 
       </header>
 
       {/* Framework selector — the app's segmented control (matches the Insights pillar filter). */}
-      <div className="inline-flex max-w-full flex-wrap gap-1 overflow-x-auto rounded-lg border border-border bg-muted p-1">
+      <SegmentedControl className="max-w-full overflow-x-auto">
         {frameworks.map((f) => {
           const on = f.framework.key === active;
           return (
-            <button
-              key={f.framework.key}
-              type="button"
-              onClick={() => setActive(f.framework.key)}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors",
-                on
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
+            <Segment key={f.framework.key} active={on} onClick={() => setActive(f.framework.key)}>
               {f.framework.label}
               {f.failed > 0 ? (
                 <span className="inline-flex min-w-4 items-center justify-center rounded-full bg-danger/10 px-1 text-[10px] font-semibold tabular-nums text-danger">
@@ -199,10 +190,10 @@ export function ComplianceView({ report }: { report: ComplianceReport | null }) 
               ) : f.assessed > 0 ? (
                 <Check className="size-3 text-success" />
               ) : null}
-            </button>
+            </Segment>
           );
         })}
-      </div>
+      </SegmentedControl>
 
       {current ? (
         <>

@@ -7,6 +7,7 @@ import { AtlasAiMark } from "@/components/brand";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SegmentedControl, Segment } from "@/components/ui/segmented-control";
 import {
   Select,
   SelectContent,
@@ -240,25 +241,19 @@ export function LlmSettingsCard({
         </div>
 
         {/* Provider selector with brand icons. */}
-        <div className="inline-flex rounded-lg border border-border bg-muted/40 p-0.5 text-xs">
+        <SegmentedControl>
           {PROVIDERS.map((p) => (
-            <button
+            <Segment
               key={p.id}
-              type="button"
-              onClick={() => switchProvider(p.id)}
+              active={provider === p.id}
               aria-pressed={provider === p.id}
-              className={cn(
-                "flex items-center gap-1.5 rounded-md px-3 py-1 font-medium transition-colors",
-                provider === p.id
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
+              onClick={() => switchProvider(p.id)}
             >
               <ProviderIcon id={p.id} className="size-3.5" />
               {p.label}
-            </button>
+            </Segment>
           ))}
-        </div>
+        </SegmentedControl>
 
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-1">

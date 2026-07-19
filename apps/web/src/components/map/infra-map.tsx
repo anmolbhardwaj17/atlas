@@ -71,7 +71,9 @@ import { cn } from "@/lib/cn";
 const nodeTypes = { resource: ResourceNode, envLane: EnvLaneNode };
 
 /** Segmented-control button: one item in the map's grouped toolbar track. Active = a raised segment
- *  (bg + shadow) inside the muted track; inactive = quiet. */
+ *  (bg + shadow) inside the muted track; inactive = quiet. Mirrors the shared <Segment> in
+ *  components/ui/segmented-control (kept local here because these are independent lens TOGGLES, not a
+ *  single-select track — see also the aria-pressed usage below). */
 const segCls = (active: boolean) =>
   cn(
     "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
