@@ -2,7 +2,12 @@ import { Suspense } from "react";
 import { requireShell } from "@/lib/shell";
 import { apiGet, type ApiOk } from "@/lib/api";
 import { IntegrationsHub } from "@/components/integrations/integrations-hub";
-import type { ConnectionSummary, ChannelSummary, SlackAskStatus } from "@/lib/browser-api";
+import type {
+  ConnectionSummary,
+  ChannelSummary,
+  SlackAskStatus,
+  DiscordAskStatus,
+} from "@/lib/browser-api";
 import IntegrationsLoading from "./loading";
 
 export const dynamic = "force-dynamic";
@@ -28,12 +33,17 @@ async function IntegrationsContent() {
   // Graph-source connections (AWS/GitHub/…) + outbound alert channels (Slack/Discord/Teams) — the
   // hub surfaces both, so a connected Slack channel reads as "Connected" here too.
   const canManage = shell.role === "Owner" || shell.role === "Admin";
-  const [connections, channels, slack] = await Promise.all([
+  const [connections, channels, slack, discord] = await Promise.all([
     apiGet<ApiOk<ConnectionSummary[]>>("/connections", auth).then((r) => r.body?.data ?? []),
     apiGet<ApiOk<ChannelSummary[]>>("/notifications", auth).then((r) => r.body?.data ?? []),
-    // Admin-only route — non-admins simply don't get the install controls (null → card shows a note).
+    // Admin-only routes — non-admins simply don't get the install controls (null → card shows a note).
     canManage
       ? apiGet<ApiOk<SlackAskStatus>>("/integrations/slack", auth).then((r) => r.body?.data ?? null)
+      : Promise.resolve(null),
+    canManage
+      ? apiGet<ApiOk<DiscordAskStatus>>("/integrations/discord", auth).then(
+          (r) => r.body?.data ?? null,
+        )
       : Promise.resolve(null),
   ]);
 
@@ -44,6 +54,7 @@ async function IntegrationsContent() {
       channels={channels}
       canManage={canManage}
       slack={slack}
+      discord={discord}
     />
   );
 }

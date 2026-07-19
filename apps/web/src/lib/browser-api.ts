@@ -1097,6 +1097,24 @@ export async function disconnectSlackAsk(orgId: string): Promise<void> {
   if (!res.ok) throw new Error(`Couldn't disconnect Slack (${res.status}).`);
 }
 
+/** Discord "Ask Atlas" connection status (for the Integrations hub). */
+export interface DiscordAskStatus {
+  connected: boolean;
+  guildName: string | null;
+  installUrl: string | null;
+}
+
+/** Disconnect the Discord "Ask Atlas" server binding. */
+export async function disconnectDiscordAsk(orgId: string): Promise<void> {
+  const token = await getClientToken();
+  if (!token) throw new Error("You're not signed in.");
+  const res = await fetch(`${apiUrl()}/integrations/discord`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) throw new Error(`Couldn't disconnect Discord (${res.status}).`);
+}
+
 /** Current active finding ids (used to confirm whether a finding cleared after a recheck). */
 export async function getActiveFindingIds(orgId: string): Promise<string[]> {
   const token = await getClientToken();

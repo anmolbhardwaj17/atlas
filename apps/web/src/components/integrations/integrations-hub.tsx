@@ -62,12 +62,15 @@ import {
   setChannel,
   testChannel,
   removeChannel,
+  disconnectSlackAsk,
+  disconnectDiscordAsk,
   type ConnectionSummary,
   type ChannelSummary,
   type ChannelKind,
   type SlackAskStatus,
+  type DiscordAskStatus,
 } from "@/lib/browser-api";
-import { SlackAskCard } from "@/components/integrations/slack-ask-card";
+import { ChatAskCard, CHAT_PLATFORMS } from "@/components/integrations/chat-ask-card";
 import { cn } from "@/lib/cn";
 
 /** Per-channel webhook setup copy (mirrors Settings → Notifications). */
@@ -126,12 +129,14 @@ export function IntegrationsHub({
   channels = [],
   canManage,
   slack = null,
+  discord = null,
 }: {
   orgId: string;
   connections: ConnectionSummary[];
   channels?: ChannelSummary[];
   canManage: boolean;
   slack?: SlackAskStatus | null;
+  discord?: DiscordAskStatus | null;
 }) {
   const [connectProvider, setConnectProvider] = React.useState<ProviderMeta | null>(null);
   const [tab, setTab] = React.useState<(typeof TABS)[number]>("All");
@@ -318,8 +323,35 @@ export function IntegrationsHub({
         </div>
       </div>
 
-      {/* Ask Atlas in Slack — the flagship inbound chat integration (grounded /atlas answers). */}
-      <SlackAskCard orgId={orgId} status={slack} canManage={canManage} />
+      {/* Ask Atlas from chat — the inbound integrations (grounded /atlas answers in Slack + Discord). */}
+      <div className="grid gap-3 lg:grid-cols-2">
+        <ChatAskCard
+          orgId={orgId}
+          platform={CHAT_PLATFORMS.slack}
+          canManage={canManage}
+          onDisconnect={disconnectSlackAsk}
+          status={
+            slack
+              ? { connected: slack.connected, name: slack.teamName, installUrl: slack.installUrl }
+              : null
+          }
+        />
+        <ChatAskCard
+          orgId={orgId}
+          platform={CHAT_PLATFORMS.discord}
+          canManage={canManage}
+          onDisconnect={disconnectDiscordAsk}
+          status={
+            discord
+              ? {
+                  connected: discord.connected,
+                  name: discord.guildName,
+                  installUrl: discord.installUrl,
+                }
+              : null
+          }
+        />
+      </div>
 
       {/* Category tabs (segmented control) + search — the row list below filters live. */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

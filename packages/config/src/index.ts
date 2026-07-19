@@ -50,6 +50,15 @@ export const EnvSchema = z.object({
   SLACK_CLIENT_SECRET: optionalString,
   SLACK_SIGNING_SECRET: optionalString,
 
+  // Discord "Ask Atlas" chat integration (HTTP interactions). APPLICATION_ID doubles as the OAuth
+  // client_id; PUBLIC_KEY Ed25519-verifies every inbound interaction (the signature IS the auth);
+  // CLIENT_SECRET drives the install OAuth; BOT_TOKEN is for one-time slash-command registration.
+  // All optional/fail-closed: unset ⇒ the /discord endpoints reject/no-op, feature simply off.
+  DISCORD_APPLICATION_ID: optionalString,
+  DISCORD_PUBLIC_KEY: optionalString,
+  DISCORD_CLIENT_SECRET: optionalString,
+  DISCORD_BOT_TOKEN: optionalString,
+
   // AES-256-GCM key (32 bytes, hex or base64) for the DB-backed Secrets Broker (docs/13 §7).
   // When set, connector credentials are stored encrypted in `connection_secrets` (durable, so
   // they survive restarts). Unset ⇒ fall back to the in-memory broker (dev-only, wiped on boot).

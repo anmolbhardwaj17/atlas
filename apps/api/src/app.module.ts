@@ -16,6 +16,7 @@ import { DemoModule } from "./demo/demo.module";
 import { AuditModule } from "./audit/audit.module";
 import { WebhookModule } from "./webhooks/webhook.module";
 import { SlackModule } from "./slack/slack.module";
+import { DiscordModule } from "./discord/discord.module";
 import { HealthController } from "./health/health.controller";
 import { ResponseInterceptor } from "./common/response.interceptor";
 import { LoggingInterceptor } from "./common/logging.interceptor";
@@ -39,6 +40,7 @@ import { HttpExceptionFilter } from "./common/http-exception.filter";
     AuditModule,
     WebhookModule,
     SlackModule,
+    DiscordModule,
   ],
   controllers: [HealthController],
   providers: [
