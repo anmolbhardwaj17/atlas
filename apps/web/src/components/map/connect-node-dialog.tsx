@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 import { Loader2, Search, X, Link2, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -47,6 +48,8 @@ export function ConnectNodeDialog({
   } | null>(null);
   const [searching, setSearching] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  useFocusTrap(panelRef, true);
 
   // Close on Escape, and restore focus to whatever was focused before the dialog opened (a11y:
   // a keyboard user isn't stranded after the modal closes).
@@ -102,6 +105,7 @@ export function ConnectNodeDialog({
       onClick={onClose}
     >
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label="Connect resource"
@@ -132,6 +136,7 @@ export function ConnectNodeDialog({
           <select
             value={type}
             onChange={(e) => setType(e.target.value)}
+            aria-label="Relationship type"
             className="rounded border border-border bg-background px-1.5 py-1 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {LINK_TYPES.map((t) => (
@@ -165,6 +170,7 @@ export function ConnectNodeDialog({
               setTarget(null);
             }}
             placeholder="Search resources to link…"
+            aria-label="Search resources to link"
             className="pl-8"
           />
         </div>

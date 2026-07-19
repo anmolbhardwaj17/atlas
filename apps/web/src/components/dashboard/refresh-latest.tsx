@@ -66,6 +66,8 @@ export function RefreshLatest({ orgId }: { orgId: string }) {
       </Button>
       {msg ? (
         <span
+          role="status"
+          aria-live="polite"
           className={`max-w-[16rem] text-right text-xs ${
             msg.tone === "ok" ? "text-muted-foreground" : "text-warning"
           }`}

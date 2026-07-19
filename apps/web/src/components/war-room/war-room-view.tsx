@@ -515,6 +515,7 @@ export function WarRoomView({
                   disabled={sending || !input.trim()}
                   className="grid size-7 shrink-0 place-items-center rounded-md bg-foreground text-background transition-opacity hover:opacity-90 disabled:opacity-40"
                   title="Send"
+                  aria-label="Send"
                 >
                   <CornerDownLeft className="size-4" />
                 </button>

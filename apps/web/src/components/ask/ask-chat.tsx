@@ -68,6 +68,8 @@ function ResourceCard({ node, onPeek }: { node?: NodeDetail | undefined; onPeek:
       </span>
       {unhealthy ? (
         <span
+          role="img"
+          aria-label={`Health: ${health?.state}`}
           className={`ml-1 size-1.5 shrink-0 rounded-full ${health?.state === "unhealthy" ? "bg-danger" : "bg-warning"}`}
           title={health?.state}
         />

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -101,6 +102,8 @@ export function CommandPalette({ orgId }: { orgId: string }) {
   // rather than hiding it behind an undiscoverable shortcut.
   const [shiftHeld, setShiftHeld] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(panelRef, open);
   const router = useRouter();
 
   // Global open shortcut.
@@ -260,6 +263,7 @@ export function CommandPalette({ orgId }: { orgId: string }) {
       aria-label="Command palette"
     >
       <div
+        ref={panelRef}
         className="w-full max-w-xl overflow-hidden rounded-xl border border-border/70 bg-card shadow-2xl ring-1 ring-black/5"
         onClick={(e) => e.stopPropagation()}
       >
@@ -286,6 +290,7 @@ export function CommandPalette({ orgId }: { orgId: string }) {
               }
             }}
             placeholder="Search resources, jump to a page, or ask Atlas…"
+            aria-label="Search resources, jump to a page, or ask Atlas"
             className="w-full bg-transparent py-3.5 text-[15px] text-foreground placeholder:text-muted-foreground focus:outline-none"
           />
           <kbd className="hidden shrink-0 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:block">

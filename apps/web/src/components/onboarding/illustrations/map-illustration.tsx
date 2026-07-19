@@ -57,6 +57,7 @@ export function MapIllustration() {
       />
 
       <svg
+        aria-hidden
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="xMidYMid meet"
         className="absolute inset-0 size-full"

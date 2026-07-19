@@ -105,6 +105,8 @@ export function HeaderUserMenu({
 
         {/* Dark mode — keep the menu open on click so the toggle feels live. */}
         <DropdownMenuItem
+          role="menuitemcheckbox"
+          aria-checked={dark}
           onSelect={(e) => {
             e.preventDefault();
             toggleDark();

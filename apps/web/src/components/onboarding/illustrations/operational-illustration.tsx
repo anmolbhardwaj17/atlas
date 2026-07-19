@@ -40,7 +40,12 @@ export function OperationalIllustration() {
 
       {/* Chart body. */}
       <div className="relative mt-2 flex-1">
-        <svg viewBox="0 0 230 64" preserveAspectRatio="none" className="absolute inset-0 size-full">
+        <svg
+          aria-hidden
+          viewBox="0 0 230 64"
+          preserveAspectRatio="none"
+          className="absolute inset-0 size-full"
+        >
           <defs>
             <linearGradient id="illo-ops-fill" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="rgb(249 115 22)" stopOpacity="0.22" />

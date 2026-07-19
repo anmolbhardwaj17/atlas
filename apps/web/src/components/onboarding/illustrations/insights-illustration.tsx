@@ -21,7 +21,7 @@ function ScoreRing({ value }: { value: number }) {
   const off = c * (1 - value / 100);
   return (
     <div className="relative grid size-8 place-items-center">
-      <svg viewBox="0 0 24 24" className="size-8 -rotate-90">
+      <svg aria-hidden viewBox="0 0 24 24" className="size-8 -rotate-90">
         <circle cx="12" cy="12" r={r} fill="none" stroke="hsl(var(--muted))" strokeWidth="3" />
         <circle
           cx="12"

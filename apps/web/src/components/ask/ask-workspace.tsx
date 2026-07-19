@@ -62,30 +62,41 @@ export function AskWorkspace({
     const fromMap = c.origin === "map";
     const label = (c.title ?? "Untitled").replace(/^Map · /, "");
     return (
-      <button
-        key={c.id}
-        type="button"
-        onClick={() => openConversation(c.id)}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          setMenu({ id: c.id, x: e.clientX, y: e.clientY });
-        }}
-        title={fromMap ? `${label} · from the map` : label}
-        className={cn(
-          "flex w-full items-center gap-1.5 px-2.5 py-2 text-left text-sm transition-colors",
-          highlightId === c.id
-            ? "font-medium text-foreground"
-            : "text-muted-foreground hover:text-foreground",
-        )}
-      >
-        {fromMap ? (
-          <Waypoints
-            className="size-3.5 shrink-0 text-muted-foreground"
-            aria-label="Started from the map"
-          />
-        ) : null}
-        <span className="truncate">{label}</span>
-      </button>
+      <div key={c.id} className="group relative flex items-center">
+        <button
+          type="button"
+          onClick={() => openConversation(c.id)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setMenu({ id: c.id, x: e.clientX, y: e.clientY });
+          }}
+          title={fromMap ? `${label} · from the map` : label}
+          className={cn(
+            "flex w-full items-center gap-1.5 py-2 pl-2.5 pr-8 text-left text-sm transition-colors",
+            highlightId === c.id
+              ? "font-medium text-foreground"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {fromMap ? (
+            <Waypoints
+              className="size-3.5 shrink-0 text-muted-foreground"
+              aria-label="Started from the map"
+            />
+          ) : null}
+          <span className="truncate">{label}</span>
+        </button>
+        {/* Keyboard/touch-reachable delete (the right-click menu above is mouse-only). Shows on
+            hover or when focused. */}
+        <button
+          type="button"
+          onClick={() => void removeConversation(c.id)}
+          aria-label={`Delete chat: ${label}`}
+          className="absolute right-1 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-danger focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
+        >
+          <Trash2 className="size-3.5" />
+        </button>
+      </div>
     );
   };
 

@@ -335,7 +335,12 @@ function HealthGauge({ score, label, tone }: { score: number; label: string; ton
     };
   });
   return (
-    <svg viewBox="0 0 200 112" className={cn("w-full max-w-[240px]", tone)} role="img">
+    <svg
+      viewBox="0 0 200 112"
+      className={cn("w-full max-w-[240px]", tone)}
+      role="img"
+      aria-label={`Health score ${score} of 100`}
+    >
       {ticks.map((t, i) => {
         // Speedometer gradient: each filled tick is coloured by its position (red → amber → green),
         // so the arc reads red at a low score and greens up as it climbs. Unfilled ticks are muted.

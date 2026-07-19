@@ -82,7 +82,12 @@ export function OrgSwitcher({
   return (
     <>
       {isSwitching ? (
-        <div className="fixed inset-0 z-[100] grid place-items-center bg-background/80 backdrop-blur-sm duration-200 animate-in fade-in">
+        <div
+          role="status"
+          aria-live="polite"
+          aria-label={`Switching to ${current.orgName}`}
+          className="fixed inset-0 z-[100] grid place-items-center bg-background/80 backdrop-blur-sm duration-200 animate-in fade-in"
+        >
           <div className="flex flex-col items-center gap-5">
             {/* The destination org's logo, centered and large, with a spinning accent ring around it
                 so the switch reads as "loading <this workspace>", not a generic spinner. */}

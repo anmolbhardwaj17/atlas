@@ -171,6 +171,8 @@ export function ResourceNode({ data, selected }: NodeProps) {
         </button>
       ) : (
         <span
+          role="img"
+          aria-label={`Confidence: ${node.confidence}`}
           className={cn(
             "size-2 shrink-0 rounded-full",
             CERTAINTY[node.confidence] ?? CERTAINTY["inferred-low"],
