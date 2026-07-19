@@ -58,9 +58,9 @@ export function DangerZoneCard({ orgId, orgName }: { orgId: string; orgName: str
   }
 
   return (
-    <Card className="border-destructive/30">
+    <Card className="border-danger/40 bg-danger/[0.03]">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-destructive">
+        <CardTitle className="flex items-center gap-2 text-danger">
           <AlertTriangle className="size-4" /> Danger zone
         </CardTitle>
       </CardHeader>
@@ -73,7 +73,7 @@ export function DangerZoneCard({ orgId, orgName }: { orgId: string; orgName: str
           </p>
         </div>
         <Button
-          variant="destructive"
+          variant="danger"
           className="shrink-0"
           onClick={() => {
             reset();
@@ -116,12 +116,12 @@ export function DangerZoneCard({ orgId, orgName }: { orgId: string; orgName: str
                   </li>
                 ))}
               </ul>
-              <p className="text-sm font-medium text-destructive">This cannot be undone.</p>
+              <p className="text-sm font-medium text-danger">This cannot be undone.</p>
               <AlertDialogFooter>
                 <Button variant="ghost" onClick={() => setOpen(false)}>
                   Cancel
                 </Button>
-                <Button variant="destructive" onClick={() => setPhase(2)}>
+                <Button variant="danger" onClick={() => setPhase(2)}>
                   Continue
                 </Button>
               </AlertDialogFooter>
@@ -152,7 +152,7 @@ export function DangerZoneCard({ orgId, orgName }: { orgId: string; orgName: str
                   Back
                 </Button>
                 <Button
-                  variant="destructive"
+                  variant="danger"
                   onClick={() => void doDelete()}
                   disabled={busy || !confirmed}
                 >
