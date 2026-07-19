@@ -325,35 +325,52 @@ export function IntegrationsHub({
         </div>
       </div>
 
-      {/* Ask Atlas from chat — the inbound integrations (grounded /atlas answers in Slack + Discord). */}
-      <div className="grid gap-3 lg:grid-cols-2">
-        <ChatAskCard
-          orgId={orgId}
-          platform={CHAT_PLATFORMS.slack}
-          canManage={canManage}
-          onDisconnect={disconnectSlackAsk}
-          status={
-            slack
-              ? { connected: slack.connected, name: slack.teamName, installUrl: slack.installUrl }
-              : null
-          }
-        />
-        <ChatAskCard
-          orgId={orgId}
-          platform={CHAT_PLATFORMS.discord}
-          canManage={canManage}
-          onDisconnect={disconnectDiscordAsk}
-          status={
-            discord
-              ? {
+      {/* Ask Atlas from chat — the inbound integrations (grounded /atlas answers in Slack + Discord).
+          Only shown for a platform that's actually set up on this deployment (connected, or an
+          install URL exists) — never a bare "not configured" note that a user can't act on. */}
+      {(() => {
+        const chatCards = [
+          slack && (slack.connected || slack.installUrl)
+            ? {
+                key: "slack" as const,
+                platform: CHAT_PLATFORMS.slack,
+                onDisconnect: disconnectSlackAsk,
+                status: {
+                  connected: slack.connected,
+                  name: slack.teamName,
+                  installUrl: slack.installUrl,
+                },
+              }
+            : null,
+          discord && (discord.connected || discord.installUrl)
+            ? {
+                key: "discord" as const,
+                platform: CHAT_PLATFORMS.discord,
+                onDisconnect: disconnectDiscordAsk,
+                status: {
                   connected: discord.connected,
                   name: discord.guildName,
                   installUrl: discord.installUrl,
-                }
-              : null
-          }
-        />
-      </div>
+                },
+              }
+            : null,
+        ].filter((c): c is NonNullable<typeof c> => c !== null);
+        if (chatCards.length === 0) return null;
+        return (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {chatCards.map((c) => (
+              <ChatAskCard
+                key={c.key}
+                orgId={orgId}
+                platform={c.platform}
+                canManage={canManage}
+                onDisconnect={c.onDisconnect}
+                status={c.status}
+              />
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Category tabs (segmented control) + search — the row list below filters live. */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
