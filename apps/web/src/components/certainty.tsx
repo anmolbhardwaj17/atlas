@@ -32,7 +32,7 @@ const TIER: Record<string, TierStyle> = {
   "ai-suggested": {
     label: "AI-suggested",
     variant: "outline",
-    className: "border-transparent bg-[#06b6d4]/15 text-[#06b6d4]",
+    className: "border-transparent bg-ai-suggested/15 text-ai-suggested",
   },
   insufficient: TIER_FALLBACK,
   // Advisory = a recommendation grounded in cited facts, not an observed fact itself (P2).

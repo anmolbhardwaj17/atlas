@@ -295,12 +295,12 @@ function PostureCard({ posture }: { posture: Posture }) {
 function HealthCard({ health }: { health: { score: number; label: string } }) {
   const tone =
     health.score >= 85
-      ? "text-emerald-500"
+      ? "text-success"
       : health.score >= 65
         ? "text-foreground"
         : health.score >= 40
-          ? "text-amber-500"
-          : "text-red-500";
+          ? "text-warning"
+          : "text-danger";
   return (
     <Card className="shadow-sm">
       <CardContent className="flex h-full flex-col p-5">
@@ -343,10 +343,10 @@ function HealthGauge({ score, label, tone }: { score: number; label: string; ton
         const cls = !t.on
           ? "stroke-muted"
           : v >= 66
-            ? "stroke-emerald-500"
+            ? "stroke-success"
             : v >= 40
-              ? "stroke-amber-500"
-              : "stroke-red-500";
+              ? "stroke-warning"
+              : "stroke-danger";
         return (
           <line
             key={i}
@@ -625,7 +625,7 @@ function Insights({ insights }: { insights: Summary["insights"] }) {
               {pct >= 80 ? (
                 <TrendingUp className="size-4 text-success" />
               ) : pct < 50 ? (
-                <TrendingDown className="size-4 text-red-500" />
+                <TrendingDown className="size-4 text-danger" />
               ) : null}
             </div>
             <div className="mt-3">
@@ -645,7 +645,7 @@ function Insights({ insights }: { insights: Summary["insights"] }) {
  */
 function TickMeter({ pct, ticks = 30 }: { pct: number; ticks?: number }) {
   const filled = Math.round((Math.max(0, Math.min(100, pct)) / 100) * ticks);
-  const fill = pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-red-500";
+  const fill = pct >= 80 ? "bg-success" : pct >= 50 ? "bg-warning" : "bg-danger";
   return (
     <div className="flex h-7 items-stretch gap-[2px]" aria-hidden>
       {Array.from({ length: ticks }).map((_, i) => (
@@ -698,7 +698,7 @@ function Leaderboard({
                 </span>
                 <div className="h-2.5 flex-1 overflow-hidden rounded-sm bg-muted">
                   <div
-                    className="h-full rounded-sm bg-[#2684ff]"
+                    className="h-full rounded-sm bg-brand"
                     style={{ width: `${Math.max(6, Math.round((it.count / max) * 100))}%` }}
                   />
                 </div>

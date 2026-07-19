@@ -69,7 +69,7 @@ const VERDICT_META: Record<string, { label: string; cls: string }> = {
   dependency: { label: "Dependency", cls: "border-warning/40 bg-warning/10 text-warning" },
   capacity: {
     label: "Capacity",
-    cls: "border-sky-500/40 bg-sky-500/10 text-sky-600 dark:text-sky-400",
+    cls: "border-sev-low/40 bg-sev-low/10 text-sev-low",
   },
   chronic: {
     label: "Not new (chronic)",

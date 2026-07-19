@@ -388,7 +388,7 @@ function NotAssessable({ rows, framework }: { rows: ControlResult[]; framework: 
                       className={cn(
                         "rounded-full px-1.5 py-px text-[10px] font-medium uppercase tracking-wide ring-1 ring-inset",
                         perms.length > 0
-                          ? "bg-amber-500/10 text-amber-700 ring-amber-500/25 dark:text-amber-400"
+                          ? "bg-warning/10 text-warning ring-warning/25"
                           : "bg-muted text-muted-foreground ring-border",
                       )}
                     >

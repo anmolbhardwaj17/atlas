@@ -78,6 +78,7 @@ export default {
         "sev-high": "hsl(var(--sev-high))",
         "sev-medium": "hsl(var(--sev-medium))",
         "sev-low": "hsl(var(--sev-low))",
+        "ai-suggested": "hsl(var(--ai-suggested))",
       },
       borderRadius: {
         lg: "var(--radius)",

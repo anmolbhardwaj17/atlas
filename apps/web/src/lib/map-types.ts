@@ -75,7 +75,9 @@ export function edgeCrossing(
 
 /** Violet accent for cross-boundary edges (the one accent that earns its place on the map). */
 export const CROSS_COLOR = "#8b5cf6";
-/** AI-suggested edges (awaiting confirm/reject) — cyan, distinct from the violet cross-boundary. */
+/** AI-suggested edges (awaiting confirm/reject) — cyan, distinct from the violet cross-boundary.
+ *  Concrete hex for SVG/canvas (React Flow) where CSS vars don't resolve; keep visually in step with
+ *  the `--ai-suggested` token (globals.css) used for the DOM badges. */
 export const AI_SUGGESTED_COLOR = "#06b6d4";
 
 // ── Environments ─────────────────────────────────────────────────────────────

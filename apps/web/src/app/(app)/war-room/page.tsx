@@ -17,9 +17,9 @@ const CHIP: Record<string, string> = {
   dismissed: "text-muted-foreground",
 };
 const SEV: Record<string, string> = {
-  high: "text-danger",
-  medium: "text-warning",
-  low: "text-yellow-600 dark:text-yellow-500",
+  high: "text-sev-high",
+  medium: "text-sev-medium",
+  low: "text-sev-low",
 };
 
 function IncidentRow({ i }: { i: Incident }) {

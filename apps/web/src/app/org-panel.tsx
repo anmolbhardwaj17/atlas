@@ -398,7 +398,7 @@ export function OrgPanel({
                 <div className="flex items-start justify-between gap-2">
                   {lastInvite.emailed ? (
                     <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Check className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                      <Check className="size-3.5 shrink-0 text-success" />
                       Invitation emailed to{" "}
                       <span className="font-medium text-foreground">{lastInvite.email}</span>. You
                       can also copy the link:
