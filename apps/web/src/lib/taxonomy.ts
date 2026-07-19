@@ -9,6 +9,7 @@ import {
   AlertCircle,
   Info,
 } from "lucide-react";
+import { SEVERITY_TEXT, SEVERITY_ACCENT, SEVERITY_BADGE } from "./severity";
 
 /**
  * Categorical taxonomy - the single source of truth for how enum-typed things are labelled,
@@ -150,27 +151,29 @@ export interface SeverityMeta {
   text: string;
 }
 
+// Colours come from lib/severity.ts (the single severity-colour source, the vivid --sev-* triad);
+// this map only adds the label + icon. Keeps badge/dot/text in lockstep with the charts + pills.
 export const SEVERITY_META: Record<Severity, SeverityMeta> = {
   high: {
     label: "High",
     icon: AlertTriangle,
-    className: "border-transparent bg-red-500/15 text-red-600 dark:text-red-400",
-    accent: "bg-red-500",
-    text: "text-red-600 dark:text-red-400",
+    className: SEVERITY_BADGE.high,
+    accent: SEVERITY_ACCENT.high,
+    text: SEVERITY_TEXT.high,
   },
   medium: {
     label: "Medium",
     icon: AlertCircle,
-    className: "border-transparent bg-amber-500/20 text-amber-600 dark:text-amber-400",
-    accent: "bg-amber-500",
-    text: "text-amber-600 dark:text-amber-400",
+    className: SEVERITY_BADGE.medium,
+    accent: SEVERITY_ACCENT.medium,
+    text: SEVERITY_TEXT.medium,
   },
   low: {
     label: "Low",
     icon: Info,
-    className: "border-transparent bg-sky-500/15 text-sky-600 dark:text-sky-400",
-    accent: "bg-sky-500",
-    text: "text-sky-600 dark:text-sky-400",
+    className: SEVERITY_BADGE.low,
+    accent: SEVERITY_ACCENT.low,
+    text: SEVERITY_TEXT.low,
   },
 };
 

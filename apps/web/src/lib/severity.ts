@@ -4,10 +4,11 @@
  * compliance, and the War Room. Everything severity-coloured now imports from here.
  *
  * One vivid triad — red (high) → amber (medium) → sky (low) — shared everywhere so severity reads
- * the same on a chart, a chip, and a finding-row dot (matches `severityMeta` in taxonomy):
+ * the same on a chart, a chip, a badge, and a finding-row dot. `severityMeta` in taxonomy composes
+ * its badge/dot/text from the maps below, so there is exactly ONE severity palette:
  *  - CHART FILLS are concrete hsl() literals (recharts sets `fill` as an SVG attribute, where CSS
  *    `var()` wouldn't resolve). Tuned to stay legible on both the light and dark ground.
- *  - BADGES / TEXT use the `--sev-*` tokens (theme-aware) via Tailwind colour classes.
+ *  - BADGES / TEXT / DOTS use the `--sev-*` tokens (theme-aware) via Tailwind colour classes.
  */
 export type Severity = "high" | "medium" | "low";
 
@@ -20,16 +21,30 @@ export const SEVERITY_COLOR: Record<Severity, string> = {
 
 /** Severity as a soft tinted pill — the one badge shape everywhere. */
 export const SEVERITY_PILL: Record<Severity, string> = {
-  high: "bg-danger/10 text-danger",
-  medium: "bg-warning/10 text-warning",
+  high: "bg-sev-high/10 text-sev-high",
+  medium: "bg-sev-medium/10 text-sev-medium",
   low: "bg-sev-low/10 text-sev-low",
 };
 
 /** Severity as coloured text (no background). */
 export const SEVERITY_TEXT: Record<Severity, string> = {
-  high: "text-danger",
-  medium: "text-warning",
+  high: "text-sev-high",
+  medium: "text-sev-medium",
   low: "text-sev-low",
+};
+
+/** Severity as a solid dot / left-rail accent fill (the finding-row dot). */
+export const SEVERITY_ACCENT: Record<Severity, string> = {
+  high: "bg-sev-high",
+  medium: "bg-sev-medium",
+  low: "bg-sev-low",
+};
+
+/** Severity as a bordered, tinted badge (icon + label). The `severityMeta` badge in taxonomy. */
+export const SEVERITY_BADGE: Record<Severity, string> = {
+  high: "border-transparent bg-sev-high/15 text-sev-high",
+  medium: "border-transparent bg-sev-medium/15 text-sev-medium",
+  low: "border-transparent bg-sev-low/15 text-sev-low",
 };
 
 /** Normalize a loose severity string ("Med", "critical"…) to a canonical tier; unknown → "low". */
