@@ -10,6 +10,14 @@ import { timeAgo, formatCount } from "@/lib/format";
 import { muteFinding, unmuteFinding } from "@/lib/browser-api";
 import { Card, CardContent } from "@/components/ui/card";
 import { SegmentedControl, Segment } from "@/components/ui/segmented-control";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
 import { AtlasAiMark } from "@/components/brand";
 import { PostureRadar, type Posture } from "@/components/dashboard/posture-radar";
 import { SeverityTrend, type TrendPoint } from "./severity-trend";
@@ -482,139 +490,135 @@ export function InsightsView({
         </Card>
       ) : (
         <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-                  {selectable ? (
-                    <th className="w-9 px-3 py-2.5">
-                      <input
-                        type="checkbox"
-                        aria-label="Select all shown findings"
-                        checked={allShownSelected}
-                        onChange={toggleAll}
-                        className="size-3.5 cursor-pointer align-middle accent-[hsl(var(--brand))]"
-                      />
-                    </th>
-                  ) : null}
-                  <th className="w-24 px-4 py-2.5 font-medium">
-                    {tab === "fixed" ? "Status" : "Severity"}
-                  </th>
-                  <th className="px-4 py-2.5 font-medium">Finding</th>
-                  <th className="hidden px-4 py-2.5 font-medium sm:table-cell">Category</th>
-                  <th className="px-4 py-2.5 text-right font-medium">
-                    {tab === "fixed" ? "Fixed" : "Affected"}
-                  </th>
-                  <th className="w-16 px-2 py-2.5" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {shown.map((it) => {
-                  const m = pillarMeta(it.guidance?.pillar);
-                  const isFixed = tab === "fixed";
-                  const age = ageLabel(it.firstSeenAt);
-                  return (
-                    <tr
-                      key={it.id}
-                      onClick={isFixed ? undefined : () => router.push(`/insights/${it.id}`)}
-                      className={cn(
-                        "align-top transition-colors",
-                        isFixed ? "" : "cursor-pointer hover:bg-muted/40",
-                      )}
-                    >
-                      {selectable ? (
-                        <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            aria-label={`Select ${it.title}`}
-                            checked={selected.has(it.id)}
-                            onChange={() => toggleOne(it.id)}
-                            className="size-3.5 cursor-pointer align-middle accent-[hsl(var(--brand))]"
-                          />
-                        </td>
-                      ) : null}
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1.5">
-                          <span
-                            className={cn(
-                              "size-2 rounded-full",
-                              isFixed ? "bg-success" : severityMeta(it.severity).accent,
-                            )}
-                          />
-                          <span
-                            className={cn(
-                              "text-xs font-medium capitalize",
-                              isFixed ? "text-success" : severityMeta(it.severity).text,
-                            )}
-                          >
-                            {isFixed ? "Fixed" : it.severity}
-                          </span>
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {isFixed ? (
-                          <span className="font-medium text-muted-foreground line-through decoration-muted-foreground/40">
-                            {it.title}
-                          </span>
-                        ) : (
-                          <div className="flex flex-col gap-0.5">
-                            <Link
-                              href={`/insights/${it.id}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="font-medium text-foreground hover:underline"
-                            >
-                              {it.title}
-                            </Link>
-                            {it.regressedAt ? (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-warning">
-                                <RotateCcw className="size-3" /> Regressed — was fixed, came back
-                              </span>
-                            ) : age ? (
-                              <span className="text-[11px] text-muted-foreground">{age}</span>
-                            ) : null}
-                          </div>
-                        )}
-                      </td>
-                      <td className="hidden px-4 py-3 sm:table-cell">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {selectable ? (
+                  <TableHead className="w-9 px-3">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all shown findings"
+                      checked={allShownSelected}
+                      onChange={toggleAll}
+                      className="size-3.5 cursor-pointer align-middle accent-[hsl(var(--brand))]"
+                    />
+                  </TableHead>
+                ) : null}
+                <TableHead className="w-24">{tab === "fixed" ? "Status" : "Severity"}</TableHead>
+                <TableHead>Finding</TableHead>
+                <TableHead className="hidden sm:table-cell">Category</TableHead>
+                <TableHead className="text-right">
+                  {tab === "fixed" ? "Fixed" : "Affected"}
+                </TableHead>
+                <TableHead className="w-16 px-2" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {shown.map((it) => {
+                const m = pillarMeta(it.guidance?.pillar);
+                const isFixed = tab === "fixed";
+                const age = ageLabel(it.firstSeenAt);
+                return (
+                  <TableRow
+                    key={it.id}
+                    onClick={isFixed ? undefined : () => router.push(`/insights/${it.id}`)}
+                    className={cn(
+                      "transition-colors",
+                      isFixed ? "" : "cursor-pointer hover:bg-muted/40",
+                    )}
+                  >
+                    {selectable ? (
+                      <TableCell className="px-3" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${it.title}`}
+                          checked={selected.has(it.id)}
+                          onChange={() => toggleOne(it.id)}
+                          className="size-3.5 cursor-pointer align-middle accent-[hsl(var(--brand))]"
+                        />
+                      </TableCell>
+                    ) : null}
+                    <TableCell>
+                      <span className="inline-flex items-center gap-1.5">
                         <span
                           className={cn(
-                            "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
-                            m.badge,
+                            "size-2 rounded-full",
+                            isFixed ? "bg-success" : severityMeta(it.severity).accent,
+                          )}
+                        />
+                        <span
+                          className={cn(
+                            "text-xs font-medium capitalize",
+                            isFixed ? "text-success" : severityMeta(it.severity).text,
                           )}
                         >
-                          <m.icon className="size-3.5" /> {m.label}
+                          {isFixed ? "Fixed" : it.severity}
                         </span>
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
-                        {isFixed
-                          ? it.resolvedAt
-                            ? timeAgo(it.resolvedAt)
-                            : "-"
-                          : it.count && it.count > 1
-                            ? it.count
-                            : "-"}
-                      </td>
-                      <td className="px-2 py-3">
-                        {isFixed ? null : (
-                          <span className="flex items-center justify-end gap-0.5">
-                            <Link
-                              href={findingAskHref(it)}
-                              onClick={(e) => e.stopPropagation()}
-                              title="Ask Atlas how to fix this"
-                              className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
-                            >
-                              <AtlasAiMark size={14} className="size-3.5" />
-                            </Link>
-                            <ChevronRight className="size-4 text-muted-foreground" />
-                          </span>
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      {isFixed ? (
+                        <span className="font-medium text-muted-foreground line-through decoration-muted-foreground/40">
+                          {it.title}
+                        </span>
+                      ) : (
+                        <div className="flex flex-col gap-0.5">
+                          <Link
+                            href={`/insights/${it.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="font-medium text-foreground hover:underline"
+                          >
+                            {it.title}
+                          </Link>
+                          {it.regressedAt ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-warning">
+                              <RotateCcw className="size-3" /> Regressed — was fixed, came back
+                            </span>
+                          ) : age ? (
+                            <span className="text-[11px] text-muted-foreground">{age}</span>
+                          ) : null}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
+                          m.badge,
                         )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      >
+                        <m.icon className="size-3.5" /> {m.label}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {isFixed
+                        ? it.resolvedAt
+                          ? timeAgo(it.resolvedAt)
+                          : "-"
+                        : it.count && it.count > 1
+                          ? formatCount(it.count)
+                          : "-"}
+                    </TableCell>
+                    <TableCell className="px-2">
+                      {isFixed ? null : (
+                        <span className="flex items-center justify-end gap-0.5">
+                          <Link
+                            href={findingAskHref(it)}
+                            onClick={(e) => e.stopPropagation()}
+                            title="Ask Atlas how to fix this"
+                            className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
+                          >
+                            <AtlasAiMark size={14} className="size-3.5" />
+                          </Link>
+                          <ChevronRight className="size-4 text-muted-foreground" />
+                        </span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         </Card>
       )}
     </div>
