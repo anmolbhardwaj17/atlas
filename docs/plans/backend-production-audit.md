@@ -20,12 +20,24 @@ secret exposure, or customer-cloud write (all verified). The gaps are **operatio
   shutdown (`SyncWorkerBootstrap` has no `OnApplicationShutdown`).
 - [x] **A2 · `/health` is a static 200** (`health.controller.ts:9`). Add a readiness endpoint that
   runs `SELECT 1` (short timeout) so a dead-pool pod is evicted from rotation. Keep liveness cheap.
-- [ ] **C1 (perf) · Sync = ~5 serial DB round-trips per resource, DB connection held across the cloud
+- [x] **C1 (perf) · Sync = ~5 serial DB round-trips per resource, DB connection held across the cloud
   crawl** (`ingest/sync-runner.ts:133-160,273-357`). Batch upserts (`INSERT … unnest … ON CONFLICT`);
-  move `discover`/`fetchDetail` network I/O outside the transaction.
+  move `discover`/`fetchDetail` network I/O outside the transaction. Done: each scope now crawls in
+  Phase 1 (no txn, no connection held) then persists in Phase 2 (one txn) via batched `unnest`
+  upserts for nodes/snapshots/provenance/signals/edges; client-generated provenance UUIDs pair
+  provenance↔edge without RETURNING-order reliance. All 9 sync-runner invariant tests pass on real PG.
 - [ ] **C2 (perf) · Inference loads the whole org graph into memory each run**
   (`inference/engine.ts:129-200`, no LIMIT, JSONB attributes/data). OOM risk on big tenants. Scope
   loads to the kinds the registered rules consume; drop heavy JSONB.
+  **DEFERRED (2026-07-21, analyzed) — needs a per-rule consumption contract first.** Rules read
+  nodes/signals via *dynamic* `nodesByKind.get(spec.kind)` / `signalsByKind.get(kind)` fed by const
+  arrays across ~14 rule files (r1 `DEPLOY_SIGNAL_KINDS`, r9 `COMPUTE_ENV_SIGNALS` + datastore
+  arrays, r11 `TARGET_KINDS`, r12/r17/r18 `PR_KINDS`, …). A hand-built "consumed kinds" list would
+  **silently drop inferred edges** the moment a rule reads a kind it missed — a wrong graph with no
+  failing test (violates P1/P3). Safe design: add `consumesKinds`/`consumesSignalKinds` to the `Rule`
+  interface (declared next to each rule's const arrays so they can't drift), union them in the engine,
+  load lightweight-all nodes (complete endpoint resolution) + attributes/signals only for the union,
+  and add a parity test asserting scoped vs. full loads produce identical edges. Its own unit of work.
 - [ ] **CX1 (connector) · AWS AssumeRole creds never refresh mid-crawl** (`connector-aws/aws/client-config.ts:16-27`
   static object, not a provider). >1h crawl → `ExpiredToken` → misclassified as `access-denied`
   (`aws/retry.ts:21-24`) → silent data loss + false "permission missing". Use a refreshing provider +
@@ -48,16 +60,20 @@ secret exposure, or customer-cloud write (all verified). The gaps are **operatio
 - [x] **H4 (perf) · Dashboard reports a capped resource count** — `graph.service.ts:581` `LIMIT 5000`
   + `:961` `resources: meta.rows.length` → estate >5000 shows "5000". Use `count(*)`; push
   clouds/accounts to SQL aggregates; stop selecting `attributes`.
-- [ ] **H3 (perf) · Search seq-scans + casts `attributes::text ILIKE` every row**
+- [x] **H3 (perf) · Search seq-scans + casts `attributes::text ILIKE` every row**
   (`search/postgres-search.provider.ts:45`) — and it's the AI-retrieval fallback (every Ask turn).
-  Add `urn` trigram index; drop full-JSONB substring from the hot WHERE.
+  Fixed by indexing, not dropping (migration 0063): added `ix_nodes_urn_trgm` and the functional
+  `ix_nodes_attrs_text_trgm` so the whole WHERE is index-backed via a BitmapOr — preserves
+  attribute-keyword matching (small scalar maps; test-covered) instead of regressing recall.
 - [x] **H1 (ops) · Outbound fetches without timeout** — email (`core/email.service.ts:210`),
   notification webhooks (`notification.service.ts:532`), Slack (`slack.service.ts:287,298`), Discord
   (`discord.service.ts:284,294`). Route through a `fetchWithTimeout` (~10s).
 - [ ] **H2 (ops) · `SECRET_ENCRYPTION_KEY` optional → in-memory broker** → creds wiped on restart.
   Prod fail-fast guard (see A3).
-- [ ] **H5 (perf) · Pool starvation** — per-request scope fan-out (dashboard 4, finding-detail 7) vs
-  `max:16` (`db/client.ts:31`). Right-size pool + cap per-request fan-out.
+- [x] **H5 (perf) · Pool starvation** — per-request scope fan-out (dashboard 4, finding-detail 7) vs
+  `max:16` (`db/client.ts:31`). Right-size pool + cap per-request fan-out. Pool `max` is now
+  env-tunable (`PG_POOL_MAX`, default 16); `findingDetail`'s blast-radius fan-out is capped at 3
+  concurrent (`mapWithConcurrency`), so a detail request holds ≤4 connections instead of 7.
 - [x] **M3 (correctness) · OSV `AFFECTS` edges never retired** (`ingest/osv-enrichment.ts:43-101`) —
   patched/withdrawn vulns keep flagging. Retire un-reproduced edges, mirroring `reconcileObservedEdges`.
 
@@ -101,8 +117,9 @@ timeouts + honest partial-failure in multi-region collectors.
   fail-fast (A3), outbound timeouts.
 - **Phase B — correctness bugs:** alert watermark (H1), sync-retry rethrow (M5), resource-count (H4),
   OSV retire (M3).
-- **Phase C — scale:** sync batching + I/O-outside-txn (C1), inference memory (C2), indexes + search
-  (H3), pool right-sizing (H5).
+- **Phase C — scale:** sync batching + I/O-outside-txn (C1 ✅), indexes + search (H3 ✅), pool
+  right-sizing (H5 ✅) all landed + verified on real Postgres. Inference memory (C2) analyzed +
+  **deferred** — needs a per-rule consumption contract to scope safely (see C2 above).
 - **Phase D — connectors:** AWS cred refresh (CX1), network-error retries (CH1), GitHub secondary-limit
   + PR pagination (CH2).
 - **Phase E — observability:** metrics/`/metrics`, org-tagged logs, `LOG_LEVEL`.
