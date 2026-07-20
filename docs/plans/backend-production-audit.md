@@ -26,18 +26,16 @@ secret exposure, or customer-cloud write (all verified). The gaps are **operatio
   Phase 1 (no txn, no connection held) then persists in Phase 2 (one txn) via batched `unnest`
   upserts for nodes/snapshots/provenance/signals/edges; client-generated provenance UUIDs pair
   provenance↔edge without RETURNING-order reliance. All 9 sync-runner invariant tests pass on real PG.
-- [ ] **C2 (perf) · Inference loads the whole org graph into memory each run**
+- [x] **C2 (perf) · Inference loads the whole org graph into memory each run**
   (`inference/engine.ts:129-200`, no LIMIT, JSONB attributes/data). OOM risk on big tenants. Scope
-  loads to the kinds the registered rules consume; drop heavy JSONB.
-  **DEFERRED (2026-07-21, analyzed) — needs a per-rule consumption contract first.** Rules read
-  nodes/signals via *dynamic* `nodesByKind.get(spec.kind)` / `signalsByKind.get(kind)` fed by const
-  arrays across ~14 rule files (r1 `DEPLOY_SIGNAL_KINDS`, r9 `COMPUTE_ENV_SIGNALS` + datastore
-  arrays, r11 `TARGET_KINDS`, r12/r17/r18 `PR_KINDS`, …). A hand-built "consumed kinds" list would
-  **silently drop inferred edges** the moment a rule reads a kind it missed — a wrong graph with no
-  failing test (violates P1/P3). Safe design: add `consumesKinds`/`consumesSignalKinds` to the `Rule`
-  interface (declared next to each rule's const arrays so they can't drift), union them in the engine,
-  load lightweight-all nodes (complete endpoint resolution) + attributes/signals only for the union,
-  and add a parity test asserting scoped vs. full loads produce identical edges. Its own unit of work.
+  loads to the kinds the registered rules consume; drop heavy JSONB. **Done via a per-rule consumption
+  contract.** `Rule` gains required `consumesKinds`/`consumesSignalKinds` (declared from each rule's own
+  const arrays so they can't drift). `buildInput` still loads ALL nodes (id/urn/kind/name → endpoint
+  resolution never misses one) but projects the heavy `attributes` JSONB only for consumed kinds
+  (`CASE … ELSE '{}'`) and loads only consumed signal kinds. Since no rule reads attributes off a
+  `nodesByUrn` endpoint, the only risk is `nodesByKind.get`/`signalsByKind.get` of an undeclared kind —
+  which `consumption-contract.test.ts` turns into a red test (recording proxy over each rule; proven to
+  catch a dropped kind, incl. r8's data-gated ARN path). Full inference suite green on real PG (146).
 - [x] **CX1 (connector) · AWS AssumeRole creds never refresh mid-crawl** (`connector-aws/aws/client-config.ts:16-27`
   static object, not a provider). >1h crawl → `ExpiredToken` → misclassified as `access-denied`
   (`aws/retry.ts:21-24`) → silent data loss + false "permission missing". Use a refreshing provider +
@@ -124,9 +122,9 @@ timeouts + honest partial-failure in multi-region collectors.
   fail-fast (A3), outbound timeouts.
 - **Phase B — correctness bugs:** alert watermark (H1), sync-retry rethrow (M5), resource-count (H4),
   OSV retire (M3).
-- **Phase C — scale:** sync batching + I/O-outside-txn (C1 ✅), indexes + search (H3 ✅), pool
-  right-sizing (H5 ✅) all landed + verified on real Postgres. Inference memory (C2) analyzed +
-  **deferred** — needs a per-rule consumption contract to scope safely (see C2 above).
+- **Phase C — scale:** ✅ DONE — sync batching + I/O-outside-txn (C1), indexes + search (H3), pool
+  right-sizing (H5), inference-memory scoping via a per-rule consumption contract (C2). All landed +
+  verified on real Postgres.
 - **Phase D — connectors:** ✅ DONE — AWS cred refresh (CX1), network-error retries across all four
   REST clients (CH1), GitHub secondary-limit + PR-file pagination (CH2). All green.
 - **Phase E — observability:** metrics/`/metrics`, org-tagged logs, `LOG_LEVEL`.
