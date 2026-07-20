@@ -33,8 +33,15 @@ export const s3Discoverer: Discoverer = {
       const Name = bucket.Name;
       if (!Name) continue;
 
-      const loc = await client.send(new GetBucketLocationCommand({ Bucket: Name }));
-      const LocationConstraint = loc.LocationConstraint ?? null;
+      let LocationConstraint: string | null = null;
+      try {
+        const loc = await client.send(new GetBucketLocationCommand({ Bucket: Name }));
+        LocationConstraint = loc.LocationConstraint ?? null;
+      } catch (err) {
+        if (isDenied(err)) throw err; // account-wide perm gap → surface as a missing permission
+        // A bucket vanished between ListBuckets and this call (or a transient blip) — don't abort the
+        // whole S3 scope; emit the bucket with an unknown region, the next sync backfills it.
+      }
 
       let NotificationConfiguration: unknown = {};
       try {
