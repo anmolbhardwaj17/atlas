@@ -33,11 +33,11 @@ secret exposure, or customer-cloud write (all verified). The gaps are **operatio
 
 ## 🟠 High — reliability + correctness bugs
 
-- [ ] **H1 (correctness) · Health alerts silently lost on transient webhook failure**
+- [x] **H1 (correctness) · Health alerts silently lost on transient webhook failure**
   (`notifications/notification.service.ts:449-456`) — `last_alert_at` advances even when `postWebhook`
   returned false (429/500/DNS blip) → alert dropped forever. Only advance the watermark on success;
   disable a channel after N consecutive failures.
-- [ ] **M5 (correctness) · BullMQ retries inert** — `runStagedSync` catches per-scope errors and
+- [x] **M5 (correctness) · BullMQ retries inert** — `runStagedSync` catches per-scope errors and
   *returns* `failed` (`ingest/sync-runner.ts:169-173`, `sync-worker.ts:51-94`), so the job is marked
   completed and `attempts:3` never fires. Rethrow when `status==='failed'` (keep `partial` non-throwing).
 - [ ] **CH1 (connector) · REST clients don't retry thrown network/timeout errors** (only non-2xx) —
@@ -45,7 +45,7 @@ secret exposure, or customer-cloud write (all verified). The gaps are **operatio
   backoff-retry (GETs are idempotent).
 - [ ] **CH2 (connector) · GitHub secondary rate-limit aborts the crawl** (`github/client.ts:113-124`) —
   403 w/o `retry-after` and `remaining>0` isn't retried. Back off ~60s w/ jitter.
-- [ ] **H4 (perf) · Dashboard reports a capped resource count** — `graph.service.ts:581` `LIMIT 5000`
+- [x] **H4 (perf) · Dashboard reports a capped resource count** — `graph.service.ts:581` `LIMIT 5000`
   + `:961` `resources: meta.rows.length` → estate >5000 shows "5000". Use `count(*)`; push
   clouds/accounts to SQL aggregates; stop selecting `attributes`.
 - [ ] **H3 (perf) · Search seq-scans + casts `attributes::text ILIKE` every row**
@@ -58,7 +58,7 @@ secret exposure, or customer-cloud write (all verified). The gaps are **operatio
   Prod fail-fast guard (see A3).
 - [ ] **H5 (perf) · Pool starvation** — per-request scope fan-out (dashboard 4, finding-detail 7) vs
   `max:16` (`db/client.ts:31`). Right-size pool + cap per-request fan-out.
-- [ ] **M3 (correctness) · OSV `AFFECTS` edges never retired** (`ingest/osv-enrichment.ts:43-101`) —
+- [x] **M3 (correctness) · OSV `AFFECTS` edges never retired** (`ingest/osv-enrichment.ts:43-101`) —
   patched/withdrawn vulns keep flagging. Retire un-reproduced edges, mirroring `reconcileObservedEdges`.
 
 ## 🟡 Medium — hardening + optimization
