@@ -86,8 +86,13 @@ secret exposure, or customer-cloud write (all verified). The gaps are **operatio
 
 - [x] **A3 · Config fail-fast in prod** — when `NODE_ENV==='production'`, require `SECRET_ENCRYPTION_KEY`,
   `DATABASE_URL`, `REDIS_URL`, Supabase Storage keys; fail at boot (today: silent degrade).
-- [ ] **Ops metrics/tracing** — no counters/histograms/`/metrics`, no tracing. Add a Prometheus
-  registry (request latency, job outcomes, queue depth).
+- [x] **Ops metrics/tracing** — no counters/histograms/`/metrics`, no tracing. Add a Prometheus
+  registry (request latency, job outcomes, queue depth). Done: `MetricsService` (default process
+  metrics + `http_requests_total`/`http_request_duration_seconds` by method+route-pattern,
+  `atlas_sync_jobs_total` by outcome, `atlas_sync_queue_depth` by state) + `GET /metrics`
+  (`@Public`, optional timing-safe `METRICS_TOKEN`). Recorded from the `LoggingInterceptor` + the
+  sync worker (`onJobResult` hook + `JobQueue.depth()`/BullMQ `getJobCounts`). Distributed tracing
+  (spans) still open — a bigger lift (OTel), left for when a collector exists.
 - [ ] **Indexes** — `ix_nodes_urn_trgm` (GIN trgm), `ix_nodes_health_state` partial expression index.
   Batch inference/OSV writes. Cache `overview()`; `listNodes` count only on page 1.
 - [ ] **Sync-run enqueue not atomic** (`connection.service.ts:368-388`) → orphaned `queued` row blocks
@@ -104,7 +109,9 @@ secret exposure, or customer-cloud write (all verified). The gaps are **operatio
   — route through `parseBody` with size caps.
 - [ ] **Connectors** — constant 1s backoff no jitter (thundering herd); `withRetry` dead code; GitHub PR
   files first 100 only (`github/crawl.ts:216`); AWS per-item describe aborts scope on one bad item.
-- [ ] **`LOG_LEVEL` parsed but unused**; logs lack org context.
+- [x] **`LOG_LEVEL` parsed but unused**; logs lack org context. Done: `LOG_LEVEL` now gates the
+  access-log emission and sets Nest's own logger levels (main.ts); the access line carries the
+  resolved `orgId` when present.
 
 ## 🟢 Verified solid (no action)
 
@@ -127,4 +134,18 @@ timeouts + honest partial-failure in multi-region collectors.
   verified on real Postgres.
 - **Phase D — connectors:** ✅ DONE — AWS cred refresh (CX1), network-error retries across all four
   REST clients (CH1), GitHub secondary-limit + PR-file pagination (CH2). All green.
-- **Phase E — observability:** metrics/`/metrics`, org-tagged logs, `LOG_LEVEL`.
+- **Phase E — observability:** ✅ DONE — Prometheus `/metrics` (http + sync + queue + default),
+  org-tagged access logs, `LOG_LEVEL` wired. Distributed tracing (OTel spans) deferred.
+
+## Found during the audit (out of scope, flagged)
+
+- **`graph()` frontier drops a real neighbour at a tiny budget** (`graph.service.ts` map query).
+  With `?limit=1` the edge-aware frontier is capped at `inView.size >= hardCap` (`= limit*2`), so a
+  budget node with two cross-budget neighbours keeps only ONE — the exact "false unlinked" the
+  feature (commit `f73942f`) meant to prevent (its own comment: "never split a repo from its
+  runtime, P3/P4"). The frontier already only pulls from the over-fetched `mapped` set (bounded), so
+  the extra cap mostly just drops real links. Also: that commit's test
+  (`graph.service.test.ts` "keeps a repo linked … when the budget truncates") seeds an inferred edge
+  with an invalid `provenance.confidence='inferred'` and no `inference_rule_id`, so it errors before
+  asserting — it has never actually run against a migrated DB. Fix = loosen the frontier cap (small
+  map-sizing change) + correct the seed. Needs a product call on max map size, so left for the user.
