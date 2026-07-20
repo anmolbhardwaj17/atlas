@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { withOrgScope, type Db } from "@atlas/db";
 import type {
@@ -8,7 +8,6 @@ import type {
   CrawlContext,
   EdgeUpsert,
   NodeUpsert,
-  RawResource,
   SecretAccessor,
   Signal,
   SyncRunType,
@@ -129,34 +128,44 @@ export async function runStagedSync(
       continue;
     }
     try {
-      // One transaction per scope → a failure rolls the whole scope back (no partial).
+      // Phase 1 — CRAWL (no DB transaction, C1). discover → fetchDetail → normalize are network I/O
+      // against the provider and a big scope can take minutes; running them here (not inside the
+      // persist txn) means we no longer hold a pooled DB connection + an open transaction across the
+      // whole cloud crawl (which starved the pool and held the txn open). Results are buffered per
+      // scope (bounded) then persisted in one batched transaction below.
+      const itemsByUrn = new Map<string, CrawlItem>();
+      for await (const ref of connector.discover(scope, ctx)) {
+        stats.discovered++;
+        const raw = await connector.fetchDetail(ref, ctx);
+        const node = connector.normalize(raw);
+        const payload = JSON.stringify(raw.payload);
+        // Dedupe by URN: a connector emitting the same URN twice in a scope would break the batch
+        // upsert's ON CONFLICT ("cannot affect row a second time"); last write wins, matching the
+        // old per-row upsert's overwrite semantics.
+        itemsByUrn.set(node.urn, {
+          node,
+          provider: node.urn.split(":")[0] || connection.provider,
+          region: typeof node.attributes.region === "string" ? node.attributes.region : null,
+          accountRef:
+            typeof node.attributes.accountRef === "string" ? node.attributes.accountRef : null,
+          payload,
+          contentHash: sha256(payload),
+          source: raw.ref.externalId,
+          signals: connector.extractSignals(raw),
+          edges: connector.observedEdges(raw),
+        });
+      }
+
+      // Phase 2 — PERSIST (one transaction per scope → a failure rolls the whole scope back, no
+      // partial persist; BR-SYNC-2). Every write is batched (one round-trip per kind of write)
+      // instead of the old ~5 serial round-trips per resource.
+      const items = [...itemsByUrn.values()];
       await withOrgScope(db, run.orgId, async (c) => {
-        const urnToId = new Map<string, string>();
-        const pendingEdges: EdgeUpsert[] = [];
-        for await (const ref of connector.discover(scope, ctx)) {
-          stats.discovered++;
-          const raw = await connector.fetchDetail(ref, ctx);
-          const node = connector.normalize(raw);
-          const { id: nodeId, changed } = await persistNode(
-            c,
-            run,
-            connection,
-            node,
-            raw,
-            snapshots,
-          );
-          urnToId.set(node.urn, nodeId);
-          stats.persisted++;
-          if (!changed) stats.unchanged++;
-          pendingEdges.push(...connector.observedEdges(raw));
-          for (const signal of connector.extractSignals(raw)) {
-            await persistSignal(c, run, connection, signal);
-            stats.signals++;
-          }
-        }
-        for (const edge of pendingEdges) {
-          if (await persistEdge(c, run, urnToId, edge)) stats.edges++;
-        }
+        const { urnToId, unchanged } = await persistNodesBatch(c, run, snapshots, items);
+        stats.persisted += items.length;
+        stats.unchanged += unchanged;
+        stats.signals += await persistSignalsBatch(c, run, items);
+        stats.edges += await persistEdgesBatch(c, run, urnToId, items);
       });
       completed.add(scope.key);
       stats.scopesOk++;
@@ -270,39 +279,61 @@ async function finalize(
   });
 }
 
-async function persistNode(
+/** One crawled resource, buffered in Phase 1 (network) for the batched Phase-2 persist. */
+interface CrawlItem {
+  node: NodeUpsert;
+  /** URN-prefix provider (`<provider>:…`, docs/05) — authoritative even when it differs from
+   *  connection.provider (a node one connector references but another owns). */
+  provider: string;
+  region: string | null;
+  accountRef: string | null;
+  /** Canonical JSON of `raw.payload` — content-hashed + snapshotted (P4). */
+  payload: string;
+  contentHash: string;
+  /** `raw.ref.externalId` — the provenance source id. */
+  source: string;
+  signals: Signal[];
+  edges: EdgeUpsert[];
+}
+
+/**
+ * Batch-persist a scope's nodes (C1). Collapses the old ~5 serial round-trips per resource into a
+ * handful of set-based statements: node_kinds seed → nodes upsert → snapshot existence check →
+ * (for changed only) storage put + raw_snapshots + provenance. Returns urn→id for edge resolution
+ * and the count of unchanged nodes (same content hash as an existing snapshot ⇒ skip re-snapshot,
+ * docs/06 §6). Node upsert semantics (health-annotation preservation, last_seen/last_sync_run_id
+ * re-stamp) are unchanged from the old per-row path.
+ */
+async function persistNodesBatch(
   c: PoolClient,
   run: SyncRunRecord,
-  connection: Connection,
-  node: NodeUpsert,
-  raw: RawResource,
   snapshots: SnapshotStore,
-): Promise<{ id: string; changed: boolean }> {
-  // A node's provider is its URN prefix — the canonical identity (`<provider>:…`, docs/05).
-  // For a well-behaved connector this equals connection.provider; it only differs for a node
-  // one connector references but another owns (e.g. a cross-cloud datastore), where the URN is
-  // authoritative. Deriving it here keeps `provider` consistent with the URN by construction.
-  const provider = node.urn.split(":")[0] || connection.provider;
-  // Self-bootstrap the kind vocabulary so we don't need a separate seed step.
+  items: CrawlItem[],
+): Promise<{ urnToId: Map<string, string>; unchanged: number }> {
+  const urnToId = new Map<string, string>();
+  if (items.length === 0) return { urnToId, unchanged: 0 };
+
+  // Self-bootstrap the kind vocabulary (no separate seed step). DISTINCT (kind,provider); first
+  // provider wins per kind via ON CONFLICT, same as the old per-row insert.
   await c.query(
     `INSERT INTO node_kinds (kind, provider, category, description)
-     VALUES ($1, $2, 'unknown', $1) ON CONFLICT (kind) DO NOTHING`,
-    [node.kind, provider],
+     SELECT DISTINCT k, p, 'unknown', k FROM unnest($1::text[], $2::text[]) AS t(k, p)
+     ON CONFLICT (kind) DO NOTHING`,
+    [items.map((i) => i.node.kind), items.map((i) => i.provider)],
   );
-  const region = typeof node.attributes.region === "string" ? node.attributes.region : null;
-  const accountRef =
-    typeof node.attributes.accountRef === "string" ? node.attributes.accountRef : null;
 
-  const { rows } = await c.query<{ id: string }>(
+  const { rows } = await c.query<{ id: string; urn: string }>(
     `INSERT INTO nodes
        (org_id, connection_id, urn, kind, name, provider, region, account_ref, attributes,
         status, confidence, last_seen, last_sync_run_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'active','observed', now(), $10)
+     SELECT $1, $2, u.urn, u.kind, u.name, u.provider, u.region, u.account_ref, u.attributes::jsonb,
+            'active', 'observed', now(), $3
+       FROM unnest($4::text[], $5::text[], $6::text[], $7::text[], $8::text[], $9::text[], $10::text[])
+            AS u(urn, kind, name, provider, region, account_ref, attributes)
      ON CONFLICT (org_id, urn) DO UPDATE SET
        name = EXCLUDED.name, provider = EXCLUDED.provider,
-       -- Crawl attributes replace wholesale, but the health poll's out-of-band annotation
-       -- must survive a sync (else every crawl flickers nodes back to health-unknown until
-       -- the next poll tick).
+       -- Crawl attributes replace wholesale, but the health poll's out-of-band annotation must
+       -- survive a sync (else every crawl flickers nodes back to health-unknown until the next poll).
        attributes = CASE
          WHEN nodes.attributes ? 'health'
            THEN EXCLUDED.attributes || jsonb_build_object('health', nodes.attributes->'health')
@@ -311,107 +342,182 @@ async function persistNode(
        region = EXCLUDED.region, account_ref = EXCLUDED.account_ref,
        connection_id = EXCLUDED.connection_id, status = 'active', last_seen = now(),
        last_sync_run_id = EXCLUDED.last_sync_run_id
-     RETURNING id`,
+     RETURNING id, urn`,
     [
       run.orgId,
       run.connectionId,
-      node.urn,
-      node.kind,
-      node.displayName,
-      provider,
-      region,
-      accountRef,
-      JSON.stringify(node.attributes),
       run.id,
+      items.map((i) => i.node.urn),
+      items.map((i) => i.node.kind),
+      items.map((i) => i.node.displayName),
+      items.map((i) => i.provider),
+      items.map((i) => i.region),
+      items.map((i) => i.accountRef),
+      items.map((i) => JSON.stringify(i.node.attributes)),
     ],
   );
-  const nodeId = rows[0]?.id;
-  if (!nodeId) throw new Error("node upsert returned no id");
+  for (const r of rows) urnToId.set(r.urn, r.id);
+  if (urnToId.size !== items.length) throw new Error("node batch upsert returned unexpected rows");
 
-  const payload = JSON.stringify(raw.payload);
-  const contentHash = sha256(payload);
-
-  // Incremental: if this node already has a snapshot with the same content hash, the
-  // resource is unchanged — the upsert above refreshed last_seen; skip re-snapshot and
-  // re-provenance (and the storage write) and signal "unchanged" so downstream
-  // infer/index can be skipped too (docs/06 §6, §5.3).
-  const existing = await c.query(
-    "SELECT 1 FROM raw_snapshots WHERE org_id = $1 AND node_id = $2 AND content_hash = $3 LIMIT 1",
-    [run.orgId, nodeId, contentHash],
+  // Incremental: a node whose latest content hash already has a snapshot is unchanged — the upsert
+  // above refreshed last_seen; skip re-snapshot/re-provenance/storage-write (docs/06 §6, §5.3).
+  const nodeIds = items.map((i) => urnToId.get(i.node.urn) as string);
+  const existing = new Set<string>();
+  const ex = await c.query<{ node_id: string; content_hash: string }>(
+    `SELECT node_id, content_hash FROM raw_snapshots
+      WHERE org_id = $1
+        AND (node_id, content_hash) IN (SELECT n, h FROM unnest($2::uuid[], $3::text[]) AS t(n, h))`,
+    [run.orgId, nodeIds, items.map((i) => i.contentHash)],
   );
-  if ((existing.rowCount ?? 0) > 0) {
-    return { id: nodeId, changed: false };
+  for (const r of ex.rows) existing.add(`${r.node_id}|${r.content_hash}`);
+
+  const changed = items.filter(
+    (i) => !existing.has(`${urnToId.get(i.node.urn)}|${i.contentHash}`),
+  );
+  const unchanged = items.length - changed.length;
+  if (changed.length === 0) return { urnToId, unchanged };
+
+  // Storage put stays inside the txn (append-only, content-addressed, and only for CHANGED nodes —
+  // bounded, unlike the crawl which is now outside). A rolled-back scope leaves at most an orphan,
+  // content-deduped blob. Provenance links back to snapshots by node_id (order-independent).
+  const changedNodeIds: string[] = [];
+  const storageRefs: string[] = [];
+  const changedHashes: string[] = [];
+  for (const i of changed) {
+    storageRefs.push(await snapshots.put(run.orgId, i.contentHash, i.payload));
+    changedNodeIds.push(urnToId.get(i.node.urn) as string);
+    changedHashes.push(i.contentHash);
   }
-
-  const storageRef = await snapshots.put(run.orgId, contentHash, payload);
-  const snap = await c.query<{ id: string }>(
+  const snaps = await c.query<{ id: string; node_id: string }>(
     `INSERT INTO raw_snapshots (org_id, node_id, storage_ref, content_hash, sync_run_id)
-     VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-    [run.orgId, nodeId, storageRef, contentHash, run.id],
+     SELECT $1, n, r, h, $2 FROM unnest($3::uuid[], $4::text[], $5::text[]) AS t(n, r, h)
+     RETURNING id, node_id`,
+    [run.orgId, run.id, changedNodeIds, storageRefs, changedHashes],
   );
+  const snapByNode = new Map(snaps.rows.map((s) => [s.node_id, s.id]));
   await c.query(
     `INSERT INTO provenance (org_id, source, sync_run_id, confidence, raw_snapshot_id)
-     VALUES ($1,$2,$3,'observed',$4)`,
-    [run.orgId, raw.ref.externalId, run.id, snap.rows[0]?.id ?? null],
+     SELECT $1, s, $2, 'observed', r FROM unnest($3::text[], $4::uuid[]) AS t(s, r)`,
+    [
+      run.orgId,
+      run.id,
+      changed.map((i) => i.source),
+      changed.map((i) => snapByNode.get(urnToId.get(i.node.urn) as string) ?? null),
+    ],
   );
-  return { id: nodeId, changed: true };
+  return { urnToId, unchanged };
 }
 
-async function persistSignal(
+/**
+ * Batch-upsert a scope's signals, deduped by (subject_urn, kind) last-wins (the batch's ON CONFLICT
+ * can't touch the same row twice). Upsert-by-(org,subject_urn,kind) so re-syncs refresh in place
+ * (docs/05 §6.3). Returns the number of distinct signals persisted.
+ */
+async function persistSignalsBatch(
   c: PoolClient,
   run: SyncRunRecord,
-  connection: Connection,
-  signal: Signal,
-): Promise<void> {
-  // Upsert by (org, subject_urn, kind) so re-syncs refresh in place (docs/05 §6.3).
+  items: CrawlItem[],
+): Promise<number> {
+  const byKey = new Map<string, Signal>();
+  for (const i of items) for (const s of i.signals) byKey.set(`${s.subjectUrn}|${s.kind}`, s);
+  const sigs = [...byKey.values()];
+  if (sigs.length === 0) return 0;
   await c.query(
     `INSERT INTO signals (org_id, connection_id, subject_urn, kind, data, last_sync_run_id)
-     VALUES ($1,$2,$3,$4,$5,$6)
+     SELECT $1, $2, s, k, d::jsonb, $3 FROM unnest($4::text[], $5::text[], $6::text[]) AS t(s, k, d)
      ON CONFLICT (org_id, subject_urn, kind) DO UPDATE SET
        data = EXCLUDED.data, connection_id = EXCLUDED.connection_id,
        last_seen = now(), last_sync_run_id = EXCLUDED.last_sync_run_id`,
     [
       run.orgId,
       run.connectionId,
-      signal.subjectUrn,
-      signal.kind,
-      JSON.stringify(signal.data),
       run.id,
+      sigs.map((s) => s.subjectUrn),
+      sigs.map((s) => s.kind),
+      sigs.map((s) => JSON.stringify(s.data)),
     ],
   );
+  return sigs.length;
 }
 
-async function persistEdge(
+/**
+ * Batch-upsert a scope's observed edges. Resolves endpoints against this scope's urn→id plus one
+ * batched lookup for URNs owned by other scopes/prior runs; skips unresolved endpoints + self-edges
+ * (the inference engine handles forward refs, G1). Deduped by (from,to,type) last-wins. Each edge
+ * gets a client-generated provenance UUID so provenance↔edge pair without relying on RETURNING order
+ * — evidence (e.g. a dependency `version`) lives on provenance, not a column (docs/05, BR-EDGE-2).
+ * Returns the number of distinct edges upserted.
+ */
+async function persistEdgesBatch(
   c: PoolClient,
   run: SyncRunRecord,
   urnToId: Map<string, string>,
-  edge: EdgeUpsert,
-): Promise<boolean> {
-  const fromId = urnToId.get(edge.fromUrn) ?? (await lookupNodeId(c, edge.fromUrn));
-  const toId = urnToId.get(edge.toUrn) ?? (await lookupNodeId(c, edge.toUrn));
-  // Skip unresolved endpoints / self-edges (the inference engine handles forward refs, G1).
-  if (!fromId || !toId || fromId === toId) return false;
+  items: CrawlItem[],
+): Promise<number> {
+  const allEdges = items.flatMap((i) => i.edges);
+  if (allEdges.length === 0) return 0;
 
-  // Edge metadata (e.g. a DEPENDS_ON_PKG's dependency `version`) has no column on `edges` by
-  // design — it lives in the edge's provenance evidence (docs/05). Store it so downstream
-  // queries (dependency sprawl) can read it back.
-  const prov = await c.query<{ id: string }>(
-    "INSERT INTO provenance (org_id, source, sync_run_id, confidence, evidence) VALUES ($1,$2,$3,'observed',$4) RETURNING id",
-    [run.orgId, `edge:${edge.type}`, run.id, JSON.stringify(edge.attributes ?? {})],
+  const resolved = new Map(urnToId);
+  const needLookup = new Set<string>();
+  for (const e of allEdges) {
+    if (!resolved.has(e.fromUrn)) needLookup.add(e.fromUrn);
+    if (!resolved.has(e.toUrn)) needLookup.add(e.toUrn);
+  }
+  if (needLookup.size > 0) {
+    const { rows } = await c.query<{ id: string; urn: string }>(
+      "SELECT id, urn FROM nodes WHERE urn = ANY($1::text[])",
+      [[...needLookup]],
+    );
+    for (const r of rows) resolved.set(r.urn, r.id);
+  }
+
+  const byKey = new Map<
+    string,
+    { fromId: string; toId: string; type: string; evidence: Record<string, unknown> }
+  >();
+  for (const e of allEdges) {
+    const fromId = resolved.get(e.fromUrn);
+    const toId = resolved.get(e.toUrn);
+    if (!fromId || !toId || fromId === toId) continue;
+    byKey.set(`${fromId}|${toId}|${e.type}`, {
+      fromId,
+      toId,
+      type: e.type,
+      evidence: e.attributes ?? {},
+    });
+  }
+  const edges = [...byKey.values()];
+  if (edges.length === 0) return 0;
+
+  const provIds = edges.map(() => randomUUID());
+  await c.query(
+    `INSERT INTO provenance (id, org_id, source, sync_run_id, confidence, evidence)
+     SELECT p, $1, 'edge:' || typ, $2, 'observed', ev::jsonb
+       FROM unnest($3::uuid[], $4::text[], $5::text[]) AS t(p, typ, ev)`,
+    [
+      run.orgId,
+      run.id,
+      provIds,
+      edges.map((e) => e.type),
+      edges.map((e) => JSON.stringify(e.evidence)),
+    ],
   );
   await c.query(
     `INSERT INTO edges
        (org_id, from_node_id, to_node_id, type, origin, confidence, provenance_id, last_seen, last_sync_run_id)
-     VALUES ($1,$2,$3,$4,'observed','observed',$5, now(), $6)
+     SELECT $1, f, t2, typ, 'observed', 'observed', p, now(), $2
+       FROM unnest($3::uuid[], $4::uuid[], $5::text[], $6::uuid[]) AS x(f, t2, typ, p)
      ON CONFLICT (org_id, from_node_id, to_node_id, type, inference_rule_id) DO UPDATE SET
        last_seen = now(), last_sync_run_id = EXCLUDED.last_sync_run_id, status = 'active',
        provenance_id = EXCLUDED.provenance_id`,
-    [run.orgId, fromId, toId, edge.type, prov.rows[0]?.id, run.id],
+    [
+      run.orgId,
+      run.id,
+      edges.map((e) => e.fromId),
+      edges.map((e) => e.toId),
+      edges.map((e) => e.type),
+      provIds,
+    ],
   );
-  return true;
-}
-
-async function lookupNodeId(c: PoolClient, urn: string): Promise<string | undefined> {
-  const { rows } = await c.query<{ id: string }>("SELECT id FROM nodes WHERE urn = $1", [urn]);
-  return rows[0]?.id;
+  return edges.length;
 }
