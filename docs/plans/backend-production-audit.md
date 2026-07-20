@@ -13,12 +13,12 @@ secret exposure, or customer-cloud write (all verified). The gaps are **operatio
 
 ## 🔴 Must-fix before production (Critical — source-verified)
 
-- [ ] **A1 · Job queue is in-memory in every env.** `connections.module.ts:62` unconditionally returns
+- [x] **A1 · Job queue is in-memory in every env.** `connections.module.ts:62` unconditionally returns
   `InMemoryQueue`; `BullMQQueue` (Redis, retries/backoff) exists but is never wired, and `REDIS_URL`
   is dead config. Syncs run in-process in the API; in-flight jobs are **lost on every deploy/crash**
   → graph silently stales (P1). Fix: select BullMQ when `REDIS_URL` set + dedicated worker + drain on
   shutdown (`SyncWorkerBootstrap` has no `OnApplicationShutdown`).
-- [ ] **A2 · `/health` is a static 200** (`health.controller.ts:9`). Add a readiness endpoint that
+- [x] **A2 · `/health` is a static 200** (`health.controller.ts:9`). Add a readiness endpoint that
   runs `SELECT 1` (short timeout) so a dead-pool pod is evicted from rotation. Keep liveness cheap.
 - [ ] **C1 (perf) · Sync = ~5 serial DB round-trips per resource, DB connection held across the cloud
   crawl** (`ingest/sync-runner.ts:133-160,273-357`). Batch upserts (`INSERT … unnest … ON CONFLICT`);
@@ -51,7 +51,7 @@ secret exposure, or customer-cloud write (all verified). The gaps are **operatio
 - [ ] **H3 (perf) · Search seq-scans + casts `attributes::text ILIKE` every row**
   (`search/postgres-search.provider.ts:45`) — and it's the AI-retrieval fallback (every Ask turn).
   Add `urn` trigram index; drop full-JSONB substring from the hot WHERE.
-- [ ] **H1 (ops) · Outbound fetches without timeout** — email (`core/email.service.ts:210`),
+- [x] **H1 (ops) · Outbound fetches without timeout** — email (`core/email.service.ts:210`),
   notification webhooks (`notification.service.ts:532`), Slack (`slack.service.ts:287,298`), Discord
   (`discord.service.ts:284,294`). Route through a `fetchWithTimeout` (~10s).
 - [ ] **H2 (ops) · `SECRET_ENCRYPTION_KEY` optional → in-memory broker** → creds wiped on restart.
@@ -63,7 +63,7 @@ secret exposure, or customer-cloud write (all verified). The gaps are **operatio
 
 ## 🟡 Medium — hardening + optimization
 
-- [ ] **A3 · Config fail-fast in prod** — when `NODE_ENV==='production'`, require `SECRET_ENCRYPTION_KEY`,
+- [x] **A3 · Config fail-fast in prod** — when `NODE_ENV==='production'`, require `SECRET_ENCRYPTION_KEY`,
   `DATABASE_URL`, `REDIS_URL`, Supabase Storage keys; fail at boot (today: silent degrade).
 - [ ] **Ops metrics/tracing** — no counters/histograms/`/metrics`, no tracing. Add a Prometheus
   registry (request latency, job outcomes, queue depth).
