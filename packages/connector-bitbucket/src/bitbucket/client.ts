@@ -74,14 +74,23 @@ export class FetchBitbucketClient implements BitbucketClient {
   ): Promise<BitbucketResponse<T>> {
     const url = this.resolve(path, opts.params);
     for (let attempt = 1; ; attempt++) {
-      const res = await fetchWithTimeout(url, {
-        headers: {
-          Authorization: this.authHeader,
-          Accept: "application/json",
-          "User-Agent": "atlas-connector",
-        },
-        ...(opts.signal ? { signal: opts.signal } : {}),
-      });
+      let res: Response;
+      try {
+        res = await fetchWithTimeout(url, {
+          headers: {
+            Authorization: this.authHeader,
+            Accept: "application/json",
+            "User-Agent": "atlas-connector",
+          },
+          ...(opts.signal ? { signal: opts.signal } : {}),
+        });
+      } catch (err) {
+        // CH1: fetch threw (network reset / DNS blip / timeout). A GET is idempotent → retry with
+        // bounded backoff rather than aborting the repo on one dropped socket. A caller abort isn't.
+        if (opts.signal?.aborted || attempt >= this.maxAttempts) throw err;
+        await this.sleep(Math.min(this.maxWaitMs, 1000 * 2 ** (attempt - 1)));
+        continue;
+      }
       if (res.ok) {
         return { status: res.status, data: (await res.json()) as T, headers: res.headers };
       }

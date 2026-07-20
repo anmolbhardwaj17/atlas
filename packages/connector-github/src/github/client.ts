@@ -1,9 +1,10 @@
 /**
  * Minimal GitHub REST client (docs/07 §10). Bearer-auths with the installation token,
  * follows `Link: rel="next"` pagination, and handles rate limits: on a primary limit
- * (`x-ratelimit-remaining: 0`) it waits until reset; on a secondary limit
- * (`retry-after`) it waits that long; 5xx get bounded backoff. Waits are bounded and
- * the sleeper is injectable for deterministic tests (mirrors AWS DD-4).
+ * (`x-ratelimit-remaining: 0`) it waits until reset; on a secondary limit it waits
+ * `retry-after` when present, else ~60s + jitter (CH2); 5xx get bounded backoff; and a
+ * thrown network/timeout error is retried too, since a GET is idempotent (CH1). Waits are
+ * bounded and the sleeper/RNG are injectable for deterministic tests (mirrors AWS DD-4).
  */
 import { fetchWithTimeout } from "@atlas/connector-sdk";
 
@@ -31,6 +32,8 @@ export interface FetchGithubClientDeps {
   maxWaitMs?: number;
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
+  /** Injectable for deterministic backoff jitter in tests; defaults to Math.random. */
+  rng?: () => number;
 }
 
 const defaultSleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -42,6 +45,7 @@ export class FetchGithubClient implements GithubClient {
   private readonly maxWaitMs: number;
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly now: () => number;
+  private readonly rng: () => number;
 
   constructor(deps: FetchGithubClientDeps) {
     this.token = deps.token;
@@ -50,24 +54,35 @@ export class FetchGithubClient implements GithubClient {
     this.maxWaitMs = deps.maxWaitMs ?? 60_000;
     this.sleep = deps.sleep ?? defaultSleep;
     this.now = deps.now ?? (() => Date.now());
+    this.rng = deps.rng ?? Math.random;
   }
 
   async request<T>(path: string, opts: GithubRequestOptions = {}): Promise<GithubResponse<T>> {
     const url = this.resolve(path, opts.params);
     for (let attempt = 1; ; attempt++) {
-      const res = await fetchWithTimeout(url, {
-        headers: {
-          Authorization: `Bearer ${this.token}`,
-          Accept: "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28",
-          "User-Agent": "atlas-connector",
-        },
-        ...(opts.signal ? { signal: opts.signal } : {}),
-      });
+      let res: Response;
+      try {
+        res = await fetchWithTimeout(url, {
+          headers: {
+            Authorization: `Bearer ${this.token}`,
+            Accept: "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "atlas-connector",
+          },
+          ...(opts.signal ? { signal: opts.signal } : {}),
+        });
+      } catch (err) {
+        // CH1: fetch itself threw — a network reset / DNS blip / request timeout. A GET is
+        // idempotent, so retry with bounded exponential backoff instead of aborting the whole repo
+        // on one dropped socket. A caller-initiated abort is intentional and must NOT be retried.
+        if (opts.signal?.aborted || attempt >= this.maxAttempts) throw err;
+        await this.sleep(this.expBackoffMs(attempt, 1000));
+        continue;
+      }
       if (res.ok) {
         return { status: res.status, data: (await res.json()) as T, headers: res.headers };
       }
-      const waitMs = this.retryWaitMs(res);
+      const waitMs = await this.retryWaitMs(res, attempt);
       if (waitMs == null || attempt >= this.maxAttempts) {
         throw new Error(`GitHub ${res.status} for ${path}`);
       }
@@ -110,17 +125,41 @@ export class FetchGithubClient implements GithubClient {
   }
 
   /** Bounded wait for rate limits / transient 5xx; null → not retryable. */
-  private retryWaitMs(res: Response): number | null {
+  private async retryWaitMs(res: Response, attempt: number): Promise<number | null> {
     const retryAfter = res.headers.get("retry-after");
     if (retryAfter) return Math.min(this.maxWaitMs, Number(retryAfter) * 1000);
     const remaining = res.headers.get("x-ratelimit-remaining");
     const reset = res.headers.get("x-ratelimit-reset");
     if ((res.status === 403 || res.status === 429) && remaining === "0" && reset) {
+      // Primary rate limit: quota exhausted → wait until the reset instant.
       const waitMs = Number(reset) * 1000 - this.now();
       return Math.max(0, Math.min(this.maxWaitMs, waitMs));
     }
-    if (res.status >= 500) return 1000;
+    if (res.status === 403 || res.status === 429) {
+      // CH2: a secondary (abuse) rate limit — 403/429 with no `retry-after` and quota not exhausted.
+      // GitHub signals it in the body ("secondary rate limit" / "abuse detection"). Back off ~60s
+      // with jitter and retry. A plain permission 403 (no such message) stays non-retryable → throws,
+      // so the crawl's permission handling still fires immediately.
+      const body = await res
+        .clone()
+        .text()
+        .catch(() => "");
+      if (/secondary rate limit|abuse detection/i.test(body)) return this.jitteredWaitMs(60_000);
+    }
+    if (res.status >= 500) return this.expBackoffMs(attempt, 1000);
     return null;
+  }
+
+  /** Exponential backoff with full jitter, bounded by maxWaitMs (mirrors AWS DD-4). */
+  private expBackoffMs(attempt: number, baseMs: number): number {
+    const ceiling = Math.min(this.maxWaitMs, baseMs * 2 ** (attempt - 1));
+    return Math.floor(this.rng() * ceiling);
+  }
+
+  /** ~target wait with half-fixed/half-jittered spread (never trivially short), bounded by maxWaitMs. */
+  private jitteredWaitMs(targetMs: number): number {
+    const capped = Math.min(this.maxWaitMs, targetMs);
+    return Math.floor(capped / 2 + this.rng() * (capped / 2));
   }
 }
 

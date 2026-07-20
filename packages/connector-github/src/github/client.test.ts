@@ -81,4 +81,55 @@ describe("FetchGithubClient", () => {
     await expect(client.request("/boom")).rejects.toThrow(/GitHub 500/);
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
+
+  it("retries a thrown network error then succeeds (CH1)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(Object.assign(new Error("socket hang up"), { code: "ECONNRESET" }))
+      .mockResolvedValueOnce(res({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new FetchGithubClient({ token: "t", sleep: noSleep, rng: () => 0 });
+    const out = await client.request<{ ok: boolean }>("/flaky");
+    expect(out.data.ok).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does NOT retry a caller-aborted fetch (CH1)", async () => {
+    const ac = new AbortController();
+    ac.abort();
+    const fetchMock = vi.fn().mockRejectedValue(Object.assign(new Error("aborted"), { name: "AbortError" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new FetchGithubClient({ token: "t", sleep: noSleep });
+    await expect(client.request("/x", { signal: ac.signal })).rejects.toThrow(/aborted/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("backs off and retries a secondary rate limit without retry-after (CH2)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        res(
+          { message: "You have exceeded a secondary rate limit. Please wait a few minutes." },
+          { status: 403, headers: { "x-ratelimit-remaining": "4999" } },
+        ),
+      )
+      .mockResolvedValueOnce(res({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new FetchGithubClient({ token: "t", sleep: noSleep, rng: () => 0 });
+    const out = await client.request<{ ok: boolean }>("/secondary");
+    expect(out.data.ok).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does NOT retry a plain permission 403 (CH2 guard)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        res({ message: "Resource not accessible by integration" }, { status: 403 }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new FetchGithubClient({ token: "t", sleep: noSleep, maxAttempts: 5 });
+    await expect(client.request("/forbidden")).rejects.toThrow(/GitHub 403/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });

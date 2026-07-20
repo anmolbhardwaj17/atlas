@@ -60,14 +60,23 @@ export class FetchJiraClient implements JiraClient {
   async request<T>(path: string, opts: JiraRequestOptions = {}): Promise<JiraResponse<T>> {
     const url = this.resolve(path, opts.params);
     for (let attempt = 1; ; attempt++) {
-      const res = await fetchWithTimeout(url, {
-        headers: {
-          Authorization: this.authHeader,
-          Accept: "application/json",
-          "User-Agent": "atlas-connector",
-        },
-        ...(opts.signal ? { signal: opts.signal } : {}),
-      });
+      let res: Response;
+      try {
+        res = await fetchWithTimeout(url, {
+          headers: {
+            Authorization: this.authHeader,
+            Accept: "application/json",
+            "User-Agent": "atlas-connector",
+          },
+          ...(opts.signal ? { signal: opts.signal } : {}),
+        });
+      } catch (err) {
+        // CH1: fetch threw (network reset / DNS blip / timeout). A GET is idempotent → retry with
+        // bounded backoff rather than aborting on one dropped socket. A caller abort isn't retried.
+        if (opts.signal?.aborted || attempt >= this.maxAttempts) throw err;
+        await this.sleep(Math.min(this.maxWaitMs, 1000 * 2 ** (attempt - 1)));
+        continue;
+      }
       if (res.ok) {
         return { status: res.status, data: (await res.json()) as T, headers: res.headers };
       }

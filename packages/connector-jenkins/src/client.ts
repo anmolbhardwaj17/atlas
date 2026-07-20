@@ -50,14 +50,23 @@ export class FetchJenkinsClient implements JenkinsClient {
     const url = this.resolve(path);
     await assertResolvesToPublic(this.host); // SSRF re-check post-DNS at fetch time (H1)
     for (let attempt = 1; ; attempt++) {
-      const res = await fetchWithTimeout(url, {
-        headers: {
-          Authorization: this.authHeader,
-          Accept: "application/json",
-          "User-Agent": "atlas-connector",
-        },
-        ...(signal ? { signal } : {}),
-      });
+      let res: Response;
+      try {
+        res = await fetchWithTimeout(url, {
+          headers: {
+            Authorization: this.authHeader,
+            Accept: "application/json",
+            "User-Agent": "atlas-connector",
+          },
+          ...(signal ? { signal } : {}),
+        });
+      } catch (err) {
+        // CH1: fetch threw (network reset / DNS blip / timeout). A GET is idempotent → retry with
+        // bounded backoff rather than aborting on one dropped socket. A caller abort isn't retried.
+        if (signal?.aborted || attempt >= this.maxAttempts) throw err;
+        await this.sleep(Math.min(this.maxWaitMs, 1000 * 2 ** (attempt - 1)));
+        continue;
+      }
       if (res.ok) return (await res.json()) as T;
       const waitMs = this.retryWaitMs(res);
       if (waitMs == null || attempt >= this.maxAttempts) {

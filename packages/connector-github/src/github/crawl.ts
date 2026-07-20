@@ -18,6 +18,11 @@ export interface Discovered {
 const CODEOWNERS_PATHS = [".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS"];
 const MANIFEST_PATHS = ["package.json", "requirements.txt", "go.mod"];
 const PR_BACKFILL = 30;
+/** Max changed files collected per PR (CH2). The old single-page request kept only the first 100,
+ *  silently dropping the rest — which could lose the very file that links a PR to a service (r6/r18).
+ *  We now page (100/page) up to this bound: generous enough that real PRs are captured whole, while a
+ *  pathological mega-PR still can't bloat the graph (GitHub's own files endpoint caps at 3000). */
+const MAX_PR_FILES = 600;
 
 export async function listInstallationRepos(
   client: GithubClient,
@@ -219,9 +224,14 @@ async function pullFiles(
   repo: string,
   number: number,
 ): Promise<string[]> {
-  const res = await client.request<Array<{ filename?: string }>>(
+  const files: string[] = [];
+  // Page through the PR's changed files (100/page via the client) up to MAX_PR_FILES, instead of
+  // taking only the first 100 — a large PR could otherwise lose the file that links it to a service.
+  for await (const f of client.paginate<{ filename?: string }>(
     `/repos/${owner}/${repo}/pulls/${number}/files`,
-    { params: { per_page: 100 } },
-  );
-  return (res.data ?? []).map((f) => f.filename).filter((f): f is string => !!f);
+  )) {
+    if (f.filename) files.push(f.filename);
+    if (files.length >= MAX_PR_FILES) break;
+  }
+  return files;
 }
