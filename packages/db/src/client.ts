@@ -17,12 +17,15 @@ export type Db = Pool;
  * move on: pg discards the dead client and opens a fresh one on the next query, so a
  * transient DB blip degrades one in-flight request, never the whole server.
  */
-export function createPool(connectionString: string, max = 16): Pool {
+export function createPool(connectionString: string, max = 16, statementTimeoutMs = 60_000): Pool {
   const pool = new Pool({
     connectionString,
     keepAlive: true, // fewer idle drops by the pooler
     connectionTimeoutMillis: 10_000,
     idleTimeoutMillis: 30_000,
+    // Backstop cap on any single statement so a runaway query can't pin a connection indefinitely
+    // (env-tunable, 0 disables). Applies to app/worker queries; migrations use a separate owner pool.
+    ...(statementTimeoutMs > 0 ? { statement_timeout: statementTimeoutMs } : {}),
     // Atlas deliberately fans a request's independent reads across several org-scoped
     // connections (separate scopes run in parallel; a single connection serialises queries).
     // A dashboard `summary()` opens ~4 at once and `findingDetail()` ~4 (its blast-radius fan-out is

@@ -30,6 +30,10 @@ async function bootstrap(): Promise<void> {
   const adapter = new FastifyAdapter({
     requestIdHeader: "x-request-id",
     genReqId: () => randomUUID(),
+    // Cap how long a client may take to send a full request so a slow-loris / stalled upload can't
+    // hold a connection open forever. This bounds request *reception*, not response streaming, so the
+    // SSE (/ai) and WebSocket (Ask) long-lived responses are unaffected.
+    requestTimeout: 30_000,
     // Fastify's default body cap is 1 MiB, which is smaller than the image-upload caps
     // (decoded 1.5 MB → ~2 MB as base64, and the /me avatar zod cap is 3 MB), so a legit logo/
     // avatar would fail with a confusing 413 before our own validators run. Lift it so the request

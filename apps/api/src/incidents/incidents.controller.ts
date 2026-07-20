@@ -1,10 +1,12 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { z } from "zod";
 import { AuthGuard } from "../auth/auth.guard";
 import { TenantScopeGuard } from "../auth/tenant-scope.guard";
 import { RolesGuard } from "../auth/roles.guard";
 import { Roles } from "../auth/roles.decorator";
 import type { AuthedRequest } from "../auth/auth.types";
 import { ApiException } from "../common/errors";
+import { parseBody } from "../common/validation";
 import {
   IncidentsService,
   type Incident,
@@ -12,19 +14,27 @@ import {
   type IncidentTrigger,
 } from "./incidents.service";
 
-const TRIGGERS = new Set<IncidentTrigger>(["map", "finding", "alert", "manual"]);
 const STATUSES = new Set<IncidentStatus>(["open", "analyzing", "resolved", "dismissed"]);
 
-interface OpenBody {
-  nodeId?: string;
-  trigger?: string;
-}
-interface UpdateBody {
-  status?: string;
-  verdict?: unknown;
-  evidence?: unknown;
-  resolution?: string | null;
-}
+// Strict, size-capped body schemas (validate at the edge; reject extra fields → no mass-assignment;
+// cap the persisted JSON so a request can't stash an unbounded blob on an incident row).
+const boundedJson = z
+  .unknown()
+  .refine((v) => JSON.stringify(v ?? null).length <= 32_000, "value too large (max 32 KB)");
+const OpenSchema = z
+  .object({
+    nodeId: z.string().trim().min(1).max(200),
+    trigger: z.enum(["map", "finding", "alert", "manual"]).default("manual"),
+  })
+  .strict();
+const UpdateSchema = z
+  .object({
+    status: z.enum(["open", "analyzing", "resolved", "dismissed"]).optional(),
+    verdict: boundedJson.optional(),
+    evidence: boundedJson.optional(),
+    resolution: z.string().max(4000).nullable().optional(),
+  })
+  .strict();
 
 /**
  * War Room incidents (docs/plans/war-room.md). Org-scoped, Member+. "Open" is idempotent per node
@@ -38,15 +48,13 @@ export class IncidentsController {
 
   @Post()
   @Roles("Member")
-  async open(@Req() req: AuthedRequest, @Body() body: OpenBody): Promise<Incident> {
+  async open(@Req() req: AuthedRequest, @Body() body: unknown): Promise<Incident> {
     const orgId = orgOf(req);
-    const nodeId = body.nodeId?.trim();
-    if (!nodeId) throw ApiException.validation([{ field: "nodeId", issue: "nodeId is required." }]);
-    const trigger = (body.trigger ?? "manual") as IncidentTrigger;
-    if (!TRIGGERS.has(trigger)) {
-      throw ApiException.validation([{ field: "trigger", issue: "Invalid trigger." }]);
-    }
-    return this.incidents.open(orgId, req.auth?.userId ?? null, { nodeId, trigger });
+    const { nodeId, trigger } = parseBody(OpenSchema, body);
+    return this.incidents.open(orgId, req.auth?.userId ?? null, {
+      nodeId,
+      trigger: trigger as IncidentTrigger,
+    });
   }
 
   @Get()
@@ -79,16 +87,14 @@ export class IncidentsController {
   async update(
     @Req() req: AuthedRequest,
     @Param("id") id: string,
-    @Body() body: UpdateBody,
+    @Body() body: unknown,
   ): Promise<Incident> {
-    if (body.status !== undefined && !STATUSES.has(body.status as IncidentStatus)) {
-      throw ApiException.validation([{ field: "status", issue: "Invalid status." }]);
-    }
+    const parsed = parseBody(UpdateSchema, body);
     return this.incidents.update(orgOf(req), id, {
-      ...(body.status !== undefined ? { status: body.status as IncidentStatus } : {}),
-      ...(body.verdict !== undefined ? { verdict: body.verdict } : {}),
-      ...(body.evidence !== undefined ? { evidence: body.evidence } : {}),
-      ...(body.resolution !== undefined ? { resolution: body.resolution } : {}),
+      ...(parsed.status !== undefined ? { status: parsed.status } : {}),
+      ...(parsed.verdict !== undefined ? { verdict: parsed.verdict } : {}),
+      ...(parsed.evidence !== undefined ? { evidence: parsed.evidence } : {}),
+      ...(parsed.resolution !== undefined ? { resolution: parsed.resolution } : {}),
     });
   }
 }

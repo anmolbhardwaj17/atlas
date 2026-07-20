@@ -384,6 +384,23 @@ export class ConnectionService {
       await enqueueSync(this.queue, { orgId, connectionId, runId, type: "full" });
     } catch (err) {
       this.logger.error(`failed to enqueue ${trigger} sync: ${(err as Error).message}`);
+      // The `queued` row is now orphaned — no worker will ever pick it up (the enqueue failed, e.g. a
+      // Redis blip). Because `uq_sync_inflight` counts it as in-flight, leaving it would block this
+      // connection from syncing for ~15 min until the reaper clears it. Mark it failed now so the
+      // next attempt can enqueue immediately. Best-effort compare-and-set on the still-queued row.
+      try {
+        await withOrgScope(this.db, orgId, (c) =>
+          c.query(
+            "UPDATE sync_runs SET status = 'failed', finished_at = now() WHERE id = $1 AND status = 'queued'",
+            [runId],
+          ),
+        );
+      } catch (cleanupErr) {
+        this.logger.error(
+          `failed to release orphaned queued sync ${runId}: ${(cleanupErr as Error).message}`,
+        );
+      }
+      return { alreadyRunning: false };
     }
     return { runId, alreadyRunning: false };
   }

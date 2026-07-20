@@ -37,6 +37,11 @@ export interface FetchJiraClientDeps {
 
 const defaultSleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
+/** ~1s backoff with jitter [500, 1500) ms — de-synchronises many workers hitting the same limit. */
+function jitteredBackoffMs(): number {
+  return 500 + Math.floor(Math.random() * 1000);
+}
+
 export class FetchJiraClient implements JiraClient {
   private readonly authHeader: string;
   private readonly baseUrl: string;
@@ -126,10 +131,12 @@ export class FetchJiraClient implements JiraClient {
   private retryWaitMs(res: Response): number | null {
     if (res.status === 429) {
       const retryAfter = Number(res.headers.get("retry-after"));
-      const ms = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 1000;
+      // Honour Retry-After when present; otherwise back off ~1s WITH jitter so many workers hitting
+      // the same limit don't retry in lockstep (thundering herd).
+      const ms = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : jitteredBackoffMs();
       return Math.min(ms, this.maxWaitMs);
     }
-    if (res.status >= 500) return Math.min(1000, this.maxWaitMs);
+    if (res.status >= 500) return Math.min(this.maxWaitMs, jitteredBackoffMs());
     return null;
   }
 }

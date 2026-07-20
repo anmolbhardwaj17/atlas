@@ -37,6 +37,11 @@ export const EnvSchema = z
     // rather than hard-coding. Min 4 keeps the fan-out from self-deadlocking.
     PG_POOL_MAX: z.coerce.number().int().min(4).max(200).default(16),
 
+    // Per-statement timeout (ms) on the app pool — a backstop against a runaway query (a bad plan /
+    // cartesian join) holding a connection forever. Generous by default so legitimate heavy
+    // aggregates + batch upserts finish; raise it if a real workload needs longer. 0 = disabled.
+    PG_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(0).max(600_000).default(60_000),
+
     // Supabase Auth (docs/12 §2–3, F1.5). The API verifies user access JWTs against
     // Supabase's JWKS (ES256) — derived from SUPABASE_URL — and mints no tokens of its
     // own. SUPABASE_JWT_SECRET is the HS256 fallback only (projects without asymmetric
