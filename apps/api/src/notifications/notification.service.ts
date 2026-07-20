@@ -130,7 +130,12 @@ interface ChannelRow {
   created_at: Date;
   last_alert_at: Date;
   last_digest_at: Date | null;
+  alert_failures: number;
 }
+
+/** Consecutive failed alert deliveries before a channel is auto-disabled (bounds retry + LLM cost
+ *  on a permanently-broken webhook). */
+const MAX_ALERT_FAILURES = 5;
 
 @Injectable()
 export class NotificationService {
@@ -387,7 +392,7 @@ export class NotificationService {
   async dispatch(orgId: string): Promise<void> {
     const channels = await withOrgScope(this.db, orgId, async (c) => {
       const { rows } = await c.query<ChannelRow>(
-        `SELECT kind, config, enabled, last_alert_at, last_digest_at
+        `SELECT kind, config, enabled, last_alert_at, last_digest_at, alert_failures
            FROM notification_channels WHERE enabled = true`,
       );
       return rows.filter(
@@ -447,13 +452,33 @@ export class NotificationService {
 
       for (const ch of channels) {
         if (ch.last_alert_at >= latest || !ch.config.webhookUrl) continue; // already caught up
-        await postWebhook(ch.kind as ChannelKind, ch.config.webhookUrl, text);
-        await withOrgScope(this.db, orgId, (c) =>
-          c.query(`UPDATE notification_channels SET last_alert_at = $1 WHERE kind = $2`, [
-            latest,
+        const delivered = await postWebhook(ch.kind as ChannelKind, ch.config.webhookUrl, text);
+        await withOrgScope(this.db, orgId, (c) => {
+          if (delivered) {
+            // Delivered — advance the watermark past this batch and clear the failure count.
+            return c.query(
+              `UPDATE notification_channels SET last_alert_at = $1, alert_failures = 0 WHERE kind = $2`,
+              [latest, ch.kind],
+            );
+          }
+          const failures = ch.alert_failures + 1;
+          if (failures >= MAX_ALERT_FAILURES) {
+            // Persistently broken webhook — stop re-sending + re-diagnosing every tick: disable the
+            // channel and advance past this batch. The user re-enables it by reconnecting.
+            this.logger.warn(
+              `disabling ${ch.kind} alert channel after ${failures} failed deliveries`,
+            );
+            return c.query(
+              `UPDATE notification_channels SET last_alert_at = $1, alert_failures = 0, enabled = false WHERE kind = $2`,
+              [latest, ch.kind],
+            );
+          }
+          // Transient failure — do NOT advance the watermark, so the next tick retries this alert.
+          return c.query(`UPDATE notification_channels SET alert_failures = $1 WHERE kind = $2`, [
+            failures,
             ch.kind,
-          ]),
-        );
+          ]);
+        });
       }
     }
 
