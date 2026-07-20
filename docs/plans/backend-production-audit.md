@@ -93,22 +93,34 @@ secret exposure, or customer-cloud write (all verified). The gaps are **operatio
   (`@Public`, optional timing-safe `METRICS_TOKEN`). Recorded from the `LoggingInterceptor` + the
   sync worker (`onJobResult` hook + `JobQueue.depth()`/BullMQ `getJobCounts`). Distributed tracing
   (spans) still open — a bigger lift (OTel), left for when a collector exists.
-- [ ] **Indexes** — `ix_nodes_urn_trgm` (GIN trgm), `ix_nodes_health_state` partial expression index.
-  Batch inference/OSV writes. Cache `overview()`; `listNodes` count only on page 1.
-- [ ] **Sync-run enqueue not atomic** (`connection.service.ts:368-388`) → orphaned `queued` row blocks
-  the connection 15 min on a Redis blip. Mark `failed` on enqueue error, or transactional outbox.
-- [ ] **Long-scope false-reap race** (`sync-runner.ts:133-168`) — `updated_at` frozen within a scope →
-  a >15-min scope is reaped mid-flight → replacement run interleaves. Emit an `updated_at` heartbeat.
-- [ ] **Digest loses a week on mid-send crash** (`digest/weekly-digest.service.ts:74-82`) — claim-then-send.
-  Provisional claim / per-org send ledger.
-- [ ] **DB `statement_timeout`** + Fastify request timeout (none today). Non-`CONCURRENTLY` index builds
-  lock writes on deploy (`db/migrate.ts:164`).
-- [ ] **RLS backstop CI-skipped** — `db/rls-coverage.test.ts` exists but `describe.skip` unless
-  `TEST_ADMIN_DATABASE_URL` set. Wire an admin DB into CI so a future org-scoped table w/o RLS fails.
-- [ ] **Incidents/alerts controllers bypass zod** (`incidents.controller.ts:41,82`, `alerts.controller.ts:33`)
-  — route through `parseBody` with size caps.
-- [ ] **Connectors** — constant 1s backoff no jitter (thundering herd); `withRetry` dead code; GitHub PR
-  files first 100 only (`github/crawl.ts:216`); AWS per-item describe aborts scope on one bad item.
+- [~] **Indexes** — `ix_nodes_urn_trgm` ✅ (0063, H3), `ix_nodes_health_state` ✅ (partial expression
+  index, migration 0064). Cache `overview()` ✅ (same TtlCache as `summary`). **Still open:** batch
+  inference/OSV writes (involved — provenance correlation); `listNodes` count only on page 1
+  (deferred — the Explore page is SSR'd per navigation and reads `page.total` on every page, so a
+  sentinel would show "-1 resources"; needs a coordinated frontend change).
+- [x] **Sync-run enqueue not atomic** (`connection.service.ts:368-388`) → orphaned `queued` row blocks
+  the connection 15 min on a Redis blip. Done: on enqueue failure the run is marked `failed` (compare-
+  and-set on `status='queued'`), so the next attempt can enqueue immediately.
+- [x] **Long-scope false-reap race** (`sync-runner.ts`) — `updated_at` frozen within a scope →
+  a >15-min scope reaped mid-flight. Done: the crawl heartbeats `sync_runs.updated_at` every ~60s
+  (guarded on `status='running'`, best-effort), well under the 15-min reap threshold.
+- [x] **Digest loses a week on mid-send crash** (`digest/weekly-digest.service.ts`) — claim-then-send.
+  Done: per-`(period, org)` claim (`app_claim_digest_org`, migration 0065) — the send loop claims each
+  org just before sending, so a crash costs at most one org (next tick resumes the rest).
+- [x] **DB `statement_timeout`** + Fastify request timeout (none today). Done: env-tunable
+  `PG_STATEMENT_TIMEOUT_MS` (default 60s) on the app pool + Fastify `requestTimeout` 30s (bounds
+  request reception, not SSE/WS responses). Non-`CONCURRENTLY` index builds are noted in each index
+  migration (0055/0063/0064) as a build-CONCURRENTLY-out-of-band caveat at scale.
+- [x] **RLS backstop CI-skipped** — verified already wired: CI's integration job sets
+  `TEST_ADMIN_DATABASE_URL` and runs `pnpm run test`, so `db/rls-coverage.test.ts` (every `org_id`
+  table must have RLS + a policy) runs on every push. No change needed.
+- [x] **Incidents/alerts controllers bypass zod** — done: both now validate through strict,
+  size-capped zod schemas via `parseBody` (rejects extra fields; caps verdict/evidence JSON at 32 KB,
+  resolution at 4 KB).
+- [~] **Connectors** — constant 1s backoff no jitter → **done** (bitbucket/jira/jenkins now jitter);
+  GitHub PR files first-100 → **done** (CH2); AWS per-item describe aborts scope → **done** (ELB/S3
+  wrapped). **Left:** `withRetry` is dead code but a tested, exported utility (the SDK's adaptive
+  retry currently supersedes it) — kept rather than churn its tests.
 - [x] **`LOG_LEVEL` parsed but unused**; logs lack org context. Done: `LOG_LEVEL` now gates the
   access-log emission and sets Nest's own logger levels (main.ts); the access line carries the
   resolved `orgId` when present.
@@ -137,15 +149,12 @@ timeouts + honest partial-failure in multi-region collectors.
 - **Phase E — observability:** ✅ DONE — Prometheus `/metrics` (http + sync + queue + default),
   org-tagged access logs, `LOG_LEVEL` wired. Distributed tracing (OTel spans) deferred.
 
-## Found during the audit (out of scope, flagged)
+## Found during the audit — FIXED
 
-- **`graph()` frontier drops a real neighbour at a tiny budget** (`graph.service.ts` map query).
-  With `?limit=1` the edge-aware frontier is capped at `inView.size >= hardCap` (`= limit*2`), so a
-  budget node with two cross-budget neighbours keeps only ONE — the exact "false unlinked" the
-  feature (commit `f73942f`) meant to prevent (its own comment: "never split a repo from its
-  runtime, P3/P4"). The frontier already only pulls from the over-fetched `mapped` set (bounded), so
-  the extra cap mostly just drops real links. Also: that commit's test
-  (`graph.service.test.ts` "keeps a repo linked … when the budget truncates") seeds an inferred edge
-  with an invalid `provenance.confidence='inferred'` and no `inference_rule_id`, so it errors before
-  asserting — it has never actually run against a migrated DB. Fix = loosen the frontier cap (small
-  map-sizing change) + correct the seed. Needs a product call on max map size, so left for the user.
+- **`graph()` frontier dropped a real neighbour at a tiny budget** (`graph.service.ts` map query).
+  ✅ Fixed: the `inView.size >= hardCap` cut is removed — the frontier already only pulls from the
+  over-fetched `mapped` set (bounded to `hardCap+1`), so a budget node's neighbours are no longer
+  split off (the "false unlinked" the feature meant to prevent, P3/P4). That commit's test
+  (`graph.service.test.ts` "keeps a repo linked … when the budget truncates") also seeded an invalid
+  inferred edge (`provenance.confidence='inferred'`, no `inference_rule_id`) so it never ran — seed
+  corrected; the test now passes (18/18).

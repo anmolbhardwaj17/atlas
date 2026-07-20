@@ -17,6 +17,15 @@ export const up: string[] = [
      PRIMARY KEY (period_key, org_id)
    )`,
 
+  // It carries an org_id, so it's org-scoped by the RLS-coverage backstop's definition (R8): enable
+  // RLS + an org-scope policy. The claim itself runs through app_claim_digest_org (SECURITY DEFINER,
+  // bypasses RLS to write cross-org), so this policy only guards any direct app_role access.
+  `ALTER TABLE digest_org_runs ENABLE ROW LEVEL SECURITY`,
+  `DROP POLICY IF EXISTS org_scope_digest_org_runs ON digest_org_runs`,
+  `CREATE POLICY org_scope_digest_org_runs ON digest_org_runs FOR ALL TO atlas_app
+     USING (org_id = NULLIF(current_setting('atlas.current_org', true), '')::uuid)
+     WITH CHECK (org_id = NULLIF(current_setting('atlas.current_org', true), '')::uuid)`,
+
   // Claim one org for one period. Returns true only to the first caller for (p_key, p_org).
   `CREATE OR REPLACE FUNCTION app_claim_digest_org(p_key text, p_org uuid)
      RETURNS boolean
