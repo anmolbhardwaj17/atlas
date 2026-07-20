@@ -92,6 +92,17 @@ export function createSyncHandler(deps: SyncWorkerDeps): (job: Job<SyncJobData>)
         logger.error(`finding reconcile after sync ${runId} failed: ${(err as Error).message}`);
       }
     }
+
+    // The sync WHOLLY failed (every scope errored — typically a provider or credential outage). Throw
+    // so the queue retries with backoff: runStagedSync resets the same runId back to 'running', so the
+    // retry re-runs cleanly. A `partial` sync is NOT retried — the graph was updated for the scopes
+    // that worked, and the next scheduled sync fills the gaps. (The dev in-memory queue swallows this;
+    // BullMQ applies attempts+backoff.)
+    if (result.status === "failed") {
+      throw new Error(
+        `sync ${runId} failed: ${result.failedScopes.length} scope(s) errored — retrying`,
+      );
+    }
   };
 }
 

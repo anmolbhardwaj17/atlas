@@ -29,6 +29,14 @@ export class InMemoryQueue implements JobQueue {
   private readonly seen = new Set<string>();
   private inflight: Array<Promise<void>> = [];
 
+  // A thrown handler is a retry signal for the prod (BullMQ) queue. The dev/test driver doesn't
+  // retry, and its handler calls are floating promises — so we swallow the rejection here (the
+  // failure is already logged by the handler and persisted on the sync_run) to avoid an unhandled
+  // rejection that would crash the process.
+  private run(handler: JobHandler<unknown>, job: Job<unknown>): Promise<void> {
+    return handler(job).catch(() => {});
+  }
+
   async enqueue<T>(name: string, data: T, opts?: { jobId?: string }): Promise<void> {
     const id = opts?.jobId ?? randomUUID();
     if (this.seen.has(id)) return;
@@ -36,7 +44,7 @@ export class InMemoryQueue implements JobQueue {
     const job: Job<unknown> = { id, name, data };
     const handler = this.handlers.get(name);
     if (handler) {
-      this.inflight.push(handler(job));
+      this.inflight.push(this.run(handler, job));
     } else {
       const list = this.pending.get(name) ?? [];
       list.push(job);
@@ -49,7 +57,7 @@ export class InMemoryQueue implements JobQueue {
     this.handlers.set(name, typed);
     const queued = this.pending.get(name) ?? [];
     this.pending.delete(name);
-    for (const job of queued) this.inflight.push(typed(job));
+    for (const job of queued) this.inflight.push(this.run(typed, job));
   }
 
   async drain(): Promise<void> {
