@@ -28,6 +28,9 @@ export interface SyncWorkerDeps extends RunnerDeps {
   /** Ran after a non-failed sync's enrich + infer stages, once the graph is fully persisted.
    *  Used to reconcile the derived-finding lifecycle (open/resolved/regressed). Best-effort. */
   onSyncComplete?: (orgId: string, connectionId: string) => Promise<void>;
+  /** Observability hook: the runner's outcome for this job (succeeded/partial/failed), for metrics.
+   *  Best-effort — a throw here must never affect the sync. */
+  onJobResult?: (outcome: "succeeded" | "partial" | "failed") => void;
 }
 
 /** Build the handler that runs one sync job: load connection → resolve connector →
@@ -44,6 +47,11 @@ export function createSyncHandler(deps: SyncWorkerDeps): (job: Job<SyncJobData>)
     if (!connector) throw new Error(`no connector for provider "${connection.provider}"`);
     const run: SyncRunRecord = { id: runId, orgId, connectionId, type };
     const result = await runStagedSync(deps, connector, connection, run);
+    try {
+      deps.onJobResult?.(result.status);
+    } catch {
+      /* metrics must never break a sync */
+    }
 
     // Enrich stage: query OSV.dev for vulnerabilities affecting the just-persisted packages.
     // Best-effort (docs/plans/security-vulnerabilities.md) — a transient OSV outage or a graph

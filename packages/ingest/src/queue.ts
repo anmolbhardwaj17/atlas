@@ -12,10 +12,19 @@ export interface Job<T> {
 }
 export type JobHandler<T> = (job: Job<T>) => Promise<void>;
 
+/** Queue depth by state, for the backlog metric (observability). */
+export interface QueueDepth {
+  waiting: number;
+  active: number;
+  failed: number;
+}
+
 export interface JobQueue {
   enqueue<T>(name: string, data: T, opts?: { jobId?: string }): Promise<void>;
   process<T>(name: string, handler: JobHandler<T>): void;
   close(): Promise<void>;
+  /** Current backlog by state (best-effort; used only for the `atlas_sync_queue_depth` gauge). */
+  depth?(): Promise<QueueDepth>;
 }
 
 /**
@@ -64,6 +73,12 @@ export class InMemoryQueue implements JobQueue {
     const current = this.inflight;
     this.inflight = [];
     await Promise.all(current);
+  }
+
+  async depth(): Promise<QueueDepth> {
+    // In-process queue runs handlers eagerly, so "waiting" is only what's buffered pre-registration.
+    const waiting = [...this.pending.values()].reduce((n, list) => n + list.length, 0);
+    return { waiting, active: this.inflight.length, failed: 0 };
   }
 
   async close(): Promise<void> {

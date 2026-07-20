@@ -3,8 +3,18 @@ import { randomUUID } from "node:crypto";
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter } from "@nestjs/platform-fastify";
 import type { NestFastifyApplication } from "@nestjs/platform-fastify";
-import { Logger } from "@nestjs/common";
+import { Logger, type LogLevel } from "@nestjs/common";
 import { loadEnv } from "@atlas/config";
+
+/** Map our `LOG_LEVEL` (error<warn<info<debug) onto Nest's cumulative logger levels. */
+const NEST_LOG_LEVELS: Record<string, LogLevel[]> = {
+  error: ["error"],
+  warn: ["error", "warn"],
+  info: ["error", "warn", "log"],
+  debug: ["error", "warn", "log", "debug", "verbose"],
+};
+const nestLogLevels = (level: string): LogLevel[] =>
+  NEST_LOG_LEVELS[level] ?? ["error", "warn", "log"];
 import { AppModule } from "./app.module";
 import { registerAskSocket } from "./ai/ask-socket";
 
@@ -40,6 +50,9 @@ async function bootstrap(): Promise<void> {
   // its HMAC signature over what was actually sent (a re-serialized JSON body wouldn't match).
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, {
     rawBody: true,
+    // Wire LOG_LEVEL (previously parsed but unused) to Nest's own logger, so a quieter prod
+    // (LOG_LEVEL=warn) suppresses routine `log` chatter while errors/warnings still surface.
+    logger: nestLogLevels(env.LOG_LEVEL),
   });
   // The web app calls the API from the browser (Bearer token) - allow its origin (docs/08 §3).
   app.enableCors({

@@ -18,6 +18,7 @@ import { WebhookModule } from "./webhooks/webhook.module";
 import { SlackModule } from "./slack/slack.module";
 import { DiscordModule } from "./discord/discord.module";
 import { HealthController } from "./health/health.controller";
+import { ObservabilityModule } from "./observability/observability.module";
 import { ResponseInterceptor } from "./common/response.interceptor";
 import { LoggingInterceptor } from "./common/logging.interceptor";
 import { HttpExceptionFilter } from "./common/http-exception.filter";
@@ -41,6 +42,7 @@ import { HttpExceptionFilter } from "./common/http-exception.filter";
     WebhookModule,
     SlackModule,
     DiscordModule,
+    ObservabilityModule,
   ],
   controllers: [HealthController],
   providers: [

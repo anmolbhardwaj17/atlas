@@ -17,6 +17,7 @@ import { PG_POOL } from "../core/tokens";
 import { GraphService } from "../graph/graph.service";
 import { SECRET_BROKER, JOB_QUEUE, SNAPSHOT_STORE } from "./tokens";
 import { ConnectorRegistry } from "./connector-registry";
+import { MetricsService } from "../observability/metrics.service";
 
 /**
  * Dev in-process sync worker (F2.5). In deploy a separate worker process consumes a
@@ -30,9 +31,13 @@ import { ConnectorRegistry } from "./connector-registry";
 export class SyncWorkerBootstrap implements OnModuleInit, OnApplicationShutdown {
   private readonly logger = new Logger(SyncWorkerBootstrap.name);
 
+  /** Polls queue depth for the `atlas_sync_queue_depth` gauge (cleared on shutdown). */
+  private depthTimer?: ReturnType<typeof setInterval>;
+
   /** On SIGTERM (deploy/scale-down), close the queue: BullMQ's worker.close() waits for in-flight
    *  jobs to finish before resolving, so a sync mid-flight completes instead of being lost. */
   async onApplicationShutdown(): Promise<void> {
+    if (this.depthTimer) clearInterval(this.depthTimer);
     try {
       await this.queue.close();
       this.logger.log("job queue closed (in-flight jobs drained)");
@@ -48,6 +53,7 @@ export class SyncWorkerBootstrap implements OnModuleInit, OnApplicationShutdown 
     @Inject(SNAPSHOT_STORE) private readonly snapshots: SnapshotStore,
     private readonly registry: ConnectorRegistry,
     private readonly graph: GraphService,
+    private readonly metrics: MetricsService,
   ) {}
 
   onModuleInit(): void {
@@ -64,6 +70,7 @@ export class SyncWorkerBootstrap implements OnModuleInit, OnApplicationShutdown 
       logger: log,
       resolveConnector: (provider) => this.registry.get(provider),
       loadConnection: (orgId, connectionId) => this.loadConnection(orgId, connectionId),
+      onJobResult: (outcome) => this.metrics.recordSyncJob(outcome),
       onSyncComplete: async (orgId) => {
         const { active, resolved } = await this.graph.reconcileFindings(orgId);
         this.logger.log(`finding lifecycle reconciled: ${active} open, ${resolved} newly resolved`);
@@ -73,6 +80,24 @@ export class SyncWorkerBootstrap implements OnModuleInit, OnApplicationShutdown 
       },
     });
     this.logger.log("In-process sync worker registered (dev).");
+
+    // Publish queue depth for the backlog metric. Best-effort + unref'd so it never keeps the
+    // process alive or lets a transient queue error escape into an unhandled rejection.
+    if (this.queue.depth) {
+      const poll = (): void => {
+        this.queue
+          .depth?.()
+          .then((d) => {
+            this.metrics.setQueueDepth("waiting", d.waiting);
+            this.metrics.setQueueDepth("active", d.active);
+            this.metrics.setQueueDepth("failed", d.failed);
+          })
+          .catch(() => undefined);
+      };
+      poll();
+      this.depthTimer = setInterval(poll, 15_000);
+      this.depthTimer.unref?.();
+    }
   }
 
   private async loadConnection(orgId: string, connectionId: string): Promise<Connection | null> {

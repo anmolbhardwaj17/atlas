@@ -67,6 +67,12 @@ export const EnvSchema = z
     DISCORD_CLIENT_SECRET: optionalString,
     DISCORD_BOT_TOKEN: optionalString,
 
+    // Optional bearer token guarding `GET /metrics` (Prometheus scrape, observability). When set,
+    // the endpoint requires `Authorization: Bearer <token>` (timing-safe); when unset, /metrics is
+    // open — fine behind a private network/service mesh, but set this if the API is internet-facing
+    // so request counts/route names aren't exposed.
+    METRICS_TOKEN: optionalString,
+
     // AES-256-GCM key (32 bytes, hex or base64) for the DB-backed Secrets Broker (docs/13 §7).
     // When set, connector credentials are stored encrypted in `connection_secrets` (durable, so
     // they survive restarts). Unset ⇒ fall back to the in-memory broker (dev-only, wiped on boot).

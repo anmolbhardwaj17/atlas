@@ -1,6 +1,6 @@
 import { Queue, Worker, type ConnectionOptions, type JobsOptions } from "bullmq";
 import type { ConnectorLogger } from "@atlas/connector-sdk";
-import type { JobHandler, JobQueue } from "./queue";
+import type { JobHandler, JobQueue, QueueDepth } from "./queue";
 
 /**
  * Production JobQueue on BullMQ/Redis (docs/02 DD-6). One named queue per stage;
@@ -53,6 +53,7 @@ export class BullMQQueue implements JobQueue {
   }
 
   process<T>(name: string, handler: JobHandler<T>): void {
+    this.queue(name); // register the Queue object too, so depth() can count this name in a worker-only process
     const worker = new Worker<T>(
       name,
       async (job) => {
@@ -73,6 +74,17 @@ export class BullMQQueue implements JobQueue {
       this.logger?.error(`worker ${name} error`, { error: err.message });
     });
     this.workers.push(worker);
+  }
+
+  async depth(): Promise<QueueDepth> {
+    const totals: QueueDepth = { waiting: 0, active: 0, failed: 0 };
+    for (const q of this.queues.values()) {
+      const c = await q.getJobCounts("wait", "active", "failed");
+      totals.waiting += c.wait ?? 0;
+      totals.active += c.active ?? 0;
+      totals.failed += c.failed ?? 0;
+    }
+    return totals;
   }
 
   async close(): Promise<void> {
