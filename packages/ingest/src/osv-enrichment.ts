@@ -23,6 +23,8 @@ export interface OsvEnrichmentResult {
   packagesScanned: number;
   vulnerabilitiesFound: number;
   affectsEdges: number;
+  /** AFFECTS edges retired this run (vuln withdrawn / package patched, no longer matched). */
+  retiredAffects: number;
 }
 
 /** Manifest ecosystem (lowercase, from the parsers) → OSV ecosystem identifier. */
@@ -54,7 +56,8 @@ export async function runOsvEnrichment(
       `SELECT id, connection_id, attributes FROM nodes
         WHERE kind = 'external.package' AND status = 'active'`,
     );
-    if (rows.length === 0) return { packagesScanned: 0, vulnerabilitiesFound: 0, affectsEdges: 0 };
+    if (rows.length === 0)
+      return { packagesScanned: 0, vulnerabilitiesFound: 0, affectsEdges: 0, retiredAffects: 0 };
 
     // Build OSV queries + a map back to each package's node/connection (skip unversioned or
     // unsupported ecosystems — OSV needs a concrete version).
@@ -70,7 +73,7 @@ export async function runOsvEnrichment(
       meta.set(pkgKey(q), { nodeId: r.id, connectionId: r.connection_id });
     }
     if (queries.length === 0)
-      return { packagesScanned: 0, vulnerabilitiesFound: 0, affectsEdges: 0 };
+      return { packagesScanned: 0, vulnerabilitiesFound: 0, affectsEdges: 0, retiredAffects: 0 };
 
     const scan = await osv.scan(queries);
 
@@ -92,10 +95,30 @@ export async function runOsvEnrichment(
         affectsEdges += 1;
       }
     }
+
+    // Retire AFFECTS edges we no longer produced — a vuln withdrawn from OSV, or a package patched/
+    // version-bumped so it no longer matches. Without this the "exposed AND vulnerable" toxic-combo
+    // would keep flagging fixed packages. Within this single transaction now() is constant and equals
+    // the last_seen stamped on every re-produced edge above, so `last_seen < now()` is exactly the
+    // un-reproduced set — scoped to the packages we actually scanned. Convergent, mirrors
+    // reconcileObservedEdges (P7).
+    const scannedPkgIds = [...meta.values()].map((m) => m.nodeId);
+    let retiredAffects = 0;
+    if (scannedPkgIds.length > 0) {
+      const res = await c.query(
+        `UPDATE edges SET status = 'retired', retired_at = now(), updated_at = now()
+           WHERE type = 'AFFECTS' AND status = 'active'
+             AND to_node_id = ANY($1::uuid[]) AND last_seen < now()`,
+        [scannedPkgIds],
+      );
+      retiredAffects = res.rowCount ?? 0;
+    }
+
     return {
       packagesScanned: queries.length,
       vulnerabilitiesFound: vulnCache.size,
       affectsEdges,
+      retiredAffects,
     };
   });
 }

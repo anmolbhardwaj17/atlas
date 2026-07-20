@@ -53,7 +53,8 @@ export function createSyncHandler(deps: SyncWorkerDeps): (job: Job<SyncJobData>)
         const osv = await runOsvEnrichment({ db: deps.db }, orgId);
         logger.info(
           `osv after sync ${runId}: scanned ${osv.packagesScanned} pkgs, ` +
-            `found ${osv.vulnerabilitiesFound} vulns (${osv.affectsEdges} affects edges)`,
+            `found ${osv.vulnerabilitiesFound} vulns (${osv.affectsEdges} affects edges, ` +
+            `${osv.retiredAffects} retired)`,
         );
       } catch (err) {
         logger.error(`osv enrichment after sync ${runId} failed: ${(err as Error).message}`);
