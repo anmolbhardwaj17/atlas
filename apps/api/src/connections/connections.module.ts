@@ -51,8 +51,14 @@ const secretBrokerProvider: Provider = {
   provide: SECRET_BROKER,
   useFactory: (env: Env, db: Db): SecretBroker => {
     if (env.SECRET_ENCRYPTION_KEY) {
-      new Logger("SecretBroker").log("Using durable DB-backed secret store (encrypted).");
-      return new DbSecretBroker(db, env.SECRET_ENCRYPTION_KEY);
+      const retired = (env.SECRET_ENCRYPTION_KEYS_RETIRED ?? "")
+        .split(",")
+        .map((k) => k.trim())
+        .filter(Boolean);
+      new Logger("SecretBroker").log(
+        `Using durable DB-backed secret store (encrypted${retired.length ? `; ${retired.length} retired key(s) for rotation` : ""}).`,
+      );
+      return new DbSecretBroker(db, env.SECRET_ENCRYPTION_KEY, retired);
     }
     new Logger("SecretBroker").warn("SECRET_ENCRYPTION_KEY unset - using in-memory broker (dev).");
     return new InMemorySecretBroker();

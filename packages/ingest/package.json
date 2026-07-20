@@ -15,7 +15,8 @@
     "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "seed:demo": "tsx scripts/seed-demo.ts"
+    "seed:demo": "tsx scripts/seed-demo.ts",
+    "rotate:secrets": "tsx scripts/rotate-secrets.ts"
   },
   "dependencies": {
     "@atlas/connector-sdk": "workspace:*",

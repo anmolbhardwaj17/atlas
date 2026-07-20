@@ -83,6 +83,12 @@ export const EnvSchema = z
     // they survive restarts). Unset ⇒ fall back to the in-memory broker (dev-only, wiped on boot).
     SECRET_ENCRYPTION_KEY: optionalString,
 
+    // Comma-separated OLD encryption keys kept for DECRYPT ONLY during/after a key rotation (each
+    // 32 bytes, hex or base64). New writes always use SECRET_ENCRYPTION_KEY; existing secrets written
+    // under a retired key still decrypt until `rotate-secrets` re-wraps them, after which the retired
+    // key can be removed. Unset ⇒ no retired keys (single-key operation, the default).
+    SECRET_ENCRYPTION_KEYS_RETIRED: optionalString,
+
     // Auto-refresh cadence: re-sync each connected source whose last sync is older than this many
     // minutes (docs/06 §11, the in-process dev slice of the Scheduler). 0 = disabled. Needs durable
     // secrets (SECRET_ENCRYPTION_KEY) so a sync can resolve credentials without a reconnect.
