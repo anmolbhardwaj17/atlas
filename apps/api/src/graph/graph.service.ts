@@ -484,7 +484,7 @@ export class GraphService {
   }
 
   /** Org overview for the dashboard (docs/09 §5.2): counts + tiers + freshness. */
-  async overview(orgId: string): Promise<OverviewResult> {
+  private async computeOverview(orgId: string): Promise<OverviewResult> {
     return withOrgScope(this.db, orgId, async (c) => {
       const [nodes, kinds, byProvider, byCategory, edges, conns, lastSync] = await Promise.all([
         c.query<{ n: number }>("SELECT count(*)::int AS n FROM nodes WHERE status <> 'deleted'"),
@@ -554,16 +554,24 @@ export class GraphService {
    * org's entry so a user's own action (mute/connect/edit) reflects immediately on this instance.
    */
   private readonly summaryCache = new TtlCache<DashboardSummary>(SUMMARY_TTL_MS);
+  /** `overview()` is a second heavy read (7 full-estate aggregates) hit on every Explore/graph load;
+   *  same inputs (change only on sync/mutation) → same short-TTL, self-invalidating cache. */
+  private readonly overviewCache = new TtlCache<OverviewResult>(SUMMARY_TTL_MS);
 
   async summary(orgId: string): Promise<DashboardSummary> {
     return this.summaryCache.get(orgId, () => this.computeSummary(orgId));
   }
 
-  /** Run an org-scoped write, then drop that org's cached summary so the writer's own change (edge
-   *  added/removed/confirmed/rejected) shows on the next dashboard read on this instance. */
+  async overview(orgId: string): Promise<OverviewResult> {
+    return this.overviewCache.get(orgId, () => this.computeOverview(orgId));
+  }
+
+  /** Run an org-scoped write, then drop that org's cached reads so the writer's own change (edge
+   *  added/removed/confirmed/rejected) shows on the next dashboard/overview read on this instance. */
   private async mutate<T>(orgId: string, fn: (c: PoolClient) => Promise<T>): Promise<T> {
     const r = await withOrgScope(this.db, orgId, fn);
     this.summaryCache.invalidate(orgId);
+    this.overviewCache.invalidate(orgId);
     return r;
   }
 
