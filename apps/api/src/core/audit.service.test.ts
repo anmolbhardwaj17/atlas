@@ -108,9 +108,11 @@ suite("P2 AuditService", () => {
   });
 
   it("list() returns events newest-first with the actor email joined, clamped by limit", async () => {
-    // A real user so the actor-email join resolves.
+    // A real user so the actor-email join resolves. Unique email so the test is idempotent (users
+    // aren't torn down between runs — a fixed email collides on `users_email_key` on a re-run).
     const userId = randomUUID();
-    await admin.query("INSERT INTO users (id, email) VALUES ($1,$2)", [userId, "amy@acme.test"]);
+    const email = `amy-${randomUUID().slice(0, 8)}@acme.test`;
+    await admin.query("INSERT INTO users (id, email) VALUES ($1,$2)", [userId, email]);
 
     await audit.record(orgId, { action: "org.create", actorUserId: userId });
     await audit.record(orgId, { action: "connection.verify", actorUserId: userId, targetId: "c1" });
@@ -119,7 +121,7 @@ suite("P2 AuditService", () => {
     expect(events.length).toBe(2);
     // Newest first: connection.verify was recorded last.
     expect(events[0]?.action).toBe("connection.verify");
-    expect(events[0]?.actor.email).toBe("amy@acme.test");
+    expect(events[0]?.actor.email).toBe(email);
     expect(events[1]?.action).toBe("org.create");
 
     // Limit clamps the result set.
