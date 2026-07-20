@@ -3,13 +3,16 @@ import {
   InMemorySecretBroker,
   DbSecretBroker,
   InMemoryQueue,
+  createBullMQQueue,
   InMemorySnapshotStore,
   SupabaseStorageSnapshotStore,
   createServiceClient,
   RAW_SNAPSHOT_BUCKET,
   type SecretBroker,
   type SnapshotStore,
+  type JobQueue,
 } from "@atlas/ingest";
+import type { ConnectorLogger } from "@atlas/connector-sdk";
 import type { Env } from "@atlas/config";
 import type { Db } from "@atlas/db";
 import { createAwsConnector } from "@atlas/connector-aws";
@@ -39,8 +42,8 @@ import { SECRET_BROKER, JOB_QUEUE, SNAPSHOT_STORE } from "./tokens";
  * The Secrets Broker is the in-memory dev impl (F2.6); AWS Secrets Manager is the
  * production impl (docs/13 §7). The ConnectorRegistry holds the REAL AwsConnector (I1)
  * and GithubConnector (I2) - verify runs a live AssumeRole / installation-token probe.
- * The JobQueue is the in-memory dev impl (F2.5); a BullMQ/Redis queue + a worker process
- * run jobs in deploy (docs/02 §5) - the API only enqueues.
+ * The JobQueue is BullMQ/Redis when REDIS_URL is set (durable, retried) and the in-memory dev
+ * driver otherwise; the worker registers in-process and drains in-flight jobs on shutdown.
  */
 // Durable encrypted store when SECRET_ENCRYPTION_KEY is set (credentials survive restarts, so
 // Fetch latest works without reconnecting); otherwise the in-memory dev broker (wiped on boot).
@@ -57,9 +60,30 @@ const secretBrokerProvider: Provider = {
   inject: [ENV, PG_POOL],
 };
 
+// Durable BullMQ/Redis queue when REDIS_URL is set (retries, backoff, survives restarts); the
+// in-memory driver is dev-only — in-flight jobs are lost on restart, so prod REQUIRES REDIS_URL
+// (enforced by the config fail-fast). Selecting here keeps a single shared queue instance that both
+// the enqueuers (scheduler/webhook/manual) and the in-process worker register on.
 const jobQueueProvider: Provider = {
   provide: JOB_QUEUE,
-  useFactory: (): InMemoryQueue => new InMemoryQueue(),
+  useFactory: (env: Env): JobQueue => {
+    const log = new Logger("JobQueue");
+    if (env.REDIS_URL) {
+      log.log("Using BullMQ/Redis job queue (durable, retried).");
+      const connectorLog: ConnectorLogger = {
+        debug: (m) => log.debug(m),
+        info: (m) => log.log(m),
+        warn: (m) => log.warn(m),
+        error: (m) => log.error(m),
+      };
+      return createBullMQQueue(env.REDIS_URL, connectorLog);
+    }
+    log.warn(
+      "REDIS_URL unset — using the in-memory job queue (dev only; jobs are lost on restart).",
+    );
+    return new InMemoryQueue();
+  },
+  inject: [ENV],
 };
 
 // Supabase Storage when the service-role key is configured (the durable prod store), else the

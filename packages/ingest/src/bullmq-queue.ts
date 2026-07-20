@@ -20,6 +20,24 @@ export const DEFAULT_JOB_OPTIONS: JobsOptions = {
   removeOnFail: { count: 1_000 },
 };
 
+/**
+ * Build a BullMQQueue from a `redis://` / `rediss://` URL. `maxRetriesPerRequest: null` is REQUIRED
+ * by BullMQ workers (blocking commands); `rediss:` enables TLS. Keeps BullMQ/ioredis connection
+ * details inside this package so the app just passes REDIS_URL.
+ */
+export function createBullMQQueue(redisUrl: string, logger?: ConnectorLogger): BullMQQueue {
+  const u = new URL(redisUrl);
+  const connection: ConnectionOptions = {
+    host: u.hostname,
+    port: u.port ? Number(u.port) : 6379,
+    username: u.username ? decodeURIComponent(u.username) : undefined,
+    password: u.password ? decodeURIComponent(u.password) : undefined,
+    ...(u.protocol === "rediss:" ? { tls: {} } : {}),
+    maxRetriesPerRequest: null,
+  };
+  return new BullMQQueue(connection, logger);
+}
+
 export class BullMQQueue implements JobQueue {
   private readonly queues = new Map<string, Queue>();
   private readonly workers: Worker[] = [];

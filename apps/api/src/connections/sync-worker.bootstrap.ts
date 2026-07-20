@@ -1,4 +1,10 @@
-import { Inject, Injectable, Logger, type OnModuleInit } from "@nestjs/common";
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnModuleInit,
+  type OnApplicationShutdown,
+} from "@nestjs/common";
 import { withOrgScope, type Db } from "@atlas/db";
 import {
   registerSyncWorker,
@@ -21,8 +27,19 @@ import { ConnectorRegistry } from "./connector-registry";
  * so no secret ever leaves the process. Raw snapshots use the in-memory store (dev).
  */
 @Injectable()
-export class SyncWorkerBootstrap implements OnModuleInit {
+export class SyncWorkerBootstrap implements OnModuleInit, OnApplicationShutdown {
   private readonly logger = new Logger(SyncWorkerBootstrap.name);
+
+  /** On SIGTERM (deploy/scale-down), close the queue: BullMQ's worker.close() waits for in-flight
+   *  jobs to finish before resolving, so a sync mid-flight completes instead of being lost. */
+  async onApplicationShutdown(): Promise<void> {
+    try {
+      await this.queue.close();
+      this.logger.log("job queue closed (in-flight jobs drained)");
+    } catch (e) {
+      this.logger.error(`job queue close failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
 
   constructor(
     @Inject(PG_POOL) private readonly db: Db,
