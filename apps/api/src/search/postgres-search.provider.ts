@@ -8,6 +8,12 @@ import type { SearchProvider, SearchQuery, SearchResponse, SearchResult } from "
  * Keyword/identifier matching via `pg_trgm` similarity + substring over name/urn/attributes
  * - strong for the exact tokens engineers type (ARNs, `prod-orders`). Org-scoped (RLS,
  * SE-4). Semantic (vector) ranking arrives with the OpenSearch driver; `semantic` is null.
+ *
+ * PERF (H3, backend audit Phase C): this is also the AI-retrieval keyword fallback on every
+ * "Ask Atlas" turn, so the hot WHERE must not Seq-Scan. Every predicate below is trigram-indexed —
+ * `name` via ix_nodes_name_trgm (0007), `urn` via ix_nodes_urn_trgm and `attributes::text` via the
+ * functional ix_nodes_attrs_text_trgm (both 0063) — so the planner BitmapOrs the GIN indexes instead
+ * of casting every row's JSONB. Keep the WHERE predicates aligned with those index expressions.
  */
 @Injectable()
 export class PostgresSearchProvider implements SearchProvider {
