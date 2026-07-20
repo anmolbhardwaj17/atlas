@@ -1740,14 +1740,19 @@ export class GraphService {
       }
       if (q.q) where.push(`name ILIKE ${p(`%${q.q}%`)}`);
 
-      // The filter set that defines the result population (everything except the keyset cursor) —
-      // shared by the COUNT (for a true "N resources" total) and the page query.
+      // The filter set that defines the result population (everything except the keyset cursor).
+      // Count ONLY on the first page (no cursor): re-running the same COUNT(*) over the whole filtered
+      // population on every keyset scroll is wasted work on a large estate. The client carries the
+      // page-1 total forward across "next page" links; `total: -1` signals "not recomputed this page".
       const baseWhere = where.join(" AND ");
-      const { rows: countRows } = await c.query<{ total: string }>(
-        `SELECT COUNT(*)::text AS total FROM nodes WHERE ${baseWhere}`,
-        params,
-      );
-      const total = Number(countRows[0]?.total ?? 0);
+      let total = -1;
+      if (!q.cursor) {
+        const { rows: countRows } = await c.query<{ total: string }>(
+          `SELECT COUNT(*)::text AS total FROM nodes WHERE ${baseWhere}`,
+          params,
+        );
+        total = Number(countRows[0]?.total ?? 0);
+      }
 
       if (q.cursor) {
         const cur = decodeCursor(q.cursor);

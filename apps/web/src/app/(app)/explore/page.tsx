@@ -52,6 +52,9 @@ async function ExploreContent({ searchParams }: { searchParams: Promise<SearchPa
   // UI facet, but when present it drives the list (and bypasses the estate default-hide).
   const kind = first(sp.kind);
   const cursor = first(sp.cursor);
+  // The server counts the total only on page 1 (no cursor); keyset pages carry it forward in the URL
+  // so we don't pay a full COUNT(*) on every scroll. See GraphService.listNodes.
+  const urlTotal = first(sp.total);
 
   // 100 = the server max; the estate (repos + services + cloud resources) fits on one page, so
   // AWS/cloud resources aren't buried on page 2 behind freshly-synced code nodes. Facets forward
@@ -73,7 +76,9 @@ async function ExploreContent({ searchParams }: { searchParams: Promise<SearchPa
   const nodes = res.body?.data ?? [];
   const page = res.body?.page as
     { nextCursor: string | null; hasMore: boolean; limit: number; total: number } | undefined;
-  const total = page?.total ?? nodes.length;
+  // Prefer the server total (page 1), else the value carried in the URL, else the row count.
+  const total =
+    page && page.total >= 0 ? page.total : urlTotal ? Number(urlTotal) : nodes.length;
   const isFiltered = Boolean(
     q || category.length || source.length || health.length || status.length || kind,
   );
@@ -92,6 +97,8 @@ async function ExploreContent({ searchParams }: { searchParams: Promise<SearchPa
   if (status.length) nextParams.set("status", status.join(","));
   if (kind) nextParams.set("kind", kind);
   if (page?.nextCursor) nextParams.set("cursor", page.nextCursor);
+  // Carry the total forward so keyset pages can show "N resources" without a re-count server-side.
+  if (total >= 0) nextParams.set("total", String(total));
 
   return (
     <div className="space-y-6">
