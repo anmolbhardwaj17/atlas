@@ -10,10 +10,10 @@
  * supplied by the service modules in I1.3 (each discoverer contributes its probe).
  */
 import type { AwsScopeKind } from "./node-kinds";
-import type { AwsTempCredentials } from "./credentials";
+import type { CrawlCredentials } from "./credentials";
 
 export interface ProbeInput {
-  credentials: AwsTempCredentials;
+  credentials: CrawlCredentials;
   accountId: string;
   /** A representative region (region-scoped probes); undefined for global probes. */
   region?: string;
@@ -38,6 +38,9 @@ export interface PermissionProbe {
 export function isAccessDenied(err: unknown): boolean {
   const e = err as { name?: string; Code?: string; $metadata?: { httpStatusCode?: number } };
   const name = `${e?.name ?? ""} ${e?.Code ?? ""}`;
+  // An expired session token also returns 403, but it is a credential lapse, not a permission gap
+  // (CX1) — don't misreport it as a missing IAM action at verify time.
+  if (/ExpiredToken|ExpiredTokenException/i.test(name)) return false;
   if (/AccessDenied|UnauthorizedOperation|AuthorizationError|Forbidden/i.test(name)) return true;
   return e?.$metadata?.httpStatusCode === 403;
 }

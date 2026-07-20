@@ -10,7 +10,7 @@ import {
   type MetricDataQuery,
 } from "@aws-sdk/client-cloudwatch";
 import { clientConfig } from "./aws/client-config";
-import type { AwsTempCredentials } from "./credentials";
+import type { CrawlCredentials } from "./credentials";
 
 export interface MetricSeries {
   /** e.g. "CPUUtilization". */
@@ -22,7 +22,7 @@ export interface MetricSeries {
 }
 
 export interface MetricsCollectInput {
-  credentials: AwsTempCredentials;
+  credentials: CrawlCredentials;
   region: string;
   /** Graph node kind (aws.ec2.instance | aws.lambda.function | aws.rds.instance | aws.elb | aws.ecs.service). */
   kind: string;

@@ -28,7 +28,9 @@ import { parseAwsConfig } from "./config";
 import {
   AssumeRoleError,
   buildSessionName,
+  refreshingCredentials,
   type AssumedRole,
+  type AwsCredentialProvider,
   type CredentialProvider,
   type StaticCredentialResolver,
 } from "./credentials";
@@ -69,6 +71,9 @@ export class AwsConnector implements Connector {
 
   /** One AssumeRole per run (docs/06 §2); creds reused across the run's scopes. */
   private readonly runCreds = new Map<string, Promise<AssumedRole>>();
+  /** One self-refreshing credential provider per run (CX1) — re-assumes before the ≤1h token
+   *  expires so a multi-hour crawl never hits ExpiredToken. */
+  private readonly runCredProviders = new Map<string, AwsCredentialProvider>();
   /** Hands a discovered payload from discover() to the immediately-following fetchDetail(). */
   private readonly pendingPayloads = new Map<string, AwsRawPayload>();
 
@@ -307,10 +312,10 @@ export class AwsConnector implements Connector {
     const discoverer = DISCOVERER_BY_SERVICE.get(service);
     if (!discoverer) return;
 
-    const assumed = await this.assumeForRun(ctx);
+    const { provider, accountId } = await this.credProviderForRun(ctx);
     for await (const item of discoverer.crawl({
-      credentials: assumed.credentials,
-      account: assumed.accountId,
+      credentials: provider,
+      account: accountId,
       region,
       ...(ctx.signal ? { signal: ctx.signal } : {}),
     })) {
@@ -327,6 +332,35 @@ export class AwsConnector implements Connector {
     }
     this.pendingPayloads.delete(key);
     return { ref, payload, fetchedAt: new Date().toISOString() };
+  }
+
+  /**
+   * A self-refreshing credential provider for the run's long crawl (CX1). Seeded with the run's
+   * first assumed creds (so no extra AssumeRole up front), it re-assumes the role before the ≤1h
+   * token lapses — a multi-hour crawl therefore never fails with ExpiredToken. Cached per run;
+   * returns the stable accountId alongside (only the credentials refresh, not the account).
+   */
+  private async credProviderForRun(
+    ctx: CrawlContext,
+  ): Promise<{ provider: AwsCredentialProvider; accountId: string }> {
+    const assumed = await this.assumeForRun(ctx);
+    let provider = this.runCredProviders.get(ctx.run.id);
+    if (!provider) {
+      provider = refreshingCredentials(
+        async () =>
+          (
+            await this.resolveCredentials(
+              ctx.connection,
+              ctx.secrets,
+              buildSessionName("atlas-sync", ctx.run.id),
+              ctx.signal,
+            )
+          ).credentials,
+        assumed.credentials,
+      );
+      this.runCredProviders.set(ctx.run.id, provider);
+    }
+    return { provider, accountId: assumed.accountId };
   }
 
   /** Resolve (and cache) the run's credentials once per run (docs/06 §2), for either auth mode. */

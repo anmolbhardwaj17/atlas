@@ -8,6 +8,8 @@ import {
   buildSessionName,
   assumeRoleMessage,
   staticCredsMessage,
+  refreshingCredentials,
+  type AwsTempCredentials,
 } from "./credentials";
 
 const stsMock = mockClient(STSClient);
@@ -152,5 +154,76 @@ describe("assumeRoleMessage", () => {
     expect(assumeRoleMessage({ name: "ExpiredToken" })).toMatch(/Atlas-side/i);
     expect(assumeRoleMessage({ name: "ValidationError" })).toMatch(/invalid|malformed/i);
     expect(assumeRoleMessage({ message: "boom" })).toMatch(/boom/);
+  });
+});
+
+describe("refreshingCredentials (CX1)", () => {
+  const creds = (accessKeyId: string, expiration: string | null): AwsTempCredentials => ({
+    accessKeyId,
+    secretAccessKey: "s",
+    sessionToken: "t",
+    expiration,
+  });
+
+  it("serves the seed without a refresh while it's comfortably unexpired", async () => {
+    let refreshes = 0;
+    const provider = refreshingCredentials(
+      async () => {
+        refreshes++;
+        return creds("REFRESHED", "2026-07-01T02:00:00.000Z");
+      },
+      creds("SEED", "2026-07-01T02:00:00.000Z"),
+      { now: () => Date.parse("2026-07-01T00:00:00.000Z") },
+    );
+    expect((await provider()).accessKeyId).toBe("SEED");
+    expect((await provider()).accessKeyId).toBe("SEED");
+    expect(refreshes).toBe(0);
+    expect((await provider()).expiration).toEqual(new Date("2026-07-01T02:00:00.000Z"));
+  });
+
+  it("re-assumes once the seed is within the refresh window, then serves fresh creds", async () => {
+    let refreshes = 0;
+    const provider = refreshingCredentials(
+      async () => {
+        refreshes++;
+        return creds("REFRESHED", "2026-07-01T03:00:00.000Z");
+      },
+      creds("SEED", "2026-07-01T00:04:00.000Z"), // expires in 4 min → inside the 5-min window
+      { now: () => Date.parse("2026-07-01T00:00:00.000Z") },
+    );
+    expect((await provider()).accessKeyId).toBe("REFRESHED");
+    expect(refreshes).toBe(1);
+  });
+
+  it("never refreshes static keys (null expiry)", async () => {
+    let refreshes = 0;
+    const provider = refreshingCredentials(
+      async () => {
+        refreshes++;
+        return creds("REFRESHED", null);
+      },
+      creds("STATIC", null),
+    );
+    expect((await provider()).accessKeyId).toBe("STATIC");
+    expect((await provider()).accessKeyId).toBe("STATIC");
+    expect((await provider()).expiration).toBeUndefined();
+    expect(refreshes).toBe(0);
+  });
+
+  it("shares a single in-flight refresh across concurrent callers", async () => {
+    let refreshes = 0;
+    const provider = refreshingCredentials(
+      async () => {
+        refreshes++;
+        await new Promise((r) => setTimeout(r, 5));
+        return creds("REFRESHED", "2026-07-01T03:00:00.000Z");
+      },
+      undefined, // no seed → first call must refresh
+      { now: () => Date.parse("2026-07-01T00:00:00.000Z") },
+    );
+    const [a, b] = await Promise.all([provider(), provider()]);
+    expect(a.accessKeyId).toBe("REFRESHED");
+    expect(b.accessKeyId).toBe("REFRESHED");
+    expect(refreshes).toBe(1);
   });
 });

@@ -31,6 +31,64 @@ export interface AssumedRole {
   accountId: string;
 }
 
+/**
+ * The AWS-SDK-shaped credential identity. Declared structurally (not imported from `@smithy/types`,
+ * which is only a transitive dep) so `clientConfig` can hand the SDK a value it accepts either as a
+ * static identity or a provider. Structurally assignable to smithy's `AwsCredentialIdentity`.
+ */
+export interface AwsCredentialIdentity {
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken?: string;
+  /** SDK refreshes when within its window of this instant; absent ⇒ never expires (static keys). */
+  expiration?: Date;
+}
+
+/** A function the AWS SDK calls to (re)resolve credentials — the async provider form (CX1). */
+export type AwsCredentialProvider = () => Promise<AwsCredentialIdentity>;
+
+/** What the crawl hands `clientConfig`: static creds, or a self-refreshing provider (CX1). */
+export type CrawlCredentials = AwsTempCredentials | AwsCredentialProvider;
+
+const toIdentity = (c: AwsTempCredentials): AwsCredentialIdentity => ({
+  accessKeyId: c.accessKeyId,
+  secretAccessKey: c.secretAccessKey,
+  ...(c.sessionToken ? { sessionToken: c.sessionToken } : {}),
+  ...(c.expiration ? { expiration: new Date(c.expiration) } : {}),
+});
+
+/**
+ * Build a self-refreshing credential provider (CX1). AssumeRole creds live ≤1h, but a full crawl can
+ * exceed that — after which every SDK call fails with `ExpiredToken`, which the crawl misread as an
+ * access-denied (missing-permission) verdict and never retried → silent data loss + a false "grant
+ * these permissions" banner. Handing the SDK a *provider* (not a frozen creds object) lets this
+ * memoizer re-`assumeRole` shortly before the token lapses, so a multi-hour crawl degrades freshness,
+ * never correctness. Static IAM-user keys carry no expiry, so `refresh` is never called past the seed.
+ * Concurrent callers share one in-flight refresh; a refresh failure propagates to the caller.
+ */
+export function refreshingCredentials(
+  refresh: () => Promise<AwsTempCredentials>,
+  seed?: AwsTempCredentials,
+  options: { refreshWindowMs?: number; now?: () => number } = {},
+): AwsCredentialProvider {
+  const windowMs = options.refreshWindowMs ?? 5 * 60_000; // refresh 5 min before expiry
+  const now = options.now ?? Date.now;
+  let cached: AwsTempCredentials | null = seed ?? null;
+  let inFlight: Promise<AwsTempCredentials> | null = null;
+  const isFresh = (c: AwsTempCredentials): boolean =>
+    c.expiration === null ? true : Date.parse(c.expiration) - now() > windowMs;
+  return async () => {
+    if (cached && isFresh(cached)) return toIdentity(cached);
+    if (!inFlight) {
+      inFlight = refresh().finally(() => {
+        inFlight = null;
+      });
+    }
+    cached = await inFlight;
+    return toIdentity(cached);
+  };
+}
+
 export interface AssumeRoleInput {
   roleArn: string;
   externalId: string;

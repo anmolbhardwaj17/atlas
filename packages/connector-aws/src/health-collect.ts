@@ -37,7 +37,7 @@ import { LambdaClient, paginateListFunctions } from "@aws-sdk/client-lambda";
 import { awsUrn } from "./urn";
 import { clientConfig } from "./aws/client-config";
 import { isAccessDenied } from "./permission-probe";
-import type { AwsTempCredentials } from "./credentials";
+import type { CrawlCredentials } from "./credentials";
 
 export type HealthState = "healthy" | "degraded" | "unhealthy";
 
@@ -52,7 +52,7 @@ export interface HealthObservation {
 }
 
 export interface HealthCollectInput {
-  credentials: AwsTempCredentials;
+  credentials: CrawlCredentials;
   accountId: string;
   regions: string[];
   /** Injectable clock for deterministic tests. */

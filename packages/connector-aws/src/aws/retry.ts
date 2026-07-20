@@ -18,6 +18,13 @@ export function classifyAwsError(err: unknown): AwsErrorClass {
   if (/Throttling|RequestLimitExceeded|TooManyRequests|Throttled/i.test(name) || status === 429) {
     return "throttling";
   }
+  // Expired session token (CX1): the ≤1h AssumeRole creds lapsed mid-crawl. AWS returns HTTP 403 for
+  // this, so WITHOUT this branch it would fall into the access-denied case below — misreported as a
+  // missing permission AND never retried (silent data loss). Classify it transient so `withRetry`
+  // retries; with the self-refreshing credential provider the retry runs against freshly-assumed creds.
+  if (/ExpiredToken|ExpiredTokenException|TokenRefreshRequired|RequestExpired/i.test(name)) {
+    return "transient";
+  }
   if (
     /AccessDenied|UnauthorizedOperation|AuthorizationError|Forbidden/i.test(name) ||
     status === 403

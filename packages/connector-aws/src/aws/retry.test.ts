@@ -13,6 +13,21 @@ describe("classifyAwsError", () => {
     expect(classifyAwsError({ $metadata: { httpStatusCode: 500 } })).toBe("transient");
     expect(classifyAwsError({ name: "ValidationError" })).toBe("fatal");
   });
+
+  it("classifies an expired session token as transient, NOT access-denied (CX1)", () => {
+    // AWS returns 403 for an expired token; without the dedicated branch it would read as
+    // access-denied (a false missing-permission) and never retry → silent data loss on a >1h crawl.
+    expect(classifyAwsError({ name: "ExpiredToken", $metadata: { httpStatusCode: 403 } })).toBe(
+      "transient",
+    );
+    expect(
+      classifyAwsError({ name: "ExpiredTokenException", $metadata: { httpStatusCode: 403 } }),
+    ).toBe("transient");
+    // A genuine permission gap must still classify as access-denied.
+    expect(classifyAwsError({ name: "AccessDenied", $metadata: { httpStatusCode: 403 } })).toBe(
+      "access-denied",
+    );
+  });
 });
 
 describe("withRetry", () => {

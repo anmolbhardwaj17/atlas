@@ -9,12 +9,12 @@
  */
 import type { ResourceRef } from "@atlas/connector-sdk";
 import type { AwsNodeKind, AwsScopeKind } from "../node-kinds";
-import type { AwsTempCredentials } from "../credentials";
+import type { CrawlCredentials } from "../credentials";
 import type { AwsRawPayload } from "../services/module";
 import type { PermissionProbe } from "../permission-probe";
 
 export interface CrawlScopeInput {
-  credentials: AwsTempCredentials;
+  credentials: CrawlCredentials;
   account: string;
   /** Region for region-scoped services; "global" for global services. */
   region: string;

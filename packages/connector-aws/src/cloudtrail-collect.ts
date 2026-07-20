@@ -15,7 +15,7 @@ import { awsUrn } from "./urn";
 import type { AwsNodeKind } from "./node-kinds";
 import { clientConfig } from "./aws/client-config";
 import { isAccessDenied } from "./permission-probe";
-import type { AwsTempCredentials } from "./credentials";
+import type { CrawlCredentials } from "./credentials";
 
 export interface ChangeEvent {
   /** URN of the node this change applies to (resolved conservatively). */
@@ -32,7 +32,7 @@ export interface ChangeEvent {
 }
 
 export interface CloudTrailCollectInput {
-  credentials: AwsTempCredentials;
+  credentials: CrawlCredentials;
   accountId: string;
   regions: string[];
   /** Only events after this instant (poll lookback / initial backfill boundary). */
