@@ -325,52 +325,48 @@ export function IntegrationsHub({
         </div>
       </div>
 
-      {/* Ask Atlas from chat — the inbound integrations (grounded /atlas answers in Slack + Discord).
-          Only shown for a platform that's actually set up on this deployment (connected, or an
-          install URL exists) — never a bare "not configured" note that a user can't act on. */}
-      {(() => {
-        const chatCards = [
-          slack && (slack.connected || slack.installUrl)
-            ? {
-                key: "slack" as const,
-                platform: CHAT_PLATFORMS.slack,
-                onDisconnect: disconnectSlackAsk,
-                status: {
-                  connected: slack.connected,
-                  name: slack.teamName,
-                  installUrl: slack.installUrl,
-                },
-              }
-            : null,
-          discord && (discord.connected || discord.installUrl)
-            ? {
-                key: "discord" as const,
-                platform: CHAT_PLATFORMS.discord,
-                onDisconnect: disconnectDiscordAsk,
-                status: {
-                  connected: discord.connected,
-                  name: discord.guildName,
-                  installUrl: discord.installUrl,
-                },
-              }
-            : null,
-        ].filter((c): c is NonNullable<typeof c> => c !== null);
-        if (chatCards.length === 0) return null;
-        return (
-          <div className="grid gap-3 lg:grid-cols-2">
-            {chatCards.map((c) => (
-              <ChatAskCard
-                key={c.key}
-                orgId={orgId}
-                platform={c.platform}
-                canManage={canManage}
-                onDisconnect={c.onDisconnect}
-                status={c.status}
-              />
-            ))}
-          </div>
-        );
-      })()}
+      {/* Ask Atlas from chat — the INBOUND integrations (grounded /atlas answers in-channel),
+          distinct from the outbound Slack/Discord/Teams alert channels in the list below. Always
+          shown as a two-card section; each card is live ("Add to …") where configured, else a quiet
+          "Coming soon". */}
+      <section className="space-y-3">
+        <div className="space-y-0.5">
+          <h2 className="text-sm font-semibold tracking-tight">Ask Atlas from chat</h2>
+          <p className="text-sm text-muted-foreground">
+            Bring Atlas into your team&rsquo;s chat — ask{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">/atlas</code> and get a grounded,
+            cited answer in-channel.
+          </p>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-2">
+          <ChatAskCard
+            orgId={orgId}
+            platform={CHAT_PLATFORMS.slack}
+            canManage={canManage}
+            onDisconnect={disconnectSlackAsk}
+            status={
+              slack
+                ? { connected: slack.connected, name: slack.teamName, installUrl: slack.installUrl }
+                : null
+            }
+          />
+          <ChatAskCard
+            orgId={orgId}
+            platform={CHAT_PLATFORMS.discord}
+            canManage={canManage}
+            onDisconnect={disconnectDiscordAsk}
+            status={
+              discord
+                ? {
+                    connected: discord.connected,
+                    name: discord.guildName,
+                    installUrl: discord.installUrl,
+                  }
+                : null
+            }
+          />
+        </div>
+      </section>
 
       {/* Category tabs (segmented control) + search — the row list below filters live. */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Slack, Check, Loader2, ExternalLink } from "lucide-react";
+import { Slack, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -117,9 +117,9 @@ export function ChatAskCard({
               ) : null}
             </div>
             <p className="max-w-md text-sm text-muted-foreground">
-              Ask <code className="rounded bg-muted px-1 py-0.5 text-xs">/atlas</code> in any{" "}
-              {platform.surface} — e.g. <em>&ldquo;what depends on orders-db?&rdquo;</em> — for a
-              grounded, cited answer from your graph, no context-switch to the app.
+              Add Atlas to your {platform.label} so anyone can ask{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">/atlas</code> — e.g.{" "}
+              <em>&ldquo;what depends on orders-db?&rdquo;</em> — right in a {platform.surface}.
             </p>
           </div>
         </div>
@@ -140,9 +140,8 @@ export function ChatAskCard({
               </a>
             </Button>
           ) : (
-            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-              <ExternalLink className="size-3.5" />
-              Not configured on this deployment yet
+            <span className="inline-flex items-center rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground">
+              Coming soon
             </span>
           )}
         </div>
