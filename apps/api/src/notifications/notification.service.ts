@@ -2,7 +2,9 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { PoolClient } from "pg";
 import { withOrgScope, type Db } from "@atlas/db";
 import type { Env } from "@atlas/config";
+import type { SecretBroker } from "@atlas/ingest";
 import { PG_POOL, ENV } from "../core/tokens";
+import { SECRET_BROKER } from "../connections/tokens";
 import { ApiException } from "../common/errors";
 import { AiService } from "../ai/ai.service";
 import { fetchWithTimeout } from "../common/fetch-timeout";
@@ -123,9 +125,18 @@ interface NotificationRow {
   created_at: Date;
 }
 
+/** A channel's stored config. The webhook is a bearer-capability secret (its URL embeds the token),
+ *  so it's encrypted at rest via the Secrets Broker: `secretRef` points at the ciphertext + `hint`
+ *  is a masked tail for display. `webhookUrl` is the legacy plaintext shape — still read for rows
+ *  written before encryption, and migrated to a secretRef the next time the channel is set. */
+interface ChannelConfig {
+  webhookUrl?: string;
+  secretRef?: string;
+  hint?: string;
+}
 interface ChannelRow {
   kind: string;
-  config: { webhookUrl?: string };
+  config: ChannelConfig;
   enabled: boolean;
   created_at: Date;
   last_alert_at: Date;
@@ -144,8 +155,25 @@ export class NotificationService {
   constructor(
     @Inject(PG_POOL) private readonly db: Db,
     @Inject(ENV) private readonly env: Env,
+    @Inject(SECRET_BROKER) private readonly secrets: SecretBroker,
     private readonly ai: AiService,
   ) {}
+
+  /** Decrypt a channel's webhook URL (via the broker), or read the legacy plaintext. Null if neither. */
+  private async resolveUrl(config: ChannelConfig): Promise<string | null> {
+    if (config.secretRef) return (await this.secrets.get(config.secretRef)).url ?? null;
+    return config.webhookUrl ?? null;
+  }
+  /** A channel has a deliverable webhook if it carries either an encrypted ref or legacy plaintext. */
+  private static hasWebhook(config: ChannelConfig): boolean {
+    return Boolean(config.secretRef || config.webhookUrl);
+  }
+  /** Masked tail for display (never the full URL / token). */
+  private static maskHint(config: ChannelConfig): string | null {
+    if (config.hint) return `…/${config.hint}…`;
+    const tail = (config.webhookUrl ?? "").split("/").pop() ?? "";
+    return tail ? `…/${tail.slice(0, 6)}…` : null;
+  }
 
   /** All configured outbound channels for the org (Slack / Discord / Teams). */
   async listChannels(orgId: string): Promise<ChannelSummary[]> {
@@ -156,11 +184,10 @@ export class NotificationService {
       return rows
         .filter((r) => CHANNEL_KINDS.includes(r.kind as ChannelKind))
         .map((r) => {
-          const tail = (r.config.webhookUrl ?? "").split("/").pop() ?? "";
           return {
             kind: r.kind as ChannelKind,
             enabled: r.enabled,
-            hint: tail ? `…/${tail.slice(0, 6)}…` : null,
+            hint: NotificationService.maskHint(r.config),
             createdAt: new Date(r.created_at).toISOString(),
           };
         });
@@ -332,22 +359,39 @@ export class NotificationService {
         `That doesn't look like a ${meta.label} incoming-webhook URL.`,
       );
     }
+    // Encrypt the webhook (its URL is a bearer token) via the Secrets Broker; store only the opaque
+    // ref + a masked hint. Any prior secret for this channel is orphaned after the upsert — delete it.
+    const prevRef = await withOrgScope(this.db, orgId, async (c) => {
+      const { rows } = await c.query<{ config: ChannelConfig }>(
+        `SELECT config FROM notification_channels WHERE kind = $1 LIMIT 1`,
+        [kind],
+      );
+      return rows[0]?.config.secretRef ?? null;
+    });
+    const secretRef = await this.secrets.put(orgId, { url });
+    const hint = (url.split("/").pop() ?? "").slice(0, 6) || undefined;
     await withOrgScope(this.db, orgId, (c) =>
       c.query(
         `INSERT INTO notification_channels (org_id, kind, config, enabled)
          VALUES ($1, $2, $3::jsonb, true)
          ON CONFLICT (org_id, kind) DO UPDATE
            SET config = EXCLUDED.config, enabled = true, updated_at = now()`,
-        [orgId, kind, JSON.stringify({ webhookUrl: url })],
+        [orgId, kind, JSON.stringify({ secretRef, hint })],
       ),
     );
+    if (prevRef && prevRef !== secretRef) await this.secrets.delete(prevRef);
     return this.listChannels(orgId);
   }
 
   async removeChannel(orgId: string, kind: ChannelKind): Promise<ChannelSummary[]> {
-    await withOrgScope(this.db, orgId, (c) =>
-      c.query(`DELETE FROM notification_channels WHERE kind = $1`, [kind]),
-    );
+    const ref = await withOrgScope(this.db, orgId, async (c) => {
+      const { rows } = await c.query<{ config: ChannelConfig }>(
+        `DELETE FROM notification_channels WHERE kind = $1 RETURNING config`,
+        [kind],
+      );
+      return rows[0]?.config.secretRef ?? null;
+    });
+    if (ref) await this.secrets.delete(ref); // don't leave the encrypted webhook behind
     return this.listChannels(orgId);
   }
 
@@ -374,13 +418,14 @@ export class NotificationService {
   }
 
   private async webhookFor(orgId: string, kind: ChannelKind): Promise<string | null> {
-    return withOrgScope(this.db, orgId, async (c) => {
-      const { rows } = await c.query<{ config: { webhookUrl?: string } }>(
+    const config = await withOrgScope(this.db, orgId, async (c) => {
+      const { rows } = await c.query<{ config: ChannelConfig }>(
         `SELECT config FROM notification_channels WHERE kind = $1 AND enabled = true LIMIT 1`,
         [kind],
       );
-      return rows[0]?.config.webhookUrl ?? null;
+      return rows[0]?.config ?? null;
     });
+    return config ? this.resolveUrl(config) : null;
   }
 
   /**
@@ -396,7 +441,7 @@ export class NotificationService {
            FROM notification_channels WHERE enabled = true`,
       );
       return rows.filter(
-        (r) => CHANNEL_KINDS.includes(r.kind as ChannelKind) && r.config.webhookUrl,
+        (r) => CHANNEL_KINDS.includes(r.kind as ChannelKind) && NotificationService.hasWebhook(r.config),
       );
     });
     if (channels.length === 0) return;
@@ -451,8 +496,10 @@ export class NotificationService {
       const latest = alerts[alerts.length - 1]?.occurred_at ?? new Date();
 
       for (const ch of channels) {
-        if (ch.last_alert_at >= latest || !ch.config.webhookUrl) continue; // already caught up
-        const delivered = await postWebhook(ch.kind as ChannelKind, ch.config.webhookUrl, text);
+        if (ch.last_alert_at >= latest) continue; // already caught up
+        const webhook = await this.resolveUrl(ch.config);
+        if (!webhook) continue;
+        const delivered = await postWebhook(ch.kind as ChannelKind, webhook, text);
         await withOrgScope(this.db, orgId, (c) => {
           if (delivered) {
             // Delivered — advance the watermark past this batch and clear the failure count.
@@ -486,8 +533,9 @@ export class NotificationService {
     const digest = await this.buildDigest(orgId);
     for (const ch of channels) {
       const due = !ch.last_digest_at || Date.now() - ch.last_digest_at.getTime() > 24 * 3_600_000;
-      if (!due || !ch.config.webhookUrl) continue;
-      if (digest) await postWebhook(ch.kind as ChannelKind, ch.config.webhookUrl, digest);
+      if (!due) continue;
+      const webhook = digest ? await this.resolveUrl(ch.config) : null;
+      if (digest && webhook) await postWebhook(ch.kind as ChannelKind, webhook, digest);
       await withOrgScope(this.db, orgId, (c) =>
         c.query(`UPDATE notification_channels SET last_digest_at = now() WHERE kind = $1`, [
           ch.kind,

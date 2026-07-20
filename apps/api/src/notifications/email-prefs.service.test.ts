@@ -4,6 +4,7 @@ import { Pool } from "pg";
 import { withOrgScope } from "@atlas/db";
 import { NotificationService } from "./notification.service";
 import type { Env } from "@atlas/config";
+import type { SecretBroker } from "@atlas/ingest";
 import type { AiService } from "../ai/ai.service";
 
 /**
@@ -31,7 +32,7 @@ suite("NotificationService email prefs", () => {
   beforeAll(() => {
     admin = new Pool({ connectionString: adminUrl });
     app = new Pool({ connectionString: appUrl });
-    svc = new NotificationService(app, {} as Env, {} as AiService);
+    svc = new NotificationService(app, {} as Env, {} as SecretBroker, {} as AiService);
   });
   afterAll(async () => {
     await admin.end();
