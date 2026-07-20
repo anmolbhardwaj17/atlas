@@ -1,0 +1,108 @@
+# Atlas Backend — Production-Readiness Audit (2026-07-20)
+
+> Five parallel read-only audits (security/isolation, correctness/concurrency, performance/DB,
+> operability, connector resilience) + source verification of the top findings. This is the working
+> plan for making the backend production-grade. Check items off as commits land.
+
+**Verdict:** the **security foundation is production-grade** — no cross-tenant leak, auth bypass,
+secret exposure, or customer-cloud write (all verified). The gaps are **operational reliability**
+(job queue, health, timeouts, config), **scale** (sync batching, inference memory, search), and
+**connector resilience** (credential refresh, retries). None are architectural rewrites.
+
+---
+
+## 🔴 Must-fix before production (Critical — source-verified)
+
+- [ ] **A1 · Job queue is in-memory in every env.** `connections.module.ts:62` unconditionally returns
+  `InMemoryQueue`; `BullMQQueue` (Redis, retries/backoff) exists but is never wired, and `REDIS_URL`
+  is dead config. Syncs run in-process in the API; in-flight jobs are **lost on every deploy/crash**
+  → graph silently stales (P1). Fix: select BullMQ when `REDIS_URL` set + dedicated worker + drain on
+  shutdown (`SyncWorkerBootstrap` has no `OnApplicationShutdown`).
+- [ ] **A2 · `/health` is a static 200** (`health.controller.ts:9`). Add a readiness endpoint that
+  runs `SELECT 1` (short timeout) so a dead-pool pod is evicted from rotation. Keep liveness cheap.
+- [ ] **C1 (perf) · Sync = ~5 serial DB round-trips per resource, DB connection held across the cloud
+  crawl** (`ingest/sync-runner.ts:133-160,273-357`). Batch upserts (`INSERT … unnest … ON CONFLICT`);
+  move `discover`/`fetchDetail` network I/O outside the transaction.
+- [ ] **C2 (perf) · Inference loads the whole org graph into memory each run**
+  (`inference/engine.ts:129-200`, no LIMIT, JSONB attributes/data). OOM risk on big tenants. Scope
+  loads to the kinds the registered rules consume; drop heavy JSONB.
+- [ ] **CX1 (connector) · AWS AssumeRole creds never refresh mid-crawl** (`connector-aws/aws/client-config.ts:16-27`
+  static object, not a provider). >1h crawl → `ExpiredToken` → misclassified as `access-denied`
+  (`aws/retry.ts:21-24`) → silent data loss + false "permission missing". Use a refreshing provider +
+  explicit expired-token branch.
+
+## 🟠 High — reliability + correctness bugs
+
+- [ ] **H1 (correctness) · Health alerts silently lost on transient webhook failure**
+  (`notifications/notification.service.ts:449-456`) — `last_alert_at` advances even when `postWebhook`
+  returned false (429/500/DNS blip) → alert dropped forever. Only advance the watermark on success;
+  disable a channel after N consecutive failures.
+- [ ] **M5 (correctness) · BullMQ retries inert** — `runStagedSync` catches per-scope errors and
+  *returns* `failed` (`ingest/sync-runner.ts:169-173`, `sync-worker.ts:51-94`), so the job is marked
+  completed and `attempts:3` never fires. Rethrow when `status==='failed'` (keep `partial` non-throwing).
+- [ ] **CH1 (connector) · REST clients don't retry thrown network/timeout errors** (only non-2xx) —
+  github/bitbucket/jira/jenkins `client.ts`. One socket reset aborts a repo. Wrap fetch in try/catch +
+  backoff-retry (GETs are idempotent).
+- [ ] **CH2 (connector) · GitHub secondary rate-limit aborts the crawl** (`github/client.ts:113-124`) —
+  403 w/o `retry-after` and `remaining>0` isn't retried. Back off ~60s w/ jitter.
+- [ ] **H4 (perf) · Dashboard reports a capped resource count** — `graph.service.ts:581` `LIMIT 5000`
+  + `:961` `resources: meta.rows.length` → estate >5000 shows "5000". Use `count(*)`; push
+  clouds/accounts to SQL aggregates; stop selecting `attributes`.
+- [ ] **H3 (perf) · Search seq-scans + casts `attributes::text ILIKE` every row**
+  (`search/postgres-search.provider.ts:45`) — and it's the AI-retrieval fallback (every Ask turn).
+  Add `urn` trigram index; drop full-JSONB substring from the hot WHERE.
+- [ ] **H1 (ops) · Outbound fetches without timeout** — email (`core/email.service.ts:210`),
+  notification webhooks (`notification.service.ts:532`), Slack (`slack.service.ts:287,298`), Discord
+  (`discord.service.ts:284,294`). Route through a `fetchWithTimeout` (~10s).
+- [ ] **H2 (ops) · `SECRET_ENCRYPTION_KEY` optional → in-memory broker** → creds wiped on restart.
+  Prod fail-fast guard (see A3).
+- [ ] **H5 (perf) · Pool starvation** — per-request scope fan-out (dashboard 4, finding-detail 7) vs
+  `max:16` (`db/client.ts:31`). Right-size pool + cap per-request fan-out.
+- [ ] **M3 (correctness) · OSV `AFFECTS` edges never retired** (`ingest/osv-enrichment.ts:43-101`) —
+  patched/withdrawn vulns keep flagging. Retire un-reproduced edges, mirroring `reconcileObservedEdges`.
+
+## 🟡 Medium — hardening + optimization
+
+- [ ] **A3 · Config fail-fast in prod** — when `NODE_ENV==='production'`, require `SECRET_ENCRYPTION_KEY`,
+  `DATABASE_URL`, `REDIS_URL`, Supabase Storage keys; fail at boot (today: silent degrade).
+- [ ] **Ops metrics/tracing** — no counters/histograms/`/metrics`, no tracing. Add a Prometheus
+  registry (request latency, job outcomes, queue depth).
+- [ ] **Indexes** — `ix_nodes_urn_trgm` (GIN trgm), `ix_nodes_health_state` partial expression index.
+  Batch inference/OSV writes. Cache `overview()`; `listNodes` count only on page 1.
+- [ ] **Sync-run enqueue not atomic** (`connection.service.ts:368-388`) → orphaned `queued` row blocks
+  the connection 15 min on a Redis blip. Mark `failed` on enqueue error, or transactional outbox.
+- [ ] **Long-scope false-reap race** (`sync-runner.ts:133-168`) — `updated_at` frozen within a scope →
+  a >15-min scope is reaped mid-flight → replacement run interleaves. Emit an `updated_at` heartbeat.
+- [ ] **Digest loses a week on mid-send crash** (`digest/weekly-digest.service.ts:74-82`) — claim-then-send.
+  Provisional claim / per-org send ledger.
+- [ ] **DB `statement_timeout`** + Fastify request timeout (none today). Non-`CONCURRENTLY` index builds
+  lock writes on deploy (`db/migrate.ts:164`).
+- [ ] **RLS backstop CI-skipped** — `db/rls-coverage.test.ts` exists but `describe.skip` unless
+  `TEST_ADMIN_DATABASE_URL` set. Wire an admin DB into CI so a future org-scoped table w/o RLS fails.
+- [ ] **Incidents/alerts controllers bypass zod** (`incidents.controller.ts:41,82`, `alerts.controller.ts:33`)
+  — route through `parseBody` with size caps.
+- [ ] **Connectors** — constant 1s backoff no jitter (thundering herd); `withRetry` dead code; GitHub PR
+  files first 100 only (`github/crawl.ts:216`); AWS per-item describe aborts scope on one bad item.
+- [ ] **`LOG_LEVEL` parsed but unused**; logs lack org context.
+
+## 🟢 Verified solid (no action)
+
+Tenant isolation (GUC+RLS, cross-tenant→404, minimal SECURITY DEFINER resolvers) · auth (global guard,
+every `@Public` route independently + timing-safe authed, WS authed) · secrets (AES-256-GCM,
+`secret_ref`, never logged/returned) · SSRF host-allowlists + token-egress guards · **P2 read-only
+enforced by a CI fitness test** · all SQL parameterized · sync idempotency + reconcile compare-and-set
+· inference serialized via advisory lock · `withOrgScope` atomic · CORS locked to `WEB_ORIGIN` ·
+rate-limiting on the abusable surfaces · pool self-heal · partial graceful shutdown · connector
+timeouts + honest partial-failure in multi-region collectors.
+
+## Sequencing
+
+- **Phase A — prod blockers:** queue+worker+shutdown-drain (A1), health readiness (A2), config
+  fail-fast (A3), outbound timeouts.
+- **Phase B — correctness bugs:** alert watermark (H1), sync-retry rethrow (M5), resource-count (H4),
+  OSV retire (M3).
+- **Phase C — scale:** sync batching + I/O-outside-txn (C1), inference memory (C2), indexes + search
+  (H3), pool right-sizing (H5).
+- **Phase D — connectors:** AWS cred refresh (CX1), network-error retries (CH1), GitHub secondary-limit
+  + PR pagination (CH2).
+- **Phase E — observability:** metrics/`/metrics`, org-tagged logs, `LOG_LEVEL`.
