@@ -54,6 +54,18 @@ export interface RunnerDeps {
 
 const sha256 = (s: string): string => createHash("sha256").update(s).digest("hex");
 
+/** How often the crawl touches `sync_runs.updated_at` to prove liveness (≪ the 15-min reap threshold). */
+const HEARTBEAT_MS = 60_000;
+
+/** Best-effort liveness bump so a slow-but-alive scope isn't false-reaped. The trigger stamps
+ *  updated_at; the `status='running'` guard makes a heartbeat on an already-reaped run a harmless
+ *  no-op, and any failure here must never break the sync. */
+async function heartbeat(db: Db, run: SyncRunRecord): Promise<void> {
+  await withOrgScope(db, run.orgId, (c) =>
+    c.query("UPDATE sync_runs SET updated_at = now() WHERE id = $1 AND status = 'running'", [run.id]),
+  ).catch(() => undefined);
+}
+
 /**
  * Run one staged sync (docs/06 §3, docs/02 §5.2): plan → per scope (discover →
  * fetchDetail → normalize/observedEdges → persist) → reconcile. Properties:
@@ -134,8 +146,17 @@ export async function runStagedSync(
       // whole cloud crawl (which starved the pool and held the txn open). Results are buffered per
       // scope (bounded) then persisted in one batched transaction below.
       const itemsByUrn = new Map<string, CrawlItem>();
+      let lastBeat = Date.now();
       for await (const ref of connector.discover(scope, ctx)) {
         stats.discovered++;
+        // Heartbeat: the crawl holds no DB connection (C1), so a scope that takes minutes would let
+        // sync_runs.updated_at go stale and the reaper would false-reap this live run mid-flight (its
+        // replacement could then interleave). Touch updated_at periodically — well under the 15-min
+        // reap threshold — so a legitimately-slow scope is never mistaken for an orphaned one.
+        if (Date.now() - lastBeat > HEARTBEAT_MS) {
+          await heartbeat(db, run);
+          lastBeat = Date.now();
+        }
         const raw = await connector.fetchDetail(ref, ctx);
         const node = connector.normalize(raw);
         const payload = JSON.stringify(raw.payload);
