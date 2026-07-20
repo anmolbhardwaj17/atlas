@@ -1633,16 +1633,20 @@ export class GraphService {
               )
             ).rows;
 
-      // Frontier: endpoints of touching edges that fell just outside the budget but are still in the
-      // over-fetched set. Bounded by hardCap so a hub node can't explode the canvas; endpoints
-      // beyond the over-fetch (or an excluded kind — packages/IAM/logs) aren't in `mapped`, so their
-      // edge is left to drop, preserving the "no dangling endpoint" guarantee.
+      // Frontier: endpoints of budget-touching edges that fell just outside the budget but are still
+      // in the over-fetched set. The pull is naturally bounded — a frontier node MUST be in `mapped`
+      // (the top `hardCap+1` by last_seen), so the whole map is at most `hardCap+1` nodes and a hub
+      // can't explode the canvas. We must NOT cut this short at `hardCap`: a budget node's real
+      // neighbours would then be split off (a repo stranded from its runtime — the exact "false
+      // unlinked" this frontier exists to prevent, P3/P4: never hide a real link). Endpoints beyond
+      // the over-fetch (or an excluded kind — packages/IAM/logs) aren't in `mapped`, so their edge is
+      // left to drop, preserving the "no dangling endpoint" guarantee.
       const inView = new Set(budgetIds);
       const byIdMapped = new Map(mapped.map((n) => [n.id, n] as const));
       const frontier: GraphNodeDto[] = [];
       for (const e of touchingEdges) {
         for (const endpoint of [e.from_node_id, e.to_node_id]) {
-          if (inView.has(endpoint) || inView.size >= hardCap) continue;
+          if (inView.has(endpoint)) continue;
           const node = byIdMapped.get(endpoint);
           if (!node) continue;
           inView.add(endpoint);

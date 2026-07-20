@@ -318,18 +318,23 @@ suite("G2.1 GraphService", () => {
       null,
       "api-svc",
     );
+    // An inferred edge REQUIRES a rule (inferred_needs_rule) and provenance.confidence must be one of
+    // observed/inferred-*; seed a real rule id and an inferred-high provenance row accordingly.
+    const ruleId = one(
+      (await admin.query<{ id: string }>("SELECT id FROM inference_rules LIMIT 1")).rows,
+    ).id;
     const prov = one(
       (
         await admin.query<{ id: string }>(
-          "INSERT INTO provenance (org_id, source, confidence) VALUES ($1,'edge','inferred') RETURNING id",
-          [orgId],
+          "INSERT INTO provenance (org_id, source, confidence, inference_rule_id) VALUES ($1,'rule:test','inferred-high',$2) RETURNING id",
+          [orgId, ruleId],
         )
       ).rows,
     ).id;
     await admin.query(
-      `INSERT INTO edges (org_id, from_node_id, to_node_id, type, origin, confidence, provenance_id)
-       VALUES ($1,$2,$3,'DEPLOYS_TO','inferred','inferred-high',$4)`,
-      [orgId, repoId, lambdaId, prov],
+      `INSERT INTO edges (org_id, from_node_id, to_node_id, type, origin, confidence, provenance_id, inference_rule_id)
+       VALUES ($1,$2,$3,'DEPLOYS_TO','inferred','inferred-high',$4,$5)`,
+      [orgId, repoId, lambdaId, prov, ruleId],
     );
     // Make the lambda the single newest node; repo + rds older so a budget of 1 excludes them.
     await admin.query("UPDATE nodes SET last_seen = now() WHERE id = $1", [lambdaId]);
