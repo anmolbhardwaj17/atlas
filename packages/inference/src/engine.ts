@@ -8,14 +8,15 @@
  * the inputs — re-running with unchanged inputs writes nothing (IE-4 convergence). All
  * work is org-scoped via withOrgScope (RLS, atlas_app role).
  */
+import { randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { withOrgScope, type Db } from "@atlas/db";
 import type {
+  ConfidenceTier,
   DerivedNode,
   EdgeLite,
   InferenceInput,
   InferenceStats,
-  InferredEdge,
   NodeLite,
   Rule,
   SignalLite,
@@ -63,10 +64,32 @@ export async function runInference(
     // guards against a concurrent writer the preload couldn't have seen.
     const existingInferred = await loadExistingInferredEdges(c);
     const stats: InferenceStats = { candidates: 0, upserted: 0, retired: 0, derivedNodes: 0 };
-    const keptByRule = new Map<string, string[]>();
 
-    // Rules run in dependency order (R1 → R4 → R5/R6); each rule's derived nodes and kept
-    // edges are folded back into `input` so later rules see them (single-pass convergence).
+    // Each kept candidate carries its uq_edge key + how to resolve its final id: a CONVERGED edge
+    // already has one (existing.id); a to-WRITE edge's id comes from the batched upsert's RETURNING.
+    const keptKeysByRule = new Map<string, Array<{ key: string; convergedId?: string }>>();
+    // Edges that actually need a write (new, reactivated, or confidence-changed), deduped by uq_edge
+    // key so the batched ON CONFLICT can't touch a row twice. Collected across ALL rules, then written
+    // in TWO statements (provenance, edges) instead of two round-trips PER changed edge.
+    const writes = new Map<
+      string,
+      {
+        ruleId: string;
+        ruleKey: string;
+        from: string;
+        to: string;
+        type: string;
+        tier: ConfidenceTier;
+        evidence: Record<string, unknown>;
+        provId: string;
+      }
+    >();
+
+    // Rules run in dependency order (R1 → R4 → R5/R6); each rule's derived nodes + candidate edges are
+    // folded back into `input` so later rules see them (single-pass convergence). Rule evaluation is
+    // pure and reads only `input`, so deferring the DB WRITES to after the loop changes nothing a
+    // later rule observes — endpoints resolve via `input.nodesByUrn` (derived nodes ARE written per
+    // rule, below, since their ids feed resolution) and via `input.inferredEdges` (URNs only).
     for (const rule of rules) {
       const ruleId = ruleIdByKey.get(rule.key);
       if (!ruleId) {
@@ -75,38 +98,28 @@ export async function runInference(
       }
       const output = rule.evaluate(input);
 
-      for (const node of output.nodes) {
-        const id = await upsertDerivedNode(c, orgId, node);
-        input.nodesByUrn.set(node.urn, {
-          id,
-          urn: node.urn,
-          kind: node.kind,
-          attributes: node.attributes,
-        });
-        stats.derivedNodes++;
+      // Derived nodes must exist before this rule's (and later rules') edges resolve, so upsert them
+      // now — but batched per rule (one round-trip for all of a rule's nodes, not one each).
+      if (output.nodes.length > 0) {
+        const idByUrn = await upsertDerivedNodesBatch(c, orgId, output.nodes);
+        for (const node of output.nodes) {
+          const id = idByUrn.get(node.urn);
+          if (!id) throw new Error(`derived node upsert returned no id for ${node.urn}`);
+          input.nodesByUrn.set(node.urn, { id, urn: node.urn, kind: node.kind, attributes: node.attributes });
+          stats.derivedNodes++;
+        }
       }
 
       stats.candidates += output.edges.length;
-      const kept: string[] = [];
+      const keptKeys: Array<{ key: string; convergedId?: string }> = [];
+      const seen = new Set<string>(); // dedup a rule's own repeated candidates
       for (const cand of output.edges) {
         const from = input.nodesByUrn.get(cand.fromUrn);
         const to = input.nodesByUrn.get(cand.toUrn);
         if (!from || !to || from.id === to.id) continue; // unresolved endpoint / self-edge
         // The user removed/rejected this exact link — don't re-infer it (it stays retired via the
-        // convergence pass below, since we never add it to `kept`).
+        // convergence pass below, since we never add it to the kept set).
         if (input.rejectedEdgeKeys?.has(`${from.id}→${to.id}→${cand.type}`)) continue;
-        const { id, wrote } = await upsertInferredEdge(
-          c,
-          orgId,
-          rule.key,
-          ruleId,
-          from.id,
-          to.id,
-          cand,
-          existingInferred.get(`${from.id}|${to.id}|${cand.type}|${ruleId}`),
-        );
-        kept.push(id);
-        if (wrote) stats.upserted++;
         // Expose to later rules (converged edges included, so R4 sees R1's DEPLOYS_TO).
         input.inferredEdges.push({
           type: cand.type,
@@ -114,12 +127,94 @@ export async function runInference(
           toUrn: cand.toUrn,
           tier: cand.tier,
         });
+        const key = `${from.id}|${to.id}|${cand.type}|${ruleId}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const existing = existingInferred.get(key);
+        if (existing && existing.status === "active" && existing.confidence === cand.tier) {
+          keptKeys.push({ key, convergedId: existing.id }); // already converged — no write (IE-4)
+        } else {
+          writes.set(key, {
+            ruleId,
+            ruleKey: rule.key,
+            from: from.id,
+            to: to.id,
+            type: cand.type,
+            tier: cand.tier,
+            evidence: cand.evidence,
+            provId: randomUUID(),
+          });
+          keptKeys.push({ key }); // id resolved from the batched upsert below
+        }
       }
-      keptByRule.set(ruleId, kept);
+      keptKeysByRule.set(ruleId, keptKeys);
     }
 
-    // Convergence: retire active inferred edges the rule no longer produced this run.
-    for (const [ruleId, kept] of keptByRule) {
+    // Batch-write the changed edges: one provenance insert (client-generated ids) + one edge upsert
+    // (ON CONFLICT reactivates/updates an existing row, so both new and changed edges go through the
+    // same statement). RETURNING maps each final edge id back to its uq_edge key for the retire pass.
+    const writeList = [...writes.values()];
+    const writtenIdByKey = new Map<string, string>();
+    if (writeList.length > 0) {
+      await c.query(
+        `INSERT INTO provenance (id, org_id, source, confidence, inference_rule_id, evidence)
+         SELECT p, $1, s, conf, rid::uuid, ev::jsonb
+           FROM unnest($2::uuid[], $3::text[], $4::text[], $5::uuid[], $6::text[])
+             AS t(p, s, conf, rid, ev)`,
+        [
+          orgId,
+          writeList.map((w) => w.provId),
+          writeList.map((w) => `rule:${w.ruleKey}`),
+          writeList.map((w) => w.tier),
+          writeList.map((w) => w.ruleId),
+          writeList.map((w) => JSON.stringify(w.evidence)),
+        ],
+      );
+      const erows = (
+        await c.query<{
+          id: string;
+          from_node_id: string;
+          to_node_id: string;
+          type: string;
+          inference_rule_id: string;
+        }>(
+          `INSERT INTO edges
+             (org_id, from_node_id, to_node_id, type, origin, confidence, provenance_id, inference_rule_id, last_seen)
+           SELECT $1, f, t2, typ, 'inferred', conf, pr, rid::uuid, now()
+             FROM unnest($2::uuid[], $3::uuid[], $4::text[], $5::text[], $6::uuid[], $7::uuid[])
+               AS x(f, t2, typ, conf, pr, rid)
+           ON CONFLICT ON CONSTRAINT uq_edge DO UPDATE
+             SET status='active', origin='inferred', confidence=EXCLUDED.confidence,
+                 provenance_id=EXCLUDED.provenance_id, retired_at=NULL, last_seen=now()
+           RETURNING id, from_node_id, to_node_id, type, inference_rule_id`,
+          [
+            orgId,
+            writeList.map((w) => w.from),
+            writeList.map((w) => w.to),
+            writeList.map((w) => w.type),
+            writeList.map((w) => w.tier),
+            writeList.map((w) => w.provId),
+            writeList.map((w) => w.ruleId),
+          ],
+        )
+      ).rows;
+      for (const r of erows) {
+        writtenIdByKey.set(
+          `${r.from_node_id}|${r.to_node_id}|${r.type}|${r.inference_rule_id}`,
+          r.id,
+        );
+      }
+      stats.upserted = writeList.length;
+    }
+
+    // Convergence: retire active inferred edges each rule no longer produced this run. `kept` is that
+    // rule's converged ids + the ids the batch just returned for its written edges.
+    for (const [ruleId, keptKeys] of keptKeysByRule) {
+      const kept: string[] = [];
+      for (const k of keptKeys) {
+        const id = k.convergedId ?? writtenIdByKey.get(k.key);
+        if (id) kept.push(id);
+      }
       const r = await c.query(
         `UPDATE edges SET status='retired', retired_at=now()
          WHERE org_id=$1 AND origin='inferred' AND inference_rule_id=$2 AND status='active'
@@ -219,29 +314,36 @@ async function buildInput(
   };
 }
 
-/** Upsert a rule-derived node (e.g. atlas.service) by URN. No connection_id (derived). */
-async function upsertDerivedNode(c: PoolClient, orgId: string, node: DerivedNode): Promise<string> {
-  const provider = node.kind.split(".")[0] ?? "atlas";
-  const { rows } = await c.query<{ id: string }>(
+/** Batch-upsert a rule's derived nodes (e.g. atlas.service) by URN. No connection_id (derived).
+ *  Deduped by URN (last wins); returns urn→id so the caller can fold them into `input.nodesByUrn`. */
+async function upsertDerivedNodesBatch(
+  c: PoolClient,
+  orgId: string,
+  nodes: readonly DerivedNode[],
+): Promise<Map<string, string>> {
+  const byUrn = new Map<string, DerivedNode>();
+  for (const n of nodes) byUrn.set(n.urn, n);
+  const list = [...byUrn.values()];
+  const { rows } = await c.query<{ id: string; urn: string }>(
     `INSERT INTO nodes (org_id, urn, kind, name, provider, attributes, status, confidence, last_seen)
-     VALUES ($1,$2,$3,$4,$5,$6,'active',$7, now())
+     SELECT $1, u.urn, u.kind, u.name, u.provider, u.attrs::jsonb, 'active', u.conf, now()
+       FROM unnest($2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[])
+         AS u(urn, kind, name, provider, attrs, conf)
      ON CONFLICT (org_id, urn) DO UPDATE SET
        name = EXCLUDED.name, attributes = EXCLUDED.attributes,
        status = 'active', confidence = EXCLUDED.confidence, last_seen = now()
-     RETURNING id`,
+     RETURNING id, urn`,
     [
       orgId,
-      node.urn,
-      node.kind,
-      node.displayName,
-      provider,
-      JSON.stringify(node.attributes),
-      node.tier,
+      list.map((n) => n.urn),
+      list.map((n) => n.kind),
+      list.map((n) => n.displayName),
+      list.map((n) => n.kind.split(".")[0] ?? "atlas"),
+      list.map((n) => JSON.stringify(n.attributes)),
+      list.map((n) => n.tier),
     ],
   );
-  const id = rows[0]?.id;
-  if (!id) throw new Error("derived node upsert returned no id");
-  return id;
+  return new Map(rows.map((r) => [r.urn, r.id]));
 }
 
 async function loadRuleIds(c: PoolClient): Promise<Map<string, string>> {
@@ -289,54 +391,3 @@ async function loadExistingInferredEdges(c: PoolClient): Promise<Map<string, Exi
   return m;
 }
 
-/**
- * Upsert one inferred edge. If an identical active edge already exists (same rule, from,
- * to, type, confidence) it's a no-op — the key to convergence (IE-4). Otherwise a fresh
- * provenance row (evidence) is written and the edge is (re)activated.
- */
-async function upsertInferredEdge(
-  c: PoolClient,
-  orgId: string,
-  ruleKey: string,
-  ruleId: string,
-  fromId: string,
-  toId: string,
-  cand: InferredEdge,
-  existing: ExistingEdge | undefined,
-): Promise<{ id: string; wrote: boolean }> {
-  if (existing && existing.status === "active" && existing.confidence === cand.tier) {
-    return { id: existing.id, wrote: false }; // already converged
-  }
-
-  const prov = await c.query<{ id: string }>(
-    `INSERT INTO provenance (org_id, source, confidence, inference_rule_id, evidence)
-     VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-    [orgId, `rule:${ruleKey}`, cand.tier, ruleId, JSON.stringify(cand.evidence)],
-  );
-  const provId = prov.rows[0]?.id;
-
-  if (existing) {
-    await c.query(
-      `UPDATE edges SET status='active', confidence=$2, provenance_id=$3, retired_at=NULL, last_seen=now()
-        WHERE id=$1`,
-      [existing.id, cand.tier, provId],
-    );
-    return { id: existing.id, wrote: true };
-  }
-
-  // ON CONFLICT (defense-in-depth beyond the per-run advisory lock): if a concurrent writer already
-  // created this exact edge, reactivate it in place instead of crashing on uq_edge.
-  const inserted = await c.query<{ id: string }>(
-    `INSERT INTO edges
-       (org_id, from_node_id, to_node_id, type, origin, confidence, provenance_id, inference_rule_id, last_seen)
-     VALUES ($1,$2,$3,$4,'inferred',$5,$6,$7, now())
-     ON CONFLICT ON CONSTRAINT uq_edge DO UPDATE
-       SET status='active', origin='inferred', confidence=EXCLUDED.confidence,
-           provenance_id=EXCLUDED.provenance_id, retired_at=NULL, last_seen=now()
-     RETURNING id`,
-    [orgId, fromId, toId, cand.type, cand.tier, provId, ruleId],
-  );
-  const id = inserted.rows[0]?.id;
-  if (!id) throw new Error("inferred edge insert returned no id");
-  return { id, wrote: true };
-}
