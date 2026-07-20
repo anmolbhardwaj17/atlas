@@ -17,7 +17,7 @@ export type Db = Pool;
  * move on: pg discards the dead client and opens a fresh one on the next query, so a
  * transient DB blip degrades one in-flight request, never the whole server.
  */
-export function createPool(connectionString: string): Pool {
+export function createPool(connectionString: string, max = 16): Pool {
   const pool = new Pool({
     connectionString,
     keepAlive: true, // fewer idle drops by the pooler
@@ -25,10 +25,11 @@ export function createPool(connectionString: string): Pool {
     idleTimeoutMillis: 30_000,
     // Atlas deliberately fans a request's independent reads across several org-scoped
     // connections (separate scopes run in parallel; a single connection serialises queries).
-    // A dashboard `summary()` opens 4 at once and `findingDetail()` up to ~7, before you count
-    // concurrent requests — pg's default max of 10 would queue those and erase the parallelism.
-    // Sits comfortably under Supabase's session-pooler per-client limit.
-    max: 16,
+    // A dashboard `summary()` opens ~4 at once and `findingDetail()` ~4 (its blast-radius fan-out is
+    // concurrency-capped, H5) — before you count concurrent requests — so pg's default max of 10
+    // would queue those and erase the parallelism. `max` is env-tunable (PG_POOL_MAX) so a deploy on
+    // a bigger Postgres/pooler can raise it; the default sits under Supabase's session-pooler limit.
+    max,
   });
   pool.on("error", (err) => {
     console.error(`[db] idle client error (recovered, not fatal): ${err.message}`);

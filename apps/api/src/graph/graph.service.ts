@@ -47,6 +47,30 @@ function edgeConfidenceRank(confidence: string): number {
   return EDGE_CONFIDENCE_RANK[confidence] ?? 0;
 }
 
+/**
+ * Run `task` over `items` with at most `limit` in flight at once, preserving result order (H5,
+ * backend audit Phase C). Each task here opens its own org-scoped pooled connection, so an unbounded
+ * `Promise.all` over N items would grab N connections at once — a single finding-detail request could
+ * hold 7, and a handful of concurrent requests then starve the pool (max 16) and time out on
+ * `pool.connect()`. Capping in-flight tasks bounds a request's connection footprint while keeping most
+ * of the parallelism (the work runs in waves of `limit`).
+ */
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  limit: number,
+  task: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    for (let i = next++; i < items.length; i = next++) {
+      results[i] = await task(items[i] as T, i);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
 const NODE_COLS = `id, urn, kind, name, provider, region, status, confidence, attributes, tags,
   first_seen, last_seen`;
 
@@ -1872,10 +1896,13 @@ export class GraphService {
     if (evidenceIds.length === 0) return { finding, affected: [], impact: null, lastSyncedAt };
 
     // The affected-node enrichment and the per-root blast-radius traversals are all independent and
-    // each open their own scope (separate pooled connection). Run them as ONE concurrent wave rather
-    // than sequentially — this endpoint previously opened up to 7 scopes back-to-back (1 affected + 6
-    // blast-radius), each a full round-trip cluster to a remote DB. Bounded roots keep pool use sane.
+    // each open their own scope (separate pooled connection). Run them concurrently rather than
+    // sequentially — this endpoint previously opened up to 7 scopes back-to-back (1 affected + 6
+    // blast-radius), each a full round-trip cluster to a remote DB. The blast-radius roots are
+    // concurrency-capped (H5) so this whole request holds at most 1 + IMPACT_FANOUT connections,
+    // leaving the pool headroom for other requests instead of one detail load starving it.
     const IMPACT_ROOTS = 6;
+    const IMPACT_FANOUT = 3;
     const roots = evidenceIds.slice(0, IMPACT_ROOTS);
     const [affected, blasts] = await Promise.all([
       // Enrich the affected nodes with environment + runtime health (one batched lookup).
@@ -1913,9 +1940,10 @@ export class GraphService {
         );
       }),
       // Impact — the inbound blast-radius of each affected root ("what breaks if these fail").
-      // Bounded (a few roots, shallow, small budget) so the detail page stays fast.
-      Promise.all(
-        roots.map((rootId) => this.blastRadius(orgId, rootId, { depth: 3, nodeBudget: 100 })),
+      // Bounded (a few roots, shallow, small budget) so the detail page stays fast; capped at
+      // IMPACT_FANOUT concurrent traversals so the request's connection footprint stays bounded (H5).
+      mapWithConcurrency(roots, IMPACT_FANOUT, (rootId) =>
+        this.blastRadius(orgId, rootId, { depth: 3, nodeBudget: 100 }),
       ),
     ]);
 

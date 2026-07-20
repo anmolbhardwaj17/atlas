@@ -30,6 +30,13 @@ export const EnvSchema = z
     REDIS_URL: optionalUrl,
     OPENSEARCH_URL: optionalUrl,
 
+    // Postgres pool size (H5, backend audit Phase C). A single request fans its independent
+    // org-scoped reads across several connections (dashboard ~4, finding-detail ~4 after the cap),
+    // so under concurrency the pool is the scarce resource. Default 16 sits under Supabase's
+    // session-pooler per-client limit; raise it in a deploy backed by a bigger Postgres/pooler
+    // rather than hard-coding. Min 4 keeps the fan-out from self-deadlocking.
+    PG_POOL_MAX: z.coerce.number().int().min(4).max(200).default(16),
+
     // Supabase Auth (docs/12 §2–3, F1.5). The API verifies user access JWTs against
     // Supabase's JWKS (ES256) — derived from SUPABASE_URL — and mints no tokens of its
     // own. SUPABASE_JWT_SECRET is the HS256 fallback only (projects without asymmetric

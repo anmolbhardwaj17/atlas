@@ -34,7 +34,7 @@ const poolProvider: Provider = {
     if (!env.DATABASE_URL) {
       throw new Error("DATABASE_URL is required (atlas_app role) - see .env / docs/12 §4");
     }
-    return createPool(env.DATABASE_URL);
+    return createPool(env.DATABASE_URL, env.PG_POOL_MAX);
   },
 };
 
