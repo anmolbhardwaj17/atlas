@@ -1,3 +1,5 @@
+// MUST be first: starts OTel tracing (when OTEL_EXPORTER_OTLP_ENDPOINT is set) before pg/fastify load.
+import "./instrumentation";
 import "reflect-metadata";
 import { randomUUID } from "node:crypto";
 import { NestFactory } from "@nestjs/core";
