@@ -62,6 +62,7 @@ import { up as up0060 } from "./migrations/0060_slack_installations";
 import { up as up0061 } from "./migrations/0061_discord_installations";
 import { up as up0062 } from "./migrations/0062_notification_alert_failures";
 import { up as up0063 } from "./migrations/0063_search_trgm_indexes";
+import { up as up0064 } from "./migrations/0064_health_state_index";
 
 /**
  * Forward-only SQL migration runner (docs/04 §9). Plain `pg`, no ORM. Each
@@ -135,6 +136,7 @@ const MIGRATIONS: ReadonlyArray<{ version: string; statements: string[] }> = [
   { version: "0061_discord_installations", statements: up0061 },
   { version: "0062_notification_alert_failures", statements: up0062 },
   { version: "0063_search_trgm_indexes", statements: up0063 },
+  { version: "0064_health_state_index", statements: up0064 },
 ];
 
 async function main(): Promise<void> {
