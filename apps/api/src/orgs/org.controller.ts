@@ -143,7 +143,7 @@ export class OrgController {
   @Roles("Owner")
   async remove(@Req() req: AuthedRequest): Promise<void> {
     const orgId = org(req).id;
-    await this.orgs.deleteOrg(orgId);
+    await this.orgs.deleteOrg(orgId, claims(req).userId ?? null);
     this.logger.warn(`org.delete: org ${orgId} permanently deleted by user ${claims(req).userId}`);
   }
 

@@ -65,6 +65,7 @@ import { up as up0063 } from "./migrations/0063_search_trgm_indexes";
 import { up as up0064 } from "./migrations/0064_health_state_index";
 import { up as up0065 } from "./migrations/0065_digest_org_runs";
 import { up as up0066 } from "./migrations/0066_secret_key_id";
+import { up as up0067 } from "./migrations/0067_org_deletion_log";
 
 /**
  * Forward-only SQL migration runner (docs/04 §9). Plain `pg`, no ORM. Each
@@ -141,6 +142,7 @@ const MIGRATIONS: ReadonlyArray<{ version: string; statements: string[] }> = [
   { version: "0064_health_state_index", statements: up0064 },
   { version: "0065_digest_org_runs", statements: up0065 },
   { version: "0066_secret_key_id", statements: up0066 },
+  { version: "0067_org_deletion_log", statements: up0067 },
 ];
 
 async function main(): Promise<void> {

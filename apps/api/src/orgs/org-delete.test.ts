@@ -124,4 +124,52 @@ suite("org hard-delete cascade sweep (docs/12 §6.4)", () => {
     // …while org B is completely untouched (R8).
     for (const t of CHILD_TABLES) expect(await countFor(t, orgB)).toBe(1);
   });
+
+  it("records a durable out-of-tenant deletion log that survives the cascade + is write-only", async () => {
+    const org = one(
+      (
+        await admin.query<{ id: string }>(
+          "INSERT INTO organizations (slug, name) VALUES ($1, 'Gone') RETURNING id",
+          [`del-${randomUUID().slice(0, 8)}`],
+        )
+      ).rows,
+    ).id;
+
+    // Delete exactly as OrgService.deleteOrg does: append the sink record, THEN cascade-delete.
+    await withOrgScope(app, org, async (c) => {
+      const { rows } = await c.query<{ slug: string; name: string }>(
+        "SELECT slug, name FROM organizations WHERE id = $1",
+        [org],
+      );
+      await c.query(
+        "INSERT INTO org_deletion_log (deleted_org_id, org_slug, org_name, actor_user_id) VALUES ($1,$2,$3,$4)",
+        [org, rows[0]?.slug, rows[0]?.name, userId],
+      );
+      await c.query("DELETE FROM organizations WHERE id = $1", [org]);
+    });
+
+    // The org is gone, but the deletion record survives (no FK to organizations) — the durable sink.
+    const gone = Number(
+      one((await admin.query<{ n: string }>("SELECT count(*) AS n FROM organizations WHERE id=$1", [org])).rows).n,
+    );
+    expect(gone).toBe(0);
+    const log = one(
+      (
+        await admin.query<{ deleted_org_id: string; actor_user_id: string | null; org_name: string }>(
+          "SELECT deleted_org_id, actor_user_id, org_name FROM org_deletion_log WHERE deleted_org_id = $1",
+          [org],
+        )
+      ).rows,
+    );
+    expect(log.deleted_org_id).toBe(org);
+    expect(log.actor_user_id).toBe(userId);
+    expect(log.org_name).toBe("Gone");
+
+    // The app role is WRITE-ONLY on the sink: a tenant can never read deletion records (no SELECT).
+    await expect(
+      withOrgScope(app, orgB, (c) => c.query("SELECT * FROM org_deletion_log LIMIT 1")),
+    ).rejects.toThrow();
+
+    await admin.query("DELETE FROM org_deletion_log WHERE deleted_org_id = $1", [org]);
+  });
 });

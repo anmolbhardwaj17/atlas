@@ -157,10 +157,22 @@ export class OrgService {
    *  scopes the DELETE to the active org; the FK cascade runs with the table owner's rights, so it
    *  reaches even the append-only tables (audit/analytics). **Irreversible.** The org's logo object
    *  in Storage is left orphaned (a public, now-unreferenced image — harmless). */
-  async deleteOrg(orgId: string): Promise<void> {
-    await withOrgScope(this.db, orgId, (c) =>
-      c.query(`DELETE FROM organizations WHERE id = $1`, [orgId]),
-    );
+  async deleteOrg(orgId: string, actorUserId: string | null = null): Promise<void> {
+    await withOrgScope(this.db, orgId, async (c) => {
+      // Record the deletion in the out-of-tenant sink BEFORE the cascade — the org's own audit_events
+      // vanish with it, so this is the only durable, provable record of who deleted the org and when
+      // (org_deletion_log has no FK to organizations, so it survives). Same transaction as the delete.
+      const { rows } = await c.query<{ slug: string; name: string }>(
+        `SELECT slug, name FROM organizations WHERE id = $1`,
+        [orgId],
+      );
+      await c.query(
+        `INSERT INTO org_deletion_log (deleted_org_id, org_slug, org_name, actor_user_id)
+         VALUES ($1, $2, $3, $4)`,
+        [orgId, rows[0]?.slug ?? null, rows[0]?.name ?? null, actorUserId],
+      );
+      await c.query(`DELETE FROM organizations WHERE id = $1`, [orgId]);
+    });
     // The DB cascade only removes rows; objects in Storage (raw-snapshot blobs that embed author
     // names / PR / Jira contents, and the org logo) are pointers, so erase those too — otherwise
     // "delete my org" leaves the raw payloads in the bucket, defeating GDPR erasure. Best-effort
