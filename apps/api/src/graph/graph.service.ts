@@ -562,13 +562,16 @@ export class GraphService {
       withOrgScope(this.db, orgId, fn);
     const [grpInventory, grpTopology, grpPeopleVulns, activity] = await Promise.all([
       scope(async (c) => {
-        const [cats, meta, edgeCount, codeCounts, stale] = await Promise.all([
+        const [cats, total, meta, edgeCount, codeCounts, stale] = await Promise.all([
           c.query<{ category: string; n: number }>(
             `SELECT nk.category, count(*)::int AS n
                FROM nodes nd JOIN node_kinds nk ON nk.kind = nd.kind
               WHERE nd.status <> 'deleted' GROUP BY nk.category`,
           ),
-          // Minimal columns for env inference + distinct clouds/accounts (bounded).
+          // True resource total — the `meta` scan below is capped at 5000 for env/cloud inference, so
+          // it must NOT be used as the count (an estate >5000 would report exactly 5000).
+          c.query<{ n: number }>(`SELECT count(*)::int AS n FROM nodes WHERE status <> 'deleted'`),
+          // Bounded sample (LIMIT 5000) — env inference + distinct clouds/accounts only, NOT the count.
           c.query<{
             name: string | null;
             urn: string;
@@ -603,7 +606,7 @@ export class GraphService {
           ),
           c.query<{ n: number }>("SELECT count(*)::int AS n FROM nodes WHERE status = 'stale'"),
         ]);
-        return { cats, meta, edgeCount, codeCounts, stale };
+        return { cats, total, meta, edgeCount, codeCounts, stale };
       }),
       scope(async (c) => {
         const [
@@ -911,7 +914,7 @@ export class GraphService {
       this.recentActivity(orgId, activitySince, 6),
     ]);
 
-    const { cats, meta, edgeCount, codeCounts, stale } = grpInventory;
+    const { cats, total, meta, edgeCount, codeCounts, stale } = grpInventory;
     const {
       conns,
       cross,
@@ -958,7 +961,7 @@ export class GraphService {
       }
 
       return {
-        resources: meta.rows.length,
+        resources: total.rows[0]?.n ?? 0,
         relationships: edgeCount.rows[0]?.n ?? 0,
         services: catN(["compute"]),
         datastores: catN(["data", "storage"]),
