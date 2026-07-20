@@ -67,22 +67,22 @@ export class WeeklyDigestService {
   }
 
   /**
-   * Claim this week's send atomically and, only if we won the claim, send. Safe to call from every
-   * API instance every tick — exactly one caller per `periodKey` proceeds (see migration 0048).
-   * Returns null when the week was already claimed (nothing to do).
+   * Send this week's digest, claiming each org's send individually (migration 0065). Safe to call
+   * from every API instance every tick: an org is sent by whoever wins its per-org claim; everyone
+   * else skips it. Unlike the old period-level claim, a crash mid-run costs at most the single org
+   * being processed — the next tick resumes the rest — instead of losing the whole week's remaining
+   * orgs. Returns the orgs claimed + emails sent on THIS run (not the whole period).
    */
   async claimAndSend(periodKey: string): Promise<{ orgs: number; sent: number } | null> {
-    const { rows } = await this.db.query<{ app_claim_digest_period: boolean }>(
-      "SELECT app_claim_digest_period($1)",
-      [periodKey],
-    );
-    if (!rows[0]?.app_claim_digest_period) return null;
-    this.logger.log(`Claimed weekly digest period ${periodKey}; sending.`);
-    return this.sendWeeklyDigests();
+    return this.sendWeeklyDigests(periodKey);
   }
 
-  /** Send the weekly digest to every eligible recipient across all orgs. Best-effort per send. */
-  async sendWeeklyDigests(): Promise<{ orgs: number; sent: number }> {
+  /**
+   * Send the weekly digest across all orgs. When `periodKey` is given, each org is claimed via
+   * `app_claim_digest_org` and skipped if already sent this period (exactly-once, resumable). With no
+   * `periodKey` (manual/ad-hoc trigger) every org is sent unconditionally. Best-effort per send.
+   */
+  async sendWeeklyDigests(periodKey?: string): Promise<{ orgs: number; sent: number }> {
     const { rows } = await this.db.query<{
       org_id: string;
       org_name: string;
@@ -100,7 +100,18 @@ export class WeeklyDigestService {
     }
 
     let sent = 0;
+    let claimedOrgs = 0;
     for (const [orgId, org] of byOrg) {
+      // Claim this org for this period just before sending it, so a crash/restart loses at most this
+      // one org (the next tick resumes the rest). No periodKey ⇒ an unconditional manual send.
+      if (periodKey) {
+        const { rows: claim } = await this.db.query<{ app_claim_digest_org: boolean }>(
+          "SELECT app_claim_digest_org($1, $2::uuid)",
+          [periodKey, orgId],
+        );
+        if (!claim[0]?.app_claim_digest_org) continue; // already sent this period (other tick/instance)
+      }
+      claimedOrgs += 1;
       let digest: Digest;
       try {
         digest = await this.buildDigest(orgId);
@@ -122,8 +133,10 @@ export class WeeklyDigestService {
         if (ok) sent += 1;
       }
     }
-    this.logger.log(`Weekly digest: ${sent} email(s) across ${byOrg.size} org(s).`);
-    return { orgs: byOrg.size, sent };
+    if (claimedOrgs > 0) {
+      this.logger.log(`Weekly digest: ${sent} email(s) across ${claimedOrgs} org(s) this run.`);
+    }
+    return { orgs: claimedOrgs, sent };
   }
 
   /** Honor an unsubscribe from a token-signed email link. Returns true if it was applied. */

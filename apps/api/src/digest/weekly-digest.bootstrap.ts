@@ -36,7 +36,9 @@ export class WeeklyDigestBootstrap implements OnModuleInit, OnApplicationShutdow
     const periodKey = `digest-${sendMoment.toISOString().slice(0, 10)}`; // the week's Monday date
     try {
       const res = await this.digest.claimAndSend(periodKey);
-      if (res)
+      // Only log when this tick actually claimed + sent something — once the period is fully sent,
+      // every later hourly tick returns 0 orgs and must stay quiet (per-org claim, migration 0065).
+      if (res && res.orgs > 0)
         this.logger.log(`Weekly digest ${periodKey}: ${res.sent} sent / ${res.orgs} org(s).`);
     } catch (err) {
       this.logger.error(`Weekly digest tick failed: ${(err as Error).message}`);
