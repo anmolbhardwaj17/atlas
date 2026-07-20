@@ -184,13 +184,16 @@ export async function answerQuestion(
   }
   const narration = await narrate(deps, prep.built.context, question, prep.system, signal, history);
   const citations = bindCitations(narration, prep.built.cites);
+  const uncitedClaims = detectUncitedClaims(narration);
+  const caveats = [...prep.built.freshnessNotes];
+  if (uncitedClaims.length > 0) caveats.push(uncitedCaveat(uncitedClaims.length));
   return {
     grounded: true,
     text: narration,
     citations,
     confidence: prep.advisory ? "advisory" : scoreConfidence(citations, prep.built.cites),
-    caveats: prep.built.freshnessNotes,
-    uncitedClaims: detectUncitedClaims(narration),
+    caveats,
+    uncitedClaims,
     nodesConsidered: prep.built.nodesConsidered,
   };
 }
@@ -200,8 +203,20 @@ export type AnswerEvent =
   | { type: "retrieval"; nodesConsidered: number; intent: Intent }
   | { type: "token"; text: string }
   | { type: "citation"; citation: AnswerCitation }
+  // L5 (docs/10 §7): factual sentences the narrator emitted WITHOUT a citation marker — the streamed
+  // counterpart of `Answer.uncitedClaims`. Also the deterministic output-side prompt-injection signal
+  // (AIR-4): a claim that isn't tied to the closed context can't be verified, so it's flagged.
+  | { type: "uncited"; claims: string[] }
   | { type: "confidence"; overall: OverallConfidence; caveats: string[] }
   | { type: "done"; grounded: boolean; citations: number };
+
+/** Caveat surfaced when the answer contains statements that couldn't be tied to a cited source —
+ *  the user-facing half of the L5 / prompt-injection output-side check (AIR-4). */
+function uncitedCaveat(count: number): string {
+  return count === 1
+    ? "1 statement couldn't be tied to a cited source — treat it with caution."
+    : `${count} statements couldn't be tied to a cited source — treat them with caution.`;
+}
 
 /** Streamed answer (docs/08 §10.2 SSE): retrieval → token* → citation* → confidence → done. */
 export async function* answerQuestionStream(
@@ -283,10 +298,18 @@ export async function* answerQuestionStream(
   const narration = parts.join("").trim();
   const citations = bindCitations(narration, prep.built.cites);
   for (const citation of citations) yield { type: "citation", citation };
+  // L5 enforcement, now at PARITY with the non-streaming path: detect factual sentences the model
+  // emitted without a valid citation marker and (a) surface them as an `uncited` event and (b) attach
+  // a user-visible caveat, so injected/fabricated content that slipped into the stream is flagged
+  // rather than presented as grounded fact.
+  const uncited = detectUncitedClaims(narration);
+  if (uncited.length > 0) yield { type: "uncited", claims: uncited };
+  const caveats = [...prep.built.freshnessNotes];
+  if (uncited.length > 0) caveats.push(uncitedCaveat(uncited.length));
   yield {
     type: "confidence",
     overall: prep.advisory ? "advisory" : scoreConfidence(citations, prep.built.cites),
-    caveats: prep.built.freshnessNotes,
+    caveats,
   };
   yield { type: "done", grounded: true, citations: citations.length };
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { answerQuestion, answerQuestionStream } from "./answer";
+import { answerQuestion, answerQuestionStream, type AnswerEvent } from "./answer";
 import { MockLLMProvider } from "./mock-provider";
 import type { MockResponder } from "./mock-provider";
 import type { RetrievalPort, RetrievedNode, Traversal } from "./retrieval-port";
@@ -347,5 +347,42 @@ describe("AI eval - advisory (P2)", () => {
     );
     expect(ans.grounded).toBe(true);
     expect(ans.confidence).toBe("advisory");
+  });
+});
+
+describe("AI streaming - L5 uncited enforcement (parity + injection signal)", () => {
+  const collect = async (narration: string): Promise<AnswerEvent[]> => {
+    const events: AnswerEvent[] = [];
+    for await (const ev of answerQuestionStream(
+      { port: port(true), llm: provider(narration) },
+      "o",
+      "what breaks if prod-orders is deleted",
+    )) {
+      events.push(ev);
+    }
+    return events;
+  };
+
+  it("flags a streamed factual claim with no citation marker (uncited event + caveat)", async () => {
+    // 2nd sentence has no [N#]/[E#] marker and isn't a hedge → an unverifiable claim (the shape a
+    // prompt-injection would take: asserting something not in the closed context).
+    const events = await collect(
+      "Deleting **prod-orders** [N1] impacts the orders-api service [N2]. It also stores every customer's raw payment card number in plaintext.",
+    );
+    const uncited = events.find((e) => e.type === "uncited");
+    expect(uncited?.type === "uncited" && uncited.claims.length).toBeGreaterThan(0);
+    const conf = events.find((e) => e.type === "confidence");
+    expect(
+      conf?.type === "confidence" && conf.caveats.some((c) => /couldn't be tied to a cited source/.test(c)),
+    ).toBe(true);
+  });
+
+  it("no uncited event/caveat when every factual sentence is cited", async () => {
+    const events = await collect("Deleting **prod-orders** [N1] impacts the orders-api service [N2].");
+    expect(events.find((e) => e.type === "uncited")).toBeUndefined();
+    const conf = events.find((e) => e.type === "confidence");
+    expect(
+      conf?.type === "confidence" && conf.caveats.some((c) => /couldn't be tied/.test(c)),
+    ).toBe(false);
   });
 });
