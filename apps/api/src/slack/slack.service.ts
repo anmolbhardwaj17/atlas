@@ -18,6 +18,7 @@ import { SECRET_BROKER } from "../connections/tokens";
 import { AiService } from "../ai/ai.service";
 import { verifySlackSignature } from "./slack-verify";
 import { formatAnswerBlocks } from "./slack-blocks";
+import { fetchWithTimeout } from "../common/fetch-timeout";
 
 const OAUTH_AUTHORIZE = "https://slack.com/oauth/v2/authorize";
 const OAUTH_ACCESS = "https://slack.com/api/oauth.v2.access";
@@ -284,7 +285,7 @@ export class SlackService {
       code,
       redirect_uri: this.redirectUri(),
     });
-    const r = await fetch(OAUTH_ACCESS, {
+    const r = await fetchWithTimeout(OAUTH_ACCESS, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
@@ -295,7 +296,7 @@ export class SlackService {
   /** POST JSON to a Slack host only (defence-in-depth SSRF guard; the URL is already signed-request-derived). */
   protected async httpPostJson(url: string, body: unknown): Promise<void> {
     if (!isSlackHost(url)) throw new Error("refusing to POST to a non-Slack host");
-    await fetch(url, {
+    await fetchWithTimeout(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

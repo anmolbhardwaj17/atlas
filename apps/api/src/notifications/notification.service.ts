@@ -5,6 +5,7 @@ import type { Env } from "@atlas/config";
 import { PG_POOL, ENV } from "../core/tokens";
 import { ApiException } from "../common/errors";
 import { AiService } from "../ai/ai.service";
+import { fetchWithTimeout } from "../common/fetch-timeout";
 
 /**
  * Proactive notifications (pull → push). An org sets an outbound channel (Slack incoming
@@ -529,7 +530,7 @@ async function postWebhook(kind: ChannelKind, webhookUrl: string, text: string):
   // Slack + Teams read `{text}`; Discord reads `{content}` (2000-char cap).
   const body = kind === "discord" ? { content: formatted.slice(0, 1900) } : { text: formatted };
   try {
-    const res = await fetch(webhookUrl, {
+    const res = await fetchWithTimeout(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

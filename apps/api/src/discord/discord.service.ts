@@ -17,6 +17,7 @@ import { ENV, PG_POOL } from "../core/tokens";
 import { AiService } from "../ai/ai.service";
 import { verifyDiscordSignature } from "./discord-verify";
 import { formatAnswerMessage } from "./discord-embeds";
+import { fetchWithTimeout } from "../common/fetch-timeout";
 
 const OAUTH_AUTHORIZE = "https://discord.com/oauth2/authorize";
 const OAUTH_TOKEN = "https://discord.com/api/oauth2/token";
@@ -281,7 +282,7 @@ export class DiscordService {
       code,
       redirect_uri: this.redirectUri(),
     });
-    const r = await fetch(OAUTH_TOKEN, {
+    const r = await fetchWithTimeout(OAUTH_TOKEN, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
@@ -291,7 +292,7 @@ export class DiscordService {
 
   protected async httpPatchJson(url: string, body: unknown): Promise<void> {
     if (!isDiscordHost(url)) throw new Error("refusing to PATCH a non-Discord host");
-    await fetch(url, {
+    await fetchWithTimeout(url, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { Env } from "@atlas/config";
 import { ENV } from "./tokens";
+import { fetchWithTimeout } from "../common/fetch-timeout";
 
 export interface InviteEmail {
   to: string;
@@ -207,7 +208,7 @@ export class EmailService {
       return false;
     }
     try {
-      const res = await fetch("https://api.resend.com/emails", {
+      const res = await fetchWithTimeout("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({ from: this.from, to, subject, html }),
