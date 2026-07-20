@@ -5,15 +5,9 @@
  * `security.vulnerability` nodes + observed `AFFECTS` edges (vulnerability → package). Org-scoped
  * via withOrgScope (RLS, atlas_app). Best-effort: a transient OSV outage never fails the sync.
  */
+import { randomUUID } from "node:crypto";
 import { withOrgScope, type Db } from "@atlas/db";
-import type { PoolClient } from "pg";
-import {
-  OsvClient,
-  pkgKey,
-  type OsvEcosystem,
-  type OsvQueryPkg,
-  type OsvVulnerability,
-} from "./osv";
+import { OsvClient, pkgKey, type OsvEcosystem, type OsvQueryPkg } from "./osv";
 
 export interface OsvEnrichmentDeps {
   db: Db;
@@ -77,23 +71,92 @@ export async function runOsvEnrichment(
 
     const scan = await osv.scan(queries);
 
-    // Upsert each unique vulnerability node once (with one provenance row), then AFFECTS edges.
-    const vulnCache = new Map<string, { nodeId: string; provId: string }>();
-    let affectsEdges = 0;
+    // Collect the unique vulns + (vuln→package) affects first (no DB), then persist in BATCHES: one
+    // vuln-node upsert, one provenance insert (client-generated UUIDs, so each edge can reference its
+    // vuln's provenance without a per-row round-trip), one AFFECTS-edge upsert — instead of the old
+    // ~2·(unique vulns) + (affects) serial round-trips. Each unique vuln keeps ONE provenance shared
+    // by all its AFFECTS edges (unchanged), and re-seen edges keep their existing provenance on
+    // conflict (also unchanged — the fresh provenance rows are the same harmless churn as before).
+    const vulns = new Map<
+      string,
+      { urn: string; connectionId: string; name: string; attributes: string; provId: string }
+    >();
+    const affects: Array<{ vulnId: string; pkgNodeId: string }> = [];
     for (const pv of scan) {
       const pkg = meta.get(pkgKey(pv.pkg));
       if (!pkg) continue;
       for (const v of pv.vulnerabilities) {
-        let cached = vulnCache.get(v.id);
-        if (!cached) {
-          const nodeId = await upsertVulnNode(c, orgId, pkg.connectionId, v);
-          const provId = await insertProvenance(c, orgId, `osv:${v.id}`);
-          cached = { nodeId, provId };
-          vulnCache.set(v.id, cached);
+        if (!vulns.has(v.id)) {
+          vulns.set(v.id, {
+            urn: `external:vuln:${v.id}`,
+            connectionId: pkg.connectionId,
+            name: v.summary ?? v.id,
+            attributes: JSON.stringify({
+              osvId: v.id,
+              severity: v.severity,
+              summary: v.summary,
+              aliases: v.aliases,
+              fixedVersion: v.fixedVersion,
+              reference: v.reference,
+              published: v.published,
+            }),
+            provId: randomUUID(),
+          });
         }
-        await upsertAffectsEdge(c, orgId, cached.nodeId, pkg.nodeId, cached.provId);
-        affectsEdges += 1;
+        affects.push({ vulnId: v.id, pkgNodeId: pkg.nodeId });
       }
+    }
+
+    let affectsEdges = 0;
+    const vulnList = [...vulns.values()];
+    if (vulnList.length > 0) {
+      // Vuln nodes → urn→id.
+      const { rows: vrows } = await c.query<{ id: string; urn: string }>(
+        `INSERT INTO nodes (org_id, connection_id, urn, kind, name, provider, attributes, status, confidence)
+         SELECT $1, u.conn::uuid, u.urn, 'security.vulnerability', u.name, 'external', u.attrs::jsonb,
+                'active', 'observed'
+           FROM unnest($2::uuid[], $3::text[], $4::text[], $5::text[]) AS u(conn, urn, name, attrs)
+         ON CONFLICT (org_id, urn) DO UPDATE
+           SET attributes = EXCLUDED.attributes, name = EXCLUDED.name,
+               status = 'active', last_seen = now(), updated_at = now()
+         RETURNING id, urn`,
+        [
+          orgId,
+          vulnList.map((v) => v.connectionId),
+          vulnList.map((v) => v.urn),
+          vulnList.map((v) => v.name),
+          vulnList.map((v) => v.attributes),
+        ],
+      );
+      const nodeIdByUrn = new Map(vrows.map((r) => [r.urn, r.id]));
+
+      // One provenance per vuln (explicit ids), shared by its AFFECTS edges.
+      await c.query(
+        `INSERT INTO provenance (id, org_id, source, confidence)
+         SELECT p, $1, s, 'observed' FROM unnest($2::uuid[], $3::text[]) AS t(p, s)`,
+        [orgId, vulnList.map((v) => v.provId), [...vulns.keys()].map((id) => `osv:${id}`)],
+      );
+
+      // AFFECTS edges, deduped by (vuln-node, package) so the batch ON CONFLICT can't touch a row twice.
+      const edgeByKey = new Map<string, { from: string; to: string; prov: string }>();
+      for (const a of affects) {
+        const v = vulns.get(a.vulnId);
+        const from = v && nodeIdByUrn.get(v.urn);
+        if (!from || !v) continue;
+        edgeByKey.set(`${from}|${a.pkgNodeId}`, { from, to: a.pkgNodeId, prov: v.provId });
+      }
+      const edges = [...edgeByKey.values()];
+      if (edges.length > 0) {
+        await c.query(
+          `INSERT INTO edges (org_id, from_node_id, to_node_id, type, origin, confidence, provenance_id, last_seen)
+           SELECT $1, f, t2, 'AFFECTS', 'observed', 'observed', pr, now()
+             FROM unnest($2::uuid[], $3::uuid[], $4::uuid[]) AS x(f, t2, pr)
+           ON CONFLICT ON CONSTRAINT uq_edge DO UPDATE
+             SET status = 'active', last_seen = now(), updated_at = now()`,
+          [orgId, edges.map((e) => e.from), edges.map((e) => e.to), edges.map((e) => e.prov)],
+        );
+      }
+      affectsEdges = edges.length;
     }
 
     // Retire AFFECTS edges we no longer produced — a vuln withdrawn from OSV, or a package patched/
@@ -116,64 +179,9 @@ export async function runOsvEnrichment(
 
     return {
       packagesScanned: queries.length,
-      vulnerabilitiesFound: vulnCache.size,
+      vulnerabilitiesFound: vulns.size,
       affectsEdges,
       retiredAffects,
     };
   });
-}
-
-async function upsertVulnNode(
-  c: PoolClient,
-  orgId: string,
-  connectionId: string,
-  v: OsvVulnerability,
-): Promise<string> {
-  const attributes = {
-    osvId: v.id,
-    severity: v.severity,
-    summary: v.summary,
-    aliases: v.aliases,
-    fixedVersion: v.fixedVersion,
-    reference: v.reference,
-    published: v.published,
-  };
-  const { rows } = await c.query<{ id: string }>(
-    `INSERT INTO nodes (org_id, connection_id, urn, kind, name, provider, attributes, status, confidence)
-     VALUES ($1, $2, $3, 'security.vulnerability', $4, 'external', $5, 'active', 'observed')
-     ON CONFLICT (org_id, urn) DO UPDATE
-       SET attributes = EXCLUDED.attributes, name = EXCLUDED.name,
-           status = 'active', last_seen = now(), updated_at = now()
-     RETURNING id`,
-    [orgId, connectionId, `external:vuln:${v.id}`, v.summary ?? v.id, JSON.stringify(attributes)],
-  );
-  const id = rows[0]?.id;
-  if (!id) throw new Error(`vulnerability node upsert returned no id for ${v.id}`);
-  return id;
-}
-
-async function insertProvenance(c: PoolClient, orgId: string, source: string): Promise<string> {
-  const { rows } = await c.query<{ id: string }>(
-    `INSERT INTO provenance (org_id, source, confidence) VALUES ($1, $2, 'observed') RETURNING id`,
-    [orgId, source],
-  );
-  const id = rows[0]?.id;
-  if (!id) throw new Error(`provenance insert returned no id for ${source}`);
-  return id;
-}
-
-async function upsertAffectsEdge(
-  c: PoolClient,
-  orgId: string,
-  vulnNodeId: string,
-  pkgNodeId: string,
-  provId: string,
-): Promise<void> {
-  await c.query(
-    `INSERT INTO edges (org_id, from_node_id, to_node_id, type, origin, confidence, provenance_id)
-     VALUES ($1, $2, $3, 'AFFECTS', 'observed', 'observed', $4)
-     ON CONFLICT ON CONSTRAINT uq_edge DO UPDATE
-       SET status = 'active', last_seen = now(), updated_at = now()`,
-    [orgId, vulnNodeId, pkgNodeId, provId],
-  );
 }
