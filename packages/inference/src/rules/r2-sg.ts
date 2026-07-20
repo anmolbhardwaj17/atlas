@@ -26,6 +26,8 @@ const COMPUTE_KINDS = new Set(["aws.ec2.instance", "aws.lambda.function", "aws.e
 export const sgCorrelationConnectsRule: Rule = {
   key: "sg_correlation_connects",
   version: 1,
+  consumesKinds: ["aws.rds.instance", "aws.securitygroup", ...COMPUTE_KINDS],
+  consumesSignalKinds: ["aws.sg.rules"],
   evaluate(input: InferenceInput): RuleOutput {
     const rds = input.nodesByKind.get("aws.rds.instance") ?? [];
     if (rds.length === 0) return { nodes: [], edges: [] };

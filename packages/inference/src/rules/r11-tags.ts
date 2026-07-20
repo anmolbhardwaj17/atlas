@@ -64,6 +64,8 @@ export function repoSegment(raw: string): string {
 export const tagCodeCorrelationRule: Rule = {
   key: "tag_code_correlation",
   version: 1,
+  consumesKinds: ["bitbucket.repository", "github.repository", ...TARGET_KINDS],
+  consumesSignalKinds: [],
   evaluate(input: InferenceInput): RuleOutput {
     const repos = [
       ...(input.nodesByKind.get("bitbucket.repository") ?? []),

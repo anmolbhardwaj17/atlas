@@ -83,6 +83,8 @@ function envByLambda(input: InferenceInput): Map<string, Record<string, string>>
 export const lambdaCommitProvenanceRule: Rule = {
   key: "lambda_commit_provenance",
   version: 1,
+  consumesKinds: ["bitbucket.repository", "github.repository", "aws.lambda.function", ...PR_KINDS],
+  consumesSignalKinds: ["aws.lambda.env"],
   evaluate(input: InferenceInput): RuleOutput {
     const repos = [
       ...(input.nodesByKind.get("bitbucket.repository") ?? []),

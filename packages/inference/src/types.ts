@@ -81,6 +81,19 @@ export interface RuleOutput {
 export interface Rule {
   readonly key: string;
   readonly version: number;
+  /**
+   * The node kinds this rule reads via `input.nodesByKind.get(kind)` (C2). The engine loads full
+   * `attributes` only for the union of every registered rule's `consumesKinds` and blanks the rest,
+   * to bound inference memory on large tenants. MUST list every kind the rule passes to
+   * `nodesByKind.get` (endpoint resolution via `nodesByUrn` needs no declaration — those nodes are
+   * always loaded). Over-declaring is safe (loads a little extra); under-declaring would blank an
+   * attribute the rule reads → the `consumption-contract` test fails rather than dropping edges.
+   * Declare from the rule's own const arrays so it can't drift. `[]` if the rule reads no attributes.
+   */
+  readonly consumesKinds: readonly string[];
+  /** The signal kinds this rule reads via `input.signalsByKind.get(kind)` (C2). Same contract as
+   *  {@link consumesKinds}: the engine loads only these signals; the contract test enforces it. */
+  readonly consumesSignalKinds: readonly string[];
   /** Pure: current graph state → derived nodes + candidate edges. */
   evaluate(input: InferenceInput): RuleOutput;
 }

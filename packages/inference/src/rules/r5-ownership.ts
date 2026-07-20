@@ -9,6 +9,8 @@ import type { InferenceInput, InferredEdge, Rule, RuleOutput } from "../types";
 export const ownershipPropagationRule: Rule = {
   key: "ownership_propagation",
   version: 1,
+  consumesKinds: [],
+  consumesSignalKinds: [],
   evaluate(input: InferenceInput): RuleOutput {
     // repo → [owner urns] from observed OWNED_BY.
     const ownersByRepo = new Map<string, string[]>();

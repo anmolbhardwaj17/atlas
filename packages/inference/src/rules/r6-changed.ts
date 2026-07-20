@@ -21,6 +21,8 @@ function repoOfPr(prUrn: string): string | null {
 export const prChangesServiceRule: Rule = {
   key: "pr_changes_service",
   version: 1,
+  consumesKinds: [],
+  consumesSignalKinds: ["github.pr.files"],
   evaluate(input: InferenceInput): RuleOutput {
     // repo → services it IMPLEMENTS (from R4 this run).
     const servicesByRepo = new Map<string, string[]>();

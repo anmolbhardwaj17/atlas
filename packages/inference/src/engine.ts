@@ -47,7 +47,13 @@ export async function runInference(
       orgId,
     ]);
 
-    const input = await buildInput(c);
+    // C2: scope the heavy JSONB load to what the registered rules actually consume. All nodes are
+    // still loaded (id/urn/kind/name) so endpoint resolution never misses one — only `attributes`
+    // (for non-consumed kinds) and non-consumed signals are dropped, bounding memory on big tenants.
+    // The `consumption-contract` test guarantees each rule declares every kind/signal it reads.
+    const consumedKinds = [...new Set(rules.flatMap((r) => r.consumesKinds))];
+    const consumedSignalKinds = [...new Set(rules.flatMap((r) => r.consumesSignalKinds))];
+    const input = await buildInput(c, consumedKinds, consumedSignalKinds);
     const ruleIdByKey = await loadRuleIds(c);
     // Preload every existing rule-produced edge once, keyed by (from,to,type,rule). In steady state
     // (IE-4) almost every candidate is already converged, so the old per-candidate existence SELECT
@@ -126,11 +132,17 @@ export async function runInference(
   });
 }
 
-async function buildInput(c: PoolClient): Promise<InferenceInput> {
+async function buildInput(
+  c: PoolClient,
+  consumedKinds: string[],
+  consumedSignalKinds: string[],
+): Promise<InferenceInput> {
   // Org slug for derived URNs — RLS scopes `organizations` to the current org.
   const orgSlug =
     (await c.query<{ slug: string }>(`SELECT slug FROM organizations LIMIT 1`)).rows[0]?.slug ?? "";
 
+  // Load every node (id/urn/kind/name — cheap, keeps endpoint resolution complete), but project the
+  // heavy `attributes` JSONB ONLY for the kinds some rule consumes (C2); others come back as `{}`.
   const nodes = (
     await c.query<{
       id: string;
@@ -138,7 +150,12 @@ async function buildInput(c: PoolClient): Promise<InferenceInput> {
       kind: string;
       name: string | null;
       attributes: Record<string, unknown>;
-    }>(`SELECT id, urn, kind, name, attributes FROM nodes WHERE status <> 'deleted'`)
+    }>(
+      `SELECT id, urn, kind, name,
+              CASE WHEN kind = ANY($1::text[]) THEN attributes ELSE '{}'::jsonb END AS attributes
+         FROM nodes WHERE status <> 'deleted'`,
+      [consumedKinds],
+    )
   ).rows;
   const nodesByUrn = new Map<string, NodeLite>();
   const nodesByKind = new Map<string, NodeLite[]>();
@@ -156,9 +173,12 @@ async function buildInput(c: PoolClient): Promise<InferenceInput> {
     else nodesByKind.set(lite.kind, [lite]);
   }
 
+  // Signals: load only the kinds some rule consumes (C2) — signal `data` (IAM policy statements, SG
+  // rules, PR file lists) is the heaviest JSONB, and no rule reads a signal kind it didn't declare.
   const signals: SignalLite[] = (
     await c.query<{ subject_urn: string; kind: string; data: Record<string, unknown> }>(
-      `SELECT subject_urn, kind, data FROM signals`,
+      `SELECT subject_urn, kind, data FROM signals WHERE kind = ANY($1::text[])`,
+      [consumedSignalKinds],
     )
   ).rows.map((s) => ({ subjectUrn: s.subject_urn, kind: s.kind, data: s.data ?? {} }));
   const signalsByKind = new Map<string, SignalLite[]>();

@@ -14,6 +14,8 @@ interface EnvData {
 export const configRefConnectsRule: Rule = {
   key: "config_ref_connects",
   version: 1,
+  consumesKinds: ["aws.rds.instance", "aws.s3.bucket", "aws.dynamodb.table"],
+  consumesSignalKinds: ["aws.lambda.env", "aws.ecs.env"],
   evaluate(input: InferenceInput): RuleOutput {
     const rds = input.nodesByKind.get("aws.rds.instance") ?? [];
     const buckets = input.nodesByKind.get("aws.s3.bucket") ?? [];

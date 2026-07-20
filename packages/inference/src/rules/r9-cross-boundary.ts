@@ -114,6 +114,12 @@ function accountOf(node: NodeLite | undefined): string | null {
 export const crossBoundaryConnectsRule: Rule = {
   key: "cross_boundary_connects",
   version: 1,
+  consumesKinds: [
+    "aws.rds.instance", "aws.elasticache.cluster", "azure.sql.database", "azure.postgres",
+    "azure.cosmosdb", "gcp.cloudsql.instance", "aws.s3.bucket", "aws.dynamodb.table",
+    "gcp.gcs.bucket", "azure.storage.account",
+  ],
+  consumesSignalKinds: COMPUTE_ENV_SIGNALS,
   evaluate(input: InferenceInput): RuleOutput {
     const signals = COMPUTE_ENV_SIGNALS.flatMap((k) => input.signalsByKind.get(k) ?? []);
     if (signals.length === 0) return { nodes: [], edges: [] };

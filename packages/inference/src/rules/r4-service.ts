@@ -17,6 +17,8 @@ function serviceKey(repoUrn: string): string | null {
 export const serviceDerivationRule: Rule = {
   key: "service_derivation",
   version: 1,
+  consumesKinds: [],
+  consumesSignalKinds: [],
   evaluate(input: InferenceInput): RuleOutput {
     const nodes: DerivedNode[] = [];
     const edges: InferredEdge[] = [];

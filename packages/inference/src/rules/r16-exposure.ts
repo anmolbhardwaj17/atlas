@@ -28,6 +28,8 @@ const COMPUTE_KINDS = new Set(["aws.ec2.instance", "aws.lambda.function", "aws.e
 export const internetExposureRule: Rule = {
   key: "internet_exposure",
   version: 1,
+  consumesKinds: ["aws.elb", ...COMPUTE_KINDS],
+  consumesSignalKinds: ["aws.sg.rules"],
   evaluate(input: InferenceInput): RuleOutput {
     const isCompute = (urn: string): boolean =>
       COMPUTE_KINDS.has(input.nodesByUrn.get(urn)?.kind ?? "");

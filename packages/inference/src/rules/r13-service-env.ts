@@ -65,6 +65,8 @@ export function serviceNameValues(
 export const serviceNameEnvRule: Rule = {
   key: "service_name_env_correlation",
   version: 1,
+  consumesKinds: ["bitbucket.repository", "github.repository", "aws.ecs.service", "aws.lambda.function", "aws.ecs.taskdef"],
+  consumesSignalKinds: ENV_SIGNAL_KINDS,
   evaluate(input: InferenceInput): RuleOutput {
     const repos = [
       ...(input.nodesByKind.get("bitbucket.repository") ?? []),

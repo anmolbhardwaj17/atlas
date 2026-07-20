@@ -40,6 +40,8 @@ const DEPLOY_SIGNAL_KINDS = [
 export const repoDeploysToRuntimeRule: Rule = {
   key: "repo_deploys_to_runtime",
   version: 2,
+  consumesKinds: ["aws.ecs.service", "aws.lambda.function"],
+  consumesSignalKinds: DEPLOY_SIGNAL_KINDS,
   evaluate(input: InferenceInput): RuleOutput {
     // Same (from,to) may be witnessed twice (name target + image chain) - keep the best tier.
     const best = new Map<string, InferredEdge>();

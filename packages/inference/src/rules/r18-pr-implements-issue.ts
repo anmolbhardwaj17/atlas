@@ -26,6 +26,8 @@ export function keysFromPr(pr: NodeLite): string[] {
 export const prImplementsIssueRule: Rule = {
   key: "pr_implements_issue",
   version: 1,
+  consumesKinds: ["jira.issue", ...PR_KINDS],
+  consumesSignalKinds: [],
   evaluate(input: InferenceInput): RuleOutput {
     const issues = input.nodesByKind.get("jira.issue") ?? [];
     if (issues.length === 0) return { nodes: [], edges: [] };

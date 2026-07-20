@@ -23,6 +23,8 @@ const arnsOf = (data: TargetGroupSignal): string[] =>
 export const albRoutesToServiceRule: Rule = {
   key: "alb_routes_to_service",
   version: 1,
+  consumesKinds: [],
+  consumesSignalKinds: ["aws.elb.targetgroups", "aws.ecs.targetgroups"],
   evaluate(input: InferenceInput): RuleOutput {
     const elbSignals = input.signalsByKind.get("aws.elb.targetgroups") ?? [];
     const svcSignals = input.signalsByKind.get("aws.ecs.targetgroups") ?? [];

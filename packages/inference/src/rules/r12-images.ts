@@ -48,6 +48,8 @@ function familyOf(node: NodeLite): string | null {
 export const imageCommitProvenanceRule: Rule = {
   key: "image_commit_provenance",
   version: 1,
+  consumesKinds: ["bitbucket.repository", "github.repository", "aws.ecs.service", "aws.ecs.taskdef", ...PR_KINDS],
+  consumesSignalKinds: [],
   evaluate(input: InferenceInput): RuleOutput {
     const repos = [
       ...(input.nodesByKind.get("bitbucket.repository") ?? []),

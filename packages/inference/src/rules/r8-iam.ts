@@ -15,6 +15,8 @@ interface PolicyStatementsData {
 export const iamAccessConnectsRule: Rule = {
   key: "iam_access_connects",
   version: 1,
+  consumesKinds: ["aws.s3.bucket", "aws.dynamodb.table", "aws.rds.instance"],
+  consumesSignalKinds: ["aws.iam.policy_statements"],
   evaluate(input: InferenceInput): RuleOutput {
     // role urn → runtimes that assume it (observed ASSUMES_ROLE: from=runtime, to=role).
     const runtimesByRole = new Map<string, string[]>();
