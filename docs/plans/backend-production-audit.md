@@ -38,10 +38,13 @@ secret exposure, or customer-cloud write (all verified). The gaps are **operatio
   interface (declared next to each rule's const arrays so they can't drift), union them in the engine,
   load lightweight-all nodes (complete endpoint resolution) + attributes/signals only for the union,
   and add a parity test asserting scoped vs. full loads produce identical edges. Its own unit of work.
-- [ ] **CX1 (connector) · AWS AssumeRole creds never refresh mid-crawl** (`connector-aws/aws/client-config.ts:16-27`
+- [x] **CX1 (connector) · AWS AssumeRole creds never refresh mid-crawl** (`connector-aws/aws/client-config.ts:16-27`
   static object, not a provider). >1h crawl → `ExpiredToken` → misclassified as `access-denied`
   (`aws/retry.ts:21-24`) → silent data loss + false "permission missing". Use a refreshing provider +
-  explicit expired-token branch.
+  explicit expired-token branch. Done: `refreshingCredentials()` (self-refreshing `AwsCredentialProvider`,
+  re-assumes ~5min before expiry, static keys never refresh, shared in-flight); `clientConfig` accepts
+  a provider (`CrawlCredentials`) and `discover()` uses one per run; `classifyAwsError` + `isAccessDenied`
+  get an explicit `ExpiredToken`→transient branch. 20 new/updated unit tests, full suite green (92).
 
 ## 🟠 High — reliability + correctness bugs
 
@@ -52,11 +55,15 @@ secret exposure, or customer-cloud write (all verified). The gaps are **operatio
 - [x] **M5 (correctness) · BullMQ retries inert** — `runStagedSync` catches per-scope errors and
   *returns* `failed` (`ingest/sync-runner.ts:169-173`, `sync-worker.ts:51-94`), so the job is marked
   completed and `attempts:3` never fires. Rethrow when `status==='failed'` (keep `partial` non-throwing).
-- [ ] **CH1 (connector) · REST clients don't retry thrown network/timeout errors** (only non-2xx) —
+- [x] **CH1 (connector) · REST clients don't retry thrown network/timeout errors** (only non-2xx) —
   github/bitbucket/jira/jenkins `client.ts`. One socket reset aborts a repo. Wrap fetch in try/catch +
-  backoff-retry (GETs are idempotent).
-- [ ] **CH2 (connector) · GitHub secondary rate-limit aborts the crawl** (`github/client.ts:113-124`) —
-  403 w/o `retry-after` and `remaining>0` isn't retried. Back off ~60s w/ jitter.
+  backoff-retry (GETs are idempotent). Done in all four clients (bounded exp backoff; a caller-initiated
+  abort is not retried).
+- [x] **CH2 (connector) · GitHub secondary rate-limit aborts the crawl** (`github/client.ts:113-124`) —
+  403 w/o `retry-after` and `remaining>0` isn't retried. Back off ~60s w/ jitter. Done: detect the
+  secondary-limit body message ("secondary rate limit"/"abuse detection") → ~60s jittered backoff; a
+  plain permission 403 stays non-retryable. Also paginated PR changed-files (was first-100-only, →
+  bounded `MAX_PR_FILES=600`) so a large PR keeps the file that links it to a service (r6/r18).
 - [x] **H4 (perf) · Dashboard reports a capped resource count** — `graph.service.ts:581` `LIMIT 5000`
   + `:961` `resources: meta.rows.length` → estate >5000 shows "5000". Use `count(*)`; push
   clouds/accounts to SQL aggregates; stop selecting `attributes`.
@@ -120,6 +127,6 @@ timeouts + honest partial-failure in multi-region collectors.
 - **Phase C — scale:** sync batching + I/O-outside-txn (C1 ✅), indexes + search (H3 ✅), pool
   right-sizing (H5 ✅) all landed + verified on real Postgres. Inference memory (C2) analyzed +
   **deferred** — needs a per-rule consumption contract to scope safely (see C2 above).
-- **Phase D — connectors:** AWS cred refresh (CX1), network-error retries (CH1), GitHub secondary-limit
-  + PR pagination (CH2).
+- **Phase D — connectors:** ✅ DONE — AWS cred refresh (CX1), network-error retries across all four
+  REST clients (CH1), GitHub secondary-limit + PR-file pagination (CH2). All green.
 - **Phase E — observability:** metrics/`/metrics`, org-tagged logs, `LOG_LEVEL`.
