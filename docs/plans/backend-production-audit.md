@@ -91,13 +91,15 @@ secret exposure, or customer-cloud write (all verified). The gaps are **operatio
   metrics + `http_requests_total`/`http_request_duration_seconds` by method+route-pattern,
   `atlas_sync_jobs_total` by outcome, `atlas_sync_queue_depth` by state) + `GET /metrics`
   (`@Public`, optional timing-safe `METRICS_TOKEN`). Recorded from the `LoggingInterceptor` + the
-  sync worker (`onJobResult` hook + `JobQueue.depth()`/BullMQ `getJobCounts`). Distributed tracing
-  (spans) still open — a bigger lift (OTel), left for when a collector exists.
-- [~] **Indexes** — `ix_nodes_urn_trgm` ✅ (0063, H3), `ix_nodes_health_state` ✅ (partial expression
-  index, migration 0064). Cache `overview()` ✅ (same TtlCache as `summary`). **Still open:** batch
-  inference/OSV writes (involved — provenance correlation); `listNodes` count only on page 1
-  (deferred — the Explore page is SSR'd per navigation and reads `page.total` on every page, so a
-  sentinel would show "-1 resources"; needs a coordinated frontend change).
+  sync worker (`onJobResult` hook + `JobQueue.depth()`/BullMQ `getJobCounts`). Distributed tracing ✅
+  — env-gated OpenTelemetry (`instrumentation.ts`): request → Fastify → pg spans over OTLP, off unless
+  `OTEL_EXPORTER_OTLP_ENDPOINT` is set (zero overhead otherwise), lights up with any collector.
+- [x] **Indexes** — `ix_nodes_urn_trgm` ✅ (0063, H3), `ix_nodes_health_state` ✅ (0064). Cache
+  `overview()` ✅. Batch inference/OSV writes ✅ — OSV enrichment now persists in 3 batched `unnest`
+  statements (+ its first integration test as a guard); the inference engine defers per-run edge
+  writes into a batched provenance + edge upsert (RETURNING correlated back for the retire pass),
+  guarded by the 146-test inference suite. `listNodes` count only on page 1 ✅ — server counts only
+  when there's no cursor; the Explore SSR page carries the page-1 total forward in the URL.
 - [x] **Sync-run enqueue not atomic** (`connection.service.ts:368-388`) → orphaned `queued` row blocks
   the connection 15 min on a Redis blip. Done: on enqueue failure the run is marked `failed` (compare-
   and-set on `status='queued'`), so the next attempt can enqueue immediately.
