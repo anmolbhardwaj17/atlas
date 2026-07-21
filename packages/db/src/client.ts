@@ -92,6 +92,17 @@ export async function withOrgScope<T>(
     throw new Error(`withOrgScope: orgId must be a UUID (got "${orgId}")`);
   }
   const client = await pool.connect();
+  // A CHECKED-OUT pooled client can still emit an async `error` — a socket ETIMEDOUT / reset to a
+  // remote DB while we hold it (between queries, or during a non-DB await in `fn`). The Pool's own
+  // `error` handler only covers IDLE clients, so WITHOUT a listener here that event is unhandled and
+  // crashes the whole process (exactly the "read ETIMEDOUT" API crash seen against the Sydney DB). Log
+  // it; any in-flight query still rejects through the catch, and the broken client is destroyed below.
+  let clientBroken = false;
+  const onClientError = (err: Error): void => {
+    clientBroken = true;
+    console.error(`[db] checked-out client error (recovered, not fatal): ${err.message}`);
+  };
+  client.on("error", onClientError);
   try {
     // BEGIN + set the tenant GUC in a SINGLE round-trip (simple protocol, multi-statement). Each DB
     // round-trip is a full network hop to Postgres, so folding these two saves one hop per scoped
@@ -105,6 +116,8 @@ export async function withOrgScope<T>(
     await client.query("ROLLBACK").catch(() => undefined);
     throw error;
   } finally {
-    client.release();
+    client.removeListener("error", onClientError);
+    // Destroy a broken client instead of returning it to the pool (a fresh one opens on next use).
+    client.release(clientBroken);
   }
 }
