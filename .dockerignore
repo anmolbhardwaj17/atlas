@@ -1,0 +1,15 @@
+# Keep the build context small + reproducible (install happens inside the image from the lockfile).
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+.git
+.github
+**/*.log
+**/coverage
+.env
+.env.*
+!.env.production.example
+apps/web
+docs
+*.md

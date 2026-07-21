@@ -1,6 +1,12 @@
-# Local development infra (docs/17 §2). Postgres for now; Redis/OpenSearch/MinIO
-# are added in their sprints (F2 / search). For hosted dev you can instead point
-# DATABASE_URL at a Supabase project (docs/17).
+# Local development infra (docs/17 §2, DD-1). Runs the stateful services in containers while
+# `pnpm dev` runs api/worker/web on the host (fast reload). For a hosted dev DB you can instead point
+# DATABASE_URL at a Supabase project and skip the `postgres` service.
+#
+#   docker compose up -d          # start Postgres + Redis
+#   pnpm dev                      # api (:4290) + worker (in-process) + web (:4291) on the host
+#
+# Redis makes the durable BullMQ queue path (docs/02 §5, audit A1) active locally when REDIS_URL is
+# set — the same driver prod uses (ElastiCache), so jobs survive restarts and drain on shutdown.
 services:
   postgres:
     image: postgres:16
@@ -14,6 +20,20 @@ services:
       - atlas_pg:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d atlas"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7
+    # No persistence needed (Redis is ephemeral for us, docs/17 DD-5); bounded memory so a runaway
+    # local queue can't eat the laptop. Prod uses ElastiCache (HA). noeviction so jobs are never
+    # dropped under pressure — the queue backs up (visible via atlas_sync_queue_depth) instead.
+    command: ["redis-server", "--save", "", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10
