@@ -9,6 +9,7 @@ import { NodeConnections } from "@/components/explore/node-connections";
 import { NodeRisks } from "@/components/explore/node-risks";
 import { IntentCoverage } from "@/components/explore/intent-coverage";
 import { CopyButton } from "@/components/explore/copy-button";
+import { ChangeTimeline } from "@/components/explore/change-timeline";
 import { kindIcon, kindStyle, KIND_LOGO } from "@/lib/kind-visual";
 import { PROVIDER_META } from "@/lib/taxonomy";
 import { keyFacts, cloudwatchLink } from "@/lib/node-facts";
@@ -232,45 +233,10 @@ export function NodeDetailView({
               <CardTitle>Timeline</CardTitle>
             </CardHeader>
             <CardBody>
-              {/* What changed, when, by whom (Phase C): CloudTrail config changes, health
-                transitions, deploys, merged PRs - newest first, the incident-story view. Rendered
-                as a vertical timeline — dots threaded on a rail — so the sequence reads at a glance. */}
-              <ol className="relative">
-                {events.slice(0, 12).map((e, i, arr) => {
-                  const dot =
-                    e.kind === "health_transition"
-                      ? "bg-danger"
-                      : e.kind === "config_change"
-                        ? "bg-warning"
-                        : "bg-muted-foreground";
-                  const last = i === arr.length - 1;
-                  return (
-                    <li key={e.id} className="relative flex gap-3 pb-5 last:pb-0">
-                      {/* the rail connecting this dot to the next (ring-card on dots masks overlap) */}
-                      {!last ? (
-                        <span
-                          aria-hidden
-                          className="absolute left-[5px] top-4 h-full w-px bg-border"
-                        />
-                      ) : null}
-                      <span
-                        className={cn(
-                          "relative z-10 mt-1 size-2.5 shrink-0 rounded-full ring-4 ring-card",
-                          dot,
-                        )}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm" title={e.title}>
-                          {e.title}
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {new Date(e.occurredAt).toLocaleString()} · {e.source}
-                        </p>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ol>
+              {/* What changed, when, by whom (Phase C): deploys · PR merges (incl. those from repos
+                that deploy here) · config changes · health transitions — one cited, kind-filterable
+                feed, newest first. See change-timeline.tsx. */}
+              <ChangeTimeline events={events} />
             </CardBody>
           </Card>
         ) : null}

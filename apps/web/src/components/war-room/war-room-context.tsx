@@ -1,19 +1,10 @@
 import * as React from "react";
-import {
-  Activity,
-  Rocket,
-  SlidersHorizontal,
-  GitMerge,
-  Bell,
-  Circle,
-  Waypoints,
-  Clock,
-  MapPin,
-} from "lucide-react";
+import { Activity, Circle, Waypoints, Clock, MapPin } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { MapNode } from "@/lib/map-types";
 import { timeAgo } from "@/lib/format";
 import { kindShort } from "@/lib/kind-visual";
+import { EVENT_COLOR, EVENT_ICON, eventVerb } from "@/lib/event-taxonomy";
 
 export interface NodeEvent {
   id: string;
@@ -85,27 +76,6 @@ export function ContextBar({
         </div>
       ))}
     </div>
-  );
-}
-
-const EVENT_ICON: Record<string, LucideIcon> = {
-  deploy: Rocket,
-  config_change: SlidersHorizontal,
-  pr_merged: GitMerge,
-  health_transition: Activity,
-  alarm_transition: Bell,
-};
-const EVENT_COLOR: Record<string, string> = {
-  deploy: "text-foreground",
-  config_change: "text-warning",
-  pr_merged: "text-muted-foreground",
-  health_transition: "text-danger",
-  alarm_transition: "text-danger",
-};
-function eventVerb(kind: string): string {
-  return (
-    { deploy: "Deployed", config_change: "Config changed", pr_merged: "PR merged" }[kind] ??
-    "Changed"
   );
 }
 
