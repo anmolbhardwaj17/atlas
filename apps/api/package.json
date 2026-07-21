@@ -6,6 +6,7 @@
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc -p tsconfig.build.json && (tsc -p tsconfig.build.json --watch --preserveWatchOutput --incremental & node --watch dist/main.js)",
     "start": "node dist/main.js",
+    "start:worker": "node dist/worker.js",
     "sync": "tsx scripts/sync.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
