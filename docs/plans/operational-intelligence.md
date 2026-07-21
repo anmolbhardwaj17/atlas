@@ -103,6 +103,13 @@ New read-only collectors, same crawl pattern as I1.3 modules:
 
 **Exit:** a node's detail view shows a unified, cited timeline: *deployed 13:58 · SG changed 14:02 · alarm fired 14:05*.
 
+**DELIVERED (2026-07-22).** `node_events` (0024) + writers (CloudTrail `config_change`, health-poll `health_transition`, derived Lambda/ECS `deploy`) and the `GET /nodes/:id/events` feed were built at A–D. This pass closed the *unified* + *cited* + *filterable* gaps:
+- **Cross-node unification (the north-star join):** a service/Lambda's timeline now also surfaces the merged PRs of every repo that `DEPLOYS_TO` it, cited with the deploying repo + `via: 'DEPLOYS_TO'` in evidence (P4). So a runtime node reads *PR merged → deployed → alarm* on one node — previously PR merges only appeared on the *repository* node, so "service broke → which PR" was broken. (`graph.service.ts nodeEvents`.)
+- **Provider-agnostic PR matching:** the derivation matched only `%.pullrequest` (bitbucket), silently dropping every GitHub PR (`.pull_request`). Now matches both.
+- **Filter + bound:** `GET /nodes/:id/events?kind=deploy,pr_merged&limit=N` (`NodeEventsQuerySchema`); UI filters client-side over the fetched feed.
+- **One cited renderer:** `ChangeTimeline` (Explore) with the full kind taxonomy (icons/colors from the shared `lib/event-taxonomy.ts`), per-event citation links (PR node + "via deploy"), kind-filter chips, show-more. War Room's timeline now shares that taxonomy (single source of truth). Regression-tested (`graph.service.test.ts`, real PG).
+- **Deferred:** `alarm_transition` ingestion (enum/UI ready, no writer — `health_transition` already carries the "broke" signal; individual CloudWatch-alarm history is a separate build). CloudTrail `config_change` still needs the pending `cloudtrail:LookupEvents` grant to populate live.
+
 ### Phase D — AI incident tracing *(needs B + C; A multiplies its value)*
 
 New tools in the existing agentic retrieval loop (KE-P1 — the loop, grounding gate, and citation binding are already built and evaluated):

@@ -226,6 +226,86 @@ suite("G2.1 GraphService", () => {
     expect(clamped.warnings.some((w) => /depth clamped/.test(w))).toBe(true);
   });
 
+  it("nodeEvents unifies a service's own events with the deploying repo's PR merges (cited), and filters by kind", async () => {
+    // repo --DEPLOYS_TO--> lambda, and the repo CONTAINS a merged PR.
+    const REPO = "github:acme/checkout-svc";
+    const repoId = await insertNode(orgId, connId, REPO, "github.repository", null, "checkout-svc");
+    const ruleId = one(
+      (
+        await admin.query<{ id: string }>(
+          "SELECT id FROM inference_rules WHERE key='repo_deploys_to_runtime' AND version=1",
+        )
+      ).rows,
+    ).id;
+    const prov = one(
+      (
+        await admin.query<{ id: string }>(
+          "INSERT INTO provenance (org_id, source, confidence, inference_rule_id) VALUES ($1,'rule:repo_deploys_to_runtime','inferred-high',$2) RETURNING id",
+          [orgId, ruleId],
+        )
+      ).rows,
+    ).id;
+    await admin.query(
+      `INSERT INTO edges (org_id, from_node_id, to_node_id, type, origin, confidence, provenance_id, inference_rule_id)
+       VALUES ($1,$2,$3,'DEPLOYS_TO','inferred','inferred-high',$4,$5)`,
+      [orgId, repoId, lambdaId, prov, ruleId],
+    );
+    const prId = await insertNode(
+      orgId,
+      connId,
+      "github:acme/checkout-svc/pr/42",
+      "github.pull_request",
+      null,
+      "Fix connection pool leak",
+    );
+    await admin.query(
+      "UPDATE nodes SET attributes = jsonb_build_object('state','MERGED','updatedOn','2026-07-19T13:50:00Z') WHERE id=$1",
+      [prId],
+    );
+    const containsProv = one(
+      (
+        await admin.query<{ id: string }>(
+          "INSERT INTO provenance (org_id, source, confidence) VALUES ($1,'edge','observed') RETURNING id",
+          [orgId],
+        )
+      ).rows,
+    ).id;
+    await admin.query(
+      `INSERT INTO edges (org_id, from_node_id, to_node_id, type, origin, confidence, provenance_id)
+       VALUES ($1,$2,$3,'CONTAINS','observed','observed',$4)`,
+      [orgId, repoId, prId, containsProv],
+    );
+    // A persisted deploy + health transition on the lambda itself.
+    await admin.query(
+      `INSERT INTO node_events (org_id, node_id, kind, occurred_at, actor, title, source, dedupe_key)
+       VALUES ($1,$2,'deploy','2026-07-19T13:58:00Z',null,'Deployed checkout','aws-lambda',$3),
+              ($1,$2,'health_transition','2026-07-19T14:05:00Z',null,'checkout → unhealthy','health-poll',$4)`,
+      [orgId, lambdaId, `deploy:${LAMBDA}:1`, `health:${LAMBDA}:1`],
+    );
+
+    // The lambda's timeline now tells the whole story: PR merged (via the deploying repo) →
+    // deployed → alarm — even though the PR lives on the repo node.
+    const events = await graph.nodeEvents(orgId, lambdaId);
+    const byKind = new Map(events.map((e) => [e.kind, e]));
+    expect(events.map((e) => e.kind)).toEqual(["health_transition", "deploy", "pr_merged"]); // newest-first
+    const pr = byKind.get("pr_merged");
+    expect(pr?.title).toContain("in checkout-svc");
+    expect(pr?.evidence).toMatchObject({ prNodeId: prId, viaRepoId: repoId, via: "DEPLOYS_TO" });
+
+    // On the repo node itself the same PR shows without the cross-node "via" citation.
+    const repoEvents = await graph.nodeEvents(orgId, repoId);
+    const repoPr = repoEvents.find((e) => e.kind === "pr_merged");
+    expect(repoPr?.evidence).toEqual({ prNodeId: prId });
+    expect(repoPr?.title).not.toContain(" in ");
+
+    // kind filter drops the persisted kinds and keeps only the derived PR merges.
+    const onlyPrs = await graph.nodeEvents(orgId, lambdaId, { kinds: ["pr_merged"] });
+    expect(onlyPrs.map((e) => e.kind)).toEqual(["pr_merged"]);
+
+    // R8: another org sees nothing (and 404s on the node).
+    await expect(graph.nodeEvents(otherOrgId, lambdaId)).rejects.toBeInstanceOf(ApiException);
+  });
+
   it("getEdge returns endpoints + evidence/provenance; 404 on missing", async () => {
     const eid = one(
       (await admin.query<{ id: string }>("SELECT id FROM edges WHERE org_id=$1", [orgId])).rows,

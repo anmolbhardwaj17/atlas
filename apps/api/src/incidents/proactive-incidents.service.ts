@@ -140,7 +140,7 @@ export class ProactiveIncidentsService {
     if (depIds.length && (await this.anyOpenIncident(orgId, depIds))) return false;
 
     const [events, depHealth] = await Promise.all([
-      this.graph.nodeEvents(orgId, change.nodeId, 20).catch(() => []),
+      this.graph.nodeEvents(orgId, change.nodeId, { limit: 20 }).catch(() => []),
       this.depHealth(orgId, depIds),
     ]);
     const unhealthyDeps = depHealth.filter(

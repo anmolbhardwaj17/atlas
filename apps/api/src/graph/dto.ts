@@ -100,6 +100,22 @@ export const EdgesQuerySchema = z
   .strict();
 export type EdgesQuery = z.infer<typeof EdgesQuerySchema>;
 
+/** Change-timeline query (operational-intelligence Phase C). `kind` filters the unified feed to a
+ *  subset of event kinds (multi-value); `limit` bounds it. Kinds mirror the node_events CHECK. */
+export const NodeEventsQuerySchema = z
+  .object({
+    kind: csvFacet([
+      "deploy",
+      "config_change",
+      "pr_merged",
+      "alarm_transition",
+      "health_transition",
+    ]),
+    limit: z.coerce.number().int().min(1).max(200).default(50),
+  })
+  .strict();
+export type NodeEventsQuery = z.infer<typeof NodeEventsQuerySchema>;
+
 export const NeighborsQuerySchema = z
   .object({ nodeBudget: z.coerce.number().int().min(1).max(500).default(100) })
   .strict();

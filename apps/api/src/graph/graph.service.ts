@@ -1480,15 +1480,26 @@ export class GraphService {
   }
 
   /**
-   * Change timeline for one node (operational-intelligence Phase C): persisted
-   * node_events (CloudTrail config changes, health transitions, deploys) UNION derived
-   * pr_merged entries for repositories (merged PRs are already graph nodes - no backfill
-   * table needed for history the graph itself proves). Newest first. 404 via loadNode.
+   * Change timeline for one node (operational-intelligence Phase C): the durable "what changed,
+   * when, by whom" behind every root-cause story. Merges three sources into one cited, newest-first
+   * feed and 404s via loadNode:
+   *
+   *  1. Persisted `node_events` on this node — CloudTrail `config_change`, `health_transition`,
+   *     and derived `deploy` events (see packages/ingest).
+   *  2. This node's own `pr_merged` history, IF it's a repository (merged PRs are already graph
+   *     nodes — no backfill table needed for history the graph itself proves).
+   *  3. **Cross-node unification (the north-star join):** the merged PRs of every repository that
+   *     `DEPLOYS_TO` this node. This is what puts *code changes on infra timelines* — so a service
+   *     or Lambda's timeline reads "PR merged → deployed → alarm fired" on one node, not just the
+   *     deploy in isolation. Each such PR is cited with the deploying repo + `via: 'DEPLOYS_TO'`
+   *     in its evidence (P4), so the link back to the graph is never un-sourced.
+   *
+   * `kinds` (optional) filters to a subset of event kinds; `limit` bounds the feed (1–200).
    */
   async nodeEvents(
     orgId: string,
     id: string,
-    limit = 50,
+    opts: { limit?: number | undefined; kinds?: string[] | undefined } = {},
   ): Promise<
     Array<{
       id: string;
@@ -1500,8 +1511,21 @@ export class GraphService {
       evidence: Record<string, unknown>;
     }>
   > {
+    const limit = Math.min(Math.max(Math.trunc(opts.limit ?? 50), 1), 200);
+    const kinds = opts.kinds && opts.kinds.length > 0 ? opts.kinds : null;
+    const wants = (k: string): boolean => !kinds || kinds.includes(k);
+
     return withOrgScope(this.db, orgId, async (c) => {
       const node = await this.loadNode(c, id);
+
+      // 1. Persisted events on this node (kind-filtered in SQL so LIMIT counts the right rows).
+      const params: unknown[] = [id];
+      let kindClause = "";
+      if (kinds) {
+        params.push(kinds);
+        kindClause = ` AND kind = ANY($${params.length})`;
+      }
+      params.push(limit);
       const { rows } = await c.query<{
         id: string;
         kind: string;
@@ -1512,9 +1536,9 @@ export class GraphService {
         evidence: Record<string, unknown>;
       }>(
         `SELECT id, kind, occurred_at, actor, title, source, evidence
-           FROM node_events WHERE node_id = $1
-          ORDER BY occurred_at DESC LIMIT $2`,
-        [id, limit],
+           FROM node_events WHERE node_id = $1${kindClause}
+          ORDER BY occurred_at DESC LIMIT $${params.length}`,
+        params,
       );
       const events = rows.map((r) => ({
         id: r.id,
@@ -1526,40 +1550,67 @@ export class GraphService {
         evidence: r.evidence,
       }));
 
-      if (node.kind.endsWith(".repository")) {
-        const prs = await c.query<{
-          id: string;
-          name: string | null;
-          author: string | null;
-          merged_on: string | null;
-        }>(
-          `SELECT p.id, p.name,
-                  (SELECT nu.name FROM edges eo
-                     JOIN nodes nu ON nu.id = eo.to_node_id
-                    WHERE eo.from_node_id = p.id AND eo.type = 'OWNED_BY' LIMIT 1) AS author,
-                  p.attributes->>'updatedOn' AS merged_on
-             FROM edges e JOIN nodes p ON p.id = e.to_node_id
-            WHERE e.from_node_id = $1 AND e.type = 'CONTAINS'
-              AND p.kind LIKE '%.pullrequest'
-              AND p.attributes->>'state' = 'MERGED'
-            ORDER BY p.attributes->>'updatedOn' DESC NULLS LAST
-            LIMIT $2`,
-          [id, limit],
+      // 2 + 3. Derived pr_merged — this node (if a repo) plus every repo that DEPLOYS_TO it.
+      if (wants("pr_merged")) {
+        // repoId -> how this node relates to it: 'self' (this IS the repo) or 'deploy' (it deploys here).
+        const repoCtx = new Map<string, { name: string | null; via: "self" | "deploy" }>();
+        if (node.kind.endsWith(".repository")) repoCtx.set(id, { name: node.name, via: "self" });
+        const deployers = await c.query<{ id: string; name: string | null }>(
+          `SELECT r.id, r.name
+             FROM edges e JOIN nodes r ON r.id = e.from_node_id
+            WHERE e.to_node_id = $1 AND e.type = 'DEPLOYS_TO'
+              AND r.kind LIKE '%.repository' AND r.status <> 'deleted'`,
+          [id],
         );
-        for (const pr of prs.rows) {
-          if (!pr.merged_on) continue;
-          events.push({
-            id: pr.id,
-            kind: "pr_merged",
-            occurredAt: pr.merged_on,
-            actor: pr.author,
-            title: `PR merged: ${pr.name ?? pr.id}${pr.author ? ` (by ${pr.author})` : ""}`,
-            source: "graph",
-            evidence: { prNodeId: pr.id },
-          });
+        for (const r of deployers.rows) {
+          if (!repoCtx.has(r.id)) repoCtx.set(r.id, { name: r.name, via: "deploy" });
         }
-        events.sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1));
+        if (repoCtx.size > 0) {
+          const repoIds = [...repoCtx.keys()];
+          const prs = await c.query<{
+            repo_id: string;
+            id: string;
+            name: string | null;
+            author: string | null;
+            merged_on: string | null;
+          }>(
+            `SELECT e.from_node_id AS repo_id, p.id, p.name,
+                    (SELECT nu.name FROM edges eo
+                       JOIN nodes nu ON nu.id = eo.to_node_id
+                      WHERE eo.from_node_id = p.id AND eo.type = 'OWNED_BY' LIMIT 1) AS author,
+                    p.attributes->>'updatedOn' AS merged_on
+               FROM edges e JOIN nodes p ON p.id = e.to_node_id
+              WHERE e.from_node_id = ANY($1::uuid[]) AND e.type = 'CONTAINS'
+                -- provider-agnostic: github uses .pull_request, bitbucket .pullrequest
+                AND (p.kind LIKE '%.pull_request' OR p.kind LIKE '%.pullrequest')
+                AND p.attributes->>'state' = 'MERGED'
+              ORDER BY p.attributes->>'updatedOn' DESC NULLS LAST
+              LIMIT $2`,
+            [repoIds, limit],
+          );
+          for (const pr of prs.rows) {
+            if (!pr.merged_on) continue;
+            const ctx = repoCtx.get(pr.repo_id);
+            const viaDeploy = ctx?.via === "deploy";
+            const inRepo = viaDeploy ? ` in ${ctx?.name ?? "a deploying repo"}` : "";
+            events.push({
+              id: pr.id,
+              kind: "pr_merged",
+              occurredAt: pr.merged_on,
+              actor: pr.author,
+              title: `PR merged${inRepo}: ${pr.name ?? pr.id}${pr.author ? ` (by ${pr.author})` : ""}`,
+              source: "graph",
+              // P4: cite the repo + the DEPLOYS_TO join for the cross-node case, so a PR shown on a
+              // service's timeline is traceable back to why it belongs there.
+              evidence: viaDeploy
+                ? { prNodeId: pr.id, viaRepoId: pr.repo_id, via: "DEPLOYS_TO" }
+                : { prNodeId: pr.id },
+            });
+          }
+        }
       }
+
+      events.sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1));
       return events.slice(0, limit);
     });
   }

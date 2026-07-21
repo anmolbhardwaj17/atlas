@@ -110,7 +110,9 @@ export class GraphRetrievalPort implements RetrievalPort {
   /** Change timeline for one node (Phase C; includes derived PR merges for repos). */
   async nodeEvents(orgId: string, nodeId: string, limit: number): Promise<NodeEventFact[]> {
     try {
-      const events = await this.graph.nodeEvents(orgId, nodeId, Math.min(Math.max(limit, 1), 50));
+      const events = await this.graph.nodeEvents(orgId, nodeId, {
+        limit: Math.min(Math.max(limit, 1), 50),
+      });
       return events.map((e) => ({
         id: e.id,
         kind: e.kind,

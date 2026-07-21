@@ -16,6 +16,7 @@ import {
   EdgesQuerySchema,
   GraphQuerySchema,
   NeighborsQuerySchema,
+  NodeEventsQuerySchema,
   NodeListQuerySchema,
   TimelineQuerySchema,
   TraversalQuerySchema,
@@ -224,8 +225,13 @@ export class GraphController {
 
   @Get("nodes/:id/events")
   @Roles("Member")
-  async nodeEvents(@Req() req: AuthedRequest, @Param("id") id: string): Promise<unknown> {
-    return this.graph.nodeEvents(org(req).id, id);
+  async nodeEvents(
+    @Req() req: AuthedRequest,
+    @Param("id") id: string,
+    @Query() query: unknown,
+  ): Promise<unknown> {
+    const { kind, limit } = parseBody(NodeEventsQuerySchema, query);
+    return this.graph.nodeEvents(org(req).id, id, { kinds: kind, limit });
   }
 
   @Get("nodes/:id/findings")
