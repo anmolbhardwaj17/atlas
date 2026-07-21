@@ -65,6 +65,7 @@ import { CloudIcon } from "@/components/cloud-icon";
 import { AtlasAiMark } from "@/components/brand";
 import { ResourceNode, EnvLaneNode } from "@/components/map/resource-node";
 import { ConnectNodeDialog } from "@/components/map/connect-node-dialog";
+import { SuggestedLinksReview } from "@/components/map/suggested-links-review";
 import { ConfidenceBadge, FreshnessTag } from "@/components/certainty";
 import { cn } from "@/lib/cn";
 
@@ -434,6 +435,10 @@ export function InfraMap({
             <RotateCw className={cn("size-3.5", isRefreshing && "animate-spin")} />
             {isRefreshing ? "Refreshing…" : "Refresh"}
           </button>
+          <SuggestedLinksReview
+            orgId={orgId}
+            onChange={() => startRefresh(() => router.refresh())}
+          />
           {cross.crossCloud + cross.crossAccount > 0 && (
             <span
               className="flex items-center gap-1.5 rounded-full border border-transparent px-2.5 py-1 font-medium"

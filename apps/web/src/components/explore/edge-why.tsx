@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { getEdgeDetail, confirmSuggestedEdge, rejectSuggestedEdge } from "@/lib/browser-api";
 import type { EdgeDetail } from "@/lib/graph-types";
 import { AI_SUGGESTED_COLOR } from "@/lib/map-types";
+import { SuggestionConfidence } from "@/components/map/suggested-links-review";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 
@@ -105,10 +106,19 @@ export function EdgeWhy({
                     background: `${AI_SUGGESTED_COLOR}0f`,
                   }}
                 >
-                  <p className="flex items-center gap-1.5 font-medium text-foreground">
-                    <Sparkles className="size-3.5" style={{ color: AI_SUGGESTED_COLOR }} /> Atlas
-                    suggests this link
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="flex items-center gap-1.5 font-medium text-foreground">
+                      <Sparkles className="size-3.5" style={{ color: AI_SUGGESTED_COLOR }} /> Atlas
+                      suggests this link
+                    </p>
+                    <SuggestionConfidence
+                      level={
+                        typeof detail.evidence?.modelConfidence === "string"
+                          ? detail.evidence.modelConfidence
+                          : null
+                      }
+                    />
+                  </div>
                   {typeof detail.evidence?.reasoning === "string" ? (
                     <p className="mt-1 text-muted-foreground">{detail.evidence.reasoning}</p>
                   ) : null}
