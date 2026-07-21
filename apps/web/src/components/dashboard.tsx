@@ -29,6 +29,7 @@ import { Onboarding } from "@/components/onboarding";
 import { AskLauncher } from "@/components/dashboard/ask-launcher";
 import { RefreshLatest } from "@/components/dashboard/refresh-latest";
 import { SampleDataBanner } from "@/components/dashboard/sample-data-banner";
+import { SuggestedLinksNudge } from "@/components/map/suggested-links-nudge";
 import { ContributorsDonut } from "@/components/dashboard/contributors-donut";
 import { FindingsDonut } from "@/components/dashboard/findings-donut";
 import { CountUp } from "@/components/dashboard/count-up";
@@ -239,7 +240,7 @@ export async function Dashboard({
 
       <RecentActivity activity={s.activity} />
 
-      <MapPreview inv={inv} cross={s.crossBoundary} />
+      <MapPreview inv={inv} cross={s.crossBoundary} orgId={orgId} />
     </div>
   );
 }
@@ -548,9 +549,11 @@ function activityLogo(kind: string): string | null {
 function MapPreview({
   inv,
   cross,
+  orgId,
 }: {
   inv: Summary["inventory"];
   cross: Summary["crossBoundary"];
+  orgId: string;
 }) {
   const crossTotal = cross.crossCloud + cross.crossAccount;
   return (
@@ -570,12 +573,15 @@ function MapPreview({
             </div>
           </div>
         </div>
-        <Link
-          href="/map"
-          className="inline-flex items-center gap-1.5 rounded-md border border-border px-3.5 py-2 text-sm font-medium hover:border-foreground/40"
-        >
-          Open map <ArrowRight className="size-4" />
-        </Link>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <SuggestedLinksNudge orgId={orgId} />
+          <Link
+            href="/map"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3.5 py-2 text-sm font-medium hover:border-foreground/40"
+          >
+            Open map <ArrowRight className="size-4" />
+          </Link>
+        </div>
       </CardContent>
     </Card>
   );
