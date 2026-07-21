@@ -60,6 +60,19 @@ export function SuggestedLinksReview({
   const [loading, setLoading] = React.useState(false);
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [finding, setFinding] = React.useState(false);
+  const [selected, setSelected] = React.useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = React.useState(false);
+
+  const allSelected = Boolean(items && items.length > 0 && items.every((s) => selected.has(s.id)));
+  const toggleOne = (id: string): void =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const toggleAll = (): void =>
+    setSelected(allSelected ? new Set() : new Set((items ?? []).map((s) => s.id)));
 
   // Advertise the pending count on the button without opening the panel.
   React.useEffect(() => {
@@ -97,6 +110,11 @@ export function SuggestedLinksReview({
       if (action === "confirm") await confirmSuggestedEdge(orgId, id);
       else await rejectSuggestedEdge(orgId, id);
       setItems((prev) => (prev ?? []).filter((x) => x.id !== id));
+      setSelected((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       setCount((c) => Math.max(0, (c ?? 1) - 1));
       toast.success(action === "confirm" ? "Link confirmed" : "Suggestion dismissed");
       onChange?.();
@@ -106,6 +124,32 @@ export function SuggestedLinksReview({
       });
     } finally {
       setBusyId(null);
+    }
+  }
+
+  /** Confirm/reject every selected suggestion at once (honest partial-failure, like Insights bulk-mute). */
+  async function bulkResolve(action: "confirm" | "reject"): Promise<void> {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) =>
+          action === "confirm" ? confirmSuggestedEdge(orgId, id) : rejectSuggestedEdge(orgId, id),
+        ),
+      );
+      const okIds = new Set(ids.filter((_, i) => results[i]?.status === "fulfilled"));
+      const failed = results.length - okIds.size;
+      setItems((prev) => (prev ?? []).filter((x) => !okIds.has(x.id)));
+      setSelected(new Set());
+      setCount((c) => Math.max(0, (c ?? okIds.size) - okIds.size));
+      if (okIds.size > 0) {
+        toast.success(action === "confirm" ? `Confirmed ${okIds.size}` : `Dismissed ${okIds.size}`);
+        onChange?.();
+      }
+      if (failed > 0) toast.error(`${failed} of ${ids.length} didn't update — try again.`);
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -167,15 +211,67 @@ export function SuggestedLinksReview({
               <Loader2 className="size-3.5 animate-spin" /> Loading suggestions…
             </p>
           ) : items && items.length > 0 ? (
-            <ul className="space-y-1.5">
-              {items.map((s) => (
-                <li key={s.id} className="rounded-md border border-border bg-card/60 p-2.5">
-                  <div className="flex items-center gap-1.5 text-xs font-medium">
-                    <span className="min-w-0 truncate">{s.from.name ?? kindLabel(s.from.kind)}</span>
-                    <ArrowRight className="size-3 shrink-0 text-muted-foreground" />
-                    <span className="min-w-0 truncate">{s.to.name ?? kindLabel(s.to.kind)}</span>
+            <>
+              {/* Select-all + bulk bar — review many at once (honest partial-failure, like Insights). */}
+              <div className="mb-1.5 flex items-center justify-between gap-2 px-1 pb-1.5">
+                <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    className="size-3.5 accent-[var(--primary)]"
+                    checked={allSelected}
+                    onChange={toggleAll}
+                    aria-label="Select all suggestions"
+                  />
+                  {selected.size > 0 ? `${selected.size} selected` : "Select all"}
+                </label>
+                {selected.size > 0 ? (
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => void bulkResolve("confirm")}
+                      disabled={bulkBusy}
+                      className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-[11px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+                    >
+                      {bulkBusy ? (
+                        <Loader2 className="size-3 animate-spin" />
+                      ) : (
+                        <Check className="size-3" />
+                      )}
+                      Confirm {selected.size}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void bulkResolve("reject")}
+                      disabled={bulkBusy}
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
+                    >
+                      <X className="size-3" /> Reject {selected.size}
+                    </button>
                   </div>
-                  <div className="mt-1 flex items-center gap-2">
+                ) : null}
+              </div>
+              <ul className="space-y-1.5">
+                {items.map((s) => (
+                  <li
+                    key={s.id}
+                    className="flex gap-2 rounded-md border border-border bg-card/60 p-2.5"
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 size-3.5 shrink-0 accent-[var(--primary)]"
+                      checked={selected.has(s.id)}
+                      onChange={() => toggleOne(s.id)}
+                      aria-label={`Select ${s.from.name ?? "suggestion"}`}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 text-xs font-medium">
+                        <span className="min-w-0 truncate">
+                          {s.from.name ?? kindLabel(s.from.kind)}
+                        </span>
+                        <ArrowRight className="size-3 shrink-0 text-muted-foreground" />
+                        <span className="min-w-0 truncate">{s.to.name ?? kindLabel(s.to.kind)}</span>
+                      </div>
+                      <div className="mt-1 flex items-center gap-2">
                     <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
                       {kindLabel(s.from.kind)} → {kindLabel(s.to.kind)}
                     </span>
@@ -204,12 +300,14 @@ export function SuggestedLinksReview({
                       disabled={busyId === s.id}
                       className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
                     >
-                      <X className="size-3" /> Reject
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                        <X className="size-3" /> Reject
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
           ) : (
             <div className="p-2 text-xs text-muted-foreground">
               <p className="flex items-center gap-1.5">
