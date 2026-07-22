@@ -271,6 +271,24 @@ export const CONTROLS: Control[] = [
     },
   },
   {
+    id: "data.no-public-database",
+    title: "No publicly-accessible database",
+    requirement:
+      "No RDS database is marked Publicly Accessible — databases are reachable only from inside the VPC, never directly from the internet.",
+    domain: "data-protection",
+    assessKey: "publicDatabase",
+    appliesTo: ["aws.rds.instance"],
+    findingId: "rds-public",
+    mappings: {
+      pci: ["1.3.1", "1.3.6"],
+      cis: ["RDS.2"],
+      nist: ["AC-3", "SC-7"],
+      iso: ["A.13.1.3"],
+      hipaa: ["§164.312(a)(1)"],
+      gdpr: ["Art.32(1)(b)"],
+    },
+  },
+  {
     id: "logging.audit-trail",
     title: "Audit logging enabled",
     requirement:
@@ -342,6 +360,7 @@ const CONTROL_SEVERITY: Record<string, ControlSeverity> = {
   "crypto.at-rest": "high",
   "crypto.in-transit": "high",
   "data.no-public-storage": "high",
+  "data.no-public-database": "high",
   "logging.audit-trail": "medium",
   "access.mfa-privileged": "high",
 };

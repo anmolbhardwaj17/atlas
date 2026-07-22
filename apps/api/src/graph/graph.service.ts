@@ -656,6 +656,7 @@ export class GraphService {
           publicBuckets,
           unencryptedData,
           noCloudTrail,
+          publicRds,
         ] = await Promise.all([
           c.query<{
             id: string;
@@ -802,6 +803,15 @@ export class GraphService {
               WHERE kind = 'aws.account' AND deleted_at IS NULL AND status <> 'deleted'
                 AND attributes->>'cloudTrailEnabled' = 'false'`,
           ),
+          // Publicly-accessible RDS databases (Phase E posture): PubliclyAccessible=true gives the DB a
+          // public endpoint reachable from the internet — a DISTINCT exposure vector from a world-open
+          // SG (which R16/EXPOSED_VIA covers) and one of the most dangerous misconfigs. Only
+          // known-true, never 'unknown' → no false-fire when the attribute wasn't crawled (pre-resync).
+          c.query<{ id: string; name: string | null }>(
+            `SELECT id, name FROM nodes
+              WHERE kind = 'aws.rds.instance' AND deleted_at IS NULL AND status <> 'deleted'
+                AND attributes->>'publiclyAccessible' = 'true'`,
+          ),
         ]);
         return {
           conns,
@@ -818,6 +828,7 @@ export class GraphService {
           publicBuckets,
           unencryptedData,
           noCloudTrail,
+          publicRds,
         };
       }),
       scope(async (c) => {
@@ -962,6 +973,7 @@ export class GraphService {
       publicBuckets,
       unencryptedData,
       noCloudTrail,
+      publicRds,
     } = grpTopology;
     const { contributors, mostActiveRepos, vulnSeverity, topVulnPkg, sprawl, exposedVulns } =
       grpPeopleVulns;
@@ -1021,6 +1033,7 @@ export class GraphService {
         publicBuckets: publicBuckets.rows,
         unencryptedData: unencryptedData.rows,
         noCloudTrail: noCloudTrail.rows,
+        publicRds: publicRds.rows,
         topContributors: contributors.rows.map((r) => ({ name: r.name ?? "unknown", count: r.n })),
         mostActiveRepos: mostActiveRepos.rows.map((r) => ({
           name: r.name ?? "unknown",
@@ -1160,6 +1173,21 @@ export class GraphService {
         href: first ? `/explore/${first.id}` : "/explore?kind=aws.s3.bucket",
         count: publicS3.length,
         evidence: publicS3.map((b) => ({ id: b.id, label: b.name ?? b.id })),
+      });
+    }
+    // Publicly-accessible RDS databases (Phase E posture) - a database endpoint on the open internet.
+    const publicRdsDbs = base.publicRds ?? [];
+    if (publicRdsDbs.length > 0) {
+      const first = publicRdsDbs[0];
+      findings.push({
+        id: "rds-public",
+        severity: "high",
+        category: "Security posture",
+        title: `${publicRdsDbs.length} database${publicRdsDbs.length > 1 ? "s are" : " is"} reachable from the public internet`,
+        detail: `${publicRdsDbs.map((d) => d.name ?? d.id).join(", ")} - the RDS instance is marked Publicly Accessible, so it has a public endpoint; set it to No and reach the DB only from inside the VPC (a bastion/VPN for admin access).`,
+        href: first ? `/explore/${first.id}` : "/explore?kind=aws.rds.instance",
+        count: publicRdsDbs.length,
+        evidence: publicRdsDbs.map((d) => ({ id: d.id, label: d.name ?? d.id })),
       });
     }
     // Datastores unencrypted at rest (Security Phase 2b).

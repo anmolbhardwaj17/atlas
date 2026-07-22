@@ -30,6 +30,7 @@ const CAPABILITIES: Record<string, Capability> = {
   iamPolicy: { supported: true, actions: [] }, // aws.iam.policy_statements (wildcard)
   vulns: { supported: true, actions: [] }, // OSV enrichment + dependency graph
   multiAz: { supported: true, actions: [] }, // RDS MultiAZ (rds:DescribeDBInstances)
+  publicDatabase: { supported: true, actions: [] }, // RDS PubliclyAccessible (same DescribeDBInstances)
   ciPipeline: { supported: true, actions: [] }, // repo/pipeline nodes
   // Phase 2b — flip `supported` to true as each crawl lands; the actions gate assessability.
   // Encryption-at-rest is assessed from RDS StorageEncrypted (rds:DescribeDBInstances, already

@@ -17,6 +17,10 @@ interface RdsInstance {
   Endpoint?: { Address?: string; Port?: number };
   MultiAZ?: boolean;
   StorageEncrypted?: boolean;
+  /** Whether the DB has a public endpoint (public IP), reachable from outside the VPC — feeds the
+   *  Phase E `rds-public` posture finding. Same DescribeDBInstances response as the fields above, so
+   *  no extra IAM permission. */
+  PubliclyAccessible?: boolean;
   VpcSecurityGroups?: Array<{ VpcSecurityGroupId?: string }>;
   DBSubnetGroup?: { VpcId?: string };
   /** DescribeDBInstances returns tags inline as `TagList` ({Key,Value}); feeds R11. */
@@ -40,6 +44,7 @@ export const rdsModule: ServiceModule<RdsInstance> = {
         engineVersion: data.EngineVersion,
         multiAz: data.MultiAZ === true,
         storageEncrypted: data.StorageEncrypted === true,
+        publiclyAccessible: data.PubliclyAccessible === true,
         endpointAddress: data.Endpoint?.Address,
         endpointPort: data.Endpoint?.Port,
         vpcId: data.DBSubnetGroup?.VpcId,

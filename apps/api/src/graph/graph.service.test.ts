@@ -306,6 +306,36 @@ suite("G2.1 GraphService", () => {
     await expect(graph.nodeEvents(otherOrgId, lambdaId)).rejects.toBeInstanceOf(ApiException);
   });
 
+  it("summary() flags a publicly-accessible RDS (Phase E rds-public posture finding)", async () => {
+    const dbId = await insertNode(
+      orgId,
+      connId,
+      "aws:us-east-1:1:rds:orders-prod",
+      "aws.rds.instance",
+      "us-east-1",
+      "orders-prod",
+    );
+    await admin.query(
+      "UPDATE nodes SET attributes = jsonb_build_object('publiclyAccessible', true) WHERE id=$1",
+      [dbId],
+    );
+    // Fresh instances so the per-instance summary cache never returns a stale read across the flip.
+    const finding = (await new GraphService(app).summary(orgId)).findings.find(
+      (f) => f.id === "rds-public",
+    );
+    expect(finding?.severity).toBe("high");
+    expect(finding?.evidence?.some((e) => e.id === dbId)).toBe(true);
+
+    // Not fired when the DB isn't public (and never on 'unknown' — attribute absent pre-resync).
+    await admin.query(
+      "UPDATE nodes SET attributes = jsonb_build_object('publiclyAccessible', false) WHERE id=$1",
+      [dbId],
+    );
+    expect(
+      (await new GraphService(app).summary(orgId)).findings.find((f) => f.id === "rds-public"),
+    ).toBeUndefined();
+  });
+
   it("getEdge returns endpoints + evidence/provenance; 404 on missing", async () => {
     const eid = one(
       (await admin.query<{ id: string }>("SELECT id FROM edges WHERE org_id=$1", [orgId])).rows,

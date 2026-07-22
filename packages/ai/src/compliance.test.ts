@@ -24,6 +24,7 @@ const baseFacts = (over: Partial<ComplianceFacts> = {}): ComplianceFacts => ({
     iamPolicy: true,
     vulns: true,
     multiAz: true,
+    publicDatabase: true,
     ciPipeline: true,
     encryptionAtRest: false,
     encryptionInTransit: false,
@@ -104,6 +105,35 @@ describe("compliance evaluation", () => {
     expect(pci.notAssessable).toBeGreaterThanOrEqual(1);
     expect(pci.assessed).toBe(pci.passed + pci.failed);
     expect(pci.passRate).not.toBeNull();
+  });
+
+  it("data.no-public-database: pass when clean, fail on the rds-public finding, NA without RDS", () => {
+    // Assessable + no open finding → pass.
+    expect(byId(evaluateControls(baseFacts()), "data.no-public-database").status).toBe("pass");
+    // The rds-public posture finding is open → the control fails and carries the evidence.
+    const failed = byId(
+      evaluateControls(
+        baseFacts({
+          openFindings: {
+            "rds-public": {
+              count: 1,
+              detail: "orders-prod",
+              evidence: [{ id: "db1", label: "orders-prod" }],
+            },
+          },
+        }),
+      ),
+      "data.no-public-database",
+    );
+    expect(failed.status).toBe("fail");
+    expect(failed.evidence).toHaveLength(1);
+    // No RDS in the estate → not-applicable (never a silent pass).
+    expect(
+      byId(
+        evaluateControls(baseFacts({ inventory: { "aws.rds.instance": 0 } })),
+        "data.no-public-database",
+      ).status,
+    ).toBe("not-applicable");
   });
 
   it("every control maps to at least one framework, and every framework has ≥1 control", () => {

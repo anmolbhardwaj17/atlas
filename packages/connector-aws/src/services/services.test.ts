@@ -261,10 +261,19 @@ describe("data + identity", () => {
       Engine: "postgres",
       EngineVersion: "15.4",
       Endpoint: { Address: "prod-orders.abc.us-east-1.rds.amazonaws.com", Port: 5432 },
+      MultiAZ: true,
+      StorageEncrypted: true,
+      PubliclyAccessible: true,
       VpcSecurityGroups: [{ VpcSecurityGroupId: "sg-db" }],
       DBSubnetGroup: { VpcId: "vpc-1" },
     });
     expect(rdsModule.normalize(raw).urn).toBe("aws:us-east-1:123456789012:rds:prod-orders");
+    // Posture attributes feed the Phase E findings (multi-AZ / encryption / rds-public).
+    expect(rdsModule.normalize(raw).attributes).toMatchObject({
+      multiAz: true,
+      storageEncrypted: true,
+      publiclyAccessible: true,
+    });
     expect(rdsModule.observedEdges(raw)[0]).toMatchObject({
       type: "PROTECTS",
       fromUrn: "aws:us-east-1:123456789012:sg:sg-db",
