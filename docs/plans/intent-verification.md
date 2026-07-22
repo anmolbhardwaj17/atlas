@@ -14,6 +14,16 @@
 > shared-words + temporal signals → best-with-clear-margin → `ai_suggested` IMPLEMENTS edges for the
 > existing confirm/reject loop; `POST /intent/suggest-links` + "Link PRs to Jira" hub button; 7 engine
 > + 3 live-DB tests). **Author↔assignee signal deferred** (PR connector doesn't capture author yet).
+> ✅ **IV-4 search-backed (2026-07-22)** — the linker was O(prs × issues): it loaded the 600
+> most-recent issues and compared every unlinked PR against all of them, which both scaled poorly and
+> **capped recall** (a PR implementing an older ticket beyond the window was never a candidate). Now a
+> partial GIN FTS index over issue summary+description (migration `0068_jira_issue_fts`) retrieves the
+> **top-K relevant candidates per PR** in a single `unnest … CROSS JOIN LATERAL` query (O(prs × K), 3
+> round-trips total regardless of PR count), then the SAME pure scorer applies the precision bar to
+> just those K. Recall ceiling gone (any issue is a candidate); the pure scorer's `prSearchTokens` is
+> exported so the tsquery terms match what it scores. This is the "OpenSearch BM25 top-K" candidate
+> step in Postgres — swap-in-later, same contract as the search provider (docs/11). Real-PG test:
+> retrieves the right ticket among noise + holds the ≥2-shared-words bar.
 > **EPIC COMPLETE** (IV-1→IV-4). Product owner's idea:
 > a PR references a Jira task (or should); the code doesn't *break*, but the **logic is wrong / the
 > intent isn't implemented**. Can Atlas link the PR to its issue (even when the key isn't in the PR),

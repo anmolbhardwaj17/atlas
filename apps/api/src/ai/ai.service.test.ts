@@ -128,6 +128,78 @@ suite("G3.5 AiService", () => {
     expect(events.some((e) => e.type === "citation")).toBe(false);
   });
 
+  it("suggestIntentLinks retrieves candidates via the FTS index and links the right ticket", async () => {
+    // A jira.issue helper: name = "KEY — summary", searchable text in attributes.
+    const issue = async (
+      key: string,
+      summary: string,
+      description: string,
+      createdAt: string,
+    ): Promise<string> =>
+      one(
+        (
+          await admin.query<{ id: string }>(
+            `INSERT INTO nodes (org_id, connection_id, urn, kind, provider, region, name, attributes, last_seen)
+             VALUES ($1,$2,$3,'jira.issue','jira',null,$4,$5,$6) RETURNING id`,
+            [
+              orgId,
+              connId,
+              `jira:${key}`,
+              `${key} — ${summary}`,
+              JSON.stringify({ key, summary, description, createdAt }),
+              createdAt, // deliberately "old" last_seen — FTS ranks by relevance, not recency, so an
+              // older ticket is still a candidate (the recall win over the old ORDER BY last_seen cap).
+            ],
+          )
+        ).rows,
+      ).id;
+
+    const target = await issue(
+      "PROJ-100",
+      "Checkout latency spike under peak traffic",
+      "Investigate the p99 on the checkout path during peak load.",
+      "2026-06-01T00:00:00Z",
+    );
+    await issue("PROJ-101", "Update onboarding email templates", "", "2026-06-01T00:00:00Z");
+    // Shares only ONE meaningful word (checkout) — retrieved as a candidate, but must fail the
+    // ≥2-shared-words precision bar and NOT be linked.
+    await issue("PROJ-102", "Checkout button color change", "", "2026-06-01T00:00:00Z");
+
+    // An unlinked PR whose title clearly matches PROJ-100 (checkout, latency, spike, peak).
+    const prId = one(
+      (
+        await admin.query<{ id: string }>(
+          `INSERT INTO nodes (org_id, connection_id, urn, kind, provider, region, name, attributes)
+           VALUES ($1,$2,$3,'bitbucket.pullrequest','bitbucket',null,$4,$5) RETURNING id`,
+          [
+            orgId,
+            connId,
+            "bitbucket:acme/svc/pr/7",
+            "Fix checkout latency spike on peak",
+            JSON.stringify({
+              sourceBranch: "bugfix/checkout-latency",
+              createdOn: "2026-06-10T00:00:00Z",
+            }),
+          ],
+        )
+      ).rows,
+    ).id;
+
+    const ai = makeAi("x");
+    const res = await ai.suggestIntentLinks(orgId);
+    expect(res.scannedIssues).toBe(3);
+    expect(res.suggested).toBe(1);
+
+    // Exactly one ai_suggested IMPLEMENTS edge, PR → PROJ-100 (the clear winner, not PROJ-102).
+    const { rows: edges } = await admin.query<{ from_node_id: string; to_node_id: string }>(
+      `SELECT from_node_id, to_node_id FROM edges
+        WHERE org_id=$1 AND type='IMPLEMENTS' AND origin='ai_suggested' AND status='active'`,
+      [orgId],
+    );
+    expect(edges).toHaveLength(1);
+    expect(edges[0]).toMatchObject({ from_node_id: prId, to_node_id: target });
+  });
+
   it("404s asking into a conversation from another org (R8)", async () => {
     const ai = makeAi("x");
     const otherOrg = one(

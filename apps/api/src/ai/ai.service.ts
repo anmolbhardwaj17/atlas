@@ -7,6 +7,7 @@ import {
   judgeCoverage,
   matchEdges,
   suggestIntentLinks,
+  prSearchTokens,
   OpenRouterProvider,
   ClaudeProvider,
   type Answer,
@@ -88,9 +89,13 @@ const DAY_SECONDS = 24 * 60 * 60;
 /** PR node kinds the coverage judge accepts (mirrors R18's linkable kinds). */
 const PR_KINDS = ["bitbucket.pullrequest", "github.pull_request"];
 
-/** Bound the fuzzy-link scan (it's O(prs × issues)); enough for a real estate, excess is reported. */
+/** Bound the fuzzy-link scan to the unlinked PRs per run (rate-limited); excess is reported.
+ *  Issues are NO LONGER capped — a full-text index retrieves the top-K relevant candidates PER PR
+ *  (migration 0068), so recall no longer stops at "the N most-recent issues" and the scan is
+ *  O(prs × K) in a single query instead of O(prs × issues). */
 const INTENT_PR_CAP = 400;
-const INTENT_ISSUE_CAP = 600;
+/** Top-K candidate issues retrieved per PR from the FTS index before scoring. */
+const INTENT_CANDIDATES_PER_PR = 20;
 
 const asString = (v: unknown): string => (typeof v === "string" ? v : "");
 const asStringOrNull = (v: unknown): string | null => (typeof v === "string" ? v : null);
@@ -370,18 +375,14 @@ export class AiService {
           ORDER BY last_seen DESC LIMIT $2`,
         [PR_KINDS, INTENT_PR_CAP],
       );
-      const { rows: issueRows } = await c.query<{
-        id: string;
-        urn: string;
-        attributes: Record<string, unknown>;
-      }>(
-        `SELECT id, urn, attributes FROM nodes
-          WHERE kind = 'jira.issue' AND status = 'active'
-          ORDER BY last_seen DESC LIMIT $1`,
-        [INTENT_ISSUE_CAP],
+      // The full jira.issue corpus we can now search across (no longer capped) — reported so the
+      // caller can honestly say "searched N issues" instead of "the 600 most recent".
+      const { rows: issueCountRows } = await c.query<{ n: string }>(
+        `SELECT count(*)::text AS n FROM nodes WHERE kind = 'jira.issue' AND status = 'active'`,
       );
-      if (prRows.length === 0 || issueRows.length === 0) {
-        return { suggested: 0, scannedPrs: prRows.length, scannedIssues: issueRows.length };
+      const scannedIssues = Number(issueCountRows[0]?.n ?? 0);
+      if (prRows.length === 0 || scannedIssues === 0) {
+        return { suggested: 0, scannedPrs: prRows.length, scannedIssues };
       }
 
       const prs: FuzzyPr[] = prRows.map((r) => ({
@@ -392,18 +393,67 @@ export class AiService {
         createdAt: asStringOrNull(r.attributes.createdOn) ?? asStringOrNull(r.attributes.createdAt),
         author: asStringOrNull(r.attributes.author),
       }));
-      const issues: FuzzyIssue[] = issueRows.map((r) => ({
-        id: r.id,
-        urn: r.urn,
-        key: asString(r.attributes.key),
-        summary: asString(r.attributes.summary),
-        createdAt: asStringOrNull(r.attributes.createdAt),
-        assignee: asStringOrNull(r.attributes.assignee),
-      }));
 
-      const suggestions = suggestIntentLinks(prs, issues);
+      // Search-backed candidate generation: for each PR, retrieve only the top-K most word-relevant
+      // issues from the FTS index (0068), then score ONLY those with the same pure linker. This drops
+      // the O(prs × issues) brute force to O(prs × K) in a SINGLE query, and lifts the recall ceiling
+      // (any issue can be a candidate, not just the most-recent N). Build one OR-tsquery per PR from
+      // its significant terms — they're safe `[a-z0-9]` tokens, so joining with ` | ` needs no
+      // escaping; a PR with no meaningful terms has nothing to match and is skipped.
+      const prQueries = prs
+        .map((pr) => ({ pr, query: prSearchTokens(pr).join(" | ") }))
+        .filter((x) => x.query.length > 0);
+      if (prQueries.length === 0) {
+        return { suggested: 0, scannedPrs: prs.length, scannedIssues };
+      }
+
+      const { rows: candRows } = await c.query<{
+        pr_id: string;
+        id: string;
+        urn: string;
+        attributes: Record<string, unknown>;
+      }>(
+        `SELECT p.pr_id, i.id, i.urn, i.attributes
+           FROM unnest($1::uuid[], $2::text[]) AS p(pr_id, query)
+           CROSS JOIN LATERAL (
+             SELECT n.id, n.urn, n.attributes
+               FROM nodes n
+              WHERE n.kind = 'jira.issue' AND n.status = 'active'
+                AND to_tsvector('english',
+                      coalesce(n.attributes->>'summary','') || ' ' ||
+                      coalesce(n.attributes->>'description','')) @@ to_tsquery('english', p.query)
+              ORDER BY ts_rank(
+                        to_tsvector('english',
+                          coalesce(n.attributes->>'summary','') || ' ' ||
+                          coalesce(n.attributes->>'description','')),
+                        to_tsquery('english', p.query)) DESC
+              LIMIT $3
+           ) i`,
+        [prQueries.map((x) => x.pr.id), prQueries.map((x) => x.query), INTENT_CANDIDATES_PER_PR],
+      );
+
+      const candByPr = new Map<string, FuzzyIssue[]>();
+      for (const r of candRows) {
+        const list = candByPr.get(r.pr_id) ?? [];
+        list.push({
+          id: r.id,
+          urn: r.urn,
+          key: asString(r.attributes.key),
+          summary: asString(r.attributes.summary),
+          createdAt: asStringOrNull(r.attributes.createdAt),
+          assignee: asStringOrNull(r.attributes.assignee),
+        });
+        candByPr.set(r.pr_id, list);
+      }
+
+      // Score each PR against ONLY its retrieved candidates. The pure linker still enforces the
+      // ≥2-shared-words + clear-winner-over-runner-up precision bar (P3); at most one link per PR.
+      const suggestions = prQueries.flatMap(({ pr }) => {
+        const cands = candByPr.get(pr.id);
+        return cands && cands.length > 0 ? suggestIntentLinks([pr], cands) : [];
+      });
       if (suggestions.length === 0) {
-        return { suggested: 0, scannedPrs: prs.length, scannedIssues: issues.length };
+        return { suggested: 0, scannedPrs: prs.length, scannedIssues };
       }
 
       const { rows: rejRows } = await c.query<{ from_node_id: string; to_node_id: string }>(
@@ -438,7 +488,7 @@ export class AiService {
         );
         if (ins.rowCount) written += 1;
       }
-      return { suggested: written, scannedPrs: prs.length, scannedIssues: issues.length };
+      return { suggested: written, scannedPrs: prs.length, scannedIssues };
     });
   }
 

@@ -139,6 +139,16 @@ function prTokens(pr: FuzzyPr): Set<string> {
   return tokenize(`${title} ${branch.replace(/[/_-]+/g, " ")}`);
 }
 
+/**
+ * The PR's significant search terms (deduped, safe `[a-z0-9]+` tokens) — the SAME tokenization the
+ * scorer uses, exported so a search-backed candidate step can retrieve issues by these exact words
+ * (and stay consistent with what `suggestIntentLinks` will then score). Empty when the PR has no
+ * meaningful words (caller should skip it — no query to run).
+ */
+export function prSearchTokens(pr: FuzzyPr): string[] {
+  return [...prTokens(pr)];
+}
+
 function daysBetween(a: string | null, b: string | null): number | null {
   if (!a || !b) return null;
   const ta = Date.parse(a);
