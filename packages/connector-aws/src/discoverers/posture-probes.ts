@@ -7,7 +7,12 @@
  */
 import { S3Client, ListBucketsCommand, GetPublicAccessBlockCommand } from "@aws-sdk/client-s3";
 import { CloudTrailClient, DescribeTrailsCommand } from "@aws-sdk/client-cloudtrail";
-import { LambdaClient, paginateListFunctions, GetFunctionCommand } from "@aws-sdk/client-lambda";
+import {
+  LambdaClient,
+  paginateListFunctions,
+  GetFunctionCommand,
+  ListTagsCommand,
+} from "@aws-sdk/client-lambda";
 import { clientConfig } from "../aws/client-config";
 import { classifyAwsError } from "../aws/retry";
 import type { PermissionProbe } from "../permission-probe";
@@ -54,6 +59,24 @@ export const POSTURE_PROBES: readonly PermissionProbe[] = [
       }
       if (!first) return; // no functions → nothing to probe
       await client.send(new GetFunctionCommand({ FunctionName: first }));
+    },
+  },
+  {
+    // Deploy provenance for zip Lambdas (Phase A → R17): CI often stamps the git SHA into a function
+    // tag (`git-sha`/`commit`/`revision`). Reading tags is `lambda:ListTags`, distinct from both
+    // ListFunctions and GetFunction — so a denial is surfaced precisely, not mis-attributed.
+    service: "lambda-tags",
+    iamAction: "lambda:ListTags",
+    scope: "region",
+    async probe(input) {
+      const client = new LambdaClient(clientConfig(input.credentials, input.region ?? "us-east-1"));
+      let first: string | undefined;
+      for await (const page of paginateListFunctions({ client }, {})) {
+        first = (page.Functions ?? [])[0]?.FunctionArn;
+        break;
+      }
+      if (!first) return; // no functions → nothing to probe
+      await client.send(new ListTagsCommand({ Resource: first }));
     },
   },
 ];

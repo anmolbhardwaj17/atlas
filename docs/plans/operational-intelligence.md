@@ -78,6 +78,19 @@ roles, `RUNS_ARTIFACT`/`BUILT_FROM`/`DEPLOYS_TO` edges, the witness interface, a
 rule — is general from day one.** EC2, EKS, App Runner, Azure, GCP are each "add one extractor," never a
 redesign.
 
+**DELIVERED (Lambda deploy-provenance witnesses complete).** The high-confidence Lambda tier is rule
+**R17** (`lambda_commit_provenance`, `packages/inference/src/rules/r17-lambda-commit.ts`): it promotes a
+name/ARN-tier Lambda `DEPLOYS_TO` to `inferred-high` when a **git SHA** off the container **image tag**,
+the **`Description`**, a **function tag** (`git-sha`/`commit`/`revision`), or a **commit-keyed env var**
+prefix-matches a crawled PR commit — ambiguity → multiple `inferred-low` (P3). `CodeSha256` is
+deliberately **never** matched (a zip hash, not a git SHA). ECS's analogue is R12 (image-tag SHA) + the
+R1 ECR chain. This pass closed the one **dead witness** in production: Lambda **tags were never
+crawled** (`ListFunctions` omits them), so R17's tag path never fired live. The discoverer now captures
+tags — free from `GetFunction.Tags` for container Lambdas, a targeted `lambda:ListTags` for zip Lambdas
+— best-effort, with a `lambda:ListTags` posture probe (already covered by the granted `lambda:List*`, so
+**no new grant**; lights up on the next re-sync). **Remaining Phase-A polish:** duplicate-tier collapse;
+extractors for EC2/EKS/App Runner/Azure/GCP (each additive).
+
 ### Phase B — Health layer: the map turns red *(can build in parallel with A)*
 
 New read-only collectors, same crawl pattern as I1.3 modules:

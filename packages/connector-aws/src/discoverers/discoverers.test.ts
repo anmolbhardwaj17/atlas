@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { mockClient } from "aws-sdk-client-mock";
 import { EC2Client, DescribeInstancesCommand } from "@aws-sdk/client-ec2";
-import { LambdaClient, ListFunctionsCommand } from "@aws-sdk/client-lambda";
+import {
+  LambdaClient,
+  ListFunctionsCommand,
+  GetFunctionCommand,
+  ListTagsCommand,
+} from "@aws-sdk/client-lambda";
 import {
   S3Client,
   ListBucketsCommand,
@@ -61,6 +66,50 @@ describe("lambdaDiscoverer", () => {
     const items = await collect(lambdaDiscoverer.crawl(region));
     expect(items).toHaveLength(1);
     expect(items[0]?.ref.externalId).toBe("resize");
+  });
+
+  it("fetches tags for a zip function via ListTags (deploy provenance → R17)", async () => {
+    const arn = "arn:aws:lambda:us-east-1:123456789012:function:resize";
+    lambdaMock.on(ListFunctionsCommand).resolves({
+      Functions: [{ FunctionName: "resize", FunctionArn: arn, PackageType: "Zip" }],
+    });
+    lambdaMock.on(ListTagsCommand, { Resource: arn }).resolves({ Tags: { "git-sha": "abc1234" } });
+    const items = await collect(lambdaDiscoverer.crawl(region));
+    expect((items[0]?.payload.data as { Tags?: Record<string, string> }).Tags).toEqual({
+      "git-sha": "abc1234",
+    });
+  });
+
+  it("captures image URI + tags from GetFunction for a container function (no extra ListTags)", async () => {
+    const arn = "arn:aws:lambda:us-east-1:123456789012:function:api";
+    lambdaMock.on(ListFunctionsCommand).resolves({
+      Functions: [{ FunctionName: "api", FunctionArn: arn, PackageType: "Image" }],
+    });
+    lambdaMock.on(GetFunctionCommand, { FunctionName: "api" }).resolves({
+      Code: { ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/api:deadbee" },
+      Tags: { commit: "deadbee" },
+    });
+    // ListTags must NOT be needed — GetFunction already returned the tags.
+    lambdaMock.on(ListTagsCommand).rejects(new Error("ListTags should not be called"));
+    const data = (await collect(lambdaDiscoverer.crawl(region)))[0]?.payload.data as {
+      ImageUri?: string;
+      Tags?: Record<string, string>;
+    };
+    expect(data.ImageUri).toBe("123456789012.dkr.ecr.us-east-1.amazonaws.com/api:deadbee");
+    expect(data.Tags).toEqual({ commit: "deadbee" });
+  });
+
+  it("tolerates a ListTags denial — still yields the function, just without tags", async () => {
+    const arn = "arn:aws:lambda:us-east-1:123456789012:function:resize";
+    lambdaMock.on(ListFunctionsCommand).resolves({
+      Functions: [{ FunctionName: "resize", FunctionArn: arn, PackageType: "Zip" }],
+    });
+    lambdaMock
+      .on(ListTagsCommand)
+      .rejects(Object.assign(new Error("no"), { name: "AccessDeniedException" }));
+    const items = await collect(lambdaDiscoverer.crawl(region));
+    expect(items).toHaveLength(1);
+    expect((items[0]?.payload.data as { Tags?: unknown }).Tags).toBeUndefined();
   });
 });
 
