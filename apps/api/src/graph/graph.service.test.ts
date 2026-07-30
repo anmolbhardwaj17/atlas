@@ -336,6 +336,57 @@ suite("G2.1 GraphService", () => {
     ).toBeUndefined();
   });
 
+  it("summary() rolls up live runtime health for the trust strip (op-intel Phase B)", async () => {
+    // No health annotations yet → nothing is monitored, so the strip has an honest `unknown`
+    // (monitored 0), never a fabricated "all healthy".
+    const cold = (await new GraphService(app).summary(orgId)).health;
+    expect(cold.monitored).toBe(0);
+    expect(cold.unhealthy + cold.degraded).toBe(0);
+    expect(cold.checkedAt).toBeNull();
+    expect(cold.top).toEqual([]);
+
+    // The health poll marks the lambda hard-down and the rds degraded (rds checked more recently).
+    await admin.query(
+      `UPDATE nodes SET attributes = jsonb_build_object('health',
+         jsonb_build_object('state','unhealthy','reason','0/2 tasks running','checkedAt','2026-07-31T10:00:00.000Z'))
+       WHERE id=$1`,
+      [lambdaId],
+    );
+    await admin.query(
+      `UPDATE nodes SET attributes = jsonb_build_object('health',
+         jsonb_build_object('state','degraded','reason','alarm CPUHigh','checkedAt','2026-07-31T10:02:00.000Z'))
+       WHERE id=$1`,
+      [rdsId],
+    );
+
+    const health = (await new GraphService(app).summary(orgId)).health;
+    expect(health.monitored).toBe(2);
+    expect(health.unhealthy).toBe(1);
+    expect(health.degraded).toBe(1);
+    // Freshest poll time wins (lexical max of ISO-8601 UTC is chronological).
+    expect(health.checkedAt).toBe("2026-07-31T10:02:00.000Z");
+    // Worst-first: the unhealthy resource leads, and it deep-links + carries its reason.
+    expect(health.top[0]).toMatchObject({
+      id: lambdaId,
+      state: "unhealthy",
+      reason: "0/2 tasks running",
+    });
+    expect(health.top.map((n) => n.state)).toEqual(["unhealthy", "degraded"]);
+
+    // A healthy annotation still counts as monitored, but not as broken.
+    await admin.query(
+      `UPDATE nodes SET attributes = jsonb_build_object('health',
+         jsonb_build_object('state','healthy','reason','ok','checkedAt','2026-07-31T10:03:00.000Z'))
+       WHERE id=$1`,
+      [lambdaId],
+    );
+    const after = (await new GraphService(app).summary(orgId)).health;
+    expect(after.monitored).toBe(2);
+    expect(after.unhealthy).toBe(0);
+    expect(after.degraded).toBe(1);
+    expect(after.top.map((n) => n.id)).toEqual([rdsId]);
+  });
+
   it("getEdge returns endpoints + evidence/provenance; 404 on missing", async () => {
     const eid = one(
       (await admin.query<{ id: string }>("SELECT id FROM edges WHERE org_id=$1", [orgId])).rows,

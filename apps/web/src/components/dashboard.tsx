@@ -32,6 +32,7 @@ import { SampleDataBanner } from "@/components/dashboard/sample-data-banner";
 import { SuggestedLinksNudge } from "@/components/map/suggested-links-nudge";
 import { ContributorsDonut } from "@/components/dashboard/contributors-donut";
 import { FindingsDonut } from "@/components/dashboard/findings-donut";
+import { HealthStrip, type EstateHealth } from "@/components/dashboard/health-strip";
 import { CountUp } from "@/components/dashboard/count-up";
 import { CloudIcon, hasCloudIcon } from "@/components/cloud-icon";
 import { KIND_LOGO } from "@/lib/kind-visual";
@@ -90,6 +91,7 @@ interface Summary {
     pullRequests: number;
   };
   trust: { sources: number; healthySources: number; lastSyncAt: string | null };
+  health: EstateHealth;
   crossBoundary: { crossCloud: number; crossAccount: number };
   findings: Finding[];
   activity: ActivityItem[];
@@ -174,6 +176,10 @@ export async function Dashboard({
           {canManage ? <RefreshLatest orgId={orgId} /> : null}
         </div>
       </div>
+
+      {/* Live-health trust strip — the dashboard's "is anything broken right now" (op-intel Phase B).
+          Renders only when the health poll has a live signal; silent otherwise (honest unknown). */}
+      <HealthStrip health={s.health} />
 
       {/* Top band — the two KPIs and the AI launcher on the left, with "Needs attention" as a
           tall rail down the right. The rail column is a touch wider than each KPI (it's the

@@ -95,6 +95,8 @@ New read-only collectors, same crawl pattern as I1.3 modules:
 
 **Surfaces:** red/amber ring on map nodes + health in the detail panel; findings ("`calsaws-prod-elb`: 2/3 targets unhealthy"); dashboard trust strip. **Exit:** kill a test target → map shows red within ~2 min, finding cites the CloudWatch/ELB evidence.
 
+**DELIVERED (health layer built; lights up on a valid-key AWS re-sync).** Collectors (`packages/connector-aws/src/health-collect.ts`: CloudWatch alarms, ELB target health, ECS running-vs-desired + rollout, RDS status, Lambda error metrics — worst-wins merge, denied probes surfaced never dropped) → interval-gated in-process **health poller** (`HEALTH_INTERVAL_MINUTES`) → `attributes.health` + `node_events` `health_transition` (`packages/ingest/src/health-apply.ts`). Surfaces built: **map red/amber ring + health lens**, **detail-panel health row**, the **"service-health" finding** (broken-right-now, worst-first, cited), and — closing the last gap this pass — the **dashboard live-health trust strip** (`HealthStrip` off a new `DashboardSummary.health` rollup: `monitored`/`unhealthy`/`degraded`/`checkedAt`/`top[]`, three honest states incl. render-nothing when nothing is monitored — `unknown` never faked as healthy). **Remaining:** `alarm_transition` has an enum + UI taxonomy but no dedicated writer (health_transition already carries the "broke" signal) — optional; Lambda `GetMetricData` + the productionised (queue-backed) poller are grant/infra-gated.
+
 ### Phase C — Change timeline: what changed, when, by whom
 
 - **CloudTrail** `cloudtrail:LookupEvents` — 90 days of management events with zero customer setup: "SG `calsaws-db-sg` modified by X at 14:02". Mapped to nodes by ARN/name → `config_change` events.

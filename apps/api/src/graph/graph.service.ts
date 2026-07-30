@@ -196,6 +196,24 @@ export interface DashboardSummary {
     healthySources: number;
     lastSyncAt: string | null;
   };
+  /** Live runtime health (operational-intelligence Phase B) — the "map turns red" trust strip.
+   *  Distinct from `trust` (source sync freshness) and from findings/posture (hygiene): this is
+   *  what the health poll marked broken RIGHT NOW. `monitored` = 0 means nothing is being polled,
+   *  an honest `unknown` state (the strip stays hidden), never faked as "all healthy". `top` is a
+   *  worst-first sample of the affected nodes (each deep-links to /explore/:id). `checkedAt` is the
+   *  freshest health-poll time (null when nothing is monitored). */
+  health: {
+    monitored: number;
+    unhealthy: number;
+    degraded: number;
+    checkedAt: string | null;
+    top: Array<{
+      id: string;
+      name: string | null;
+      state: "degraded" | "unhealthy";
+      reason: string | null;
+    }>;
+  };
   crossBoundary: { crossCloud: number; crossAccount: number };
   findings: Finding[];
   activity: ActivityItem[];
@@ -652,6 +670,7 @@ export class GraphService {
           wildcardRoles,
           singleAzDbs,
           unhealthy,
+          healthRollup,
           rootNoMfa,
           publicBuckets,
           unencryptedData,
@@ -773,6 +792,25 @@ export class GraphService {
               ORDER BY CASE attributes->'health'->>'state' WHEN 'unhealthy' THEN 0 ELSE 1 END
               LIMIT 20`,
           ),
+          // Health rollup for the dashboard "live health" trust strip (operational-intelligence
+          // Phase B). `monitored` = every node the health poll has ever annotated (healthy included),
+          // so a zero here means "nothing is being polled" — an honest `unknown`, distinct from
+          // "all healthy". `checked_at` is the freshest poll time (ISO-8601 UTC → lexical max is
+          // chronological). Cheap: filtered to nodes that carry a health annotation.
+          c.query<{
+            monitored: number;
+            unhealthy: number;
+            degraded: number;
+            checked_at: string | null;
+          }>(
+            `SELECT count(*)::int AS monitored,
+                    count(*) FILTER (WHERE attributes->'health'->>'state' = 'unhealthy')::int AS unhealthy,
+                    count(*) FILTER (WHERE attributes->'health'->>'state' = 'degraded')::int AS degraded,
+                    max(attributes->'health'->>'checkedAt') AS checked_at
+               FROM nodes
+              WHERE status <> 'deleted' AND deleted_at IS NULL
+                AND attributes->'health'->>'state' IS NOT NULL`,
+          ),
           // Root account without MFA (Security Phase 2b): the classic CIS/critical finding — the
           // root user is unrestricted, so it MUST have MFA. From the aws.account node.
           c.query<{ id: string; name: string | null }>(
@@ -824,6 +862,7 @@ export class GraphService {
           wildcardRoles,
           singleAzDbs,
           unhealthy,
+          healthRollup,
           rootNoMfa,
           publicBuckets,
           unencryptedData,
@@ -969,6 +1008,7 @@ export class GraphService {
       wildcardRoles,
       singleAzDbs,
       unhealthy,
+      healthRollup,
       rootNoMfa,
       publicBuckets,
       unencryptedData,
@@ -1025,6 +1065,7 @@ export class GraphService {
         noPipeline: noPipeline.rows[0]?.n ?? 0,
         emptyProjects: emptyProjects.rows[0]?.n ?? 0,
         unhealthyNodes: unhealthy.rows,
+        healthRollup: healthRollup.rows[0] ?? null,
         openSgs: openSgs.rows,
         publicElbs: publicElbs.rows,
         wildcardRoles: wildcardRoles.rows,
@@ -1443,6 +1484,20 @@ export class GraphService {
         sources: base.conns.length,
         healthySources: base.conns.filter((c) => c.status === "connected").length,
         lastSyncAt: lastSyncAt?.toISOString() ?? null,
+      },
+      health: {
+        monitored: base.healthRollup?.monitored ?? 0,
+        unhealthy: base.healthRollup?.unhealthy ?? 0,
+        degraded: base.healthRollup?.degraded ?? 0,
+        checkedAt: base.healthRollup?.checked_at ?? null,
+        // The worst-first affected nodes were already fetched (unhealthyNodes, LIMIT 20); surface a
+        // small sample for the strip. state is constrained to degraded|unhealthy by that query.
+        top: unhealthyNodes.slice(0, 4).map((n) => ({
+          id: n.id,
+          name: n.name,
+          state: n.state as "degraded" | "unhealthy",
+          reason: n.reason,
+        })),
       },
       crossBoundary: { crossCloud: base.crossCloud, crossAccount: base.crossAccount },
       insights: {
