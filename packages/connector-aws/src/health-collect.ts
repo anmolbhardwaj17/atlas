@@ -60,8 +60,24 @@ export interface HealthCollectInput {
   signal?: AbortSignal;
 }
 
+/** A firing CloudWatch alarm mapped to a node — the raw material for an `alarm_transition`
+ *  change-timeline event, distinct from the derived node health it also contributes to (the
+ *  health tells you the node is degraded; this names the specific alarm that fired, for RCA). */
+export interface AlarmEvent {
+  urn: string;
+  alarmName: string;
+  metric: string | null;
+  stateReason: string | null;
+  /** When the alarm last changed state (CloudWatch `StateUpdatedTimestamp`, ISO-8601). This is the
+   *  event's true occurred_at AND its idempotency anchor, so a firing lands once across polls and a
+   *  re-fire (new timestamp) is a new event. Alarms without it carry no stable time → not emitted. */
+  since: string;
+}
+
 export interface HealthCollectResult {
   observations: HealthObservation[];
+  /** Firing CloudWatch alarms → `alarm_transition` events (Phase B change timeline). */
+  alarms: AlarmEvent[];
   /** Checks that could not run (denied/unavailable) — surfaced, never silent. */
   skipped: Array<{ check: string; region: string; iamAction: string; message: string }>;
 }
@@ -71,6 +87,7 @@ const RANK: Record<HealthState, number> = { healthy: 0, degraded: 1, unhealthy: 
 export async function collectAwsHealth(input: HealthCollectInput): Promise<HealthCollectResult> {
   const now = input.now ?? (() => new Date());
   const byUrn = new Map<string, HealthObservation>();
+  const alarms: AlarmEvent[] = [];
   const skipped: HealthCollectResult["skipped"] = [];
 
   const keep = (o: HealthObservation) => {
@@ -113,7 +130,7 @@ export async function collectAwsHealth(input: HealthCollectInput): Promise<Healt
     await run("ecs-services", "ecs:DescribeServices", () => collectEcs(input, region, at, keep));
     await run("rds-status", "rds:DescribeDBInstances", () => collectRds(input, region, at, keep));
     await run("cloudwatch-alarms", "cloudwatch:DescribeAlarms", () =>
-      collectAlarms(input, region, at, keep),
+      collectAlarms(input, region, at, keep, alarms),
     );
     // Lambda has no status field — its health lives in CloudWatch metrics (needs GetMetricData,
     // beyond the crawl's permissions), so this lights up when that grant lands.
@@ -122,7 +139,7 @@ export async function collectAwsHealth(input: HealthCollectInput): Promise<Healt
     );
   }
 
-  return { observations: [...byUrn.values()], skipped };
+  return { observations: [...byUrn.values()], alarms, skipped };
 }
 
 async function collectElb(
@@ -290,6 +307,7 @@ async function collectAlarms(
   region: string,
   at: string,
   keep: (o: HealthObservation) => void,
+  alarms: AlarmEvent[],
 ): Promise<void> {
   const client = new CloudWatchClient(clientConfig(input.credentials, region));
   for await (const page of paginateDescribeAlarms({ client }, { StateValue: "ALARM" })) {
@@ -311,6 +329,7 @@ async function collectAlarms(
         urn = awsUrn("aws.ecs.service", { ...acct, naturalKey: `${ecsCluster}/${ecsService}` });
       }
       if (!urn) continue;
+      const since = alarm.StateUpdatedTimestamp?.toISOString();
       keep({
         urn,
         state: "degraded",
@@ -318,10 +337,22 @@ async function collectAlarms(
         evidence: {
           alarm: alarm.AlarmName,
           metric: alarm.MetricName,
-          since: alarm.StateUpdatedTimestamp?.toISOString(),
+          since,
         },
         checkedAt: at,
       });
+      // Also record it as a distinct timeline event. Requires the alarm's name + its own
+      // state-change time (the honest occurred_at and idempotency key); without them we keep the
+      // health annotation but emit no event (P3 — no fabricated timestamp).
+      if (since && alarm.AlarmName) {
+        alarms.push({
+          urn,
+          alarmName: alarm.AlarmName,
+          metric: alarm.MetricName ?? null,
+          stateReason: alarm.StateReason ?? null,
+          since,
+        });
+      }
     }
   }
 }

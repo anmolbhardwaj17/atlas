@@ -150,6 +150,43 @@ describe("collectAwsHealth", () => {
     expect(db?.state).toBe("unhealthy");
   });
 
+  it("emits each firing alarm as an alarm_transition record keyed on its state-change time", async () => {
+    const since = new Date("2026-07-31T14:05:00.000Z");
+    cwMock.on(DescribeAlarmsCommand).resolves({
+      MetricAlarms: [
+        {
+          AlarmName: "chat-errors",
+          MetricName: "Errors",
+          StateReason: "threshold crossed",
+          StateUpdatedTimestamp: since,
+          Dimensions: [{ Name: "FunctionName", Value: "calsaws-chat-processor" }],
+        },
+        {
+          // No StateUpdatedTimestamp → no honest occurred_at / stable dedupe key: still annotates
+          // health, but emits NO event (P3 — never a fabricated timestamp).
+          AlarmName: "no-timestamp",
+          MetricName: "Errors",
+          Dimensions: [{ Name: "FunctionName", Value: "calsaws-chat-processor" }],
+        },
+      ],
+    });
+
+    const r = await collectAwsHealth(INPUT);
+    expect(r.alarms).toHaveLength(1);
+    expect(r.alarms[0]).toMatchObject({
+      alarmName: "chat-errors",
+      metric: "Errors",
+      stateReason: "threshold crossed",
+      since: since.toISOString(),
+    });
+    expect(r.alarms[0]?.urn).toContain("lambda:calsaws-chat-processor");
+    // The alarm still drives node health (both alarms mark the function degraded) — the event is
+    // additive, not a replacement.
+    expect(r.observations.find((o) => o.urn.includes("calsaws-chat-processor"))?.state).toBe(
+      "degraded",
+    );
+  });
+
   it("a denied check lands in skipped (named, never silent) and the rest still run", async () => {
     const denied = Object.assign(new Error("no"), { name: "AccessDenied" });
     cwMock.on(DescribeAlarmsCommand).rejects(denied);

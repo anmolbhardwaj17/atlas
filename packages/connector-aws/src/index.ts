@@ -49,6 +49,7 @@ export type {
   HealthObservation,
   HealthCollectInput,
   HealthCollectResult,
+  AlarmEvent,
 } from "./health-collect";
 export { withRetry, classifyAwsError } from "./aws/retry";
 export type { AwsErrorClass, RetryOptions } from "./aws/retry";

@@ -162,6 +162,40 @@ export class HealthPollerBootstrap implements OnModuleInit, OnApplicationShutdow
           : ""),
     );
 
+    // Alarm timeline (Phase B): each firing CloudWatch alarm → a distinct `alarm_transition`
+    // event, keyed on the alarm's own StateUpdatedTimestamp so a firing lands exactly once across
+    // polls while a re-fire (new timestamp) is a new event. This names the specific alarm on the
+    // node's change timeline — the health_transition says the node broke, this says which alarm
+    // fired and why (RCA). Best-effort: an event-write failure never affects the health annotation.
+    if (result.alarms.length > 0) {
+      try {
+        const alarmEvts = await applyNodeEvents(
+          this.db,
+          orgId,
+          result.alarms.map((a) => ({
+            urn: a.urn,
+            kind: "alarm_transition" as const,
+            occurredAt: a.since,
+            actor: null,
+            title: `Alarm firing: ${a.alarmName}${a.metric ? ` (${a.metric})` : ""}`,
+            evidence: { alarm: a.alarmName, metric: a.metric, reason: a.stateReason, to: "ALARM" },
+            source: "cloudwatch",
+            dedupeKey: `alarm:${a.urn}:${a.alarmName}:${a.since}`,
+          })),
+        );
+        if (alarmEvts.inserted > 0) {
+          this.logger.log(
+            `alarms ${conn.display_name}: ${alarmEvts.inserted} new alarm event(s)` +
+              (alarmEvts.unmatched > 0 ? `, ${alarmEvts.unmatched} unmatched` : ""),
+          );
+        }
+      } catch (err) {
+        this.logger.warn(
+          `alarm events skipped for ${conn.display_name}: ${(err as Error).message}`,
+        );
+      }
+    }
+
     // Change timeline (Phase C): CloudTrail write events in the lookback window → node_events.
     if (isChangeCapable(connector)) {
       const since = new Date(Date.now() - CHANGE_LOOKBACK_MS);
