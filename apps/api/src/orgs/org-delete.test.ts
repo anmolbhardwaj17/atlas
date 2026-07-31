@@ -150,12 +150,22 @@ suite("org hard-delete cascade sweep (docs/12 §6.4)", () => {
 
     // The org is gone, but the deletion record survives (no FK to organizations) — the durable sink.
     const gone = Number(
-      one((await admin.query<{ n: string }>("SELECT count(*) AS n FROM organizations WHERE id=$1", [org])).rows).n,
+      one(
+        (
+          await admin.query<{ n: string }>("SELECT count(*) AS n FROM organizations WHERE id=$1", [
+            org,
+          ])
+        ).rows,
+      ).n,
     );
     expect(gone).toBe(0);
     const log = one(
       (
-        await admin.query<{ deleted_org_id: string; actor_user_id: string | null; org_name: string }>(
+        await admin.query<{
+          deleted_org_id: string;
+          actor_user_id: string | null;
+          org_name: string;
+        }>(
           "SELECT deleted_org_id, actor_user_id, org_name FROM org_deletion_log WHERE deleted_org_id = $1",
           [org],
         )

@@ -6,8 +6,6 @@
 // Existing rows keep key_id NULL (written before rotation was possible); the broker falls back to
 // trying every configured key (GCM's auth tag makes that safe) until one authenticates.
 
-export const up: string[] = [
-  `ALTER TABLE connection_secrets ADD COLUMN IF NOT EXISTS key_id text`,
-];
+export const up: string[] = [`ALTER TABLE connection_secrets ADD COLUMN IF NOT EXISTS key_id text`];
 
 export const down: string[] = [`ALTER TABLE connection_secrets DROP COLUMN IF EXISTS key_id`];

@@ -39,7 +39,9 @@ async function main(): Promise<void> {
       if (n > 0) console.log(`  ${org_id}: rewrapped ${n}`);
       total += n;
     }
-    console.log(`✓ rewrapped ${total} secret(s) across ${rows.length} org(s) onto the primary key.`);
+    console.log(
+      `✓ rewrapped ${total} secret(s) across ${rows.length} org(s) onto the primary key.`,
+    );
     if (total === 0) console.log("  Nothing left on a retired key — safe to drop it from the env.");
   } finally {
     await app.end();

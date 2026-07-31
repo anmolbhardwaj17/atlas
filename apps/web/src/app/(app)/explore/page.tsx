@@ -77,8 +77,7 @@ async function ExploreContent({ searchParams }: { searchParams: Promise<SearchPa
   const page = res.body?.page as
     { nextCursor: string | null; hasMore: boolean; limit: number; total: number } | undefined;
   // Prefer the server total (page 1), else the value carried in the URL, else the row count.
-  const total =
-    page && page.total >= 0 ? page.total : urlTotal ? Number(urlTotal) : nodes.length;
+  const total = page && page.total >= 0 ? page.total : urlTotal ? Number(urlTotal) : nodes.length;
   const isFiltered = Boolean(
     q || category.length || source.length || health.length || status.length || kind,
   );

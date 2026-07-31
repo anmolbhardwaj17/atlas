@@ -47,7 +47,12 @@ function nameMatches(a: string, b: string): boolean {
 export const imageNameCorrelationRule: Rule = {
   key: "image_name_correlation",
   version: 1,
-  consumesKinds: ["bitbucket.repository", "github.repository", "aws.ecs.service", "aws.ecs.taskdef"],
+  consumesKinds: [
+    "bitbucket.repository",
+    "github.repository",
+    "aws.ecs.service",
+    "aws.ecs.taskdef",
+  ],
   consumesSignalKinds: [],
   evaluate(input: InferenceInput): RuleOutput {
     const repos = [

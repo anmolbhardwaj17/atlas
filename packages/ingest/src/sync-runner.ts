@@ -62,7 +62,9 @@ const HEARTBEAT_MS = 60_000;
  *  no-op, and any failure here must never break the sync. */
 async function heartbeat(db: Db, run: SyncRunRecord): Promise<void> {
   await withOrgScope(db, run.orgId, (c) =>
-    c.query("UPDATE sync_runs SET updated_at = now() WHERE id = $1 AND status = 'running'", [run.id]),
+    c.query("UPDATE sync_runs SET updated_at = now() WHERE id = $1 AND status = 'running'", [
+      run.id,
+    ]),
   ).catch(() => undefined);
 }
 
@@ -392,9 +394,7 @@ async function persistNodesBatch(
   );
   for (const r of ex.rows) existing.add(`${r.node_id}|${r.content_hash}`);
 
-  const changed = items.filter(
-    (i) => !existing.has(`${urnToId.get(i.node.urn)}|${i.contentHash}`),
-  );
+  const changed = items.filter((i) => !existing.has(`${urnToId.get(i.node.urn)}|${i.contentHash}`));
   const unchanged = items.length - changed.length;
   if (changed.length === 0) return { urnToId, unchanged };
 

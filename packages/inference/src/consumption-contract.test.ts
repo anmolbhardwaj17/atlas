@@ -67,7 +67,9 @@ const RICH_SIGNAL_DATA: Record<string, unknown> = {
       ],
     },
   ],
-  rules: [{ direction: "ingress", protocol: "tcp", fromPort: 5432, toPort: 5432, cidr: "10.0.0.0/8" }],
+  rules: [
+    { direction: "ingress", protocol: "tcp", fromPort: 5432, toPort: 5432, cidr: "10.0.0.0/8" },
+  ],
   files: ["src/orders/handler.ts", "README.md"],
   targetGroups: [{ arn: "arn:aws:elasticloadbalancing:...:targetgroup/tg/1", targetArns: [] }],
   repo: "org/app",
@@ -97,7 +99,11 @@ function buildRecordingInput(): {
   const signalsByKind = new RecordingMap<SignalLite[]>();
   const signals: SignalLite[] = [];
   for (const kind of ALL_SIGNAL_KINDS) {
-    const sig: SignalLite = { subjectUrn: `urn:subject:${kind}`, kind, data: { ...RICH_SIGNAL_DATA } };
+    const sig: SignalLite = {
+      subjectUrn: `urn:subject:${kind}`,
+      kind,
+      data: { ...RICH_SIGNAL_DATA },
+    };
     signalsByKind.set(kind, [sig]);
     signals.push(sig);
   }
@@ -114,9 +120,15 @@ function buildRecordingInput(): {
     observedEdges: [
       { type: "OWNED_BY", fromUrn: someUrn, toUrn: "urn:user:1" },
       { type: "CONTAINS", fromUrn: someUrn, toUrn: "urn:child:1" },
-      { type: "ASSUMES_ROLE", fromUrn: "urn:runtime:1", toUrn: "urn:subject:aws.iam.policy_statements" },
+      {
+        type: "ASSUMES_ROLE",
+        fromUrn: "urn:runtime:1",
+        toUrn: "urn:subject:aws.iam.policy_statements",
+      },
     ],
-    inferredEdges: [{ type: "DEPLOYS_TO", fromUrn: someUrn, toUrn: someUrn, tier: "inferred-high" }],
+    inferredEdges: [
+      { type: "DEPLOYS_TO", fromUrn: someUrn, toUrn: someUrn, tier: "inferred-high" },
+    ],
     rejectedEdgeKeys: new Set<string>(),
   };
   return { input, nodesByKind, signalsByKind };

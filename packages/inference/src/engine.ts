@@ -105,7 +105,12 @@ export async function runInference(
         for (const node of output.nodes) {
           const id = idByUrn.get(node.urn);
           if (!id) throw new Error(`derived node upsert returned no id for ${node.urn}`);
-          input.nodesByUrn.set(node.urn, { id, urn: node.urn, kind: node.kind, attributes: node.attributes });
+          input.nodesByUrn.set(node.urn, {
+            id,
+            urn: node.urn,
+            kind: node.kind,
+            attributes: node.attributes,
+          });
           stats.derivedNodes++;
         }
       }
@@ -390,4 +395,3 @@ async function loadExistingInferredEdges(c: PoolClient): Promise<Map<string, Exi
   }
   return m;
 }
-

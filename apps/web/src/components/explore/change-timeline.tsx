@@ -36,7 +36,12 @@ export function ChangeTimeline({ events }: { events: NodeEvent[] }) {
     <div>
       {present.length > 1 ? (
         <div className="mb-3 flex flex-wrap gap-1.5">
-          <FilterChip label="All" count={events.length} on={!active} onClick={() => setActive(null)} />
+          <FilterChip
+            label="All"
+            count={events.length}
+            on={!active}
+            onClick={() => setActive(null)}
+          />
           {present.map(({ kind, count }) => (
             <FilterChip
               key={kind}

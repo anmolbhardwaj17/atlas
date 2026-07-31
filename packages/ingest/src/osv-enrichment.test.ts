@@ -118,7 +118,10 @@ suite("OSV enrichment", () => {
     void b;
     const shared = vuln("GHSA-shared");
     const byPkg = new Map([
-      [pkgKey({ name: "lodash", version: "4.17.11", ecosystem: "npm" }), [vuln("GHSA-lodash"), shared]],
+      [
+        pkgKey({ name: "lodash", version: "4.17.11", ecosystem: "npm" }),
+        [vuln("GHSA-lodash"), shared],
+      ],
       [pkgKey({ name: "express", version: "4.16.0", ecosystem: "npm" }), [shared]],
     ]);
 

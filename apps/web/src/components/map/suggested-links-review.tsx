@@ -16,7 +16,11 @@ import { cn } from "@/lib/cn";
 /** How confident the MODEL was about a proposal (its own high/medium/low), rendered as a colour cue
  *  so a reviewer weighs a "low" the model itself flagged differently from a "high". Shared with the
  *  inline edge "why?" panel. Unknown/other values render verbatim, muted. */
-export function SuggestionConfidence({ level }: { level: string | null }): React.JSX.Element | null {
+export function SuggestionConfidence({
+  level,
+}: {
+  level: string | null;
+}): React.JSX.Element | null {
   if (!level) return null;
   const l = level.toLowerCase();
   const tone =
@@ -269,38 +273,40 @@ export function SuggestedLinksReview({
                           {s.from.name ?? kindLabel(s.from.kind)}
                         </span>
                         <ArrowRight className="size-3 shrink-0 text-muted-foreground" />
-                        <span className="min-w-0 truncate">{s.to.name ?? kindLabel(s.to.kind)}</span>
+                        <span className="min-w-0 truncate">
+                          {s.to.name ?? kindLabel(s.to.kind)}
+                        </span>
                       </div>
                       <div className="mt-1 flex items-center gap-2">
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      {kindLabel(s.from.kind)} → {kindLabel(s.to.kind)}
-                    </span>
-                    <SuggestionConfidence level={s.modelConfidence} />
-                  </div>
-                  {s.reasoning ? (
-                    <p className="mt-1.5 text-xs text-muted-foreground">{s.reasoning}</p>
-                  ) : null}
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void resolve(s.id, "confirm")}
-                      disabled={busyId === s.id}
-                      className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
-                    >
-                      {busyId === s.id ? (
-                        <Loader2 className="size-3 animate-spin" />
-                      ) : (
-                        <Check className="size-3" />
-                      )}
-                      Confirm
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void resolve(s.id, "reject")}
-                      disabled={busyId === s.id}
-                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
-                    >
-                        <X className="size-3" /> Reject
+                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                          {kindLabel(s.from.kind)} → {kindLabel(s.to.kind)}
+                        </span>
+                        <SuggestionConfidence level={s.modelConfidence} />
+                      </div>
+                      {s.reasoning ? (
+                        <p className="mt-1.5 text-xs text-muted-foreground">{s.reasoning}</p>
+                      ) : null}
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void resolve(s.id, "confirm")}
+                          disabled={busyId === s.id}
+                          className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+                        >
+                          {busyId === s.id ? (
+                            <Loader2 className="size-3 animate-spin" />
+                          ) : (
+                            <Check className="size-3" />
+                          )}
+                          Confirm
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void resolve(s.id, "reject")}
+                          disabled={busyId === s.id}
+                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
+                        >
+                          <X className="size-3" /> Reject
                         </button>
                       </div>
                     </div>
@@ -315,8 +321,8 @@ export function SuggestedLinksReview({
                 No links to review.
               </p>
               <p className="mt-1">
-                Atlas can propose repo → runtime links that the naming/tags don't reveal — you confirm
-                or reject each.
+                Atlas can propose repo → runtime links that the naming/tags don't reveal — you
+                confirm or reject each.
               </p>
               <button
                 type="button"

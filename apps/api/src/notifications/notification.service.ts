@@ -441,7 +441,8 @@ export class NotificationService {
            FROM notification_channels WHERE enabled = true`,
       );
       return rows.filter(
-        (r) => CHANNEL_KINDS.includes(r.kind as ChannelKind) && NotificationService.hasWebhook(r.config),
+        (r) =>
+          CHANNEL_KINDS.includes(r.kind as ChannelKind) && NotificationService.hasWebhook(r.config),
       );
     });
     if (channels.length === 0) return;

@@ -11,8 +11,7 @@ export interface AwsClientConfig {
    *  provider the SDK re-invokes before the token expires (CX1). `sessionToken` is present for
    *  AssumeRole creds and omitted for static IAM-user keys. */
   credentials:
-    | AwsCredentialProvider
-    | { accessKeyId: string; secretAccessKey: string; sessionToken?: string };
+    AwsCredentialProvider | { accessKeyId: string; secretAccessKey: string; sessionToken?: string };
   retryMode: "adaptive";
   maxAttempts: number;
 }

@@ -97,7 +97,9 @@ describe("FetchGithubClient", () => {
   it("does NOT retry a caller-aborted fetch (CH1)", async () => {
     const ac = new AbortController();
     ac.abort();
-    const fetchMock = vi.fn().mockRejectedValue(Object.assign(new Error("aborted"), { name: "AbortError" }));
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new Error("aborted"), { name: "AbortError" }));
     vi.stubGlobal("fetch", fetchMock);
     const client = new FetchGithubClient({ token: "t", sleep: noSleep });
     await expect(client.request("/x", { signal: ac.signal })).rejects.toThrow(/aborted/);

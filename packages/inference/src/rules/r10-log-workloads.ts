@@ -102,7 +102,13 @@ function probableTokens(a: Set<string>, b: Set<string>, isRare: (t: string) => b
 export const logWorkloadCorrelationRule: Rule = {
   key: "log_workload_correlation",
   version: 2,
-  consumesKinds: ["bitbucket.repository", "github.repository", "aws.ec2.instance", "aws.lambda.function", "aws.ecs.service"],
+  consumesKinds: [
+    "bitbucket.repository",
+    "github.repository",
+    "aws.ec2.instance",
+    "aws.lambda.function",
+    "aws.ecs.service",
+  ],
   consumesSignalKinds: ["aws.logs.workload"],
   evaluate(input: InferenceInput): RuleOutput {
     const repos = [

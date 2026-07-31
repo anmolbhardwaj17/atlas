@@ -373,12 +373,15 @@ describe("AI streaming - L5 uncited enforcement (parity + injection signal)", ()
     expect(uncited?.type === "uncited" && uncited.claims.length).toBeGreaterThan(0);
     const conf = events.find((e) => e.type === "confidence");
     expect(
-      conf?.type === "confidence" && conf.caveats.some((c) => /couldn't be tied to a cited source/.test(c)),
+      conf?.type === "confidence" &&
+        conf.caveats.some((c) => /couldn't be tied to a cited source/.test(c)),
     ).toBe(true);
   });
 
   it("no uncited event/caveat when every factual sentence is cited", async () => {
-    const events = await collect("Deleting **prod-orders** [N1] impacts the orders-api service [N2].");
+    const events = await collect(
+      "Deleting **prod-orders** [N1] impacts the orders-api service [N2].",
+    );
     expect(events.find((e) => e.type === "uncited")).toBeUndefined();
     const conf = events.find((e) => e.type === "confidence");
     expect(

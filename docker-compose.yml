@@ -29,7 +29,8 @@ services:
     # No persistence needed (Redis is ephemeral for us, docs/17 DD-5); bounded memory so a runaway
     # local queue can't eat the laptop. Prod uses ElastiCache (HA). noeviction so jobs are never
     # dropped under pressure — the queue backs up (visible via atlas_sync_queue_depth) instead.
-    command: ["redis-server", "--save", "", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
+    command:
+      ["redis-server", "--save", "", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
     ports:
       - "6379:6379"
     healthcheck:

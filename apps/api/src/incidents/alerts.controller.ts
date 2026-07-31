@@ -16,7 +16,10 @@ const SetPolicySchema = z
   .object({
     policy: z
       .string()
-      .refine((v): v is AlertPolicy => ALERT_POLICIES.includes(v as AlertPolicy), "Invalid alert policy."),
+      .refine(
+        (v): v is AlertPolicy => ALERT_POLICIES.includes(v as AlertPolicy),
+        "Invalid alert policy.",
+      ),
   })
   .strict();
 

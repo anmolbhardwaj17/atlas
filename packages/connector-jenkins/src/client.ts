@@ -110,7 +110,8 @@ export class FetchJenkinsClient implements JenkinsClient {
       const retryAfter = Number(res.headers.get("retry-after"));
       // Honour Retry-After when present; otherwise back off ~1s WITH jitter so many workers hitting
       // the same limit don't retry in lockstep (thundering herd).
-      const ms = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : jitteredBackoffMs();
+      const ms =
+        Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : jitteredBackoffMs();
       return Math.min(ms, this.maxWaitMs);
     }
     if (res.status >= 500) return Math.min(this.maxWaitMs, jitteredBackoffMs());
