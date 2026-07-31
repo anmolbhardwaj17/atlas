@@ -35,8 +35,12 @@
 ## 🏗️ Longer-term (infra / pre-GA)
 - **Perf P0 — DB co-location** (deploy the API in Sydney, ap-southeast-2, next to Supabase). NO data loss
   (compute moves, not the DB). The dominant prod latency lever; needs a deploy.
-- **P2 hardening** — load/perf tests, DR drill, mutation tests, the adversarial QA agent + E2E/contract/
-  AI-eval CI stages, RBAC enforcement sweep (#43). Do before onboarding a real design partner.
+- **P2 hardening** — *(2026-07-31 progress)* **DONE:** AI-eval + nightly mutation now named CI stages;
+  security headers; RBAC sweep (#43) + Owner-invariant unit tests. **Still open:** load/perf tests + DR
+  drill (**blocked** — need a deployed staging env + real data volume); E2E + API-contract stages
+  (**blocked** — no Playwright dep / no OpenAPI spec yet); the **adversarial QA agent** CI slice
+  (buildable, but introduces LLM-in-CI cost + an API-key secret → **needs an owner decision**). Do the
+  blocked ones around first design-partner onboarding.
 
 ## 🚧 In flight now (so you know what's NOT parked)
 - **Intent Verification** (Jira ↔ PR "did we build the right thing") — building.
