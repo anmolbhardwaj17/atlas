@@ -1,0 +1,52 @@
+# Nightly mutation testing (docs/14 DD-4, roadmap Phase P2). Stryker mutates the inference rules +
+# evaluate.ts and re-runs the unit suite against each mutant — the real test of whether our tests
+# would CATCH a broken rule, not just cover the line. It's minutes-heavy, so it runs on a schedule
+# (and on demand) rather than per-PR. The config's `break` threshold is a ratchet: the job fails if
+# the mutation score drops below the committed floor, so coverage can only improve.
+#
+# Scope today: `@atlas/inference` (the correctness-critical core — precision/tiering is where a silent
+# regression is most dangerous, P3/P5). Extending to isolation/crawler/confidence is a follow-up
+# (packages get their own stryker.config.json + a filter line here).
+name: Mutation
+
+on:
+  schedule:
+    # 03:17 UTC nightly (off the hour to dodge the top-of-hour Actions crush).
+    - cron: "17 3 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  mutation:
+    name: Mutation · inference rules
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Stryker (inference)
+        run: pnpm --filter @atlas/inference run test:mutation
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report-inference
+          path: packages/inference/reports/mutation/
+          if-no-files-found: ignore

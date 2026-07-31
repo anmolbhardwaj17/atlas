@@ -1,9 +1,11 @@
 # Atlas CI — runs the quality gates on every push to main (docs/14 §16, docs/17 §5).
 # Gates: format, lint, typecheck, unit test (check job) + integration tests against a
 # real ephemeral Postgres with the two-role setup + RLS incl. the append-only audit log
-# (integration job, US-12) + a production web build (web-build job, catches build/NODE_ENV
-# regressions). Heavier stages still to come (API contract, the adversarial QA agent, E2E,
-# load, AI-eval) land as those capabilities arrive (see docs/14 §16 for the full sequence).
+# (integration job, US-12) + a production web build (web-build job) + the AI-eval gate
+# (ai-eval job — grounded/cited/honest-absence set, escaped-hallucination-zero, docs/14 §11).
+# Mutation testing runs nightly in a separate workflow (mutation.yml). Heavier stages still to
+# come (API contract, the adversarial QA agent, E2E, load) land as those capabilities arrive
+# (see docs/14 §16 for the full sequence).
 name: CI
 
 on:
@@ -133,3 +135,32 @@ jobs:
 
       - name: Build web (next build, production)
         run: pnpm --filter @atlas/web run build
+
+  ai-eval:
+    name: AI · Eval (grounding · citations · honest absence)
+    runs-on: ubuntu-latest
+    # The AI answer/diagnose eval set (docs/14 §11): grounded + cited + confidence-tiered answers,
+    # US-11 honest absence, and the adversarial tempt-to-hallucinate cases whose escaped-hallucination
+    # rate must stay 0 (docs/01 §7.3). Deterministic — a MockLLMProvider drives it, so no model, network
+    # or secret is needed; surfaced as its own required check so a grounding regression is unmissable
+    # (it also runs inside `check` via turbo, but that buries it).
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: AI eval set
+        run: pnpm --filter @atlas/ai run test
