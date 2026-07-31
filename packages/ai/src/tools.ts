@@ -37,8 +37,34 @@ export interface ToolOutcome {
   estate?: EstateOverview;
   /** Change-timeline facts per subject node (from diagnose) - each event is citable. */
   events?: Array<{ subject: string; items: NodeEventFact[] }>;
+  /** Deterministic ranked root-cause hypotheses (from diagnose): each a real change that plausibly
+   *  caused the failure, scored by temporal proximity to onset × graph distance, classified by kind.
+   *  Empty/absent when the window is quiet (honest absence — never a fabricated cause). */
+  hypotheses?: DiagnosisHypothesis[];
   /** An on-demand PR diff (from get_pr_diff) - reference text tied to the PR node. */
   diff?: { prName: string; text: string; truncated: boolean };
+}
+
+/** One ranked root-cause candidate from diagnose. Deterministic (no LLM) so the ranking is stable and
+ *  auditable; the model then narrates + cites it rather than inventing an order. */
+export interface DiagnosisHypothesis {
+  /** The change event proposed as the cause (citable via the diagnose `events` facts). */
+  eventId: string;
+  kind: string;
+  title: string;
+  occurredAt: string;
+  actor: string | null;
+  /** Where the change happened: the node itself (distance 0) or a repo that deploys to it (1 hop). */
+  subject: string;
+  distance: 0 | 1;
+  /** Verdict class we can assert deterministically from the change kind (aligned with the incident
+   *  model). dependency/capacity/chronic need signals we don't have here, so they're left to the
+   *  onset layer + LLM — we never guess one (P3). */
+  verdict: "code-change" | "config-change";
+  /** 0–100 suspicion score: temporal proximity to onset × graph distance. */
+  score: number;
+  /** One-line rationale (the evidence chain, in words). */
+  why: string;
 }
 
 const clampInt = (v: unknown, min: number, max: number, dflt: number): number => {
@@ -46,6 +72,69 @@ const clampInt = (v: unknown, min: number, max: number, dflt: number): number =>
   return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : dflt;
 };
 const asStr = (v: unknown): string => (typeof v === "string" ? v : "");
+
+/** Change kinds that can CAUSE a failure. Symptoms (`health_transition`, `alarm_transition`) are the
+ *  failure itself, not its cause, so they never become hypotheses (P3). */
+const CAUSE_KINDS = new Set(["deploy", "config_change", "pr_merged"]);
+const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
+
+/** Human-friendly gap for a rationale ("18m", "3h", "2d"). */
+function fmtGap(hours: number): string {
+  const h = Math.abs(hours);
+  if (h < 1) return `${Math.max(1, Math.round(h * 60))}m`;
+  if (h < 48) return `${Math.round(h)}h`;
+  return `${Math.round(h / 24)}d`;
+}
+
+/**
+ * Deterministically rank candidate changes as root-cause hypotheses (operational-intelligence Phase D):
+ * **temporal proximity to the failure onset × graph distance**. A cause precedes the failure, so a
+ * change at/just-before onset scores highest; a change AFTER onset (most likely a remediation) is
+ * demoted. A change on the node itself (distance 0) slightly outranks one a hop away on a deployer repo
+ * (distance 1). No LLM — the model narrates and cites this order rather than inventing one. Returns
+ * `[]` for a quiet window, which is how honest-absence is preserved.
+ */
+export function rankHypotheses(
+  nodeName: string,
+  onsetMs: number,
+  windowHours: number,
+  candidates: Array<{ event: NodeEventFact; subject: string; distance: 0 | 1 }>,
+): DiagnosisHypothesis[] {
+  const scored: DiagnosisHypothesis[] = candidates.map(({ event, subject, distance }) => {
+    const dtHours = (onsetMs - new Date(event.occurredAt).getTime()) / 3_600_000;
+    // Before onset (dt ≥ 0): closer = more suspect. After onset (dt < 0): likely a fix, so heavily
+    // discounted but not zero (clocks/attribution can be imperfect).
+    const proximity =
+      dtHours >= 0 ? clamp01(1 - dtHours / windowHours) : 0.25 * clamp01(1 + dtHours / windowHours);
+    const score = Math.round(100 * proximity * (distance === 0 ? 1 : 0.85));
+    const verdict = event.kind === "config_change" ? "config-change" : "code-change";
+    const rel = `${fmtGap(dtHours)} ${dtHours >= 0 ? "before" : "after"} ${nodeName} went unhealthy`;
+    const why =
+      distance === 0
+        ? `${event.kind === "config_change" ? "config change" : "change"} "${event.title}" on ${nodeName}, ${rel}`
+        : `${subject} shipped "${event.title}" ${rel}`;
+    return {
+      eventId: event.id,
+      kind: event.kind,
+      title: event.title,
+      occurredAt: event.occurredAt,
+      actor: event.actor,
+      subject,
+      distance,
+      verdict,
+      score,
+      why,
+    };
+  });
+  // Highest score first; deterministic tie-break by most-recent, then id.
+  scored.sort(
+    (a, b) =>
+      b.score - a.score ||
+      new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime() ||
+      (a.eventId < b.eventId ? -1 : 1),
+  );
+  return scored;
+}
 
 /** The P1 tool set. Each entry is a spec (for the model) + a bounded `run` (over the port). */
 interface Tool {
@@ -223,10 +312,32 @@ const TOOLS: Record<string, Tool> = {
         if (evs.length > 0) deployerEvents.push({ subject: d.from.name ?? d.from.id, items: evs });
       }
 
+      // Onset proxy: the node's most recent health transition in the window ≈ when it broke. Without
+      // one (health polling off, or no recorded transition), fall back to "now" so recency drives
+      // proximity. (Precise metric/log-signature onset is the grant-gated Phase-D layer.)
+      const nodeName = node.name ?? node.id;
+      const healthTransitions = own.filter((e) => e.kind === "health_transition");
+      const onsetMs = healthTransitions.length
+        ? Math.max(...healthTransitions.map((e) => new Date(e.occurredAt).getTime()))
+        : Date.now();
+      // Candidate causes: real CHANGES on the node (distance 0) or on a repo that deploys to it
+      // (distance 1) — never the symptom transitions.
+      const candidates: Array<{ event: NodeEventFact; subject: string; distance: 0 | 1 }> = [
+        ...own
+          .filter((e) => CAUSE_KINDS.has(e.kind))
+          .map((e) => ({ event: e, subject: nodeName, distance: 0 as const })),
+        ...deployerEvents.flatMap((d) =>
+          d.items
+            .filter((e) => CAUSE_KINDS.has(e.kind))
+            .map((e) => ({ event: e, subject: d.subject, distance: 1 as const })),
+        ),
+      ];
+      const hypotheses = rankHypotheses(nodeName, onsetMs, hours, candidates);
+
       const fmt = (e: NodeEventFact): string =>
         `${e.occurredAt} [${e.kind}] ${e.title}${e.actor ? ` (by ${e.actor})` : ""}`;
       const lines: string[] = [
-        `${node.name ?? node.id} (${node.kind})` +
+        `${nodeName} (${node.kind})` +
           (node.health
             ? ` - health: ${node.health.state}${node.health.reason ? ` (${node.health.reason})` : ""}`
             : " - health: unknown (not checked)"),
@@ -238,11 +349,20 @@ const TOOLS: Record<string, Tool> = {
         ),
         deployers.length === 0 ? "no repository is known to deploy to it (no DEPLOYS_TO edge)" : "",
         `blast radius: ${blast.impacted.length} resource(s) depend on it`,
-        "Correlate the timeline with the failure: rank hypotheses by how close in time and how directly connected each change is, cite every claim, and inspect a suspicious merged PR with get_pr_diff. If the window shows no changes, say plainly that no likely culprit was found in it - do not invent one.",
+        // Deterministic ranking replaces the old "you rank them" instruction: give the model the
+        // scored order to narrate + cite, or the honest-absence line when nothing plausibly fits.
+        hypotheses.length
+          ? "ranked likely causes (most→least suspect, by temporal proximity to onset × graph distance):\n" +
+            hypotheses
+              .slice(0, 5)
+              .map((h, i) => `${i + 1}. [${h.verdict}] ${h.why} (score ${h.score})`)
+              .join("\n") +
+            "\nCite each claim; inspect a suspicious merged PR with get_pr_diff."
+          : "no likely culprit was found in it - do not invent one.",
       ].filter(Boolean);
 
       const eventFacts = [
-        ...(own.length ? [{ subject: node.name ?? node.id, items: own }] : []),
+        ...(own.length ? [{ subject: nodeName, items: own }] : []),
         ...deployerEvents,
       ];
       return {
@@ -251,6 +371,7 @@ const TOOLS: Record<string, Tool> = {
         edges: deployers,
         traversal: blast,
         ...(eventFacts.length ? { events: eventFacts } : {}),
+        ...(hypotheses.length ? { hypotheses } : {}),
       };
     },
   },

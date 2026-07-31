@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runTool } from "./tools";
+import { runTool, rankHypotheses } from "./tools";
 import { ContextAccumulator } from "./loop";
 import type { NodeEventFact, RetrievalPort, RetrievedNode } from "./retrieval-port";
 
@@ -131,6 +131,84 @@ describe("diagnose (Phase D)", () => {
     expect(out.summary).toContain("no recorded changes on it in the last 24h");
     expect(out.summary).toContain("no likely culprit was found");
     expect(out.events).toBeUndefined();
+    // No candidate changes → no hypotheses at all (never a fabricated one).
+    expect(out.hypotheses).toBeUndefined();
+  });
+
+  it("ranks candidate changes deterministically and classifies each verdict", async () => {
+    const port = fakePort(
+      {
+        "rds-1": [
+          {
+            id: "ev-cfg",
+            kind: "config_change",
+            occurredAt: recent(20),
+            actor: "readonly-anmol",
+            title: "ModifyDBInstance",
+            source: "cloudtrail",
+          },
+          {
+            // A symptom, not a cause — must never become a hypothesis.
+            id: "ev-health",
+            kind: "health_transition",
+            occurredAt: recent(15),
+            actor: null,
+            title: "Health healthy → unhealthy",
+            source: "health-poll",
+          },
+        ],
+        "repo-1": [
+          {
+            id: "ev-pr",
+            kind: "pr_merged",
+            occurredAt: recent(90),
+            actor: "dev-a",
+            title: "PR merged: #3022 - pool tuning",
+            source: "graph",
+          },
+        ],
+      },
+      null,
+    );
+    const out = await runTool(port, "org-1", "diagnose", { node_id: "rds-1", hours: 24 });
+    const h = out.hypotheses ?? [];
+    // Two candidates (config change + deployer PR); the health transition is excluded.
+    expect(h.map((x) => x.eventId)).toEqual(["ev-cfg", "ev-pr"]);
+    expect(h.some((x) => x.kind === "health_transition")).toBe(false);
+    // Nearer-to-onset config change on the node outranks the older, one-hop-away PR.
+    expect(h[0]?.eventId).toBe("ev-cfg");
+    expect(h[0]?.verdict).toBe("config-change");
+    expect(h[0]?.distance).toBe(0);
+    expect(h[1]?.verdict).toBe("code-change");
+    expect(h[0]?.score).toBeGreaterThan(h[1]?.score ?? 0);
+    // The ranking is surfaced in the model-facing summary too.
+    expect(out.summary).toContain("ranked likely causes");
+  });
+
+  it("rankHypotheses demotes a change that happened AFTER the failure onset (likely a fix)", () => {
+    const onset = Date.now() - 60 * 60_000; // broke 1h ago
+    const before: NodeEventFact = {
+      id: "before",
+      kind: "deploy",
+      occurredAt: new Date(onset - 10 * 60_000).toISOString(), // 10m before onset
+      actor: null,
+      title: "deploy A",
+      source: "s",
+    };
+    const after: NodeEventFact = {
+      id: "after",
+      kind: "deploy",
+      occurredAt: new Date(onset + 30 * 60_000).toISOString(), // 30m after onset (a remediation)
+      actor: null,
+      title: "deploy B",
+      source: "s",
+    };
+    const ranked = rankHypotheses("svc", onset, 24, [
+      { event: after, subject: "svc", distance: 0 },
+      { event: before, subject: "svc", distance: 0 },
+    ]);
+    expect(ranked[0]?.eventId).toBe("before"); // the pre-onset change is the suspect
+    expect(ranked[0]?.score).toBeGreaterThan(ranked[1]?.score ?? 0);
   });
 
   it("get_pr_diff returns the diff tied to the PR node; unavailable → honest summary", async () => {
