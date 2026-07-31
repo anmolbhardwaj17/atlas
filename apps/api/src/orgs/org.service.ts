@@ -328,16 +328,15 @@ export class OrgService {
   ): Promise<MemberDto> {
     return withOrgScope(this.db, orgId, async (c) => {
       const target = await loadMember(c, targetUserId);
-      // BR-MEM-3: only an Owner may modify an Owner.
-      if (target.role === "Owner" && callerRole !== "Owner") {
-        throw ApiException.insufficientRole("Only an Owner can modify an Owner.");
-      }
-      // Only an Owner may grant Owner (transfer/ownership escalation).
-      if (newRole === "Owner" && callerRole !== "Owner") {
-        throw ApiException.insufficientRole("Only an Owner can grant the Owner role.");
-      }
-      // BR-MEM-2 / BR-ORG-1: never demote the last Owner.
-      if (target.role === "Owner" && newRole !== "Owner" && (await ownerCount(c)) <= 1) {
+      // BR-MEM-3: authorization to touch this membership / grant Owner.
+      const authErr = memberMutationAuthError(callerRole, target.role, newRole);
+      if (authErr) throw authErr;
+      // BR-MEM-2 / BR-ORG-1: never demote the last Owner (query the count only when it could fire).
+      if (
+        target.role === "Owner" &&
+        newRole !== "Owner" &&
+        dropsLastOwner(target.role, newRole, await ownerCount(c))
+      ) {
         throw ApiException.invalidState("Cannot demote the last Owner - promote another first.");
       }
       const { rows } = await c.query<{
@@ -371,10 +370,11 @@ export class OrgService {
   async removeMember(orgId: string, callerRole: Role, targetUserId: string): Promise<void> {
     await withOrgScope(this.db, orgId, async (c) => {
       const target = await loadMember(c, targetUserId);
-      if (target.role === "Owner" && callerRole !== "Owner") {
-        throw ApiException.insufficientRole("Only an Owner can remove an Owner.");
-      }
-      if (target.role === "Owner" && (await ownerCount(c)) <= 1) {
+      // BR-MEM-3: only an Owner may remove an Owner (newRole = null signals a removal).
+      const authErr = memberMutationAuthError(callerRole, target.role, null);
+      if (authErr) throw authErr;
+      // BR-MEM-2 / BR-ORG-1: never remove the last Owner.
+      if (target.role === "Owner" && dropsLastOwner(target.role, null, await ownerCount(c))) {
         throw ApiException.invalidState("Cannot remove the last Owner.");
       }
       await c.query(`DELETE FROM memberships WHERE user_id = $1`, [targetUserId]);
@@ -397,6 +397,43 @@ async function ownerCount(c: PoolClient): Promise<number> {
     `SELECT count(*)::text AS n FROM memberships WHERE role = 'Owner' AND status = 'active'`,
   );
   return Number(rows[0]?.n ?? "0");
+}
+
+/**
+ * BR-MEM-3 (docs/12 §5.2): the pure authorization invariant for mutating a membership — who may
+ * modify/remove an Owner, and who may grant Owner. Returns the ApiException to throw, or null if the
+ * actor is authorized. `newRole` is `null` for a removal. Kept pure (no DB) so every actor×target×new
+ * combination is exhaustively unit-testable, not just reachable through DB-gated integration tests.
+ * The last-Owner invariant (BR-MEM-2) is separate because it needs a live count — see {@link dropsLastOwner}.
+ */
+export function memberMutationAuthError(
+  callerRole: Role,
+  targetRole: Role,
+  newRole: Role | null,
+): ApiException | null {
+  // Only an Owner may modify or remove an Owner.
+  if (targetRole === "Owner" && callerRole !== "Owner") {
+    return ApiException.insufficientRole(
+      newRole === null
+        ? "Only an Owner can remove an Owner."
+        : "Only an Owner can modify an Owner.",
+    );
+  }
+  // Only an Owner may grant Owner (ownership escalation / transfer).
+  if (newRole === "Owner" && callerRole !== "Owner") {
+    return ApiException.insufficientRole("Only an Owner can grant the Owner role.");
+  }
+  return null;
+}
+
+/**
+ * BR-MEM-2 / BR-ORG-1: an org must always keep ≥1 active Owner. True when the mutation would drop the
+ * target out of Owner — a demote to a non-Owner role, or a removal (`newRole === null`) — and it is the
+ * last Owner. Pure, so callers query the owner count only when this could fire.
+ */
+export function dropsLastOwner(targetRole: Role, newRole: Role | null, owners: number): boolean {
+  const dropsOwner = targetRole === "Owner" && newRole !== "Owner";
+  return dropsOwner && owners <= 1;
 }
 
 function toOrgDto(row: OrgRow | undefined): OrgDto {
