@@ -48,6 +48,35 @@ function edgeConfidenceRank(confidence: string): number {
 }
 
 /**
+ * Collapse duplicate edges to ONE per (from,to,type) at the strongest confidence. `uq_edge` includes
+ * `inference_rule_id`, so several rules (e.g. R1 name-match + R12/R17 SHA-match) each persist their
+ * own DEPLOYS_TO row for the same pair — correct for provenance (every row and its evidence stays, and
+ * `getEdge` still reaches each), but a reader must show a single cited edge at its strongest tier, not
+ * the same arrow twice at conflicting confidence (P3). Ties break on the lowest id so the surviving
+ * edge is deterministic regardless of DB row order. Shared by the map, node-edges, and neighbors reads
+ * so they can't drift.
+ */
+function collapseEdgesByPair<T>(
+  edges: T[],
+  pairKey: (e: T) => string,
+  confidence: (e: T) => string,
+  id: (e: T) => string,
+): T[] {
+  const best = new Map<string, T>();
+  for (const e of edges) {
+    const k = pairKey(e);
+    const prev = best.get(k);
+    if (!prev) {
+      best.set(k, e);
+      continue;
+    }
+    const delta = edgeConfidenceRank(confidence(e)) - edgeConfidenceRank(confidence(prev));
+    if (delta > 0 || (delta === 0 && id(e) < id(prev))) best.set(k, e);
+  }
+  return [...best.values()];
+}
+
+/**
  * Run `task` over `items` with at most `limit` in flight at once, preserving result order (H5,
  * backend audit Phase C). Each task here opens its own org-scoped pooled connection, so an unbounded
  * `Promise.all` over N items would grab N connections at once — a single finding-detail request could
@@ -1811,16 +1840,15 @@ export class GraphService {
       // persist their own DEPLOYS_TO row for the same pair — correct for provenance, but the map must
       // show a single cited edge at its strongest tier, not the same arrow twice at conflicting
       // confidence (P3 — one high-confidence edge, not a high AND a low).
-      const bestByPair = new Map<string, (typeof touchingEdges)[number]>();
-      for (const e of touchingEdges) {
-        if (!(inView.has(e.from_node_id) && inView.has(e.to_node_id))) continue;
-        const key = `${e.from_node_id}|${e.to_node_id}|${e.type}`;
-        const prev = bestByPair.get(key);
-        if (!prev || edgeConfidenceRank(e.confidence) > edgeConfidenceRank(prev.confidence)) {
-          bestByPair.set(key, e);
-        }
-      }
-      const edges = [...bestByPair.values()].map((e) => ({
+      const visibleEdges = touchingEdges.filter(
+        (e) => inView.has(e.from_node_id) && inView.has(e.to_node_id),
+      );
+      const edges = collapseEdgesByPair(
+        visibleEdges,
+        (e) => `${e.from_node_id}|${e.to_node_id}|${e.type}`,
+        (e) => e.confidence,
+        (e) => e.id,
+      ).map((e) => ({
         id: e.id,
         from: e.from_node_id,
         to: e.to_node_id,
@@ -2147,7 +2175,14 @@ export class GraphService {
           ORDER BY e.type LIMIT ${q.limit}`,
         params,
       );
-      return rows.map(toEdgeDto);
+      // Collapse the same (from,to,type) pair — witnessed by multiple inference rules as separate
+      // rows — to one best-tier edge, so node-detail never lists the same relationship twice.
+      return collapseEdgesByPair(
+        rows.map(toEdgeDto),
+        (e) => `${e.from.id}|${e.to.id}|${e.type}`,
+        (e) => e.confidence,
+        (e) => e.id,
+      );
     });
   }
 
@@ -2169,7 +2204,13 @@ export class GraphService {
           LIMIT $2`,
         [id, q.nodeBudget],
       );
-      const edges = edgeRows.map(toEdgeDto);
+      // Collapse duplicate multi-rule edges to one best-tier edge per pair (same as the map/detail).
+      const edges = collapseEdgesByPair(
+        edgeRows.map(toEdgeDto),
+        (e) => `${e.from.id}|${e.to.id}|${e.type}`,
+        (e) => e.confidence,
+        (e) => e.id,
+      );
       const neighborIds = new Set<string>();
       for (const e of edges) {
         if (e.from.id !== id) neighborIds.add(e.from.id);

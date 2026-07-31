@@ -169,6 +169,62 @@ suite("G2.1 GraphService", () => {
     expect(sub.edges).toHaveLength(1);
   });
 
+  it("collapses multi-rule DEPLOYS_TO to one best-tier edge (node-edges + neighbors)", async () => {
+    const REPO = "github:acme/pay-svc";
+    const repoId = await insertNode(orgId, connId, REPO, "github.repository", null, "pay-svc");
+    const mkInferredEdge = async (ruleKey: string, tier: string): Promise<void> => {
+      const ruleId = one(
+        (
+          await admin.query<{ id: string }>(
+            "SELECT id FROM inference_rules WHERE key=$1 ORDER BY version DESC LIMIT 1",
+            [ruleKey],
+          )
+        ).rows,
+      ).id;
+      const prov = one(
+        (
+          await admin.query<{ id: string }>(
+            "INSERT INTO provenance (org_id, source, confidence, inference_rule_id) VALUES ($1,$2,$3,$4) RETURNING id",
+            [orgId, `rule:${ruleKey}`, tier, ruleId],
+          )
+        ).rows,
+      ).id;
+      await admin.query(
+        `INSERT INTO edges (org_id, from_node_id, to_node_id, type, origin, confidence, provenance_id, inference_rule_id)
+         VALUES ($1,$2,$3,'DEPLOYS_TO','inferred',$4,$5,$6)`,
+        [orgId, repoId, lambdaId, tier, prov, ruleId],
+      );
+    };
+    // Two rules witness the same repo→lambda deploy at different tiers → two persisted rows, which is
+    // correct for provenance (uq_edge includes inference_rule_id).
+    await mkInferredEdge("repo_deploys_to_runtime", "inferred-low");
+    await mkInferredEdge("lambda_commit_provenance", "inferred-high");
+
+    // Both rows remain in the graph — no evidence is lost (P4).
+    const raw = one(
+      (
+        await admin.query<{ n: number }>(
+          "SELECT count(*)::int AS n FROM edges WHERE org_id=$1 AND type='DEPLOYS_TO'",
+          [orgId],
+        )
+      ).rows,
+    ).n;
+    expect(raw).toBe(2);
+
+    // …but the reads collapse them to ONE edge, at the strongest tier (never the same arrow twice).
+    const out = (await graph.nodeEdges(orgId, repoId, { direction: "out", limit: 100 })).filter(
+      (e) => e.type === "DEPLOYS_TO",
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0]?.confidence).toBe("inferred-high");
+
+    const sub = (await graph.nodeNeighbors(orgId, repoId, { nodeBudget: 100 })).edges.filter(
+      (e) => e.type === "DEPLOYS_TO",
+    );
+    expect(sub).toHaveLength(1);
+    expect(sub[0]?.confidence).toBe("inferred-high");
+  });
+
   it("is tenant-isolated - another org sees nothing (R8)", async () => {
     expect((await graph.listNodes(otherOrgId, { limit: 50 })).data).toHaveLength(0);
     await expect(graph.getNode(otherOrgId, lambdaId)).rejects.toBeInstanceOf(ApiException);
