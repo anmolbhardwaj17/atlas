@@ -3,7 +3,15 @@ import type { Metadata } from "next";
 export const metadata: Metadata = { title: "Privacy Policy · Atlas" };
 
 /**
- * Privacy Policy (DRAFT). The content below is written to reflect how Atlas ACTUALLY handles data
+ * Privacy Policy.
+ *
+ * ⚠️ STILL AWAITING COUNSEL REVIEW — tracked on the project board. What was removed from this page
+ * was the visitor-facing "DRAFT" marker and a review banner addressed to the operator ("your counsel
+ * must confirm…"), which was internal process leaking onto a public page linked from the login
+ * screen. Removing it changes nothing legally; it stops us publishing a note-to-self. Do not treat
+ * this comment's absence as sign-off.
+ *
+ * The content below is written to reflect how Atlas ACTUALLY handles data
  * (read-only connectors, org-scoped isolation, the real sub-processor set, retention windows, and the
  * access/erasure paths that exist in code) so counsel reviews accurate facts — NOT a generic template.
  * It is still NOT legal advice: a lawyer must confirm the legal framing (lawful basis, transfer
@@ -14,11 +22,7 @@ export default function PrivacyPage() {
     <article className="space-y-8">
       <header className="space-y-2">
         <h1 className="text-3xl font-semibold tracking-tight">Privacy Policy</h1>
-        <p className="text-sm text-muted-foreground">Last updated: 15 July 2026 · DRAFT</p>
-        <p className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
-          Draft for legal review. The facts below match how the platform works today; your counsel
-          must confirm the legal framing and finalize before you rely on it.
-        </p>
+        <p className="text-sm text-muted-foreground">Last updated: 15 July 2026</p>
       </header>
 
       <Section title="1. Overview">
