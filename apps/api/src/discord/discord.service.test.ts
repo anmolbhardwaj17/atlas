@@ -20,7 +20,15 @@ const ENV = {
 } as unknown as Env;
 
 function mockDb(orgForGuild: string | null) {
-  const client = { query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }), release: vi.fn() };
+  // `on`/`removeListener`: withOrgScope attaches an `error` listener to the checked-out client
+  // (packages/db/src/client.ts) so an async socket error can't crash the process — the double has
+  // to be an EventEmitter-shaped client or every scoped call throws.
+  const client = {
+    query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+    release: vi.fn(),
+    on: vi.fn(),
+    removeListener: vi.fn(),
+  };
   const db = {
     query: vi.fn(async (sql: string) => {
       if (sql.includes("app_discord_org")) return { rows: [{ org: orgForGuild }] };

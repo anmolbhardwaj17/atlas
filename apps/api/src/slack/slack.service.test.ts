@@ -15,7 +15,15 @@ const ENV = {
 
 /** A pool that answers the app_slack_org resolver and captures withOrgScope client queries. */
 function mockDb(orgForTeam: string | null) {
-  const client = { query: vi.fn().mockResolvedValue({ rows: [] }), release: vi.fn() };
+  // `on`/`removeListener`: withOrgScope attaches an `error` listener to the checked-out client
+  // (packages/db/src/client.ts) so an async socket error can't crash the process — the double has
+  // to be an EventEmitter-shaped client or every scoped call throws.
+  const client = {
+    query: vi.fn().mockResolvedValue({ rows: [] }),
+    release: vi.fn(),
+    on: vi.fn(),
+    removeListener: vi.fn(),
+  };
   const db = {
     query: vi.fn(async (sql: string) => {
       if (sql.includes("app_slack_org")) return { rows: [{ org: orgForTeam }] };
