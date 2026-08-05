@@ -178,14 +178,14 @@ jobs:
 
       - name: Verify the API is serving
         run: |
-          url="${API_URL:-https://atlas-api.fly.dev}/health/ready"
+          url="${API_URL:-https://atlas-api-anmol.fly.dev}/health/ready"
           for i in $(seq 1 10); do
             if curl -fsS "$url" | grep -q '"db":"up"'; then
               echo "Ready: $url"; exit 0
             fi
             echo "attempt $i: not ready yet"; sleep 10
           done
-          echo "::error::API did not report ready after deploy — check \`fly logs -a atlas-api\`"
+          echo "::error::API did not report ready after deploy — check \`fly logs -a atlas-api-anmol\`"
           exit 1
         env:
           API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}

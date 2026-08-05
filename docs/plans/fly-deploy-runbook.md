@@ -9,7 +9,7 @@ already automated — what's below is the one-time setup only you can do.
 ```
 Cloudflare (DNS · CDN · TLS · WAF — free)
    ├── app.<domain>  → atlas-web   Fly syd, 512MB
-   └── api.<domain>  → atlas-api   Fly syd, 1GB  ← API + BullMQ worker + schedulers, one machine
+   └── api.<domain>  → atlas-api-anmol   Fly syd, 1GB  ← API + BullMQ worker + schedulers, one machine
                                      ├── Supabase Postgres (ap-southeast-2 — same region, on purpose)
                                      └── Upstash Redis (rediss://)
 ```
@@ -46,7 +46,7 @@ no code change is needed.
 **Run these from the repo root** (`cd ~/Desktop/code/atlas`), not from your home directory.
 
 ```sh
-fly apps create atlas-api
+fly apps create atlas-api-anmol
 fly apps create atlas-web
 ```
 
@@ -76,7 +76,7 @@ Everything the app treats as sensitive. `fly secrets set` stages them and restar
 deploy.
 
 ```sh
-fly secrets set -a atlas-api \
+fly secrets set -a atlas-api-anmol \
   DATABASE_URL="postgres://atlas_app:<pw>@<host>:5432/postgres" \
   DATABASE_URL_MIGRATE="postgres://postgres:<pw>@<host>:5432/postgres" \
   REDIS_URL="rediss://default:<pw>@<host>:6379" \
@@ -98,7 +98,7 @@ Notes that will save you an outage:
 - **`SECRET_ENCRYPTION_KEY` is not recoverable.** It decrypts every stored connector credential. Lose
   it and every customer has to reconnect every source. Put a copy in a password manager now.
 - **Boot fails loudly if any of these are missing** — that's by design. If the release fails at
-  startup, `fly logs -a atlas-api` will name the exact variable.
+  startup, `fly logs -a atlas-api-anmol` will name the exact variable.
 - Use the **session pooler** connection string from Supabase, not the direct one, and keep
   `PG_POOL_MAX` (16) under its per-client limit.
 
@@ -124,8 +124,8 @@ you with a half-deployed app.
 Verify:
 
 ```sh
-curl -fsS https://atlas-api.fly.dev/health/ready     # {"status":"ready","db":"up"}
-fly logs -a atlas-api
+curl -fsS https://atlas-api-anmol.fly.dev/health/ready     # {"status":"ready","db":"up"}
+fly logs -a atlas-api-anmol
 ```
 
 ## 6. Provision the `atlas_app` role (once, if you haven't)
@@ -158,7 +158,7 @@ After that, every green push to `main` publishes images to GHCR and rolls Fly au
 ## 8. Custom domains + Cloudflare
 
 ```sh
-fly certs add api.<your-domain> -a atlas-api
+fly certs add api.<your-domain> -a atlas-api-anmol
 fly certs add app.<your-domain> -a atlas-web
 ```
 
@@ -178,18 +178,18 @@ Then update `WEB_ORIGIN` / `PUBLIC_API_URL` secrets and rebuild the web image wi
 is quiet. Once the graph is populated and you want live incidents:
 
 ```sh
-fly secrets set -a atlas-api HEALTH_INTERVAL_MINUTES=2
+fly secrets set -a atlas-api-anmol HEALTH_INTERVAL_MINUTES=2
 ```
 
 ## 10. Operating notes
 
 | Task | Command |
 |---|---|
-| Logs | `fly logs -a atlas-api` |
-| Shell | `fly ssh console -a atlas-api` |
-| Scale memory | `fly scale memory 2048 -a atlas-api` |
-| Add a machine | `fly scale count 2 -a atlas-api` — safe: ticks are leader-locked |
-| Roll back | `fly releases -a atlas-api` then `fly deploy --image <previous>` |
+| Logs | `fly logs -a atlas-api-anmol` |
+| Shell | `fly ssh console -a atlas-api-anmol` |
+| Scale memory | `fly scale memory 2048 -a atlas-api-anmol` |
+| Add a machine | `fly scale count 2 -a atlas-api-anmol` — safe: ticks are leader-locked |
+| Roll back | `fly releases -a atlas-api-anmol` then `fly deploy --image <previous>` |
 | Metrics | `curl -H "Authorization: Bearer $METRICS_TOKEN" https://api.<domain>/metrics` |
 
 **Do not set `auto_stop_machines` on the API.** The schedulers are `setInterval` timers inside the
