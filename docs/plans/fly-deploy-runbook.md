@@ -211,12 +211,17 @@ Doing it by hand instead (GitHub → Settings → Secrets and variables → Acti
 | Variable | `NEXT_PUBLIC_SUPABASE_URL` | from `.env` |
 | Variable | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | from `.env` |
 
-After that, every push to `main` runs: CI gates → publish images to GHCR → deploy API (migrations
-first) → deploy web → assert `/health/ready`.
+After that, every push to `main` deploys: API (migrations first) → web → assert `/health/ready`.
+Image publishing to GHCR runs in parallel and is not a prerequisite, so a registry hiccup can't
+block a rollout.
 
-Pause deploys without unpicking anything: `gh variable set FLY_DEPLOY_ENABLED --body false`.
-Require approval per deploy: GitHub → Settings → Environments → `production` → Required reviewers
-(the job already declares `environment: production`).
+> ⚠️ **The deploy does NOT wait for CI.** `release.yml` triggers on push independently of `ci.yml`,
+> so a red test suite will not stop a deploy. That's deliberate while the product is in testing —
+> push to `main` means it ships. **Before real users depend on this**, add either a `workflow_run`
+> dependency on CI or an `environment:` with a required reviewer; both are a few lines in
+> `release.yml`.
+
+Kill switch: `gh variable set FLY_DEPLOY_ENABLED --body false`.
 
 ## 8. Custom domains + Cloudflare
 

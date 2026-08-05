@@ -5,9 +5,13 @@
 # unreproducible. This publishes immutable, digest-pinned, SBOM-carrying images to GHCR on every
 # green push to main.
 #
-# Then it rolls out to Fly.io (docs/17 DD-2) — but only once `vars.FLY_DEPLOY_ENABLED == 'true'`,
-# so the publish half works from day one and the deploy half switches on when the Fly apps exist.
-# The API deploy also runs expand migrations, via fly.toml's `release_command`.
+# Then it rolls out to Fly.io (docs/17 DD-2a) — gated only on `vars.FLY_DEPLOY_ENABLED == 'true'`,
+# which doubles as the kill switch. The API deploy also runs expand migrations, via fly.toml's
+# `release_command`.
+#
+# NOTE: this workflow does not wait for CI — it triggers on push in parallel with it. While the
+# product is in testing that's intended (push to main = it ships). Before real users depend on it,
+# either add a `workflow_run` dependency on CI or re-introduce an `environment:` approval gate.
 #
 # Registry: GHCR (ghcr.io/<owner>/atlas-{api,web}). Chosen because it needs no cloud credentials —
 # GITHUB_TOKEN authenticates it. Fly builds its own image from the same Dockerfile rather than
@@ -132,15 +136,22 @@ jobs:
 
   deploy:
     name: Deploy · Fly.io
-    needs: publish
     runs-on: ubuntu-latest
-    # Opt-in: set the repository variable FLY_DEPLOY_ENABLED=true once the Fly apps exist. Until
-    # then every other job still runs and images still publish — the pipeline just stops before
-    # rollout instead of failing red on a missing token. (A repo VARIABLE, not a secret: secrets
-    # can't be referenced in a job-level `if`.)
+    # Deliberately UNGATED while the product is in testing: every push to main ships.
+    #
+    #  - No `needs: publish`. Fly builds its own image from the same Dockerfile, so the GHCR push
+    #    isn't a prerequisite — making it one would let a registry hiccup block a deploy, and
+    #    running them in parallel is faster.
+    #  - No `environment:`. Declaring one is what makes a required-reviewer gate possible; without
+    #    it there is nothing to approve and deploys never pause.
+    #  - This workflow does NOT wait for CI. It triggers on push independently, so a red test suite
+    #    does not stop a deploy. That is the current intent, not an oversight — revisit it before
+    #    real users depend on this.
+    #
+    # FLY_DEPLOY_ENABLED stays as the single kill switch:
+    #    gh variable set FLY_DEPLOY_ENABLED --body false
+    # (A repo VARIABLE, not a secret — secrets can't be referenced in a job-level `if`.)
     if: ${{ vars.FLY_DEPLOY_ENABLED == 'true' }}
-    # `production` lets you add a required reviewer in repo settings if you want promotion gated.
-    environment: production
     # Never let two rollouts race; unlike CI, don't cancel one midway through.
     concurrency:
       group: deploy-fly

@@ -84,15 +84,14 @@ gh variable list
 
 cat <<NOTE
 
-Done. Every push to main now: CI gates → publish images to GHCR → deploy API (migrations first)
-→ deploy web → assert /health/ready.
+Done. Every push to main now deploys: API (migrations first) → web → assert /health/ready.
+Image publishing to GHCR runs in parallel and is not a prerequisite.
 
-To pause deploys without touching anything else:
+This does NOT wait for CI — the deploy workflow triggers on push independently, so a red test
+suite will not stop a deploy. Intended while testing; revisit before real users depend on it.
+
+The one kill switch:
     gh variable set FLY_DEPLOY_ENABLED --body false
-
-To require your approval before each deploy:
-    GitHub → Settings → Environments → production → Required reviewers
-    (the deploy job already declares \`environment: production\`)
 
 To rotate the Fly token: re-run this script. Old tokens: fly tokens list / fly tokens revoke.
 NOTE
