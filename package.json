@@ -17,6 +17,18 @@
     "format:check": "prettier --check .",
     "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test"
   },
+  "pnpm": {
+    "//": "Security overrides for TRANSITIVE deps we don't declare ourselves — each pins the patched",
+    "//2": "version from a GHSA advisory. All are patch/minor bumps within the dependent's own range.",
+    "//3": "Re-check on every major framework bump: once fastify/next ship these themselves, drop the",
+    "//4": "entry rather than leaving a stale floor pinned here. `pnpm audit --prod` is a CI gate.",
+    "overrides": {
+      "fast-uri@>=3.0.0 <3.1.5": ">=3.1.5",
+      "find-my-way@<=9.6.0": ">=9.7.0",
+      "postcss@<8.5.23": ">=8.5.23",
+      "sharp@<0.35.0": ">=0.35.0"
+    }
+  },
   "devDependencies": {
     "@types/node": "^22.10.2",
     "eslint": "^9.17.0",
