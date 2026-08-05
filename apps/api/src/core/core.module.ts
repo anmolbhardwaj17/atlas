@@ -15,6 +15,7 @@ import { AnalyticsService } from "./analytics.service";
 import { EmailService } from "./email.service";
 import { ImageUploadService } from "./image-upload.service";
 import { RateLimitService } from "./rate-limit.service";
+import { LeaderLockService } from "./leader-lock.service";
 
 /**
  * App-wide singletons (docs/02 §3, docs/17 §6): the parsed env (fail-fast at boot)
@@ -48,6 +49,7 @@ const poolProvider: Provider = {
     EmailService,
     ImageUploadService,
     RateLimitService,
+    LeaderLockService,
   ],
   exports: [
     ENV,
@@ -57,6 +59,7 @@ const poolProvider: Provider = {
     EmailService,
     ImageUploadService,
     RateLimitService,
+    LeaderLockService,
   ],
 })
 export class CoreModule implements OnApplicationBootstrap, OnApplicationShutdown {

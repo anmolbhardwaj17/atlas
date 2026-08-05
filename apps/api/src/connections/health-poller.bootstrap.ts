@@ -11,6 +11,7 @@ import { applyHealthObservations, applyNodeEvents, type SecretBroker } from "@at
 import type { Connection } from "@atlas/connector-sdk";
 import type { HealthCollectResult, CloudTrailCollectResult } from "@atlas/connector-aws";
 import { PG_POOL, ENV } from "../core/tokens";
+import { LeaderLockService } from "../core/leader-lock.service";
 import { SECRET_BROKER } from "./tokens";
 import { ConnectorRegistry } from "./connector-registry";
 import { ProactiveIncidentsService } from "../incidents/proactive-incidents.service";
@@ -64,6 +65,7 @@ export class HealthPollerBootstrap implements OnModuleInit, OnApplicationShutdow
     @Inject(SECRET_BROKER) private readonly secrets: SecretBroker,
     private readonly registry: ConnectorRegistry,
     private readonly proactive: ProactiveIncidentsService,
+    private readonly leader: LeaderLockService,
   ) {}
 
   onModuleInit(): void {
@@ -86,19 +88,24 @@ export class HealthPollerBootstrap implements OnModuleInit, OnApplicationShutdow
   }
 
   private async tick(): Promise<void> {
-    if (this.running) return; // never overlap ticks
+    if (this.running) return; // never overlap ticks WITHIN this process
     this.running = true;
     try {
-      const { rows } = await this.db.query<{ org_id: string; connection_id: string }>(
-        "SELECT org_id, connection_id FROM app_health_targets()",
-      );
-      for (const r of rows) {
-        try {
-          await this.checkConnection(r.org_id, r.connection_id);
-        } catch (err) {
-          this.logger.warn(`health poll skipped ${r.connection_id}: ${(err as Error).message}`);
+      // ...and never overlap ACROSS processes either (deploy readiness P0-5): every replica polling
+      // would re-crawl the same cloud accounts, multiplying third-party API calls against the same
+      // provider rate limits for identical results.
+      await this.leader.runExclusive("healthPoll", async () => {
+        const { rows } = await this.db.query<{ org_id: string; connection_id: string }>(
+          "SELECT org_id, connection_id FROM app_health_targets()",
+        );
+        for (const r of rows) {
+          try {
+            await this.checkConnection(r.org_id, r.connection_id);
+          } catch (err) {
+            this.logger.warn(`health poll skipped ${r.connection_id}: ${(err as Error).message}`);
+          }
         }
-      }
+      });
     } catch (err) {
       this.logger.error(`health poll tick failed: ${(err as Error).message}`);
     } finally {

@@ -8,15 +8,19 @@ import {
 import type { Db } from "@atlas/db";
 import type { Env } from "@atlas/config";
 import { PG_POOL, ENV } from "../core/tokens";
+import { LeaderLockService } from "../core/leader-lock.service";
 import { ConnectionService } from "./connection.service";
 
 /**
- * Auto-refresh scheduler (docs/06 §11) — the in-process dev slice of the Scheduler (a leader-
- * elected worker is the deploy target). Every tick it asks `app_due_syncs` (SECURITY DEFINER,
+ * Auto-refresh scheduler (docs/06 §11). Every tick it asks `app_due_syncs` (SECURITY DEFINER,
  * cross-org) which connections are stale and triggers a re-sync for each via ConnectionService
  * (which scopes per-org, checks credentials, and respects BR-SYNC-1). Off unless
  * SYNC_INTERVAL_MINUTES > 0. Requires durable secrets so a sync can resolve credentials without a
- * reconnect. In dev this single process is the only one, so no leader election is needed.
+ * reconnect.
+ *
+ * Leader-locked (deploy readiness P0-5). Enqueue itself is already idempotent — BullMQ dedupes on
+ * `jobId` — so concurrent ticks would not double-sync; the lock is here so N replicas don't each
+ * resolve credentials and walk the whole due-list every cadence to do work only one of them lands.
  */
 @Injectable()
 export class SyncSchedulerBootstrap implements OnModuleInit, OnApplicationShutdown {
@@ -27,6 +31,7 @@ export class SyncSchedulerBootstrap implements OnModuleInit, OnApplicationShutdo
     @Inject(PG_POOL) private readonly db: Db,
     @Inject(ENV) private readonly env: Env,
     private readonly connections: ConnectionService,
+    private readonly leader: LeaderLockService,
   ) {}
 
   onModuleInit(): void {
@@ -52,20 +57,22 @@ export class SyncSchedulerBootstrap implements OnModuleInit, OnApplicationShutdo
 
   private async tick(thresholdMinutes: number): Promise<void> {
     try {
-      const { rows } = await this.db.query<{ org_id: string; connection_id: string }>(
-        "SELECT org_id, connection_id FROM app_due_syncs($1::interval)",
-        [`${thresholdMinutes} minutes`],
-      );
-      if (rows.length === 0) return;
-      this.logger.log(`Auto-refresh: ${rows.length} source(s) due.`);
-      for (const r of rows) {
-        try {
-          await this.connections.triggerSync(r.org_id, r.connection_id);
-        } catch (err) {
-          // A source with unresolvable creds / a transient error is skipped, not fatal.
-          this.logger.warn(`Auto-refresh skipped ${r.connection_id}: ${(err as Error).message}`);
+      await this.leader.runExclusive("syncSchedule", async () => {
+        const { rows } = await this.db.query<{ org_id: string; connection_id: string }>(
+          "SELECT org_id, connection_id FROM app_due_syncs($1::interval)",
+          [`${thresholdMinutes} minutes`],
+        );
+        if (rows.length === 0) return;
+        this.logger.log(`Auto-refresh: ${rows.length} source(s) due.`);
+        for (const r of rows) {
+          try {
+            await this.connections.triggerSync(r.org_id, r.connection_id);
+          } catch (err) {
+            // A source with unresolvable creds / a transient error is skipped, not fatal.
+            this.logger.warn(`Auto-refresh skipped ${r.connection_id}: ${(err as Error).message}`);
+          }
         }
-      }
+      });
     } catch (err) {
       this.logger.error(`Auto-refresh tick failed: ${(err as Error).message}`);
     }
