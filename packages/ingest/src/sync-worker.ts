@@ -17,9 +17,21 @@ export interface SyncJobData {
   type?: "full" | "incremental";
 }
 
-/** Deterministic idempotency key (docs/02 §5.3): one job per (org, connection, run). */
+/**
+ * Deterministic idempotency key (docs/02 §5.3): one job per (org, connection, run).
+ *
+ * Separated by `-`, NOT `:`. BullMQ rejects a custom job id containing a colon outright
+ * (`Custom Id cannot contain :`) because it namespaces its own Redis keys with `:` — so a colon in
+ * the id would collide with its key structure. This is still unambiguous: every component is a UUID.
+ *
+ * This bit us in production and nowhere else. Dev and CI leave `REDIS_URL` unset and fall back to
+ * the in-memory queue (`queue.ts`), which accepts any string as an id — so the very first time this
+ * ran against a real BullMQ was the first production sync, where every enqueue failed and each sync
+ * died before it started. `syncJobId.test.ts` now pins the constraint so the in-memory fallback
+ * can't hide it again.
+ */
 export function syncJobId(data: SyncJobData): string {
-  return `sync:${data.orgId}:${data.connectionId}:${data.runId}`;
+  return `sync-${data.orgId}-${data.connectionId}-${data.runId}`;
 }
 
 export interface SyncWorkerDeps extends RunnerDeps {
