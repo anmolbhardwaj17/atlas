@@ -1,0 +1,21 @@
+# Build context filter for the WEB image specifically.
+#
+# BuildKit looks for `<dockerfile-path>.dockerignore` before falling back to the context root's
+# `.dockerignore` — so this file shadows the root one for `docker build -f apps/web/Dockerfile`.
+# It has to exist: the root `.dockerignore` excludes `apps/web` outright (correct for the API image,
+# which has no use for the frontend and benefits from the smaller context), which stripped the web
+# app out of its own build. Caught by the CI image job on its first green run of the API image.
+#
+# Patterns are relative to the CONTEXT root (the repo root), not to this directory.
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+.git
+.github
+**/*.log
+**/coverage
+.env
+.env.*
+docs
+*.md

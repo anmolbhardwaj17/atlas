@@ -10,6 +10,9 @@
 .env
 .env.*
 !.env.production.example
+# The API image has no use for the frontend — dropping it keeps the context small. The WEB image
+# builds from this same context root, so it carries its own `apps/web/Dockerfile.dockerignore`
+# (which BuildKit prefers) to undo this exclusion for itself.
 apps/web
 docs
 *.md
