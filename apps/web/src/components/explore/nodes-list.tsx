@@ -49,7 +49,7 @@ function HealthCell({ node }: { node: NodeDto }) {
 }
 
 /** The nodes table (docs/09 §5.3) — resource · kind · health · region · freshness. Health is
- *  surfaced per row so "what's broken" reads at a glance, matching the map + dashboard. */
+ *  surfaced per row so "what’s broken" reads at a glance, matching the map + dashboard. */
 export function NodesList({ nodes, filtered = false }: { nodes: NodeDto[]; filtered?: boolean }) {
   if (nodes.length === 0) {
     return filtered ? (

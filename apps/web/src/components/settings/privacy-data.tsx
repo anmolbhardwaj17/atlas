@@ -24,7 +24,7 @@ export function PrivacyDataCard({ orgId }: { orgId: string }) {
     const data = await getDataExport(orgId);
     setExporting(false);
     if (!data) {
-      toast.error("Couldn't generate the export.");
+      toast.error("Couldn’t generate the export.");
       return;
     }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -46,7 +46,7 @@ export function PrivacyDataCard({ orgId }: { orgId: string }) {
           <ShieldCheck className="size-4 text-muted-foreground" /> Privacy & data
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Answer data-subject requests: export the personal data we hold for this workspace, or
+          Answer data-subject requests: export the personal data we hold for this organization, or
           erase a specific person from the graph.
         </p>
       </CardHeader>
@@ -113,7 +113,7 @@ function ErasePerson({ orgId }: { orgId: string }) {
       setQuery("");
       setResults([]);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't erase this person.");
+      toast.error(e instanceof Error ? e.message : "Couldn’t erase this person.");
     } finally {
       setErasing(false);
     }

@@ -107,7 +107,7 @@ export function ResourceNode({ data, selected }: NodeProps) {
         {exposed ? (
           <span
             className="mt-1 inline-flex max-w-full items-center gap-1 truncate rounded-full bg-orange-500/15 px-1.5 py-px text-[9px] font-medium text-orange-600 dark:text-orange-400"
-            title="Reachable from the public internet - via a world-open security group or an internet-facing load balancer (R16)"
+            title="Reachable from the public internet — via a world-open security group or an internet-facing load balancer (R16)"
           >
             <Globe className="size-2.5 shrink-0" />
             <span className="truncate">Internet-exposed</span>

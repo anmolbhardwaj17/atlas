@@ -228,7 +228,7 @@ export function SiftSetup({ repos }: { repos: RepoOption[] }) {
                 code lives.
               </Step>
               <Step title="See reviews in context">
-                Sift's findings appear on each pull request and inside the War Room trace, right
+                Sift’s findings appear on each pull request and inside the War Room trace, right
                 next to the ticket intent Atlas already checks — code correctness and intent
                 coverage, together.
               </Step>

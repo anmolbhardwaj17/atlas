@@ -25,7 +25,7 @@ export interface EstateHealth {
  * from source freshness (`trust`). Three honest states:
  *   • nothing monitored  → render nothing (health polling off / no live signal — an `unknown` we
  *     never dress up as "all healthy", docs/09 §7).
- *   • all healthy        → a calm, low-key confirmation ("we are watching, and it's green").
+ *   • all healthy        → a calm, low-key confirmation ("we are watching, and it’s green").
  *   • degraded/unhealthy → a red (any unhealthy) or amber (degraded only) alert with the worst
  *     resources named + deep-linked, and a live "checked Ns ago" recency stamp.
  */

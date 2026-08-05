@@ -335,7 +335,7 @@ export function ComplianceView({ report }: { report: ComplianceReport | null }) 
 }
 
 /** Not-assessable controls — Atlas's crawl gaps, shown quietly in a collapsible so they never
- *  compete with the actionable controls. Doubles as an honest "here's what we can't see yet" list. */
+ *  compete with the actionable controls. Doubles as an honest "here’s what we can’t see yet" list. */
 function NotAssessable({ rows, framework }: { rows: ControlResult[]; framework: Framework }) {
   const [open, setOpen] = React.useState(false);
   return (
@@ -353,7 +353,7 @@ function NotAssessable({ rows, framework }: { rows: ControlResult[]; framework: 
         <span className="ml-1 hidden text-xs text-muted-foreground sm:inline">
           {rows.some((r) => r.missingActions?.length)
             ? "some just need an AWS permission — grant it and they light up"
-            : "controls that need data Atlas doesn't crawl yet — not a pass or a fail"}
+            : "controls that need data Atlas doesn’t crawl yet — not a pass or a fail"}
         </span>
         <ChevronRight
           className={cn(
@@ -522,7 +522,7 @@ function ControlRow({
             <Link
               href={`/insights/${r.control.findingId}`}
               onClick={(e) => e.stopPropagation()}
-              title="View the finding's evidence"
+              title="View the finding’s evidence"
               className="text-muted-foreground transition-colors hover:text-foreground"
             >
               <ChevronRight className="size-4" />

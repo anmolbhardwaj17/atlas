@@ -48,7 +48,11 @@ function UnsubscribeFlow() {
             : { k: "error", msg: "This unsubscribe link is invalid or has expired." },
         );
       } catch {
-        if (!cancelled) setState({ k: "error", msg: "Something went wrong. Please try again." });
+        if (!cancelled)
+          setState({
+            k: "error",
+            msg: "Couldn’t update your email preferences. Try again, or use the link in a more recent email.",
+          });
       }
     })();
     return () => {
@@ -73,8 +77,8 @@ function UnsubscribeFlow() {
             <CheckCircle2 className="mx-auto mt-6 size-7 text-success" />
             <h1 className="mt-3 text-lg font-semibold tracking-tight">Unsubscribed</h1>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              You won&apos;t receive the weekly Atlas digest anymore. Your other Atlas notifications
-              are unaffected.
+              You won&rsquo;t receive the weekly Atlas digest anymore. Your other Atlas
+              notifications are unaffected.
             </p>
             <Button asChild variant="outline" className="mt-6 w-full">
               <Link href="/dashboard">Go to Atlas</Link>
@@ -85,7 +89,9 @@ function UnsubscribeFlow() {
         {state.k === "error" && (
           <>
             <XCircle className="mx-auto mt-6 size-7 text-danger" />
-            <h1 className="mt-3 text-lg font-semibold tracking-tight">Couldn&apos;t unsubscribe</h1>
+            <h1 className="mt-3 text-lg font-semibold tracking-tight">
+              Couldn&rsquo;t unsubscribe
+            </h1>
             <p className="mt-1.5 text-sm text-muted-foreground">{state.msg}</p>
             <Button asChild variant="outline" className="mt-6 w-full">
               <Link href="/dashboard">Go to Atlas</Link>

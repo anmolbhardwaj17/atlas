@@ -13,7 +13,7 @@ import { AtlasAiMark } from "@/components/brand";
 const EXAMPLES = [
   "Which repositories have no CI/CD pipeline?",
   "Who are the top contributors this month?",
-  "What's the blast radius of the payments service?",
+  "What’s the blast radius of the payments service?",
 ];
 
 export function AskLauncher() {
@@ -54,7 +54,7 @@ export function AskLauncher() {
           <h2 className="text-base font-semibold">Ask Atlas</h2>
         </div>
         <p className="mb-4 max-w-xl text-sm text-muted-foreground">
-          Ask anything about your infrastructure and code - every answer is grounded in your live
+          Ask anything about your infrastructure and code — every answer is grounded in your live
           graph and cited back to it.
         </p>
 

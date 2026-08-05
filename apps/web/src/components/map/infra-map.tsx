@@ -154,7 +154,7 @@ export function InfraMap({
 
   // Health lens (operational-intelligence north star): OFF = normal map; ON = recolour the whole
   // graph by runtime health — broken/degraded nodes stay lit, everything healthy recedes, so
-  // "what's on fire" reads in one glance. Default off.
+  // "what’s on fire" reads in one glance. Default off.
   const [healthLens, setHealthLens] = useState(initLenses.has("health"));
 
   // "What changed" lens: highlight recently-observed (new) or drifted (stale/deleted) nodes; the
@@ -319,7 +319,7 @@ export function InfraMap({
               title={
                 healthLens
                   ? "Back to the normal map"
-                  : "Highlight unhealthy resources, dim everything that's healthy"
+                  : "Highlight unhealthy resources, dim everything that’s healthy"
               }
               className={segCls(healthLens)}
             >
@@ -578,10 +578,10 @@ function Flow({
   const [showMinimap, setShowMinimap] = useState(false);
   // "Ask the map": the set of nodes the latest AI answer cited lights up; everything else recedes
   // (null = nothing highlighted). While a set is active the shelves auto-expand so matches hiding in
-  // them aren't missed. A deliberate node selection (blast radius) out-ranks this — see `litSet`.
+  // them aren’t missed. A deliberate node selection (blast radius) out-ranks this — see `litSet`.
   const [queryIds, setQueryIds] = useState<Set<string> | null>(null);
   // The docked chat conversation (empty = closed). Follow-ups reuse the same backend conversation
-  // (convoRef), so Atlas keeps context turn to turn. The latest assistant turn's cited nodes feed
+  // (convoRef), so Atlas keeps context turn to turn. The latest assistant turn’s cited nodes feed
   // `queryIds`, so the graph lights up as Atlas cites its evidence — the P4 money shot on the canvas.
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [chatOpen, setChatOpen] = useState(false);
@@ -589,7 +589,7 @@ function Flow({
   const askAbortRef = useRef<AbortController | null>(null);
   const streaming = messages.some((m) => m.role === "assistant" && STREAMING_PHASES.has(m.phase));
   // Fitting the viewport to the cited nodes is a discrete event (once, when the answer lands) — a
-  // nonce triggers it, decoupled from the per-citation `queryIds` churn so the view doesn't jump
+  // nonce triggers it, decoupled from the per-citation `queryIds` churn so the view doesn’t jump
   // on every token. `queryIdsRef` lets that effect read the freshest set without depending on it.
   const [fitNonce, setFitNonce] = useState(0);
   const queryIdsRef = useRef<Set<string> | null>(null);
@@ -1110,7 +1110,7 @@ function Flow({
 
   const selected = selectedId ? (data.nodes.find((n) => n.id === selectedId) ?? null) : null;
 
-  // The selected node's links, both directions, for the detail panel's "Links" list — the place you
+  // The selected node’s links, both directions, for the detail panel’s "Links" list — the place you
   // fix a wrong edge. EXPOSED_VIA is a node-level fact (shown as a chip), not a drawn link, so skip it.
   const selectedLinks = useMemo<NodeLink[]>(() => {
     if (!selectedId) return [];
@@ -1364,7 +1364,7 @@ function renderMapRich(
  * The docked map chat — the conversational sidekick beside the graph. A scrollable transcript of
  * turns + a follow-up input pinned to the bottom. Same retrieval-first, cited engine as Ask Atlas;
  * the latest answer's cited nodes light up on the canvas (P4), and every source jumps you to it.
- * An insufficient-grounding answer reads as an honest "I don't know" (US-11), never a fabrication.
+ * An insufficient-grounding answer reads as an honest "I don’t know" (US-11), never a fabrication.
  */
 function MapChat({
   messages,
@@ -2195,7 +2195,7 @@ function LinkRow({
       toast.success("Link removed");
       onRemoved();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't remove the link.");
+      toast.error(e instanceof Error ? e.message : "Couldn’t remove the link.");
       setBusy(false);
     }
   };
@@ -2239,7 +2239,7 @@ function LinkRow({
 }
 
 /** Open (or reuse) a War Room for a broken node straight from the map, then navigate to it. The map is
- *  where "something's on fire" is felt, so this is the primary incident entry point (docs/plans/war-room.md). */
+ *  where "something’s on fire" is felt, so this is the primary incident entry point (docs/plans/war-room.md). */
 function WarRoomCta({ orgId, nodeId }: { orgId: string; nodeId: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);

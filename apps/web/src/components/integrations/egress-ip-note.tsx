@@ -6,7 +6,7 @@ import { egressIps } from "@/lib/env";
 import { cn } from "@/lib/cn";
 
 /**
- * "Whitelist Atlas's IP" note in the connector setup. Enterprises commonly restrict inbound access
+ * "Whitelist Atlas’s IP" note in the connector setup. Enterprises commonly restrict inbound access
  * to an IP allowlist / firewall / security group (or keep the service on an internal network), so
  * Atlas — connecting from a fixed egress IP — must be allowed through or the sync silently can't
  * reach the target. Shows the IP(s) with a copy button; falls back to neutral guidance when the IP

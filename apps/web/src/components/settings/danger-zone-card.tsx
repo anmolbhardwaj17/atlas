@@ -50,7 +50,7 @@ export function DangerZoneCard({ orgId, orgName }: { orgId: string; orgName: str
       router.push("/");
       router.refresh();
     } catch (e) {
-      toast.error("Couldn't delete the organization", {
+      toast.error("Couldn’t delete the organization", {
         description: e instanceof Error ? e.message : undefined,
       });
       setBusy(false);
@@ -69,7 +69,7 @@ export function DangerZoneCard({ orgId, orgName }: { orgId: string; orgName: str
           <p className="text-sm font-medium">Delete this organization</p>
           <p className="mt-0.5 max-w-md text-sm text-muted-foreground">
             Permanently removes {orgName} and all of its data — the graph, connections, members, and
-            history. This can&apos;t be undone.
+            history. This can&rsquo;t be undone.
           </p>
         </div>
         <Button
@@ -98,7 +98,7 @@ export function DangerZoneCard({ orgId, orgName }: { orgId: string; orgName: str
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete “{orgName}”?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This permanently deletes the workspace and <strong>everything in it</strong>:
+                  This permanently deletes the organization and <strong>everything in it</strong>:
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <ul className="space-y-2 text-sm text-muted-foreground">

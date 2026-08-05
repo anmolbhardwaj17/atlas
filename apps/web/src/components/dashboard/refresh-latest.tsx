@@ -52,7 +52,7 @@ export function RefreshLatest({ orgId }: { orgId: string }) {
         });
       }
     } catch (e) {
-      setMsg({ tone: "warn", text: e instanceof Error ? e.message : "Couldn't refresh." });
+      setMsg({ tone: "warn", text: e instanceof Error ? e.message : "Couldn’t refresh." });
     } finally {
       setBusy(false);
     }

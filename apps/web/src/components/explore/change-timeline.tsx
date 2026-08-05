@@ -96,7 +96,7 @@ export function ChangeTimeline({ events }: { events: NodeEvent[] }) {
                       <Link
                         href={`/explore/${viaRepoId}`}
                         className="text-primary hover:underline"
-                        title="This PR is on this timeline because its repo deploys here (DEPLOYS_TO)"
+                        title="This PR is on this timeline because its repository deploys to this resource"
                       >
                         via deploy
                       </Link>

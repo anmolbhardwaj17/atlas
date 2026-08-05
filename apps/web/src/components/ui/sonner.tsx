@@ -5,7 +5,7 @@ import { Toaster as Sonner } from "sonner";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
-/** Follow the app's theme: the header toggle flips the `dark` class on <html> (no next-themes), so
+/** Follow the app’s theme: the header toggle flips the `dark` class on <html> (no next-themes), so
  *  we watch that class live and hand sonner the right theme — otherwise toasts render light in dark
  *  mode. Starts light and syncs on mount (avoids an SSR/hydration mismatch; toasts appear post-mount). */
 function useHtmlTheme(): "light" | "dark" {

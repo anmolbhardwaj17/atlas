@@ -16,7 +16,7 @@ const ROWS: Array<{ key: keyof EmailPrefs; label: string; desc: string }> = [
   {
     key: "weeklyDigest",
     label: "Weekly digest",
-    desc: "A Monday summary of what changed, what's at risk, and what got fixed.",
+    desc: "A Monday summary of what changed, what’s at risk, and what got fixed.",
   },
 ];
 
@@ -44,7 +44,7 @@ export function EmailPrefsCard({ orgId }: { orgId: string }) {
     if (result) setPrefs(result);
     else {
       setPrefs(prev);
-      toast.error("Couldn't save your email preference.");
+      toast.error("Couldn’t save your email preference.");
     }
   }
 
@@ -55,8 +55,8 @@ export function EmailPrefsCard({ orgId }: { orgId: string }) {
           <Mail className="size-4 text-muted-foreground" /> Email notifications
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Choose which emails Atlas sends you for this workspace. In-app notifications (the bell)
-          aren't affected.
+          Choose which emails Atlas sends you for this organization. In-app notifications (the bell)
+          aren’t affected.
         </p>
       </CardHeader>
       <CardContent className="space-y-1">

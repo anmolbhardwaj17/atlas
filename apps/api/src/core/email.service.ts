@@ -99,7 +99,8 @@ export class EmailService {
   async sendWelcome(msg: WelcomeEmail): Promise<boolean> {
     const first = msg.name ? (msg.name.split(" ")[0] ?? msg.name) : null;
     const html = emailShell({
-      preheader: "Your Atlas workspace is ready — connect a source and see your whole system map.",
+      preheader:
+        "Your Atlas organization is ready — connect a source and see your whole system map.",
       heading: first ? `Welcome, ${escapeHtml(first)}` : "Welcome to Atlas",
       intro: `Atlas builds a live, cited map of everything your team runs and ships — your cloud, your code, and how they connect — so you can understand your estate at a glance, spot risks early, and ask it anything in plain English.`,
       steps: [

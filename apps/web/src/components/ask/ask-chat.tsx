@@ -137,7 +137,7 @@ const FALLBACK_EXAMPLES = [
 
 /**
  * Ask AI (docs/09 §5.5, docs/10). Retrieval-first, streamed. Every answer is cited and
- * confidence-tiered; a zero-grounding answer renders as an explicit "I don't know"
+ * confidence-tiered; a zero-grounding answer renders as an explicit "I don’t know"
  * (US-11) - one of the four designed states (empty · streaming · answered · honest-absence).
  */
 export function AskChat({
@@ -158,8 +158,8 @@ export function AskChat({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  // True while a reopened conversation's turns are being fetched (show a skeleton, not the
-  // empty state) - fixes the "click a chat → blank flash → answer pops in" jank.
+  // True while a reopened conversation’s turns are being fetched (show a skeleton, not the
+  // empty state) — fixes the "click a chat → blank flash → answer pops in" jank.
   const [loadingConversation, setLoadingConversation] = useState<boolean>(!!conversationId);
   const convoRef = useRef<string | null>(conversationId ?? null);
   const autoAsked = useRef(false);
@@ -175,7 +175,7 @@ export function AskChat({
     const last = messages[messages.length - 1];
     const streaming = !!last?.streaming;
     if (prevStreaming.current && !streaming && last?.role === "assistant") {
-      setAnnounce(last.error ? "Atlas couldn't answer that." : "Atlas answered.");
+      setAnnounce(last.error ? "Atlas couldn’t answer that." : "Atlas answered.");
     }
     prevStreaming.current = streaming;
   }, [messages]);
@@ -300,7 +300,7 @@ export function AskChat({
           <div className="h-4 w-56 max-w-[60%] animate-pulse rounded bg-muted" />
         </div>
       ) : title ? (
-        // Fixed h-11 + border-b so the title's separator lines up with the sidebar header's.
+        // Fixed h-11 + border-b so the title’s separator lines up with the sidebar header’s.
         <div className="mb-3 flex h-11 shrink-0 items-center border-b border-border">
           <h2 className="truncate text-sm font-semibold text-foreground" title={title}>
             {title}
@@ -486,7 +486,7 @@ function AssistantBubble({
           </div>
         ) : message.text.length === 0 && !message.streaming ? (
           <p className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
-            The model returned no answer - it may be rate-limited or unavailable. Try a different
+            The model returned no answer — it may be rate-limited or unavailable. Try a different
             model in Settings.
           </p>
         ) : (
@@ -858,7 +858,7 @@ function EmptyState({
           <h2 className="text-3xl font-semibold text-foreground">Ask Atlas</h2>
           <p className="mx-auto mt-1.5 max-w-md text-sm text-muted-foreground">
             Ask about your infrastructure, code, and deploys. Every answer is grounded in your graph
-            - cited, confidence-tiered, and honest when it doesn’t know.
+            — cited, confidence-tiered, and honest when it doesn’t know.
           </p>
         </div>
       </div>

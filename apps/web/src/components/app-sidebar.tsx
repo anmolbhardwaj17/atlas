@@ -187,7 +187,7 @@ export function AppSidebar() {
       <SidebarContent>
         {(
           [
-            ["Workspace", WORKSPACE_NAV],
+            ["Overview", WORKSPACE_NAV],
             ["Manage", MANAGE_NAV],
           ] as const
         ).map(([label, items]) => (
@@ -211,7 +211,7 @@ export function AppSidebar() {
                         ) : item.href === "/sift" ? (
                           <SiftMark className="size-2.5 shrink-0" />
                         ) : (
-                          // The Ask Atlas mark reads a touch bigger than the lucide glyphs (it's a
+                          // The Ask Atlas mark reads a touch bigger than the lucide glyphs (it’s a
                           // filled sphere, not a line icon); the row height is fixed so this adds no
                           // spacing between items.
                           <AtlasAiMark size={20} className="size-5 shrink-0" />

@@ -147,7 +147,7 @@ export function IntegrationsHub({
   const [findingLinks, setFindingLinks] = React.useState(false);
   const [linkingIntent, setLinkingIntent] = React.useState(false);
 
-  // Ask the AI to propose repo→runtime links deterministic matching can't catch. They appear in
+  // Ask the AI to propose repo→runtime links deterministic matching can’t catch. They appear in
   // the graph badged "AI-suggested" for the user to confirm or reject.
   async function findAiLinks(): Promise<void> {
     setFindingLinks(true);
@@ -165,7 +165,7 @@ export function IntegrationsHub({
         },
       );
     } catch (e) {
-      toast.error("Couldn't generate AI links", {
+      toast.error("Couldn’t generate AI links", {
         description: e instanceof Error ? e.message : undefined,
       });
     } finally {
@@ -193,7 +193,7 @@ export function IntegrationsHub({
         },
       );
     } catch (e) {
-      toast.error("Couldn't suggest PR↔ticket links", {
+      toast.error("Couldn’t suggest PR↔ticket links", {
         description: e instanceof Error ? e.message : undefined,
       });
     } finally {
@@ -216,7 +216,7 @@ export function IntegrationsHub({
             : "No changes — the graph was already up to date.",
       });
     } catch (e) {
-      toast.error("Couldn't rebuild links", {
+      toast.error("Couldn’t rebuild links", {
         description: e instanceof Error ? e.message : undefined,
       });
     } finally {
@@ -315,7 +315,8 @@ export function IntegrationsHub({
                 </Button>
               ) : null}
               <span className="text-xs text-muted-foreground">
-                Re-derive links, or let AI propose ones matching can&rsquo;t catch.
+                Re-derive links, or let AI propose ones that deterministic matching can&rsquo;t
+                catch.
               </span>
             </div>
           ) : null}
@@ -577,7 +578,7 @@ function AlertManageSheet({
   const kind = provider.id as ChannelKind;
   const meta = ALERT_META[kind] ?? {
     placeholder: "https://…",
-    help: "Paste the channel's incoming webhook URL.",
+    help: "Paste the channel’s incoming webhook URL.",
   };
   const connected = channel?.enabled === true;
   const [url, setUrl] = React.useState("");
@@ -619,7 +620,7 @@ function AlertManageSheet({
       toast.success(`${provider.name} disconnected`);
       router.refresh();
     } catch (e) {
-      toast.error("Couldn't disconnect", {
+      toast.error("Couldn’t disconnect", {
         description: e instanceof Error ? e.message : undefined,
       });
     } finally {
@@ -967,7 +968,7 @@ function ConnectionBlock({
       });
       router.refresh();
     } catch (e) {
-      toast.error("Couldn't disconnect", {
+      toast.error("Couldn’t disconnect", {
         description: e instanceof Error ? e.message : "Please try again.",
       });
     } finally {
@@ -985,9 +986,9 @@ function ConnectionBlock({
       });
       router.refresh(); // the row's live "Syncing…" state takes over from here
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Couldn't start a sync.";
+      const message = e instanceof Error ? e.message : "Couldn’t start a sync.";
       setNote(message);
-      toast.error("Couldn't start a sync", { description: message });
+      toast.error("Couldn’t start a sync", { description: message });
     } finally {
       setTriggering(false);
     }
@@ -1003,9 +1004,9 @@ function ConnectionBlock({
       toast.success(`${conn.displayName} verified`, { description: "Atlas is starting a sync." });
       router.refresh();
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Still couldn't verify.";
+      const message = e instanceof Error ? e.message : "Still couldn’t verify.";
       setNote(message);
-      toast.error("Still couldn't verify", { description: message });
+      toast.error("Still couldn’t verify", { description: message });
     } finally {
       setTriggering(false);
     }
@@ -1168,9 +1169,9 @@ function ConnectionBlock({
             <AlertDialogTitle>Disconnect {conn.displayName}?</AlertDialogTitle>
             <AlertDialogDescription>
               This removes the connection and{" "}
-              <strong>purges everything Atlas learned from it</strong> - its resources, edges, and
+              <strong>purges everything Atlas learned from it</strong> — its resources, edges, and
               signals disappear from your graph, map, and Ask AI answers. Reconnecting later starts
-              a fresh sync. This can&apos;t be undone.
+              a fresh sync. This can&rsquo;t be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1275,7 +1276,7 @@ function ConnectSheet({
           apiToken: token.trim(),
         });
         if (verified.status === "error") {
-          setError("Bitbucket rejected the credentials - check the email, token, and its scopes.");
+          setError("Bitbucket rejected the credentials — check the email, token, and its scopes.");
           setBusy(false);
           return;
         }
@@ -1302,7 +1303,7 @@ function ConnectSheet({
         });
         if (verified.status === "error") {
           setError(
-            "AWS rejected the credentials - check the Access Key ID, Secret Access Key, and that the IAM user has read access.",
+            "AWS rejected the credentials — check the Access Key ID, Secret Access Key, and that the IAM user has read access.",
           );
           setBusy(false);
           return;
@@ -1325,7 +1326,7 @@ function ConnectSheet({
         });
         if (verified.status === "error") {
           setError(
-            "Jenkins rejected the credentials - check the server URL, username, and API token.",
+            "Jenkins rejected the credentials — check the server URL, username, and API token.",
           );
           setBusy(false);
           return;
@@ -1347,7 +1348,7 @@ function ConnectSheet({
           apiToken: token.trim(),
         });
         if (verified.status === "error") {
-          setError("Jira rejected the credentials - check the site, email, token, and its scope.");
+          setError("Jira rejected the credentials — check the site, email, token, and its scope.");
           setBusy(false);
           return;
         }
@@ -1416,7 +1417,7 @@ function ConnectSheet({
                         id="bb-workspace"
                         value={workspace}
                         onChange={(e) => setWorkspace(e.target.value)}
-                        placeholder="e.g. siemba - leave blank to auto-detect"
+                        placeholder="e.g. siemba — leave blank to auto-detect"
                         autoComplete="off"
                       />
                     </div>
@@ -1446,7 +1447,7 @@ function ConnectSheet({
                         autoComplete="off"
                       />
                       <p className="text-xs text-muted-foreground">
-                        Sent once to verify + stored encrypted in the secrets broker - never saved
+                        Sent once to verify + stored encrypted in the secrets broker — never saved
                         in the database or shown again.
                       </p>
                     </div>
@@ -1492,7 +1493,7 @@ function ConnectSheet({
                         spellCheck={false}
                       />
                       <p className="text-xs text-muted-foreground">
-                        Sent once to verify + stored encrypted in the secrets broker - never saved
+                        Sent once to verify + stored encrypted in the secrets broker — never saved
                         in the database or shown again. Use an IAM user with a read-only policy.
                       </p>
                     </div>
@@ -1537,7 +1538,7 @@ function ConnectSheet({
                         autoComplete="off"
                       />
                       <p className="text-xs text-muted-foreground">
-                        Sent once to verify + stored encrypted in the secrets broker - never saved
+                        Sent once to verify + stored encrypted in the secrets broker — never saved
                         in the database or shown again. Use a user with Overall/Read + Job/Read
                         only.
                       </p>
@@ -1584,7 +1585,7 @@ function ConnectSheet({
                         autoComplete="off"
                       />
                       <p className="text-xs text-muted-foreground">
-                        Sent once to verify + stored encrypted in the secrets broker - never saved
+                        Sent once to verify + stored encrypted in the secrets broker — never saved
                         in the database or shown again.
                       </p>
                     </div>

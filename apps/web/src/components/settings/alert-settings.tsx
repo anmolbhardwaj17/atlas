@@ -48,7 +48,7 @@ export function AlertSettingsCard({ orgId }: { orgId: string }) {
     if (ok) toast.success("Alert policy updated.");
     else {
       setPolicy(prev);
-      toast.error("Couldn't save the alert policy.");
+      toast.error("Couldn’t save the alert policy.");
     }
   }
 

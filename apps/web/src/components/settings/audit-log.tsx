@@ -48,7 +48,7 @@ export async function AuditLog({ orgId, token }: { orgId: string; token: string 
             bare
             icon={ScrollText}
             title="No activity yet"
-            description="Security-relevant actions - organization, member, and connection changes - will appear here."
+            description="Security-relevant actions — organization, member, and connection changes — will appear here."
           />
         ) : (
           <ul className="-mr-2 max-h-96 divide-y divide-border overflow-y-auto pr-2">

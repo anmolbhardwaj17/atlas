@@ -176,7 +176,7 @@ export function WarRoomMap(props: {
   if (!has) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        This resource isn&apos;t on the map.
+        This resource isn&rsquo;t on the map.
       </div>
     );
   }

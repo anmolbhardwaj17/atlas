@@ -36,7 +36,7 @@ async function IntegrationsContent() {
   const [connections, channels, slack, discord] = await Promise.all([
     apiGet<ApiOk<ConnectionSummary[]>>("/connections", auth).then((r) => r.body?.data ?? []),
     apiGet<ApiOk<ChannelSummary[]>>("/notifications", auth).then((r) => r.body?.data ?? []),
-    // Admin-only routes — non-admins simply don't get the install controls (null → card shows a note).
+    // Admin-only routes — non-admins simply don’t get the install controls (null → card shows a note).
     canManage
       ? apiGet<ApiOk<SlackAskStatus>>("/integrations/slack", auth).then((r) => r.body?.data ?? null)
       : Promise.resolve(null),

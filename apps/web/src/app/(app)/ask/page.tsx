@@ -33,7 +33,7 @@ function suggestions(s: SummaryLite | undefined): string[] {
   // Operational + security hooks first (only when there's actually something to look at), so the most
   // useful question surfaces when the estate needs attention.
   if (/unhealthy|degraded|broken|down|failing|error rate|incident/i.test(findingText)) {
-    out.push("What's unhealthy right now, and what's the likely cause?");
+    out.push("What’s unhealthy right now, and what’s the likely cause?");
   }
   if (/vulnerab|\bCVE\b|exposed|outdated/i.test(findingText)) {
     out.push("Which internet-exposed services are running a vulnerable dependency?");

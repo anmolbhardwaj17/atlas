@@ -164,7 +164,7 @@ export async function Dashboard({
             {firstName ? `, ${firstName}` : ""}
           </h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            Here&apos;s what needs your attention across the estate.
+            Here&rsquo;s what needs your attention across the estate.
           </p>
         </div>
         <div className="flex items-center gap-2.5">
@@ -422,12 +422,12 @@ function NeedsAttention({ findings }: { findings: Finding[] }) {
             <div>
               <div className="font-medium">Nothing needs attention</div>
               <div className="text-muted-foreground">
-                Your graph looks healthy - no risks, drift, or unhealthy sources right now.
+                Your graph looks healthy — no risks, drift, or unhealthy sources right now.
               </div>
             </div>
           </div>
         ) : (
-          // Absolutely-positioned list so the findings don't drive the rail's height (the KPI +
+          // Absolutely-positioned list so the findings don’t drive the rail’s height (the KPI +
           // Ask stack on the left does) — overflow scrolls internally.
           <div className="relative min-h-0 flex-1">
             <div className="absolute inset-0 -mx-2 overflow-y-auto">
@@ -616,7 +616,7 @@ function Insights({ insights }: { insights: Summary["insights"] }) {
           <h2 className="text-base font-semibold">Insights</h2>
         </div>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Delivery activity over the last 30 days — who&apos;s shipping, what&apos;s active, and
+          Delivery activity over the last 30 days — who&rsquo;s shipping, what&rsquo;s active, and
           CI/CD coverage.
         </p>
       </div>
@@ -762,7 +762,7 @@ function InventoryCard({
           {icons.length ? (
             <div className="flex items-center gap-1.5">
               {icons.map((l) => (
-                // White chip so brand marks (e.g. AWS's dark wordmark) stay legible in dark mode.
+                // White chip so brand marks (e.g. AWS’s dark wordmark) stay legible in dark mode.
                 <span
                   key={l}
                   className="grid size-6 place-items-center rounded-md bg-white ring-1 ring-black/5"

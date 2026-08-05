@@ -48,7 +48,7 @@ export default function InviteAcceptPage() {
         }, 1400);
       } catch (e) {
         if (!cancelled) {
-          setState({ k: "error", msg: e instanceof Error ? e.message : "Couldn't accept." });
+          setState({ k: "error", msg: e instanceof Error ? e.message : "Couldn’t accept." });
         }
       }
     })();
@@ -73,7 +73,7 @@ export default function InviteAcceptPage() {
 
         {state.k === "signin" && (
           <>
-            <h1 className="mt-5 text-lg font-semibold tracking-tight">You&apos;ve been invited</h1>
+            <h1 className="mt-5 text-lg font-semibold tracking-tight">You&rsquo;ve been invited</h1>
             <p className="mt-1.5 text-sm text-muted-foreground">
               Sign in to accept — use the email the invitation was sent to.
             </p>
@@ -88,7 +88,7 @@ export default function InviteAcceptPage() {
         {state.k === "done" && (
           <>
             <CheckCircle2 className="mx-auto mt-6 size-7 text-success" />
-            <h1 className="mt-3 text-lg font-semibold tracking-tight">You&apos;re in</h1>
+            <h1 className="mt-3 text-lg font-semibold tracking-tight">You&rsquo;re in</h1>
             <p className="mt-1.5 text-sm text-muted-foreground">
               Joined <span className="font-medium text-foreground">{state.org}</span>. Taking you to
               your dashboard…
@@ -99,7 +99,7 @@ export default function InviteAcceptPage() {
         {state.k === "error" && (
           <>
             <XCircle className="mx-auto mt-6 size-7 text-danger" />
-            <h1 className="mt-3 text-lg font-semibold tracking-tight">Couldn&apos;t accept</h1>
+            <h1 className="mt-3 text-lg font-semibold tracking-tight">Couldn&rsquo;t accept</h1>
             <p className="mt-1.5 text-sm text-muted-foreground">{state.msg}</p>
             <Button asChild variant="outline" className="mt-6 w-full">
               <Link href="/dashboard">Go to Atlas</Link>

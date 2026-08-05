@@ -152,7 +152,7 @@ export function NotificationBell({ orgId }: { orgId: string }) {
               ) : items.length === 0 ? (
                 <div className="px-4 py-10 text-center">
                   <Bell className="mx-auto mb-2 size-5 text-muted-foreground" />
-                  <p className="text-sm font-medium">You&apos;re all caught up</p>
+                  <p className="text-sm font-medium">You&rsquo;re all caught up</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     Health changes and other alerts will show up here.
                   </p>

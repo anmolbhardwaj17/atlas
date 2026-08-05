@@ -312,7 +312,7 @@ export function CommandPalette({ orgId }: { orgId: string }) {
           ) : null}
           {items.length === 0 && !searching ? (
             <li className="px-3 py-10 text-center text-sm text-muted-foreground">
-              No matches - try a resource name, or press ↵ to ask Atlas.
+              No matches — try a resource name, or press ↵ to ask Atlas.
             </li>
           ) : (
             items.map((item, i) => {
@@ -362,7 +362,7 @@ export function CommandPalette({ orgId }: { orgId: string }) {
                         <CornerDownLeft size={13} className="shrink-0 text-muted-foreground" />
                       ) : (
                         // Surface the Shift alternate action inline on the row (not just the footer),
-                        // so it's discoverable: a persistent "⇧ ask" chip that lights up — and swaps
+                        // so it’s discoverable: a persistent "⇧ ask" chip that lights up — and swaps
                         // the ↵ for the AI mark — while Shift is actually held.
                         <span className="flex shrink-0 items-center gap-2">
                           <span

@@ -25,7 +25,7 @@ export function SampleDataBanner({ orgId }: { orgId: string }) {
       // The dashboard is a server component — refresh re-renders it (now empty → onboarding).
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't clear the sample data.");
+      setError(e instanceof Error ? e.message : "Couldn’t clear the sample data.");
       setBusy(false);
     }
   }
@@ -35,7 +35,7 @@ export function SampleDataBanner({ orgId }: { orgId: string }) {
       <div className="flex items-center gap-2.5 text-sm">
         <Sparkles className="size-4 shrink-0 text-muted-foreground" />
         <span>
-          <span className="font-medium">You&apos;re exploring sample data.</span>{" "}
+          <span className="font-medium">You&rsquo;re exploring sample data.</span>{" "}
           <span className="text-muted-foreground">
             A demo estate built through the real pipeline — clear it anytime to connect your own.
           </span>

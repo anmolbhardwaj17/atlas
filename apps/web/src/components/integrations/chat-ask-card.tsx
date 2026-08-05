@@ -76,7 +76,7 @@ export function ChatAskCard({
         description:
           reason === "already_connected_to_another_org"
             ? `This ${platform.surface} is already connected to another Atlas organization.`
-            : "The install didn't complete. Please try again.",
+            : "The install didn’t complete. Please try again.",
       });
     }
     router.replace("/integrations");
@@ -89,7 +89,7 @@ export function ChatAskCard({
       toast.success(`${platform.label} disconnected`);
       router.refresh();
     } catch (e) {
-      toast.error("Couldn't disconnect", {
+      toast.error("Couldn’t disconnect", {
         description: e instanceof Error ? e.message : undefined,
       });
     } finally {

@@ -123,7 +123,7 @@ export function SuggestedLinksReview({
       toast.success(action === "confirm" ? "Link confirmed" : "Suggestion dismissed");
       onChange?.();
     } catch (e) {
-      toast.error(action === "confirm" ? "Couldn't confirm" : "Couldn't reject", {
+      toast.error(action === "confirm" ? "Couldn’t confirm" : "Couldn’t reject", {
         description: e instanceof Error ? e.message : undefined,
       });
     } finally {
@@ -169,7 +169,7 @@ export function SuggestedLinksReview({
       await load();
       onChange?.();
     } catch (e) {
-      toast.error("Couldn't generate suggestions", {
+      toast.error("Couldn’t generate suggestions", {
         description: e instanceof Error ? e.message : undefined,
       });
     } finally {
@@ -321,7 +321,7 @@ export function SuggestedLinksReview({
                 No links to review.
               </p>
               <p className="mt-1">
-                Atlas can propose repo → runtime links that the naming/tags don't reveal — you
+                Atlas can propose repo → runtime links that the naming/tags don’t reveal — you
                 confirm or reject each.
               </p>
               <button

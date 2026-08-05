@@ -139,7 +139,7 @@ export default function LoginPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
             Sign in to Atlas
           </h1>
-          <p className="mt-1.5 text-sm text-neutral-500">Everything you run, one sign-in away.</p>
+          <p className="mt-1.5 text-sm text-neutral-500">Sign in to continue.</p>
 
           <Button onClick={signInWithGoogle} disabled={busy} className="mt-8 h-12 w-full gap-2.5">
             <span className="grid size-6 shrink-0 place-items-center rounded-full bg-white">

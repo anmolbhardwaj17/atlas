@@ -35,7 +35,7 @@ const STATUS: Record<
 > = {
   implemented: { label: "Addressed", text: "text-success", Icon: Check },
   "possibly-missing": { label: "Worth a look", text: "text-warning", Icon: HelpCircle },
-  "cannot-tell": { label: "Can't tell", text: "text-muted-foreground", Icon: CircleHelp },
+  "cannot-tell": { label: "Can’t tell", text: "text-muted-foreground", Icon: CircleHelp },
 };
 
 const SOURCE_LABEL: Record<CoverageCriterion["source"], string> = {
@@ -108,7 +108,7 @@ function Assessment({
   if (a.status === "no-intent") {
     return (
       <p className="px-5 py-4 text-sm text-muted-foreground">
-        No linked Jira issue, so there's no stated intent to check this against. Reference a ticket
+        No linked Jira issue, so there’s no stated intent to check this against. Reference a ticket
         key in the PR (or connect Jira) to enable a coverage review.
       </p>
     );
@@ -118,7 +118,7 @@ function Assessment({
       <div className="px-5 py-4 text-sm text-muted-foreground">
         {a.issue ? <IssueChip issue={a.issue} /> : null}
         <p className="mt-2">
-          The diff for this PR isn't available right now, so its coverage couldn't be checked.
+          The diff for this PR isn’t available right now, so its coverage couldn’t be checked.
         </p>
       </div>
     );
@@ -222,7 +222,10 @@ export function IntentCoverage({ orgId, prId }: { orgId: string; prId: string })
       .catch((e: unknown) =>
         setState({
           phase: "error",
-          message: e instanceof Error ? e.message : "Something went wrong.",
+          message:
+            e instanceof Error
+              ? e.message
+              : "Couldn’t review this pull request. Try again in a moment.",
         }),
       );
   };

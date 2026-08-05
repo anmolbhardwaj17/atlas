@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { openIncident, type Incident } from "@/lib/browser-api";
 
 /**
- * "Take to War Room" (docs/plans/war-room.md). Opens (or reuses) an incident for a node and navigates
+ * "Open War Room" (docs/plans/war-room.md). Opens (or reuses) an incident for a node and navigates
  * to its War Room. Rendered wherever something is broken — a finding, a red map node, an alert.
  */
 export function WarRoomButton({

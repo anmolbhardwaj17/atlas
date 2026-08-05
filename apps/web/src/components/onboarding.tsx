@@ -15,7 +15,7 @@ import { seedDemo } from "@/lib/browser-api";
  * Onboarding / first-run empty state (P1.2, docs/09 §8). A new org has already chosen Atlas, so this
  * screen's ONE job is the fastest path from empty → first value: connect a real source (the real
  * payoff) or load sample data (instant). Deliberately lean and action-first — the marketing-style
- * "what you'll get" capability carousel now lives in `./onboarding/capability-marquee` (ready for a
+ * "what you’ll get" capability carousel now lives in `./onboarding/capability-marquee` (ready for a
  * landing page) and is intentionally NOT rendered here.
  */
 
@@ -72,7 +72,7 @@ export function Onboarding({
           <h1 className="text-pretty text-3xl font-semibold tracking-tight md:text-4xl">
             {firstName
               ? `Let's build your graph, ${firstName}`
-              : "Let's build your knowledge graph"}
+              : "Let’s build your knowledge graph"}
           </h1>
           <p className="max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
             Connect a source and Atlas turns your cloud and code into one live, cited graph you can
@@ -162,7 +162,9 @@ function SampleDataCard({ orgId, canSeed }: { orgId: string; canSeed: boolean })
       // The dashboard is a server component - refresh re-renders it with the seeded graph.
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong.");
+      setError(
+        e instanceof Error ? e.message : "Couldn’t load the sample data. Try again in a moment.",
+      );
       setState("error");
     }
   }
@@ -249,7 +251,7 @@ const MORE_PREVIEW = ["gitlab", "datadog", "slack"]
   .map((id) => PROVIDERS.find((p) => p.id === id))
   .filter((p): p is (typeof PROVIDERS)[number] => Boolean(p));
 
-/** A provider picker — each tile jumps to the Integrations page with that provider's guided setup
+/** A provider picker — each tile jumps to the Integrations page with that provider’s guided setup
  *  already open (`?connect=<id>`). A final "more" tile opens the full catalog, so a new user sees
  *  that Atlas connects far more than the handful shown here. */
 function ConnectSource() {

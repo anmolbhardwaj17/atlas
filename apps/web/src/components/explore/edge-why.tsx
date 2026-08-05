@@ -40,7 +40,7 @@ export function EdgeWhy({
       toast.success("Link confirmed");
       onResolved?.();
     } catch (e) {
-      toast.error("Couldn't confirm", { description: e instanceof Error ? e.message : undefined });
+      toast.error("Couldn’t confirm", { description: e instanceof Error ? e.message : undefined });
     } finally {
       setBusy(false);
     }
@@ -54,7 +54,7 @@ export function EdgeWhy({
       toast.success("Suggestion dismissed");
       onResolved?.();
     } catch (e) {
-      toast.error("Couldn't reject", { description: e instanceof Error ? e.message : undefined });
+      toast.error("Couldn’t reject", { description: e instanceof Error ? e.message : undefined });
     } finally {
       setBusy(false);
     }

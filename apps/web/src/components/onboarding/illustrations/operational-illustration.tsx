@@ -7,7 +7,7 @@ import { CloudIcon } from "@/components/cloud-icon";
  * "Operational intelligence" illustration — a realistic service-health chart card: a metric that's
  * steady then spikes into an incident (rose marker + ping), with a floating AI callout that has
  * already found the root cause and cites the offending PR (GitHub logo + Atlas AI mark). UI-real:
- * a chart, a status pill, brand logos — the "broken right now, here's why" moment.
+ * a chart, a status pill, brand logos — the "broken right now, here’s why" moment.
  */
 
 // Chart polyline in a 230×64 space: mostly flat, then a sharp spike at the end (the incident).
@@ -75,7 +75,7 @@ export function OperationalIllustration() {
           </span>
         </div>
 
-        {/* AI root-cause callout — the "here's why" moment. */}
+        {/* AI root-cause callout — the "here’s why" moment. */}
         <div className="illo-float absolute bottom-1.5 left-1.5 flex items-center gap-1.5 rounded-lg border border-border bg-background px-2 py-1.5 shadow-md">
           <AtlasAiMark size={14} className="size-3.5 shrink-0" />
           <div className="leading-tight">

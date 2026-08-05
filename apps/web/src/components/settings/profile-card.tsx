@@ -98,7 +98,7 @@ export function ProfileCard({
       router.refresh(); // refresh the header avatar (server-rendered from the shell)
       toast.success("Photo updated");
     } catch (err) {
-      toast.error("Couldn't upload the photo", {
+      toast.error("Couldn’t upload the photo", {
         description: err instanceof Error ? err.message : undefined,
       });
     } finally {
@@ -125,7 +125,7 @@ export function ProfileCard({
       router.refresh(); // refresh the header avatar/name (server-rendered from the shell)
       toast.success("Profile updated");
     } catch (e) {
-      toast.error("Couldn't update your profile", {
+      toast.error("Couldn’t update your profile", {
         description: e instanceof Error ? e.message : undefined,
       });
     } finally {

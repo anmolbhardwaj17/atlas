@@ -104,7 +104,7 @@ async function ExploreContent({ searchParams }: { searchParams: Promise<SearchPa
       <div className="space-y-1.5">
         <h1 className="text-2xl font-semibold tracking-tight">Explore</h1>
         <p className="text-sm text-muted-foreground">
-          Your infrastructure and code - repositories, services, datastores, and cloud resources.
+          Your infrastructure and code — repositories, services, datastores, and cloud resources.
           Filter by type, source, health, or status; click through for provenance and connections.
         </p>
       </div>
@@ -117,7 +117,7 @@ async function ExploreContent({ searchParams }: { searchParams: Promise<SearchPa
         {res.status !== 0 && res.body === null ? (
           <ErrorState
             title="Couldn’t load resources"
-            description={`The graph read failed (status ${res.status}). Try again in a moment.`}
+            description="We couldn’t read your graph just now. This is usually temporary — try again in a moment."
           />
         ) : (
           <div className="space-y-3">

@@ -18,7 +18,7 @@ import { AskIllustration } from "@/components/onboarding/illustrations/ask-illus
 import { AlertsIllustration } from "@/components/onboarding/illustrations/alerts-illustration";
 
 /**
- * The "What you'll get" capability carousel — a full-bleed, infinitely-scrolling row of richly
+ * The "What you’ll get" capability carousel — a full-bleed, infinitely-scrolling row of richly
  * illustrated capability cards. Built for the onboarding but pulled out of it: onboarding is now
  * lean and action-first, so this doesn't render there anymore. It's kept intact and exported for
  * reuse (e.g. a marketing / landing page, where selling a product people haven't chosen yet belongs).
@@ -59,7 +59,7 @@ export const CAPABILITIES: Capability[] = [
   {
     icon: Activity,
     title: "Operational intelligence",
-    body: "See what's broken right now — with an AI root-cause, down to the PR.",
+    body: "See what’s broken right now — with an AI root-cause, down to the PR.",
     tint: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
     Illustration: OperationalIllustration,
   },

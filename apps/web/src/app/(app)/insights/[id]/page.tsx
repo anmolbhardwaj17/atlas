@@ -117,7 +117,7 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
         <SetBreadcrumbs items={[{ label: "Insights", href: "/insights" }, { label: "Finding" }]} />
         <ErrorState
           title="This finding cleared"
-          description="It's no longer flagged in your latest graph - either it was fixed and auto-resolved, or the resource went away. Nice."
+          description="It’s no longer flagged in your latest graph — either it was fixed and auto-resolved, or the resource went away. Nice."
           actions={
             <Link
               href="/insights"
@@ -382,7 +382,7 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
           </ul>
         </div>
       ) : finding.detail ? (
-        // No structured evidence nodes — show the finding's own detail text as the proof.
+        // No structured evidence nodes — show the finding’s own detail text as the proof.
         <div className="space-y-3">
           <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             <ScanSearch className="size-3.5" /> Evidence

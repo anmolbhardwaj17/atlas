@@ -50,7 +50,7 @@ function IncidentRow({ i }: { i: Incident }) {
 }
 
 /**
- * War Room home (docs/plans/war-room.md). Incidents are an OPERATIONAL surface — "what's broken now" —
+ * War Room home (docs/plans/war-room.md). Incidents are an OPERATIONAL surface — "what’s broken now" —
  * distinct from Insights (posture). Active investigations up top, closed history below. Start one from
  * a red map node, an alert, or an Insights finding.
  */
@@ -78,7 +78,7 @@ async function WarRoomContent() {
           <Crosshair className="size-6 text-danger" /> War Room
         </h1>
         <p className="text-sm text-muted-foreground">
-          Investigate what&apos;s broken — a live, cited trace from the failing resource to the
+          Investigate what&rsquo;s broken — a live, cited trace from the failing resource to the
           likely cause. Start one from a red node on the map or a finding in Insights.
         </p>
       </div>

@@ -51,7 +51,7 @@ export function AskWorkspace({
         description: removed?.title ? `"${removed.title}" was removed.` : undefined,
       });
     } catch {
-      toast.error("Couldn't delete the chat", { description: "Please try again." });
+      toast.error("Couldn’t delete the chat", { description: "Please try again." });
     }
   }
 

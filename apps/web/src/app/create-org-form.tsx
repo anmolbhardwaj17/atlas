@@ -102,7 +102,7 @@ export function CreateOrgForm() {
       setLogo(await fileToLogoDataUrl(file));
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't read that image.");
+      setError(err instanceof Error ? err.message : "Couldn’t read that image.");
     }
   }
 
@@ -124,7 +124,7 @@ export function CreateOrgForm() {
   async function submit(skip: boolean): Promise<void> {
     if (!name.trim()) {
       setStep(1);
-      setError("Please name your workspace.");
+      setError("Please name your organization.");
       return;
     }
     setBusy(true);
@@ -143,8 +143,8 @@ export function CreateOrgForm() {
         const message =
           typeof body === "object" && body !== null && "error" in body
             ? (body as { error: { message?: string } }).error.message
-            : `Request failed (${res.status})`;
-        setError(message ?? `Request failed (${res.status})`);
+            : null;
+        setError(message ?? "Couldn’t create your organization. Try again in a moment.");
         setStep(1);
         return;
       }
@@ -182,7 +182,7 @@ export function CreateOrgForm() {
       router.push("/dashboard");
       router.refresh();
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError("Couldn’t create your organization. Try again in a moment.");
       setStep(1);
     } finally {
       setBusy(false);
@@ -195,9 +195,9 @@ export function CreateOrgForm() {
 
       {step === 1 ? (
         <>
-          <h2 className="mt-3 text-2xl font-semibold tracking-tight">Name your workspace</h2>
+          <h2 className="mt-3 text-2xl font-semibold tracking-tight">Name your organization</h2>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            This is where your team&apos;s graph lives. You can change it later.
+            This is where your team&rsquo;s graph lives. You can change it later.
           </p>
           <form onSubmit={toQuestions} className="mt-6 space-y-4">
             <div className="flex items-center gap-3">
@@ -259,7 +259,7 @@ export function CreateOrgForm() {
           </p>
 
           <div className="mt-6 space-y-6">
-            <Field label="What's your role?">
+            <Field label="What’s your role?">
               <div className="flex flex-wrap gap-2">
                 {ROLES.map((o) => (
                   <Chip
@@ -301,7 +301,7 @@ export function CreateOrgForm() {
               </div>
             </Field>
 
-            <Field label="What's in your stack?" hint="Pick any">
+            <Field label="What’s in your stack?" hint="Pick any">
               <div className="flex flex-wrap gap-2">
                 {PROVIDERS.map((p) => (
                   <Chip
@@ -356,7 +356,7 @@ export function CreateOrgForm() {
                   <Loader2 className="size-4 animate-spin" />
                 ) : (
                   <>
-                    Create workspace <ArrowRight className="size-4" />
+                    Create organization <ArrowRight className="size-4" />
                   </>
                 )}
               </Button>

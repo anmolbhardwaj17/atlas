@@ -25,7 +25,7 @@ export default function AppError({
   return (
     <div className="flex min-h-[60vh] items-center justify-center p-6">
       <ErrorState
-        title="Couldn't load this page"
+        title="Couldn’t load this page"
         description="Something went wrong on our end — this is usually temporary. Try again, or refresh."
         actions={
           <Button size="sm" onClick={() => reset()}>

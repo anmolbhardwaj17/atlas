@@ -40,7 +40,7 @@ export function OrgSwitcher({
   const [currentId, setCurrentId] = React.useState<string | null>(initialCurrentId ?? null);
   // The whole app re-renders server-side on an org switch (force-dynamic + router.refresh), which
   // takes a beat. Without feedback the OLD org's page lingers and reads as broken. useTransition
-  // keeps isPending true until that re-render lands, so we can show a "Switching workspace…" overlay.
+  // keeps isPending true until that re-render lands, so we can show a "Switching organization…" overlay.
   const [isSwitching, startSwitch] = React.useTransition();
 
   const load = React.useCallback(async () => {
@@ -102,7 +102,7 @@ export function OrgSwitcher({
               />
             </div>
             <div className="space-y-1 text-center">
-              <p className="text-sm font-medium">Switching workspace</p>
+              <p className="text-sm font-medium">Switching organization</p>
               <p className="text-sm text-muted-foreground">
                 Loading <span className="text-foreground">{current.orgName}</span>…
               </p>

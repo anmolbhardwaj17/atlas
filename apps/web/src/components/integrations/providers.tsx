@@ -45,7 +45,7 @@ export const PROVIDERS: ProviderMeta[] = [
     name: "Amazon Web Services",
     category: "Cloud",
     status: "available",
-    blurb: "EC2, ECS, Lambda, RDS, DynamoDB, VPC, IAM and more - via a read-only role.",
+    blurb: "EC2, ECS, Lambda, RDS, DynamoDB, VPC, IAM and more — via a read-only role.",
     logo: "aws",
   },
   {
@@ -53,7 +53,7 @@ export const PROVIDERS: ProviderMeta[] = [
     name: "Microsoft Azure",
     category: "Cloud",
     status: "available",
-    blurb: "VMs, AKS, App Service, SQL - via a read-only service principal.",
+    blurb: "VMs, AKS, App Service, SQL — via a read-only service principal.",
     logo: "microsoft-azure",
   },
   {
@@ -61,7 +61,7 @@ export const PROVIDERS: ProviderMeta[] = [
     name: "Google Cloud",
     category: "Cloud",
     status: "available",
-    blurb: "Compute Engine, GKE, Cloud SQL, Pub/Sub - via a read-only service account.",
+    blurb: "Compute Engine, GKE, Cloud SQL, Pub/Sub — via a read-only service account.",
     logo: "google-cloud",
   },
   // ── Code ──
@@ -70,7 +70,7 @@ export const PROVIDERS: ProviderMeta[] = [
     name: "GitHub",
     category: "Code",
     status: "available",
-    blurb: "Repositories, workflows, dependencies and ownership - via a read-only App.",
+    blurb: "Repositories, workflows, dependencies and ownership — via a read-only App.",
     logo: "github-icon",
   },
   {
@@ -78,7 +78,7 @@ export const PROVIDERS: ProviderMeta[] = [
     name: "Bitbucket",
     category: "Code",
     status: "available",
-    blurb: "Repositories, Pipelines, and pull requests - via a read-only App password.",
+    blurb: "Repositories, Pipelines, and pull requests — via a read-only App password.",
     logo: "bitbucket",
   },
   {
@@ -105,7 +105,7 @@ export const PROVIDERS: ProviderMeta[] = [
     name: "Jenkins",
     category: "CI/CD",
     status: "available",
-    blurb: "Jobs, pipelines, and deployments - links what ships to the infra it runs on.",
+    blurb: "Jobs, pipelines, and deployments — links what ships to the infra it runs on.",
     logo: "jenkins",
   },
   {
@@ -113,7 +113,7 @@ export const PROVIDERS: ProviderMeta[] = [
     name: "CircleCI",
     category: "CI/CD",
     status: "coming-soon",
-    blurb: "Pipelines and deploy jobs - the code→infra deploy link.",
+    blurb: "Pipelines and deploy jobs — the code→infra deploy link.",
     logo: "circleci",
   },
   {
@@ -121,7 +121,7 @@ export const PROVIDERS: ProviderMeta[] = [
     name: "Argo CD",
     category: "CI/CD",
     status: "coming-soon",
-    blurb: "GitOps app deployments to clusters - declarative, high-signal targets.",
+    blurb: "GitOps app deployments to clusters — declarative, high-signal targets.",
     logo: "argocd",
   },
   // ── Observability ──
@@ -130,7 +130,7 @@ export const PROVIDERS: ProviderMeta[] = [
     name: "Datadog",
     category: "Observability",
     status: "coming-soon",
-    blurb: "Monitors, dashboards, and the service map - richer runtime signal.",
+    blurb: "Monitors, dashboards, and the service map — richer runtime signal.",
     logo: "datadog",
   },
   {
@@ -138,7 +138,7 @@ export const PROVIDERS: ProviderMeta[] = [
     name: "Grafana",
     category: "Observability",
     status: "coming-soon",
-    blurb: "Dashboards, alerts, and metrics - health signal on the graph.",
+    blurb: "Dashboards, alerts, and metrics — health signal on the graph.",
     logo: "grafana",
   },
   // ── Alerts (outbound channels — where Atlas sends findings/incidents; set up via an incoming

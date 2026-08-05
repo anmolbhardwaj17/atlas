@@ -94,7 +94,7 @@ export function ConnectNodeDialog({
       toast.success("Link added");
       onDone();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't add the link.");
+      toast.error(e instanceof Error ? e.message : "Couldn’t add the link.");
       setSubmitting(false);
     }
   };

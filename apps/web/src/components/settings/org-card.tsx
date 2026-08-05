@@ -59,7 +59,7 @@ export function OrgCard({
       notifyOrgUpdated();
       toast.success("Organization renamed");
     } catch (e) {
-      toast.error("Couldn't rename the organization", {
+      toast.error("Couldn’t rename the organization", {
         description: e instanceof Error ? e.message : undefined,
       });
     } finally {
@@ -79,7 +79,7 @@ export function OrgCard({
       notifyOrgUpdated();
       toast.success("Logo updated");
     } catch (err) {
-      toast.error("Couldn't update the logo", {
+      toast.error("Couldn’t update the logo", {
         description: err instanceof Error ? err.message : undefined,
       });
     } finally {
@@ -95,7 +95,7 @@ export function OrgCard({
       notifyOrgUpdated();
       toast.success("Logo removed");
     } catch (err) {
-      toast.error("Couldn't remove the logo", {
+      toast.error("Couldn’t remove the logo", {
         description: err instanceof Error ? err.message : undefined,
       });
     } finally {

@@ -267,7 +267,7 @@ export function NodeDetailView({
             </dl>
           ) : (
             <p className="text-sm text-muted-foreground">
-              No provenance recorded - this node was derived, not directly observed.
+              No provenance recorded — this node was derived, not directly observed.
             </p>
           )}
         </Disclosure>

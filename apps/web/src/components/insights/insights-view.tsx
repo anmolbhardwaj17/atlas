@@ -273,7 +273,7 @@ export function InsightsView({
           ) : null}
         </div>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          What to act on - grounded findings with best-practice guidance. Open any one for the full
+          What to act on — grounded findings with best-practice guidance. Open any one for the full
           fix, evidence, and to track it. Findings are derived live from your graph, so a real fix
           clears them on the next sync.
         </p>
@@ -395,7 +395,7 @@ export function InsightsView({
           <button
             type="button"
             disabled={shown.length === 0}
-            title="Download the findings you're viewing as CSV"
+            title="Download the findings you’re viewing as CSV"
             onClick={() => {
               const csv = toCsv(
                 [
@@ -474,7 +474,7 @@ export function InsightsView({
                   : filtering
                     ? "No findings match your search or filters."
                     : active.length === 0
-                      ? "Nothing needs attention right now - the graph doesn't flag any issues. You're in good shape."
+                      ? "Nothing needs attention right now — the graph doesn’t flag any issues. You’re in good shape."
                       : "No findings here."}
             </p>
             {filtering ? (

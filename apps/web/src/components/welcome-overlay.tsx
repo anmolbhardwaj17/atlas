@@ -131,7 +131,7 @@ export function WelcomeOverlay({
           {firstName ? `Hey ${firstName}!` : "Welcome to Atlas"}
         </h2>
         <p className="mt-2 max-w-xs text-sm text-white/80 [text-shadow:0_2px_16px_rgba(0,0,0,0.3)]">
-          Your workspace is ready. Taking you in…
+          Your organization is ready. Taking you in…
         </p>
       </div>
     </div>

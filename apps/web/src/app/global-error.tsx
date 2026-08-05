@@ -23,7 +23,7 @@ export default function GlobalError({ reset }: { error: Error; reset: () => void
           <div style={{ maxWidth: "28rem" }}>
             <h1 style={{ fontSize: "1.5rem", fontWeight: 600 }}>Something went wrong</h1>
             <p style={{ marginTop: "0.5rem", fontSize: "0.875rem", color: "#666" }}>
-              An unexpected error occurred. You can try again - if it persists, please reload.
+              An unexpected error occurred. You can try again — if it persists, please reload.
             </p>
             <button
               type="button"

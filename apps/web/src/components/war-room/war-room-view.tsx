@@ -62,7 +62,7 @@ const SEV_TEXT: Record<string, string> = SEVERITY_TEXT;
 
 // The structured verdict the model appends (parsed client-side; no AI-backend change). Classifies the
 // likely cause so the "Likely cause" card leads with a definite answer, not a wall of prose (P3/P4 —
-// the classification is the model's, grounded in its own cited reasoning; "unknown" is first-class).
+// the classification is the model’s, grounded in its own cited reasoning; "unknown" is first-class).
 const VERDICT_META: Record<string, { label: string; cls: string }> = {
   "code-change": { label: "Code change", cls: "border-danger/40 bg-danger/10 text-danger" },
   "config-change": { label: "Config change", cls: "border-warning/40 bg-warning/10 text-warning" },
@@ -257,7 +257,7 @@ export function WarRoomView({
       }
       const convId = convRef.current;
       if (!convId) {
-        setError("Couldn't start the investigation.");
+        setError("Couldn’t start the investigation.");
         asking.current = false;
         setSending(false);
         return;

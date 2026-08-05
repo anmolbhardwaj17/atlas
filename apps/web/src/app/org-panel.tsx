@@ -82,7 +82,7 @@ export function OrgPanel({
   const [note, setNote] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
   // The last invite we created + its accept link, kept visible so the inviter can copy/share it —
-  // the primary way to bring in a teammate while email delivery isn't configured yet.
+  // the primary way to bring in a teammate while email delivery isn’t configured yet.
   const [lastInvite, setLastInvite] = useState<{
     email: string;
     role: string;
@@ -157,9 +157,10 @@ export function OrgPanel({
         );
         void load();
       } else {
-        const message = body.error?.message ?? `Failed (${res.status})`;
+        // Prefer the API's own message; it's written for humans. The status code is for logs, not users.
+        const message = body.error?.message ?? "That didn’t work. Try again in a moment.";
         setNote(message);
-        toast.error("Couldn't send the invitation", { description: message });
+        toast.error("Couldn’t send the invitation", { description: message });
       }
     } finally {
       setInviting(false);
@@ -172,7 +173,7 @@ export function OrgPanel({
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error("Couldn't copy — select the link and copy it manually.");
+      toast.error("Couldn’t copy — select the link and copy it manually.");
     }
   }
 
@@ -186,7 +187,7 @@ export function OrgPanel({
       );
       toast.success(`${m.name ?? m.email} is now ${updated.role}`);
     } catch (e) {
-      toast.error("Couldn't change role", {
+      toast.error("Couldn’t change role", {
         description: e instanceof Error ? e.message : undefined,
       });
     } finally {
@@ -204,7 +205,7 @@ export function OrgPanel({
       toast.success(`Removed ${m.name ?? m.email}`);
       setPendingRemoval(null);
     } catch (e) {
-      toast.error("Couldn't remove member", {
+      toast.error("Couldn’t remove member", {
         description: e instanceof Error ? e.message : undefined,
       });
     } finally {
@@ -219,7 +220,7 @@ export function OrgPanel({
       setInvites((prev) => prev.filter((x) => x.id !== inv.id));
       toast.success(`Revoked the invite to ${inv.email}`);
     } catch (e) {
-      toast.error("Couldn't revoke the invite", {
+      toast.error("Couldn’t revoke the invite", {
         description: e instanceof Error ? e.message : undefined,
       });
     } finally {

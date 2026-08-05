@@ -40,7 +40,7 @@ export function FindingActions({
       if (muted) {
         await unmuteFinding(orgId, findingId);
         setMuted(false);
-        toast.success("Unmuted", { description: "It's back in your active findings." });
+        toast.success("Unmuted", { description: "It’s back in your active findings." });
       } else {
         await muteFinding(orgId, findingId);
         setMuted(true);
@@ -48,7 +48,7 @@ export function FindingActions({
       }
       router.refresh();
     } catch (e) {
-      toast.error("Couldn't update", { description: e instanceof Error ? e.message : undefined });
+      toast.error("Couldn’t update", { description: e instanceof Error ? e.message : undefined });
     } finally {
       setBusy(null);
     }
@@ -84,7 +84,7 @@ export function FindingActions({
 
       const stillActive = (await getActiveFindingIds(orgId)).includes(findingId);
       if (!stillActive) {
-        toast.success("Fixed - it cleared!", {
+        toast.success("Fixed — it cleared.", {
           id: t,
           description: "This finding is no longer flagged in your latest graph.",
         });
