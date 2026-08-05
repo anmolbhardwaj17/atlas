@@ -20,6 +20,10 @@ const securityHeaders = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Emit `.next/standalone` — a self-contained server bundle with only the traced runtime deps.
+  // This is what makes a small web container possible at all (docs/17 §3 calls for three images;
+  // the web one had no build target before). Harmless for `next start` / a PaaS deploy.
+  output: "standalone",
   experimental: {
     // Navigation feel: <Link> prefetches each route's loading.tsx shell, but Next's default
     // `staleTimes.dynamic` of 0 throws that prefetch away immediately — so clicking a dynamic
