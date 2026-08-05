@@ -1,0 +1,99 @@
+# Atlas alert rules (docs/17 §7). Ships as code so the alerts are reviewable, diffable, and actually
+# exist — the deployment checklist named them in prose and there was nothing to load.
+#
+# Load into Prometheus (`rule_files:`) or import into Alertmanager/Grafana. Every rule fires on a
+# metric this codebase actually exports; nothing here is aspirational.
+#
+# Scrape target: `GET /metrics` on the API (send `Authorization: Bearer $METRICS_TOKEN` when set).
+# The worker exposes no HTTP server, so worker-side signals (queue depth, sync outcomes, process
+# errors) are written to the same shared Postgres/Redis and surface via the API's scrape.
+groups:
+  - name: atlas-availability
+    rules:
+      - alert: AtlasApiDown
+        expr: up{job="atlas-api"} == 0
+        for: 2m
+        labels: { severity: page }
+        annotations:
+          summary: "Atlas API is not being scraped"
+          description: >-
+            No successful scrape for 2 minutes. Check the ECS service, then GET /health/ready —
+            it returns 503 when the pod cannot reach Postgres, which drains it from the LB
+            rather than serving 500s.
+
+      - alert: AtlasHighErrorRate
+        # 5xx share of all requests. Excludes 4xx: a client sending bad input is not an incident.
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+            / clamp_min(sum(rate(http_requests_total[5m])), 0.001) > 0.05
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "Over 5% of Atlas requests are failing"
+          description: "Correlate by requestId — every response and its log line share one."
+
+      - alert: AtlasLatencyRegression
+        # p95 across all routes. The DB round-trip dominates, so this usually moves when Postgres
+        # does (see the DB co-location note in docs/plans/deployment-checklist.md §7).
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m]))) > 2
+        for: 10m
+        labels: { severity: warn }
+        annotations:
+          summary: "Atlas p95 latency above 2s"
+
+  - name: atlas-process-health
+    rules:
+      # Any increase is worth knowing about — see observability/crash-handlers.ts for why the two
+      # kinds are treated differently (a rejection is survived, an exception exits).
+      - alert: AtlasUncaughtException
+        expr: increase(atlas_process_errors_total{kind="uncaught_exception"}[10m]) > 0
+        labels: { severity: page }
+        annotations:
+          summary: "Atlas process died on an uncaught exception"
+          description: "The task exited non-zero and was restarted. The stack is in the JSON log line."
+
+      - alert: AtlasUnhandledRejections
+        expr: increase(atlas_process_errors_total{kind="unhandled_rejection"}[30m]) > 5
+        for: 5m
+        labels: { severity: warn }
+        annotations:
+          summary: "Repeated unhandled promise rejections"
+          description: >-
+            The process survives these by design, so they do not show up as restarts — something is
+            failing silently in the background. Find the stack in the structured log.
+
+  - name: atlas-ingest
+    rules:
+      - alert: AtlasSyncQueueBacklog
+        # Redis is noeviction, so a backlog builds rather than dropping jobs — it shows up here.
+        expr: atlas_sync_queue_depth{state="waiting"} > 50
+        for: 15m
+        labels: { severity: warn }
+        annotations:
+          summary: "Sync queue backing up"
+          description: "Scale the worker service; it autoscales on this metric (docs/17 §4)."
+
+      - alert: AtlasSyncFailureRate
+        expr: |
+          sum(rate(atlas_sync_jobs_total{outcome="failed"}[30m]))
+            / clamp_min(sum(rate(atlas_sync_jobs_total[30m])), 0.001) > 0.25
+        for: 15m
+        labels: { severity: warn }
+        annotations:
+          summary: "Over a quarter of sync jobs are failing"
+          description: >-
+            Usually expired or revoked connector credentials, or a provider rate limit. Check the
+            Integrations hub — it surfaces per-source sync state and missing permissions.
+
+      - alert: AtlasSyncStalled
+        # Distinct from the backlog alert: depth can sit at zero while nothing is being produced
+        # either, which is what a wedged scheduler looks like.
+        expr: sum(rate(atlas_sync_jobs_total[2h])) == 0 and sum(atlas_sync_queue_depth) == 0
+        for: 2h
+        labels: { severity: warn }
+        annotations:
+          summary: "No sync jobs completed in 2 hours"
+          description: >-
+            Expected when SYNC_INTERVAL_MINUTES=0. Otherwise check the scheduler: it is
+            leader-locked (LeaderLockService), so verify a leader is actually acquiring the
+            advisory lock and not just failing quietly.

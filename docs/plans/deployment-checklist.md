@@ -32,15 +32,18 @@ audit (Phases A–E), the compliance close-out, and the container/worker artifac
 - [ ] Provision the `atlas_app` login/password out of band (or `ATLAS_APP_PASSWORD=… pnpm --filter
       @atlas/db run setup:app-role` in ephemeral envs).
 
-## 3. Build + push the images
-- [ ] **api/worker** — `docker build -t <registry>/atlas-api:<sha> .` (repo root). Push.
-- [ ] **web** — `docker build -f apps/web/Dockerfile -t <registry>/atlas-web:<sha> .` (repo root too).
-      Pass the real `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `NEXT_PUBLIC_API_URL`
-      as `--build-arg`: they are **inlined into the client bundle at build time**, so changing them
-      needs a rebuild, not a redeploy. Never pass the service-role key.
-- [ ] ⚠️ **Neither image has ever been built** — both Dockerfiles were authored without a local Docker
-      daemon. `docker build` both once, locally, before the first deploy. The `pnpm deploy --prod
-      --legacy` step in the API image is the most likely thing to need adjusting.
+## 3. Build + push the images — **automated**
+- [ ] Nothing to do by hand: **`.github/workflows/release.yml` builds and pushes both images to GHCR
+      on every green push to `main`**, tagged by full commit SHA (immutable), with provenance + SBOM,
+      and Trivy-scanned into the Security tab. `.github/workflows/ci.yml` also `docker build`s both
+      on every push, so a broken Dockerfile fails in CI rather than during a deploy.
+- [ ] **Set the repository variables** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+      `NEXT_PUBLIC_API_URL` before deploying the web image anywhere real — they are **inlined into
+      the client bundle at build time**, so changing them needs a rebuild, not a redeploy. Until
+      they're set the web image builds against placeholders (fine for smoke-testing only). Never
+      set the service-role key as a build arg.
+- [ ] Manual equivalents, if you need one: `docker build -t atlas-api .` and
+      `docker build -f apps/web/Dockerfile -t atlas-web .` (both from the repo root).
 
 ## 4. Deploy — two ECS services from the ONE api image (+ the web image)
 - [ ] **api** — `CMD node dist/main.js`. Autoscale on CPU/request count. Health checks:
@@ -65,8 +68,11 @@ audit (Phases A–E), the compliance close-out, and the container/worker artifac
       Exposes `http_requests_total` / `http_request_duration_seconds` (by route), `atlas_sync_jobs_total`,
       `atlas_sync_queue_depth`, + default process metrics.
 - [ ] Set `OTEL_EXPORTER_OTLP_ENDPOINT` to turn on request→pg tracing (off/zero-overhead when unset).
-- [ ] Alerts: queue-depth growth, sync failure rate (`atlas_sync_jobs_total{outcome="failed"}`),
-      p95 latency, `/health/ready` failures, secret-access anomalies (docs/17 §7).
+- [ ] **Load `deploy/prometheus-alerts.yml`** — the alerts now exist as code (availability, 5xx rate,
+      p95 latency, uncaught exceptions / unhandled rejections, queue backlog, sync failure rate,
+      stalled scheduler). Every rule references a metric this codebase actually exports.
+- [ ] Alert on `atlas_process_errors_total` in particular: unhandled rejections are survived by
+      design, so they never show up as restarts — the counter is the only signal.
 
 ## 6. Post-deploy verification
 - [ ] `GET /health/ready` → `{db:"up"}`; `GET /metrics` returns exposition text.
