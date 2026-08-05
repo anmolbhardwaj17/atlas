@@ -2,7 +2,9 @@
 # Gates: format, lint, typecheck, unit test (check job) + integration tests against a
 # real ephemeral Postgres with the two-role setup + RLS incl. the append-only audit log
 # (integration job, US-12) + a production web build (web-build job) + the AI-eval gate
-# (ai-eval job — grounded/cited/honest-absence set, escaped-hallucination-zero, docs/14 §11).
+# (ai-eval job — grounded/cited/honest-absence set, escaped-hallucination-zero, docs/14 §11)
+# + supply-chain scanning (security job: dependency advisories + secret scan, docs/13/16)
+# + a real `docker build` of both runtime images (images job, docs/17 §3).
 # Mutation testing runs nightly in a separate workflow (mutation.yml). Heavier stages still to
 # come (API contract, the adversarial QA agent, E2E, load) land as those capabilities arrive
 # (see docs/14 §16 for the full sequence).
@@ -164,3 +166,93 @@ jobs:
 
       - name: AI eval set
         run: pnpm --filter @atlas/ai run test
+
+  security:
+    name: Security · Dependencies + secrets
+    runs-on: ubuntu-latest
+    # docs/17 §5 sequences a "secret scan + dep vuln scan" gate before build; it had never been
+    # wired, and a readiness audit found 16 live advisories (9 high) sitting in the lockfile —
+    # including an HTTP/2 DoS in Fastify's own router. Both scans are cheap; run them on every push.
+    steps:
+      - name: Checkout
+        # Full history: gitleaks diffs commits, so a shallow clone would silently scan almost nothing.
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      # --prod: advisories in devDependencies (test/build tooling) don't ship to customers and would
+      # make this gate noisy enough to be ignored. Runtime dependencies are the ones that matter.
+      - name: Dependency advisories (runtime deps)
+        run: pnpm audit --prod --audit-level moderate
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  images:
+    name: Images · docker build (api + web)
+    runs-on: ubuntu-latest
+    # Both Dockerfiles were authored without a local Docker daemon and had NEVER been built — the
+    # single largest unknown in the deploy path. This job is the daemon: it builds both images on
+    # every push, so a broken Dockerfile fails here instead of during a first production deploy.
+    # Build only (no push) — publishing is release.yml's job, gated on this passing.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build the API/worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          # GitHub Actions layer cache: the pnpm install + workspace build dominate, and they only
+          # change when the lockfile or sources do.
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+
+      - name: Build the web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: false
+          # NEXT_PUBLIC_* are inlined into the client bundle at build time, so the image is
+          # environment-specific. Placeholders are fine here — this job proves the build works;
+          # release.yml passes the real values.
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=https://ci.example.supabase.co
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=ci-placeholder-anon-key
+            NEXT_PUBLIC_API_URL=http://localhost:4290
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+
+      # Prove the API image actually boots, not just that it compiles. Config is fail-fast in prod,
+      # so a NODE_ENV=production run with no env is EXPECTED to exit non-zero listing missing vars —
+      # that specific failure is the success signal: the entrypoint resolved and the app started.
+      # A missing module or a bad `pnpm deploy` layer looks completely different.
+      - name: Smoke-test the API entrypoint
+        run: |
+          docker build -t atlas-api:smoke .
+          output=$(docker run --rm -e NODE_ENV=production atlas-api:smoke 2>&1 || true)
+          echo "$output"
+          echo "$output" | grep -q "Invalid environment configuration" \
+            || { echo "::error::API image did not reach config validation — the entrypoint is broken."; exit 1; }
+          echo "API image boots and reaches config validation."
