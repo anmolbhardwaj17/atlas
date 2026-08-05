@@ -1,25 +1,24 @@
-import { Skeleton } from "@/components/ui/skeleton";
-
-/** War Room skeleton — mirrors the page: title + description, then rows of incidents. Shown the
- *  instant you navigate here so the click never feels like a blank wait. */
+/**
+ * War Room board skeleton. Mirrors the real layout (masthead → live cards → archive) on the same
+ * dark surface, so the page doesn't flash a light shell before going dark — a theme flip during load
+ * is the cheapest way to make a considered design feel unfinished.
+ */
 export default function WarRoomLoading() {
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <Skeleton className="h-8 w-44" />
-        <Skeleton className="h-4 w-[34rem] max-w-full" />
-      </div>
-      <div className="space-y-2">
-        <Skeleton className="h-4 w-16" />
-        <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-3 px-4 py-3">
-              <div className="min-w-0 flex-1 space-y-1.5">
-                <Skeleton className="h-4 w-2/5" />
-                <Skeleton className="h-3 w-1/4" />
-              </div>
-              <Skeleton className="h-4 w-16" />
-            </div>
+    <div className="dark -mx-4 -mt-4 min-h-[calc(100dvh-4rem)] bg-[hsl(0_0%_6.5%)] px-4 pt-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <div className="mx-auto max-w-6xl space-y-10">
+        <div className="space-y-3 pt-2">
+          <div className="h-2.5 w-40 animate-pulse rounded bg-white/[0.07]" />
+          <div className="h-11 w-56 animate-pulse rounded bg-white/[0.07]" />
+          <div className="h-4 w-full max-w-xl animate-pulse rounded bg-white/[0.05]" />
+        </div>
+        <div className="space-y-3">
+          <div className="h-2.5 w-28 animate-pulse rounded bg-white/[0.07]" />
+          {[0, 1].map((i) => (
+            <div
+              key={i}
+              className="h-[148px] animate-pulse rounded-xl border border-border/60 bg-white/[0.03]"
+            />
           ))}
         </div>
       </div>
