@@ -40,9 +40,21 @@ interface ProviderCfg {
   groups: Group[];
 }
 
-// Curated per provider. OpenRouter model ids are VERIFIED against the live catalogue + a real
-// completion (openrouter.ai/models). NOTE: OpenRouter's $0 `:free` models are heavily rate-limited
-// and often return empty/429 - deliberately not offered here; the low-cost ones are pennies + reliable.
+// Curated per provider, and re-verified against the live catalogues on 2026-08-06.
+//
+// ⚠️ THIS LIST ROTS. Model ids are retired by providers on their own schedule, and a retired id is
+// not a soft failure — the provider 404s and the user's Ask AI simply stops working. A previous
+// revision recommended `anthropic/claude-3.5-sonnet` under the label "recommended for Atlas" long
+// after it had been withdrawn, and the direct-Anthropic option offered two retired ids with no
+// working alternative at all. Re-check against openrouter.ai/api/v1/models and Anthropic's model
+// list whenever you touch this file; prefer the un-dated aliases below, which the providers keep
+// pointed at the current release.
+//
+// Note the naming differs by provider for the SAME model: OpenRouter uses dots
+// (anthropic/claude-haiku-4.5), Anthropic's own API uses dashes (claude-haiku-4-5).
+//
+// NOTE: OpenRouter's $0 `:free` models are heavily rate-limited and often return empty/429 -
+// deliberately not offered here; the low-cost ones are pennies + reliable.
 const PROVIDERS: ProviderCfg[] = [
   {
     id: "openrouter",
@@ -52,25 +64,28 @@ const PROVIDERS: ProviderCfg[] = [
     defaultModel: "openai/gpt-4o-mini",
     groups: [
       {
-        title: "Cheapest · ~$0.02 / M tokens",
+        // No price in the label: provider pricing changes without notice and a stale number in the
+        // UI is a small lie we'd never notice telling.
+        title: "Lowest cost",
         models: [
           { id: "meta-llama/llama-3.1-8b-instruct", label: "Llama 3.1 8B" },
           { id: "mistralai/mistral-nemo", label: "Mistral Nemo" },
         ],
       },
       {
-        title: "Low cost · pennies, reliable",
+        title: "Low cost · reliable",
         models: [
           { id: "openai/gpt-4o-mini", label: "GPT-4o mini" },
           { id: "deepseek/deepseek-chat", label: "DeepSeek V3" },
-          { id: "anthropic/claude-3-haiku", label: "Claude 3 Haiku" },
+          { id: "anthropic/claude-haiku-4.5", label: "Claude Haiku 4.5" },
           { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash" },
         ],
       },
       {
         title: "Best reasoning · recommended for Atlas",
         models: [
-          { id: "anthropic/claude-3.5-sonnet", label: "Claude 3.5 Sonnet" },
+          { id: "anthropic/claude-opus-5", label: "Claude Opus 5" },
+          { id: "anthropic/claude-sonnet-5", label: "Claude Sonnet 5" },
           { id: "openai/gpt-4o", label: "GPT-4o" },
           { id: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro" },
           { id: "deepseek/deepseek-r1", label: "DeepSeek R1 (reasoning)" },
@@ -100,12 +115,17 @@ const PROVIDERS: ProviderCfg[] = [
     label: "Anthropic",
     keyUrl: "https://console.anthropic.com/settings/keys",
     keyPlaceholder: "sk-ant-...",
-    defaultModel: "claude-3-5-haiku-latest",
+    // Both previous entries here (claude-3-5-haiku-latest, claude-3-5-sonnet-latest) named models
+    // that have since been retired, so this provider had NO working option at all.
+    defaultModel: "claude-haiku-4-5",
     groups: [
-      { title: "Low cost", models: [{ id: "claude-3-5-haiku-latest", label: "Claude 3.5 Haiku" }] },
+      { title: "Low cost", models: [{ id: "claude-haiku-4-5", label: "Claude Haiku 4.5" }] },
       {
-        title: "Premium",
-        models: [{ id: "claude-3-5-sonnet-latest", label: "Claude 3.5 Sonnet" }],
+        title: "Best reasoning",
+        models: [
+          { id: "claude-opus-5", label: "Claude Opus 5" },
+          { id: "claude-sonnet-5", label: "Claude Sonnet 5" },
+        ],
       },
     ],
   },
@@ -165,9 +185,9 @@ export function LlmSettingsCard({
       setMsg({ tone: "ok", text: `Tested + saved - Ask AI now uses ${saved.model}.` });
       toast.success("Model saved", { description: `Ask AI now uses ${saved.model}.` });
     } catch (e) {
-      const text = e instanceof Error ? e.message : "Couldn't save the model.";
+      const text = e instanceof Error ? e.message : "Couldn’t save the model.";
       setMsg({ tone: "warn", text });
-      toast.error("Couldn't save the model", { description: text });
+      toast.error("Couldn’t save the model", { description: text });
     } finally {
       setBusy(false);
     }
@@ -179,12 +199,12 @@ export function LlmSettingsCard({
     try {
       await deleteLlmSettings(orgId);
       setCurrent(null);
-      setMsg({ tone: "ok", text: "Removed - Ask AI is back on the platform default." });
+      setMsg({ tone: "ok", text: "Removed — Ask AI is back on the platform default." });
       toast.success("Model removed", { description: "Ask AI is back on the platform default." });
     } catch (e) {
-      const text = e instanceof Error ? e.message : "Couldn't remove the model.";
+      const text = e instanceof Error ? e.message : "Couldn’t remove the model.";
       setMsg({ tone: "warn", text });
-      toast.error("Couldn't remove the model", { description: text });
+      toast.error("Couldn’t remove the model", { description: text });
     } finally {
       setBusy(false);
     }
@@ -200,7 +220,7 @@ export function LlmSettingsCard({
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Bring your own model for Ask AI. Answers stay grounded in your graph and cited - the model
+          Bring your own model for Ask AI. Answers stay grounded in your graph and cited — the model
           only narrates. Your key is tested, stored encrypted, and never shown again.
         </p>
 
