@@ -5,14 +5,14 @@
 # unreproducible. This publishes immutable, digest-pinned, SBOM-carrying images to GHCR on every
 # green push to main.
 #
-# Deliberately STOPS at publish. The actual rollout (ECS service update) needs AWS account IDs, an
-# OIDC role and cluster/service names that don't exist yet — see the commented `deploy` job at the
-# bottom for the shape it takes once the infrastructure is provisioned. Publishing is safe and
-# useful on its own: `docker pull` the tag and deploy it from anywhere.
+# Then it rolls out to Fly.io (docs/17 DD-2) — but only once `vars.FLY_DEPLOY_ENABLED == 'true'`,
+# so the publish half works from day one and the deploy half switches on when the Fly apps exist.
+# The API deploy also runs expand migrations, via fly.toml's `release_command`.
 #
 # Registry: GHCR (ghcr.io/<owner>/atlas-{api,web}). Chosen because it needs no cloud credentials —
-# GITHUB_TOKEN authenticates it — so this pipeline works today rather than after AWS is set up.
-# Switching to ECR later is a change to the login step and the image name, nothing else.
+# GITHUB_TOKEN authenticates it. Fly builds its own image from the same Dockerfile rather than
+# pulling from GHCR, which avoids wiring private-registry auth into Fly; GHCR remains the portable,
+# SBOM-carrying artifact you can deploy anywhere else (including ECS later).
 name: Release
 
 on:
@@ -130,35 +130,62 @@ jobs:
             echo "Deploy by DIGEST, not tag — digests are immutable, tags can move."
           } >> "$GITHUB_STEP_SUMMARY"
 
-# ── The rollout step, for when the infrastructure exists ───────────────────────────────────────────
-#
-# Uncomment and fill in once ECS is provisioned. Prerequisites, in order:
-#   1. An IAM role GitHub can assume via OIDC (no long-lived AWS keys in secrets).
-#   2. An ECS cluster + three services: atlas-api, atlas-worker (same image, CMD `node dist/worker.js`),
-#      atlas-web.
-#   3. Migrations run as a SEPARATE step BEFORE the service update — expand-only, never a breaking
-#      change in the same release (docs/04 DD-6, docs/17 §5). A contract migration ships a release later.
-#
-# deploy:
-#   name: Deploy · ECS
-#   needs: publish
-#   runs-on: ubuntu-latest
-#   environment: production      # gate promotion on a manual approval
-#   permissions:
-#     id-token: write
-#     contents: read
-#   steps:
-#     - uses: aws-actions/configure-aws-credentials@v4
-#       with:
-#         role-to-assume: arn:aws:iam::<account-id>:role/atlas-github-deploy
-#         aws-region: <region>   # co-locate with the DB — docs/plans/deployment-checklist.md §7
-#     - name: Run expand migrations
-#       run: |   # one-off Fargate task on the api image, CMD overridden to the migrate script
-#         aws ecs run-task --cluster atlas --task-definition atlas-migrate --launch-type FARGATE ...
-#     - name: Roll the services
-#       run: |   # --force-new-deployment picks up the new image; ECS health-checks gate the rollout
-#         for svc in atlas-api atlas-worker atlas-web; do
-#           aws ecs update-service --cluster atlas --service "$svc" --force-new-deployment
-#         done
-#     - name: Wait for stability (auto-rollback happens here if health checks fail)
-#       run: aws ecs wait services-stable --cluster atlas --services atlas-api atlas-worker atlas-web
+  deploy:
+    name: Deploy · Fly.io
+    needs: publish
+    runs-on: ubuntu-latest
+    # Opt-in: set the repository variable FLY_DEPLOY_ENABLED=true once the Fly apps exist. Until
+    # then every other job still runs and images still publish — the pipeline just stops before
+    # rollout instead of failing red on a missing token. (A repo VARIABLE, not a secret: secrets
+    # can't be referenced in a job-level `if`.)
+    if: ${{ vars.FLY_DEPLOY_ENABLED == 'true' }}
+    # `production` lets you add a required reviewer in repo settings if you want promotion gated.
+    environment: production
+    # Never let two rollouts race; unlike CI, don't cancel one midway through.
+    concurrency:
+      group: deploy-fly
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # Deploys the API AND runs expand migrations: fly.toml's `release_command` executes
+      # `@atlas/db`'s compiled migrate in a temporary machine before the new version takes traffic,
+      # and a non-zero exit aborts the rollout (docs/04 DD-6). Health checks gate the rolling
+      # replacement, so a machine that fails /health/ready never receives traffic.
+      - name: Deploy API + run migrations
+        run: flyctl deploy --remote-only --config fly.toml
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      # NEXT_PUBLIC_* are inlined into the client bundle at BUILD time, so they're build args here,
+      # not secrets or env. Repository variables (not secrets) because they ship to every browser
+      # anyway — and keeping them out of the secret store makes it obvious they aren't private.
+      - name: Deploy web
+        run: |
+          flyctl deploy --remote-only --config fly.web.toml \
+            --build-arg NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL}" \
+            --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="${NEXT_PUBLIC_SUPABASE_ANON_KEY}" \
+            --build-arg NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL}"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+
+      - name: Verify the API is serving
+        run: |
+          url="${API_URL:-https://atlas-api.fly.dev}/health/ready"
+          for i in $(seq 1 10); do
+            if curl -fsS "$url" | grep -q '"db":"up"'; then
+              echo "Ready: $url"; exit 0
+            fi
+            echo "attempt $i: not ready yet"; sleep 10
+          done
+          echo "::error::API did not report ready after deploy — check \`fly logs -a atlas-api\`"
+          exit 1
+        env:
+          API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}

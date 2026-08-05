@@ -1,4 +1,9 @@
 {
+  // `migrate.ts` + `migrations/` are deliberately INCLUDED in the build (they used to be excluded):
+  // the deploy runs migrations as a release step from the shipped image, so the compiled runner and
+  // its migration list have to travel with it. Without them the image cannot migrate at all, and
+  // the expand-before-deploy ordering (docs/04 DD-6, docs/17 §5) has nothing to execute.
+  // Cost is negligible — the migrations are string arrays.
   "extends": "./tsconfig.json",
-  "exclude": ["src/**/*.test.ts", "src/migrate.ts", "src/migrations"]
+  "exclude": ["src/**/*.test.ts"]
 }

@@ -1,0 +1,66 @@
+# Fly.io config for the Atlas API (+ the in-process worker and schedulers).
+#
+# Why Fly rather than the ECS Fargate of docs/17 DD-2: cost at MVP scale (~$6/mo vs ~$30+), it runs
+# the Dockerfile we already build in CI unchanged, and — the real reason — it has a **Sydney**
+# region. The Supabase Postgres lives in ap-southeast-2, and co-locating compute with it turns
+# ~137ms DB round-trips into ~1-3ms. That was the parked "perf P0", and picking the right region
+# closes it for free. DD-2 in docs/17 records the decision and the path back to ECS at scale.
+#
+#   fly launch --no-deploy --copy-config    # first time only, creates the app
+#   fly deploy                              # thereafter (CI does this on green main)
+app = "atlas-api"
+primary_region = "syd" # MUST match the Supabase region — this is the latency lever
+
+[build]
+  dockerfile = "Dockerfile"
+
+[deploy]
+  # Expand-only migrations run in a temporary machine BEFORE the new version takes traffic, and a
+  # non-zero exit aborts the deploy (docs/04 DD-6, docs/17 §5). Contract migrations ship a release
+  # later, never in the same one. Needs DATABASE_URL_MIGRATE (owner role) as a Fly secret — the app
+  # itself connects as the restricted atlas_app role via DATABASE_URL and could not run DDL.
+  release_command = "node node_modules/@atlas/db/dist/migrate.js"
+  strategy = "rolling"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "4290"
+  LOG_LEVEL = "info"
+  # This one machine runs the API, the BullMQ worker and the schedulers together (the "single-node
+  # MVP" shape in the deployment checklist). Safe to enable the cadences here precisely because the
+  # ticks are leader-locked via Postgres advisory locks — adding a second machine later will not
+  # double-send Slack alerts or double-spend on autoDiagnose.
+  SYNC_INTERVAL_MINUTES = "60"
+  HEALTH_INTERVAL_MINUTES = "0" # set >0 to turn on live health polling + proactive incidents
+  NOTIFY_INTERVAL_MINUTES = "2"
+  PG_POOL_MAX = "16"
+
+[http_service]
+  internal_port = 4290
+  force_https = true
+  # ── The single most important line in this file ──
+  # Fly's default is to suspend idle machines. That would silently stop every scheduler: no
+  # auto-refresh, no health polling, no notification dispatch, no digest — all of which are
+  # `setInterval` timers inside this process, not external cron. The app would look fine on every
+  # request you made by hand while quietly doing nothing in between.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [[http_service.checks]]
+    # Readiness, not liveness: /health/ready probes Postgres and 503s when the pool is dead, so a
+    # machine that can't reach the DB is pulled from rotation rather than serving 500s.
+    path = "/health/ready"
+    method = "GET"
+    interval = "15s"
+    timeout = "5s"
+    # Generous: boot runs config validation, the DB role check, and Nest DI wiring.
+    grace_period = "30s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  # 1GB, not 512MB: a cloud crawl plus the inference pass over a real estate is the memory-hungry
+  # path, and an OOM-killed machine takes the schedulers down with it. Drop to 512mb to save ~$2.50/mo
+  # once you've watched actual usage under a full sync.
+  memory = "1gb"

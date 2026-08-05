@@ -100,7 +100,18 @@ flowchart LR
 - **SBOM** generated per image (`13` §11, Phase-1).
 
 ### 3.1 Compute platform (resolves `02` OQ-ARCH-1)
-> **DD-2 — ECS Fargate for MVP.** **Why:** removes node/cluster management entirely (no K8s control plane to operate) for a small team (P10, `02` DD-9); native autoscaling, IAM task roles, and tight AWS integration (we already run on AWS, A64). **Alternative — managed K8s (EKS):** more portable/powerful but more operational surface than an early team should carry; **revisit at scale** if multi-region/complex scheduling demands it — the stateless-container design ports cleanly (OP-3). Decision is reversible (containers are platform-agnostic).
+> **DD-2 (superseded, 2026-08-05) — ECS Fargate for MVP.** **Why:** removes node/cluster management entirely (no K8s control plane to operate) for a small team (P10, `02` DD-9); native autoscaling, IAM task roles, and tight AWS integration (we already run on AWS, A64). **Alternative — managed K8s (EKS):** more portable/powerful but more operational surface than an early team should carry; **revisit at scale** if multi-region/complex scheduling demands it — the stateless-container design ports cleanly (OP-3). Decision is reversible (containers are platform-agnostic).
+
+> **DD-2a — Fly.io for MVP; ECS Fargate at scale.** Supersedes DD-2 for the first production deploy. **Why three things ECS could not give us now:**
+> 1. **Region.** Fly has `syd`; the Supabase Postgres is in `ap-southeast-2`. Co-locating compute with the database turns ~137ms round-trips into ~1–3ms. This was the parked **perf P0**, and it is the largest single latency lever in the system — a platform choice closes it for free. Fargate would have meant either an ap-southeast-2 AWS footprint or accepting the cross-region penalty.
+> 2. **Cost at MVP scale.** ~$9/mo (one 1GB API machine + one 512MB web machine) against ~$30+/mo for the equivalent always-on Fargate services, before NAT/ALB. At zero customers that ratio matters more than the feature gap.
+> 3. **Zero new build surface.** Fly deploys the same Dockerfiles CI already builds and smoke-tests on every push. No task definitions, no ALB/target-group wiring, no OIDC role to provision before the first deploy.
+>
+> **What we give up:** IAM task roles (connector credentials stay in our own AES-GCM secrets broker, which is where they already live — see `13` §7), AWS-native autoscaling, and same-VPC networking to AWS resources. None are load-bearing at MVP: Atlas reads customer AWS accounts over the public API via AssumeRole, so it does not need to *be* in the customer's VPC, or in AWS at all.
+>
+> **When to revisit:** a customer requiring VPC-peered or PrivateLink connectivity; sustained load where Fargate's autoscaling beats adding Fly machines; or a compliance requirement to run inside a specific AWS account. **The path back is short and deliberately kept open** — GHCR still receives every image with provenance and an SBOM, the runtime is a plain container with no Fly-specific API, and the commented ECS shape is preserved in git history. **P2 — read-only by construction and R8 tenant isolation are unaffected:** both live in the app and the database, not the platform.
+>
+> **One platform-specific correctness constraint, recorded because it is easy to lose:** `auto_stop_machines` **must stay off** on the API. The cadence schedulers are `setInterval` timers inside the process (`06` §11), not external cron, so a suspended machine silently stops syncing, health-polling and notifying while still answering every request you make by hand.
 
 ---
 

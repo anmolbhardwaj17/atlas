@@ -2,7 +2,12 @@
 
 A practical, ordered runbook for a first production deploy. Ties together the production-hardening
 audit (Phases A–E), the compliance close-out, and the container/worker artifacts. The design is in
-`docs/17-deployment.md`; this is the do-it list. Same image, two runtimes (API + worker), ECS Fargate.
+`docs/17-deployment.md`; this is the do-it list.
+
+> **Deploying on Fly.io? → `fly-deploy-runbook.md` is the one to follow** (docs/17 **DD-2a**: Fly for
+> MVP, ECS at scale — chosen for the Sydney region that co-locates with Supabase, ~$9/mo, and zero new
+> build surface). It has the exact commands. This file remains the platform-neutral checklist and the
+> reference for an ECS deploy later; sections 0–2 and 5–7 apply to both.
 
 ## 0. Prerequisites (infra)
 - [ ] **Postgres** — Supabase (session pooler) or RDS/Aurora Multi-AZ + PITR. Two roles: the owner

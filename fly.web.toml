@@ -1,0 +1,54 @@
+# Fly.io config for the Atlas web app (Next.js 15, standalone output).
+#
+# Lives at the repo ROOT, not in apps/web, because Fly uses the config file's directory as the
+# Docker build context and apps/web/Dockerfile needs the whole workspace (pnpm monorepo).
+#
+#   fly launch --no-deploy --copy-config -c fly.web.toml
+#   fly deploy -c fly.web.toml --build-arg NEXT_PUBLIC_API_URL=... (see below)
+#
+# ⚠️ NEXT_PUBLIC_* are **build-time**, not runtime. Next inlines them into the JavaScript the browser
+# downloads, so setting them as Fly secrets or [env] does nothing — they must be --build-arg, and
+# changing one needs a REBUILD, not a restart. This is the single most common way to deploy a
+# working-looking frontend that talks to the wrong API.
+app = "atlas-web"
+primary_region = "syd" # same region as the API: server components call it on every render
+
+[build]
+  dockerfile = "apps/web/Dockerfile"
+  # Placeholders only. CI passes the real values from repository variables (see release.yml);
+  # for a manual deploy pass them on the command line. Never put the Supabase SERVICE ROLE key
+  # here — these values ship to every browser. The anon key is safe by design; the service-role
+  # key is not, and the web app never needs it.
+  [build.args]
+    NEXT_PUBLIC_SUPABASE_URL = "https://placeholder.supabase.co"
+    NEXT_PUBLIC_SUPABASE_ANON_KEY = "placeholder-anon-key"
+    NEXT_PUBLIC_API_URL = "http://localhost:4290"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "4291"
+
+[http_service]
+  internal_port = 4291
+  force_https = true
+  # Unlike the API, nothing here ticks on a timer — the frontend is purely request-driven, so
+  # suspending it when idle is safe and is where most of the savings are. The tradeoff is a
+  # cold start (~1-2s) on the first request after a quiet period. Set min_machines_running = 0
+  # and auto_stop_machines = "stop" if you'd rather have the cost than the latency.
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [[http_service.checks]]
+    # Next has no health endpoint of its own; the root route is server-rendered, so a 200 here
+    # means the server is genuinely up rather than merely listening.
+    path = "/"
+    method = "GET"
+    interval = "30s"
+    timeout = "10s"
+    grace_period = "20s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
