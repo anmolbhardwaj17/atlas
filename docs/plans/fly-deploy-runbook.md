@@ -32,14 +32,38 @@ machines. Budget ~$9/month for the shape above.
 
 ## 2. Redis
 
-Create an **Upstash Redis** database (their free tier is enough to start) in the region closest to
-Sydney. Copy the **`rediss://` TCP URL** — not the REST URL. BullMQ needs the Redis protocol and
-blocking commands; `bullmq-queue.ts` already sets `maxRetriesPerRequest: null` and handles TLS, so
-no code change is needed.
+No separate Upstash signup needed — flyctl provisions it:
 
-> If the free tier's daily command limit bites (the health poller and queue are chatty), either move
-> to Upstash pay-as-you-go — cents per month at this volume — or run Redis as a third Fly machine
-> with a small volume and `appendonly yes`.
+```sh
+fly redis create
+```
+
+Answer the prompts:
+
+| Prompt | Answer | Why |
+|---|---|---|
+| Organization | your personal org | |
+| Name | `atlas-redis` | |
+| Primary region | **Sydney (syd)** | same region as the API and the database |
+| Replica regions | none | one region is all we need |
+| Plan | **Pay-as-you-go** | free base + $0.20/100K commands. The Fixed plans start at $10/mo for capacity we don't need — the queue holds job descriptors, not data. |
+| Enable eviction? | **NO** | ⚠️ Eviction lets Redis silently drop keys under memory pressure — i.e. **drop queued jobs**. `docs/17` DD-5 specifies `noeviction` precisely so a backlog builds and surfaces via `atlas_sync_queue_depth` instead of quietly vanishing. |
+
+It prints a `redis://…upstash.io` URL once, at creation. Copy it — that's `REDIS_URL`. To see it
+again later: `fly redis status atlas-redis`.
+
+`bullmq-queue.ts` already sets `maxRetriesPerRequest: null` (required for BullMQ's blocking
+commands) and handles both `redis://` and `rediss://`, so no code change is needed.
+
+> **It's reachable only from inside your Fly private network** (that's where the API runs), so
+> `redis-cli` from your laptop won't connect. That's expected, not a misconfiguration — use
+> `fly redis connect` if you need a shell against it.
+
+**Expected cost, since it's per-command:** an idle deployment still talks to Redis — the BullMQ
+worker re-issues a blocking read every ~5s and the queue-depth metric polls every 15s. That's
+roughly 45K commands/day ≈ **$2–3/month**. Not free, but no cliff either: it scales smoothly rather
+than cutting you off. If you want it lower, widening the queue-depth poll to 60s cuts about
+two-thirds of it with no practical loss (the alert on that metric fires on a 15-minute window).
 
 ## 3. Create the two Fly apps
 
@@ -84,13 +108,18 @@ fly secrets set -a atlas-api-anmol \
   SUPABASE_URL="https://<project>.supabase.co" \
   SUPABASE_SERVICE_ROLE_KEY="<service-role-key>" \
   SUPABASE_ANON_KEY="<anon-key>" \
-  ANTHROPIC_API_KEY="<sk-ant-...>" \
+  ALLOW_BYO_ONLY_LLM="true" \
   WEB_ORIGIN="https://app.<your-domain>" \
   PUBLIC_API_URL="https://api.<your-domain>"
 ```
 
 Notes that will save you an outage:
 
+- **`ALLOW_BYO_ONLY_LLM=true` instead of an `ANTHROPIC_API_KEY`** is correct when every org brings
+  its own model key — which is this deployment's case (Siemba runs on OpenRouter/`gpt-4o-mini`).
+  Orgs *without* their own key then get an explicit error rather than an answer; what they never get
+  is dev-mock prose dressed up as a real answer. Swap to `ANTHROPIC_API_KEY` if you later want the
+  platform to answer for keyless orgs.
 - **Two different database URLs, deliberately.** `DATABASE_URL` is the restricted `atlas_app` role
   the app runs as — it cannot do DDL and RLS applies to it. `DATABASE_URL_MIGRATE` is the owner role
   used only by the release-command migration. The app **refuses to boot** if its role can bypass RLS
