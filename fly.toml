@@ -6,12 +6,12 @@
 # ~137ms DB round-trips into ~1-3ms. That was the parked "perf P0", and picking the right region
 # closes it for free. DD-2 in docs/17 records the decision and the path back to ECS at scale.
 #
-#   fly apps create atlas-api-anmol   # first time only — registers the name, writes nothing
+#   fly apps create atlas-api-v1   # first time only — registers the name, writes nothing
 #   fly deploy                        # thereafter (CI does this on green main)
 #
 # NOTE: do NOT use `fly launch`. It's the greenfield command and can overwrite this file — including
 # `auto_stop_machines = "off"` and `release_command` below, both of which are load-bearing.
-app = "atlas-api-anmol"
+app = "atlas-api-v1"
 primary_region = "syd" # MUST match the Supabase region — this is the latency lever
 
 [build]

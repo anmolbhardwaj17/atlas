@@ -47,7 +47,7 @@ audit (Phases A–E), the compliance close-out, and the container/worker artifac
       the client bundle at build time**, so changing them needs a rebuild, not a redeploy. Until
       they're set the web image builds against placeholders (fine for smoke-testing only). Never
       set the service-role key as a build arg.
-- [ ] Manual equivalents, if you need one: `docker build -t atlas-api-anmol .` and
+- [ ] Manual equivalents, if you need one: `docker build -t atlas-api-v1 .` and
       `docker build -f apps/web/Dockerfile -t atlas-web .` (both from the repo root).
 
 ## 4. Deploy — two ECS services from the ONE api image (+ the web image)

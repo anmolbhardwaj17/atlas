@@ -41,13 +41,16 @@ primary_region = "syd" # same region as the API: server components call it on ev
   processes = ["app"]
 
   [[http_service.checks]]
-    # Next has no health endpoint of its own; the root route is server-rendered, so a 200 here
-    # means the server is genuinely up rather than merely listening.
-    path = "/"
+    # NOT "/" — that route is a pure router that always redirect()s (to /login, /dashboard or
+    # /create-org), so it never returns 200 and the check fails permanently: Fly marks the machine
+    # unhealthy, the proxy answers "could not find a good candidate", and the app is unreachable
+    # even though Next started fine. /api/health is a dedicated 200-or-nothing endpoint.
+    path = "/api/health"
     method = "GET"
     interval = "30s"
-    timeout = "10s"
-    grace_period = "20s"
+    timeout = "5s"
+    # Next boots in well under a second, but the machine has to start first.
+    grace_period = "15s"
 
 [[vm]]
   size = "shared-cpu-1x"
