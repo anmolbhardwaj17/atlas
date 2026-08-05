@@ -43,15 +43,32 @@ no code change is needed.
 
 ## 3. Create the two Fly apps
 
-From the repo root. `--no-deploy` because secrets have to exist before the first boot — the config
-fails fast and the machine would crash-loop otherwise.
+**Run these from the repo root** (`cd ~/Desktop/code/atlas`), not from your home directory.
 
 ```sh
-fly launch --no-deploy --copy-config --name atlas-api --region syd
-fly launch --no-deploy --copy-config --name atlas-web --region syd -c fly.web.toml
+fly apps create atlas-api
+fly apps create atlas-web
 ```
 
-If those names are taken, pick your own and update `app =` in `fly.toml` / `fly.web.toml`.
+That's all this step needs to do: register the two names. `fly deploy` in step 5 reads the region,
+VM size, health checks and release command from the `fly.toml` / `fly.web.toml` already in the repo.
+
+> ⚠️ **Do not use `fly launch` here.** It's the greenfield command: it scans the working directory,
+> guesses a framework, and **generates or overwrites `fly.toml`**. Run from the wrong directory it
+> reports things like `Creating app in /Users/apple` and `Detected a NextJS app` — it found your home
+> folder, not this project. Run from the *right* directory it's still wrong for us, because it would
+> happily rewrite hand-authored config where individual lines are load-bearing:
+> `auto_stop_machines = "off"` (without it the schedulers silently stop) and `release_command`
+> (without it migrations never run). `fly apps create` touches no files.
+
+If those names are taken, pick your own and update `app =` in `fly.toml` / `fly.web.toml` to match.
+
+### If a `fly` command fails with `Post "https://api.fly.io/graphql": EOF`
+
+A dropped connection to Fly's API, not a problem with your config — nothing was created, so just
+retry. If it repeats: `fly version upgrade`, then check for a VPN/proxy/corporate DNS in the way
+(`curl -sS -o /dev/null -w '%{http_code}\n' https://api.fly.io/graphql` should print a number, not
+hang). `fly auth whoami` confirms your session is still good.
 
 ## 4. Set the API secrets
 
