@@ -72,6 +72,21 @@ export const EnvSchema = z
     DISCORD_CLIENT_SECRET: optionalString,
     DISCORD_BOT_TOKEN: optionalString,
 
+    // Atlas's own Anthropic key — the PLATFORM narrator, used for any org that hasn't brought its
+    // own LLM key (BYO-LLM in Settings takes precedence per-org). Previously read straight off
+    // `process.env` in ai.module, which meant a prod deploy that forgot it silently fell back to the
+    // dev MockLLMProvider and served "(Atlas dev) …" text as if it were an answer. Declared here so
+    // it's validated + documented; the prod check below makes its absence a loud boot failure unless
+    // the operator explicitly opts into a BYO-key-only deployment (see ALLOW_BYO_ONLY_LLM).
+    ANTHROPIC_API_KEY: optionalString,
+
+    // Escape hatch for a deployment where EVERY org brings its own LLM key: skips the prod
+    // requirement on ANTHROPIC_API_KEY. The AI then hard-fails (loudly) for any org without a BYO
+    // key rather than answering from the dev mock — degraded, but never fabricated-looking.
+    ALLOW_BYO_ONLY_LLM: z
+      .preprocess(blankToUndefined, z.enum(["true", "false"]).optional())
+      .transform((v) => v === "true"),
+
     // Optional bearer token guarding `GET /metrics` (Prometheus scrape, observability). When set,
     // the endpoint requires `Authorization: Bearer <token>` (timing-safe); when unset, /metrics is
     // open — fine behind a private network/service mesh, but set this if the API is internet-facing
@@ -143,6 +158,18 @@ export const EnvSchema = z
           message: `${key} is required when NODE_ENV=production (prod must not silently degrade)`,
         });
       }
+    }
+    // The platform LLM key is the same class of failure — without it the AI half of the product is
+    // dark — but it has a legitimate absence (every org on its own BYO key), so it's opt-out rather
+    // than unconditional. Silence is never allowed; the operator must state which world they're in.
+    if (!env.ANTHROPIC_API_KEY && !env.ALLOW_BYO_ONLY_LLM) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["ANTHROPIC_API_KEY"],
+        message:
+          "ANTHROPIC_API_KEY is required when NODE_ENV=production — without it every AI answer " +
+          "falls back to the dev mock. Set ALLOW_BYO_ONLY_LLM=true if every org supplies its own key.",
+      });
     }
   });
 

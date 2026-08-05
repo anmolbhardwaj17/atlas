@@ -19,6 +19,7 @@ export type {
 } from "./llm";
 export { MockLLMProvider, streamText } from "./mock-provider";
 export type { MockResponder } from "./mock-provider";
+export { UnconfiguredLLMProvider } from "./unconfigured-provider";
 export { ClaudeProvider } from "./claude-provider";
 export type { ClaudeConfig } from "./claude-provider";
 export { OpenRouterProvider } from "./openrouter-provider";
