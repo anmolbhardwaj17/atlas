@@ -100,7 +100,9 @@ jobs:
       # break the pipeline. `pnpm audit` in CI is the blocking gate for OUR dependency tree; this
       # covers the OS layer, where the right response is usually "rebuild on a fresh base".
       - name: Scan the published image
-        uses: aquasecurity/trivy-action@0.28.0
+        # Tags on this action are v-prefixed (`v0.36.0`); an unprefixed one fails the whole job at
+        # action-resolution time, before any step runs — which is how the first Release run died.
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
           format: sarif
