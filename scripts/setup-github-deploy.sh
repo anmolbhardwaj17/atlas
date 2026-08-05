@@ -44,8 +44,18 @@ echo
 # ── the Fly token ────────────────────────────────────────────────────────────
 # ORG-scoped, not app-scoped. `fly tokens create deploy` is tied to ONE app, so it would deploy the
 # API and then fail on the web app — the deploy job needs both. Default expiry is ~20 years.
-echo "Creating an org-scoped Fly deploy token…"
-TOKEN_JSON="$(fly tokens create org -j -n 'atlas github actions')" || die "Couldn't create the token"
+# `-j` puts flyctl in non-interactive mode, so it can't prompt for the organization and fails with
+# "argument must be specified when not running interactively" — the org has to be passed explicitly.
+# `fly orgs list --json` returns {"<slug>": "<display name>"}; take the first slug, or override with
+# FLY_ORG=<slug> for a multi-org account.
+FLY_ORG="${FLY_ORG:-$(fly orgs list --json 2>/dev/null | node -e '
+  let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{
+    try { process.stdout.write(Object.keys(JSON.parse(s))[0] ?? ""); } catch { process.stdout.write(""); }
+  })')}"
+[ -n "$FLY_ORG" ] || die "Couldn't determine your Fly org — re-run with FLY_ORG=<slug> (see: fly orgs list)"
+
+echo "Creating an org-scoped Fly deploy token (org: $FLY_ORG)…"
+TOKEN_JSON="$(fly tokens create org -j -o "$FLY_ORG" -n 'atlas github actions')" || die "Couldn't create the token"
 TOKEN="$(printf '%s' "$TOKEN_JSON" | node -e '
   let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{
     try { const o = JSON.parse(s); process.stdout.write(o.token ?? o.Token ?? ""); }
