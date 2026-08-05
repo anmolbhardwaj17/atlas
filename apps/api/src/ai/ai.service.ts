@@ -29,6 +29,8 @@ import { ApiException } from "../common/errors";
 import { RateLimitService } from "../core/rate-limit.service";
 import { GraphRetrievalPort } from "./graph-retrieval.port";
 import { EdgeSuggestionService } from "./edge-suggestion.service";
+import { AiUsageService } from "./ai-usage.service";
+import { MeteredLLMProvider } from "./metered-provider";
 import { GraphService } from "../graph/graph.service";
 import { LLM_PROVIDER } from "./tokens";
 
@@ -163,6 +165,7 @@ export class AiService {
     private readonly rateLimit: RateLimitService,
     private readonly edgeSuggest: EdgeSuggestionService,
     private readonly graph: GraphService,
+    private readonly usage: AiUsageService,
   ) {}
 
   /**
@@ -578,7 +581,11 @@ export class AiService {
 
   /** Pick the narrator: the org's BYO-LLM (OpenRouter) if configured + key resolves, else the
    *  env default (Claude when ANTHROPIC_API_KEY is set, otherwise the dev mock). `shared` is true
-   *  when we fell back to Atlas's own key — the caller then applies the shared-key budget (H2). */
+   *  when we fell back to Atlas's own key — the caller then applies the shared-key budget (H2).
+   *
+   *  Every provider returned here is wrapped in `MeteredLLMProvider`, so token usage is recorded and
+   *  the monthly spend cap enforced on ALL six call paths (and any added later) without each having
+   *  to remember. Wrapping preserves `name`, so the engine's `llm.name === "mock"` guards still fire. */
   private async resolveProvider(orgId: string): Promise<{ llm: LLMProvider; shared: boolean }> {
     const cfg = await withOrgScope(this.db, orgId, async (c) => {
       const { rows } = await c.query<{ provider: string; model: string; secret_ref: string }>(
@@ -595,13 +602,13 @@ export class AiService {
     ) {
       const material = await this.secrets.get(cfg.secret_ref);
       if (material.apiKey) {
-        return {
-          llm: buildProvider(cfg.provider, cfg.model, material.apiKey, this.env.WEB_ORIGIN),
-          shared: false,
-        };
+        const byo = buildProvider(cfg.provider, cfg.model, material.apiKey, this.env.WEB_ORIGIN);
+        // BYO-key usage is metered for the customer's own visibility, never capped — it's their
+        // provider bill, not ours (enforceBudget no-ops when `sharedKey` is false).
+        return { llm: new MeteredLLMProvider(byo, this.usage, orgId, false), shared: false };
       }
     }
-    return { llm: this.llm, shared: true };
+    return { llm: new MeteredLLMProvider(this.llm, this.usage, orgId, true), shared: true };
   }
 
   /**

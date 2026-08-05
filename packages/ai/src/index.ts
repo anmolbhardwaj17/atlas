@@ -13,6 +13,7 @@ export type {
   LLMProvider,
   CompleteRequest,
   LLMEvent,
+  LLMUsage,
   ChatMessage,
   ToolCall,
   ToolSpec,
@@ -20,6 +21,8 @@ export type {
 export { MockLLMProvider, streamText } from "./mock-provider";
 export type { MockResponder } from "./mock-provider";
 export { UnconfiguredLLMProvider } from "./unconfigured-provider";
+export { estimateCostUsd, rateFor } from "./pricing";
+export type { ModelRate, CostInput } from "./pricing";
 export { ClaudeProvider } from "./claude-provider";
 export type { ClaudeConfig } from "./claude-provider";
 export { OpenRouterProvider } from "./openrouter-provider";

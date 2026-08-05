@@ -35,10 +35,25 @@ export interface ToolSpec {
   inputSchema: Record<string, unknown>;
 }
 
+/**
+ * Tokens billed for one model call. Reported by the provider on its terminating `stop` event so the
+ * caller can meter spend (deploy-readiness P1: there was no usage accounting at all, and
+ * `autoDiagnose` spends unattended off health alerts). Absent when the provider can't report it —
+ * callers must treat `undefined` as "unknown", never as zero.
+ */
+export interface LLMUsage {
+  inputTokens: number;
+  outputTokens: number;
+  /** Cached-prefix reads, billed at ~10% of input. Counted separately so cost isn't overstated. */
+  cacheReadTokens?: number;
+  /** Cache writes, billed at ~125% of input (5-minute TTL). */
+  cacheWriteTokens?: number;
+}
+
 export type LLMEvent =
   | { type: "token"; text: string }
   | { type: "tool_call"; id: string; name: string; input: Record<string, unknown> }
-  | { type: "stop"; reason: string };
+  | { type: "stop"; reason: string; usage?: LLMUsage };
 
 export interface CompleteRequest {
   system: string;
@@ -58,6 +73,9 @@ export interface CompleteRequest {
 
 export interface LLMProvider {
   readonly name: string;
+  /** The concrete model id (e.g. `claude-opus-4-8`), when the provider targets one. `name` is a
+   *  provider label ("anthropic-claude") and is NOT usable for pricing — the meter needs this. */
+  readonly model?: string;
   complete(req: CompleteRequest): AsyncIterable<LLMEvent>;
   /** Optional - embeddings may also come from a dedicated model (docs/11). */
   embed?(texts: string[]): Promise<number[][]>;

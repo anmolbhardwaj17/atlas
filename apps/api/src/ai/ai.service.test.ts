@@ -10,6 +10,7 @@ import { PostgresSearchProvider } from "../search/postgres-search.provider";
 import { GraphRetrievalPort } from "./graph-retrieval.port";
 import { AiService } from "./ai.service";
 import { EdgeSuggestionService } from "./edge-suggestion.service";
+import { AiUsageService } from "./ai-usage.service";
 import { RateLimitService } from "../core/rate-limit.service";
 
 /**
@@ -55,6 +56,7 @@ suite("G3.5 AiService", () => {
       new RateLimitService(app),
       new EdgeSuggestionService(app),
       new GraphService(app),
+      new AiUsageService(app, loadEnv({})),
     );
   };
 

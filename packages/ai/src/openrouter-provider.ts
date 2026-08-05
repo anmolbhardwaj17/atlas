@@ -5,7 +5,7 @@
  * config** (users bring their own key), never baked into the image. Like ClaudeProvider it's a
  * NARRATOR constrained by retrieved context (P1/AE-4), never the source of truth.
  */
-import type { ChatMessage, CompleteRequest, LLMEvent, LLMProvider } from "./llm";
+import type { ChatMessage, CompleteRequest, LLMEvent, LLMProvider, LLMUsage } from "./llm";
 import { timeoutFetch } from "./net";
 
 export interface OpenRouterConfig {
@@ -31,17 +31,22 @@ interface StreamChoice {
 }
 interface StreamChunk {
   choices?: StreamChoice[];
+  /** Present only on the final chunk, and only when `stream_options.include_usage` was requested. */
+  usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
 
 const DEFAULT_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 
 export class OpenRouterProvider implements LLMProvider {
   readonly name: string;
+  /** Exposed for the spend meter (see LLMProvider.model). */
+  readonly model: string;
   private readonly fetchImpl: typeof fetch;
   private readonly endpoint: string;
 
   constructor(private readonly config: OpenRouterConfig) {
     this.name = `openrouter:${config.model}`;
+    this.model = config.model;
     this.fetchImpl = config.fetchImpl ?? timeoutFetch;
     this.endpoint = config.endpoint ?? DEFAULT_ENDPOINT;
   }
@@ -53,6 +58,10 @@ export class OpenRouterProvider implements LLMProvider {
       temperature: req.temperature,
       max_tokens: req.maxTokens,
       stream: true,
+      // OpenAI-compatible APIs omit usage from streamed responses unless you ask; without this the
+      // spend meter records nothing for BYO-key orgs. The final chunk then carries a usage object
+      // and an empty `choices` array, which the loop below already tolerates.
+      stream_options: { include_usage: true },
       ...(req.tools && req.tools.length > 0
         ? {
             tools: req.tools.map((t) => ({
@@ -85,6 +94,7 @@ export class OpenRouterProvider implements LLMProvider {
     const decoder = new TextDecoder();
     let buffer = "";
     let stopReason = "end";
+    let usage: LLMUsage | undefined;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -103,8 +113,14 @@ export class OpenRouterProvider implements LLMProvider {
         } catch {
           continue; // ignore keep-alive / malformed frames
         }
+        if (chunk.usage) {
+          usage = {
+            inputTokens: chunk.usage.prompt_tokens ?? 0,
+            outputTokens: chunk.usage.completion_tokens ?? 0,
+          };
+        }
         const choice = chunk.choices?.[0];
-        if (!choice) continue;
+        if (!choice) continue; // usage-only final chunk carries no choices
         const content = choice.delta?.content;
         if (typeof content === "string" && content.length > 0) {
           yield { type: "token", text: content };
@@ -125,7 +141,7 @@ export class OpenRouterProvider implements LLMProvider {
       if (!tc.name) continue;
       yield { type: "tool_call", id: tc.id || tc.name, name: tc.name, input: safeJson(tc.args) };
     }
-    yield { type: "stop", reason: stopReason };
+    yield { type: "stop", reason: stopReason, ...(usage ? { usage } : {}) };
   }
 }
 

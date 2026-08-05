@@ -5,17 +5,25 @@
  * the MockLLMProvider covers the engine logic. Model + key are per-env config.
  */
 import Anthropic from "@anthropic-ai/sdk";
-import type { ChatMessage, CompleteRequest, LLMEvent, LLMProvider } from "./llm";
+import type { ChatMessage, CompleteRequest, LLMEvent, LLMProvider, LLMUsage } from "./llm";
 
 export interface ClaudeConfig {
   apiKey?: string;
   model?: string;
 }
 
+/** The usage block as the API actually sends it (see the cast at `message_start`). */
+interface CacheAwareUsage {
+  input_tokens: number;
+  cache_read_input_tokens?: number | null;
+  cache_creation_input_tokens?: number | null;
+}
+
 export class ClaudeProvider implements LLMProvider {
   readonly name = "anthropic-claude";
+  /** Exposed (not private) so the spend meter can price calls by model — `name` can't. */
+  readonly model: string;
   private readonly client: Anthropic;
-  private readonly model: string;
 
   constructor(config: ClaudeConfig = {}) {
     // Explicit request deadline (the SDK also retries): a dead socket can't hang an SSE request
@@ -56,6 +64,9 @@ export class ClaudeProvider implements LLMProvider {
     // Accumulate streamed tool-call JSON per content block; emit on block stop.
     const toolBlocks = new Map<number, { id: string; name: string; json: string }>();
     let stopReason = "end";
+    // Token accounting for the spend meter. Anthropic reports input (+ cache) once on `message_start`
+    // and the running output count on each `message_delta`; the last delta carries the final total.
+    let usage: LLMUsage | undefined;
 
     for await (const event of stream) {
       if (event.type === "content_block_start" && event.content_block.type === "tool_use") {
@@ -77,12 +88,30 @@ export class ClaudeProvider implements LLMProvider {
           toolBlocks.delete(event.index);
           yield { type: "tool_call", id: block.id, name: block.name, input: safeJson(block.json) };
         }
-      } else if (event.type === "message_delta" && event.delta.stop_reason) {
+      } else if (event.type === "message_start") {
+        // The cache counters are read structurally rather than off the SDK's `Usage` type: the pinned
+        // SDK (0.32.1) predates them, but the API sends them, so this picks them up now and keeps
+        // compiling after an SDK bump. Absent ⇒ undefined ⇒ the meter prices the call as uncached.
+        const u = event.message.usage as CacheAwareUsage;
+        usage = {
+          inputTokens: u.input_tokens,
+          outputTokens: 0,
+          // Spread rather than assign undefined: exactOptionalPropertyTypes distinguishes "absent"
+          // from "present and undefined", and the meter's contract is that absent means unknown.
+          ...(u.cache_read_input_tokens != null
+            ? { cacheReadTokens: u.cache_read_input_tokens }
+            : {}),
+          ...(u.cache_creation_input_tokens != null
+            ? { cacheWriteTokens: u.cache_creation_input_tokens }
+            : {}),
+        };
+      } else if (event.type === "message_delta") {
+        if (usage) usage.outputTokens = event.usage.output_tokens;
         // "tool_use" tells the loop the model wants to call tools; "end_turn" = it's done.
-        stopReason = event.delta.stop_reason;
+        if (event.delta.stop_reason) stopReason = event.delta.stop_reason;
       }
     }
-    yield { type: "stop", reason: stopReason };
+    yield { type: "stop", reason: stopReason, ...(usage ? { usage } : {}) };
   }
 }
 

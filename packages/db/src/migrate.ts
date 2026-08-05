@@ -67,6 +67,7 @@ import { up as up0065 } from "./migrations/0065_digest_org_runs";
 import { up as up0066 } from "./migrations/0066_secret_key_id";
 import { up as up0067 } from "./migrations/0067_org_deletion_log";
 import { up as up0068 } from "./migrations/0068_jira_issue_fts";
+import { up as up0069 } from "./migrations/0069_ai_usage";
 
 /**
  * Forward-only SQL migration runner (docs/04 §9). Plain `pg`, no ORM. Each
@@ -145,6 +146,7 @@ const MIGRATIONS: ReadonlyArray<{ version: string; statements: string[] }> = [
   { version: "0066_secret_key_id", statements: up0066 },
   { version: "0067_org_deletion_log", statements: up0067 },
   { version: "0068_jira_issue_fts", statements: up0068 },
+  { version: "0069_ai_usage", statements: up0069 },
 ];
 
 async function main(): Promise<void> {

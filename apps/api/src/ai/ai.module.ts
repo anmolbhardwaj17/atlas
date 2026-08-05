@@ -9,6 +9,7 @@ import { SEARCH_PROVIDER } from "../search/search.provider";
 import { PostgresSearchProvider } from "../search/postgres-search.provider";
 import { GraphRetrievalPort } from "./graph-retrieval.port";
 import { AiService } from "./ai.service";
+import { AiUsageService } from "./ai-usage.service";
 import { EdgeSuggestionService } from "./edge-suggestion.service";
 import { AiController } from "./ai.controller";
 import { IntentController } from "./intent.controller";
@@ -58,6 +59,7 @@ const searchProvider: Provider = {
     searchProvider,
     GraphRetrievalPort,
     AiService,
+    AiUsageService,
     EdgeSuggestionService,
     llmProvider,
   ],

@@ -87,6 +87,14 @@ export const EnvSchema = z
       .preprocess(blankToUndefined, z.enum(["true", "false"]).optional())
       .transform((v) => v === "true"),
 
+    // Monthly ceiling, in USD, on what ONE org may spend against Atlas's shared platform key
+    // (deploy-readiness P1). 0 disables the cap. Orgs with their own BYO-LLM key are metered but
+    // never capped — that's their provider bill, not ours. This is a runaway guard, not billing:
+    // it's checked before each call against spend so far, so a single call can overshoot slightly.
+    // Matters because `autoDiagnose` fires unattended off health alerts — a flapping estate would
+    // otherwise bill indefinitely with nobody watching.
+    AI_MONTHLY_USD_CAP: z.coerce.number().min(0).max(100_000).default(50),
+
     // Optional bearer token guarding `GET /metrics` (Prometheus scrape, observability). When set,
     // the endpoint requires `Authorization: Bearer <token>` (timing-safe); when unset, /metrics is
     // open — fine behind a private network/service mesh, but set this if the API is internet-facing

@@ -9,6 +9,7 @@ import { PostgresSearchProvider } from "../search/postgres-search.provider";
 import { GraphRetrievalPort } from "./graph-retrieval.port";
 import { AiService } from "./ai.service";
 import { EdgeSuggestionService } from "./edge-suggestion.service";
+import { AiUsageService } from "./ai-usage.service";
 import { RateLimitService } from "../core/rate-limit.service";
 import { ApiException } from "../common/errors";
 
@@ -52,6 +53,7 @@ suite("IV-3b intent-coverage assembly", () => {
       new RateLimitService(app),
       new EdgeSuggestionService(app),
       new GraphService(app),
+      new AiUsageService(app, loadEnv({})),
     );
   };
 
