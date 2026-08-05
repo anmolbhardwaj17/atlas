@@ -40,3 +40,6 @@ tmp/
 
 # Local, per-developer Claude Code settings
 .claude/settings.local.json
+
+# Redis dump (a local `redis-server` writes this into the CWD — never a repo artifact)
+*.rdb

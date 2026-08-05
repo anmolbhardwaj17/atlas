@@ -16,8 +16,13 @@ audit (Phases A–E), the compliance close-out, and the container/worker artifac
 
 ## 1. Config
 - [ ] Fill `.env.production` from `.env.production.example`. In prod the config **fails fast at boot**
-      if any of `DATABASE_URL, SECRET_ENCRYPTION_KEY, REDIS_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY`
-      is missing (no silent degradation, audit A3).
+      if any of `DATABASE_URL, SECRET_ENCRYPTION_KEY, REDIS_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+      ANTHROPIC_API_KEY` is missing (no silent degradation, audit A3).
+- [ ] **`ANTHROPIC_API_KEY` is required** — it is the platform narrator for every org that hasn't
+      added a BYO-LLM key. Before the deploy-readiness audit its absence silently fell back to the dev
+      `MockLLMProvider`, which served `"(Atlas dev) …"` placeholder prose as though it were a real
+      answer. Set `ALLOW_BYO_ONLY_LLM=true` only if every org supplies its own key (orgs without one
+      then get a clear error, never mock text).
 - [ ] Generate the encryption key: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
 - [ ] Set `WEB_ORIGIN` (CORS) + `PUBLIC_API_URL` to the real domains.
 
@@ -27,18 +32,33 @@ audit (Phases A–E), the compliance close-out, and the container/worker artifac
 - [ ] Provision the `atlas_app` login/password out of band (or `ATLAS_APP_PASSWORD=… pnpm --filter
       @atlas/db run setup:app-role` in ephemeral envs).
 
-## 3. Build + push the image
-- [ ] `docker build -t <registry>/atlas-api:<sha> .` (repo root; **build-test this once — the Dockerfile
-      was authored without a local daemon**). Push. The web app builds/deploys as its own image.
+## 3. Build + push the images
+- [ ] **api/worker** — `docker build -t <registry>/atlas-api:<sha> .` (repo root). Push.
+- [ ] **web** — `docker build -f apps/web/Dockerfile -t <registry>/atlas-web:<sha> .` (repo root too).
+      Pass the real `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `NEXT_PUBLIC_API_URL`
+      as `--build-arg`: they are **inlined into the client bundle at build time**, so changing them
+      needs a rebuild, not a redeploy. Never pass the service-role key.
+- [ ] ⚠️ **Neither image has ever been built** — both Dockerfiles were authored without a local Docker
+      daemon. `docker build` both once, locally, before the first deploy. The `pnpm deploy --prod
+      --legacy` step in the API image is the most likely thing to need adjusting.
 
-## 4. Deploy — two ECS services from the ONE image
+## 4. Deploy — two ECS services from the ONE api image (+ the web image)
 - [ ] **api** — `CMD node dist/main.js`. Autoscale on CPU/request count. Health checks:
       `GET /health` (liveness, cheap) + `GET /health/ready` (DB probe — drains a dead-pool pod, A2).
       Fastify `requestTimeout` 30s; graceful shutdown drains in-flight work.
 - [ ] **worker** — override `CMD node dist/worker.js` (headless: BullMQ consumer + schedulers, no HTTP).
       **Autoscale on `atlas_sync_queue_depth`** (docs/17 §4). `SIGTERM` drains the active job (no lost
       sync). Enable the cadences (`SYNC/HEALTH/NOTIFY_INTERVAL_MINUTES`) here.
+- [ ] **web** — `node apps/web/server.js` on `:4291` behind the TLS edge.
 - [ ] *(single-node MVP alternative)* Run only the API — it runs the worker + schedulers in-process.
+
+> **Scheduler concurrency (resolved).** The cadence ticks used to be bare `setInterval` with no
+> cross-instance coordination, so every replica with `SYNC/HEALTH/NOTIFY_INTERVAL_MINUTES` set would
+> tick — duplicate Slack alerts, duplicate `autoDiagnose` LLM spend, duplicate cloud crawls. They now
+> take a **Postgres advisory lock per tick** (`LeaderLockService`), so it is safe to set the cadences
+> on any number of tasks and to autoscale the worker. Retention, the sync reaper and the weekly digest
+> were already safe by construction (age-based / single atomic UPDATE / per-org claim) and are
+> deliberately not locked.
 
 ## 5. Observability
 - [ ] Scrape `GET /metrics` (set `METRICS_TOKEN` and pass `Authorization: Bearer …` if internet-facing).
