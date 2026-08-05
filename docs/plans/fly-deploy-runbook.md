@@ -184,21 +184,39 @@ DATABASE_URL_MIGRATE="<owner-url>" ATLAS_APP_PASSWORD="<pw>" \
 
 ## 7. Turn on automatic deploys
 
-In GitHub → Settings:
+```sh
+bash scripts/setup-github-deploy.sh
+```
+
+Sets one secret and four variables via the `gh` CLI, then prints them back. Also the way to rotate
+the Fly token later — re-running replaces it.
+
+Two things it gets right that are easy to get wrong by hand:
+
+- **The Fly token must be ORG-scoped** (`fly tokens create org`), not a deploy token.
+  `fly tokens create deploy` is tied to a single app, so it would deploy the API and then fail on the
+  web app.
+- **The `NEXT_PUBLIC_*` values are repository VARIABLES, not secrets.** They're compiled into the
+  browser bundle and ship to every visitor, so they aren't private; storing them as secrets would
+  imply otherwise and make them harder to read back. The Supabase **service role** key is the
+  opposite — it must never be here.
+
+Doing it by hand instead (GitHub → Settings → Secrets and variables → Actions):
 
 | Kind | Name | Value |
 |---|---|---|
-| Secret | `FLY_API_TOKEN` | `fly tokens create deploy -x 999999h` |
+| Secret | `FLY_API_TOKEN` | output of `fly tokens create org` |
 | Variable | `FLY_DEPLOY_ENABLED` | `true` |
-| Variable | `NEXT_PUBLIC_API_URL` | `https://api.<your-domain>` |
-| Variable | `NEXT_PUBLIC_SUPABASE_URL` | `https://<project>.supabase.co` |
-| Variable | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | the anon key |
+| Variable | `NEXT_PUBLIC_API_URL` | `https://atlas-api-v1.fly.dev` |
+| Variable | `NEXT_PUBLIC_SUPABASE_URL` | from `.env` |
+| Variable | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | from `.env` |
 
-Variables, not secrets, for the `NEXT_PUBLIC_*` values — they ship to every browser regardless, and
-keeping them out of the secret store makes that obvious. **Never** put the service-role key here.
+After that, every push to `main` runs: CI gates → publish images to GHCR → deploy API (migrations
+first) → deploy web → assert `/health/ready`.
 
-After that, every green push to `main` publishes images to GHCR and rolls Fly automatically. Until
-`FLY_DEPLOY_ENABLED=true` the deploy job is skipped and everything else still runs.
+Pause deploys without unpicking anything: `gh variable set FLY_DEPLOY_ENABLED --body false`.
+Require approval per deploy: GitHub → Settings → Environments → `production` → Required reviewers
+(the job already declares `environment: production`).
 
 ## 8. Custom domains + Cloudflare
 
