@@ -131,15 +131,31 @@ Notes that will save you an outage:
 - Use the **session pooler** connection string from Supabase, not the direct one, and keep
   `PG_POOL_MAX` (16) under its per-client limit.
 
-## 5. First deploy
+## 5. Deploy
 
 ```sh
-fly deploy                       # API — runs migrations first, then rolls
-fly deploy -c fly.web.toml \
-  --build-arg NEXT_PUBLIC_SUPABASE_URL="https://<project>.supabase.co" \
-  --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="<anon-key>" \
-  --build-arg NEXT_PUBLIC_API_URL="https://api.<your-domain>"
+pnpm run deploy:fly
 ```
+
+One command for both apps. It reads the app names from `fly.toml` / `fly.web.toml` and the
+`NEXT_PUBLIC_*` build args from `.env`, deploys the **API first** (its `release_command` applies
+migrations), waits for `/health/ready`, then builds and deploys the web app against the now-verified
+API URL and waits for `/api/health`.
+
+The ordering isn't cosmetic: the API's URL is **compiled into the browser bundle**, so deploying web
+against an API that isn't up ships a broken frontend that only a rebuild can fix. If the API fails,
+the web deploy is skipped rather than shipped against a broken backend.
+
+```sh
+pnpm run deploy:fly -- --api    # API only
+pnpm run deploy:fly -- --web    # web only (still refuses if the API isn't serving)
+pnpm run deploy:fly -- --yes    # no confirmation prompt, e.g. from CI
+```
+
+Custom domain later: `ATLAS_API_URL=https://api.example.com pnpm run deploy:fly`.
+
+*(Note: the alias is `deploy:fly`, not `deploy` — `pnpm deploy` is a reserved pnpm builtin, the one
+the API Dockerfile uses to assemble its production bundle.)*
 
 The API deploy runs `node node_modules/@atlas/db/dist/migrate.js` in a temporary machine **before**
 the new version takes traffic; a non-zero exit aborts the rollout, so a bad migration never leaves
