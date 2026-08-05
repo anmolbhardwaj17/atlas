@@ -7,8 +7,9 @@
 #   docker run --env-file .env.production -p 4290:4290 atlas-api            # API + in-process worker
 #   docker run --env-file .env.production atlas-api node dist/worker.js     # dedicated worker
 #
-# NOTE: authored offline (no Docker daemon available this session to build-test) — do a `docker build`
-# before the first deploy. The runtime is non-root; the web app (Next.js) ships as its own image.
+# Build-tested in CI (the `images` job in .github/workflows/ci.yml builds this on every push and
+# smoke-runs the entrypoint). The runtime is non-root; the web app ships as its own image
+# (apps/web/Dockerfile).
 FROM node:22-slim AS base
 ENV PNPM_HOME=/pnpm PATH="/pnpm:$PATH"
 RUN corepack enable
@@ -20,7 +21,11 @@ FROM base AS build
 COPY . .
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter "@atlas/*" run build && pnpm --filter @atlas/api run build
-RUN pnpm --filter @atlas/api deploy --prod --legacy /deploy
+# `deploy` produces a self-contained tree: the api's own build output plus its workspace deps
+# (@atlas/db, @atlas/ai, …) injected into node_modules with their compiled dist/. No `--legacy`:
+# that flag doesn't exist in pnpm 9 (`ERROR Unknown option: 'legacy'`) — it was the first thing the
+# CI image build caught once there was finally a Docker daemon to run it.
+RUN pnpm --filter @atlas/api deploy --prod /deploy
 
 # ── runtime: minimal, non-root, production-only deps ──
 FROM base AS runtime
