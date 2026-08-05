@@ -253,6 +253,12 @@
 
 ---
 
+## 🎨 UI/UX to-do (raised 2026-08-06)
+
+| # | Item | Notes |
+|---|---|---|
+| U1 | **War Room doesn't feel like a war room** | User's words: "the war room page seems very off, it doesn't feel like a room." Today it's a page: header, map panel, a chat column. It should read as an incident command surface — pressure, focus, live state. Think: dark/high-contrast treatment distinct from the rest of the app, the blast-radius map as the hero rather than a side panel, the investigation streaming as a visible timeline of steps, the ranked verdict as a headline you can't miss, elapsed-time and severity always in view. Content and data are already there (`components/war-room/`); this is composition, hierarchy and motion, not new backend work. Use the installed design skills. |
+
 ## 🗂️ Planned deep-dives (captured feature plans, not yet scheduled)
 - **⚡ Perceived-performance pass (product-owner concern, 2026-07-10)** → **`docs/plans/performance.md`** (measured + planned). **Root cause found & first fix shipped.** Measured: Supabase PG is in **Sydney (ap-southeast-2)**, ~**137 ms per DB round-trip** from the dev laptop; cost = (sequential round-trips) × RTT. `withOrgScope` was **4 hops** per scoped op (BEGIN/set_config/query/COMMIT = ~610 ms for one read) → **✅ folded BEGIN+set_config into 1 hop** (RLS verified intact). **Next (P0)** the dominant *prod* lever = **co-locate the ECS API in ap-southeast-2** (turns 137 ms hops into ~1–3 ms). **P1** consolidate multi-`withOrgScope` endpoints + batch reads (measured 170 ms vs 610 ms for one round-trip); **P2** de-dupe the per-page `/me` + client cache (SWR); **P3** Suspense streaming; **P4** prefetch + bundle split. Much of the *dev* lag is on-demand compilation (gone in prod) — measure a prod build before attributing more to the app.
 - **🔒 Security & QA leak/hollow sweep (2026-07-10, requested)** → **`docs/plans/security-qa-sweep.md`** — full audit for where the system is leaky or hollow (tenant isolation/RLS, auth/session, injection/validation, read-only P2, secrets, storage-bucket exposure, abuse/rate-limits, error info-leak, test-coverage gaps). Findings recorded with severity + location + fix so we can start fixing on return.
