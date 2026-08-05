@@ -4,81 +4,22 @@ import * as React from "react";
 import { cn } from "@/lib/cn";
 
 /**
- * Shared visual layer for the War Room (board U1).
+ * Small shared pieces for the War Room (board U1).
  *
- * The design brief was that it "doesn't feel like a room". The fix isn't more chrome — it's that an
- * incident surface should be recognisably *not* the rest of the app.
+ * An earlier pass gave this route its own forced-dark surface with a bloom and a rule texture. That
+ * was a mistake: a bespoke surface on one route is an inconsistency, not a design — it read as a
+ * different product. The War Room now uses the app's own theme, tokens and card patterns like every
+ * other page, and gets its character from information hierarchy and severity colour instead:
+ * live incidents are large and coloured, settled ones are small and neutral.
  *
- * It forces the dark token set regardless of the user's theme, and goes DEEPER than the app's own
- * dark background (4% against the theme's 7%). That margin matters: an earlier pass used 6.5%,
- * which is invisible next to 7% — for anyone already running dark mode the "different room" effect
- * simply didn't exist. The differentiation has to survive both themes, so it comes from depth plus
- * the severity bloom and the rule texture, not from light-vs-dark alone.
- *
- * Three rules hold it together and keep it out of "glowing dark dashboard" territory:
- *
- *  1. **Severity is the only chroma, and it behaves like a light source.** Everything structural is
- *     neutral; the incident's own severity colour is the single hue in the room, and it *emits*
- *     (a soft bloom behind the headline) rather than being painted on as borders and pills. Scarce
- *     colour reads as signal. Colour everywhere reads as decoration.
- *  2. **Never pure black.** The surface is a tinted near-black; pure #000 kills depth and looks
- *     cheap next to real content.
- *  3. **No glass, no gradient text, no neon.** The atmosphere comes from contrast, restraint and
- *     one moving element (the clock) — not from effects.
+ * What survives from that pass is only what carries information — the clock and the pulse.
  */
 
 /**
- * The room itself: forces the dark token set regardless of the user's theme, and lays a very low
- * amplitude vertical rule texture over it. The texture is what stops a large dark area reading as
- * a flat void — it's near-invisible individually and reads as "instrumented surface" in aggregate.
- */
-export function WarRoomSurface({
-  hue,
-  className,
-  children,
-}: {
-  hue: string;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      data-theme="dark"
-      style={{ "--room-hue": hue } as React.CSSProperties}
-      className={cn(
-        "dark relative isolate -mx-4 -mt-4 min-h-[calc(100dvh-4rem)] bg-[hsl(0_0%_4%)] px-4 pb-8 pt-4 text-foreground sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8",
-        className,
-      )}
-    >
-      {/* Instrument texture — 1px rules at low alpha. Pointer-events off; purely atmospheric. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.55]"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(90deg, hsl(0 0% 100% / 0.022) 0 1px, transparent 1px 96px)",
-        }}
-      />
-      {/* The severity bloom. Sits behind everything, top-left biased so the headline sits inside it. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px]"
-        style={{
-          background:
-            "radial-gradient(60% 100% at 22% 0%, hsl(var(--room-hue) / 0.20), transparent 70%)",
-        }}
-      />
-      {children}
-    </div>
-  );
-}
-
-/**
- * A live elapsed clock. Incident rooms have clocks — this is the one moving element in the design,
- * and it earns its place twice: it's the single most-asked question during an incident ("how long
- * has this been going?") and it makes a static page feel live.
+ * A live elapsed clock. "How long has this been going?" is the first question asked in any incident,
+ * so it's worth a component rather than a static timestamp — and it keeps the page feeling live.
  *
- * Ticks once a second under a minute, then every 30s — a seconds display that keeps re-rendering an
+ * Ticks once a second under a minute, then every 30s; a seconds readout that keeps re-rendering an
  * hour into an incident is noise, not information.
  */
 export function ElapsedClock({
@@ -106,7 +47,7 @@ export function ElapsedClock({
   const h = Math.floor(secs / 3600);
   const m = Math.floor((secs % 3600) / 60);
   const s = secs % 60;
-  // Under an hour show m:ss so short incidents read precisely; past that, h:mm — nobody triaging a
+  // Under an hour show m:ss so short incidents read precisely; past that h:mm — nobody triaging a
   // four-hour outage needs the seconds.
   const text = h > 0 ? `${h}:${String(m).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
 
@@ -123,7 +64,7 @@ export function ElapsedClock({
 
 /**
  * Status dot. Live incidents pulse; settled ones don't — motion is reserved for "this is still
- * happening", so a screen of resolved incidents is completely still.
+ * happening", so a list of resolved incidents is completely still.
  */
 export function StatusPulse({ live, hue }: { live: boolean; hue: string }) {
   return (
@@ -137,23 +78,8 @@ export function StatusPulse({ live, hue }: { live: boolean; hue: string }) {
       ) : null}
       <span
         className="relative size-2 rounded-full"
-        style={{ background: live ? `hsl(${hue})` : "hsl(0 0% 42%)" }}
+        style={{ background: live ? `hsl(${hue})` : "hsl(var(--muted-foreground) / 0.5)" }}
       />
     </span>
-  );
-}
-
-/**
- * Section rule with a label — the room's structural device instead of yet another bordered card.
- * Cards-in-cards was the main thing making the old layout read as a generic dashboard.
- */
-export function RoomRule({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-3">
-      <h2 className="text-[0.7rem] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-        {children}
-      </h2>
-      <div className="h-px flex-1 bg-border/70" />
-    </div>
   );
 }

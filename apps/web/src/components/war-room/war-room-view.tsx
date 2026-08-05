@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   XCircle,
   ArrowLeft,
+  Crosshair,
   RotateCw,
   SkipForward,
   CornerDownLeft,
@@ -18,7 +19,7 @@ import type { MapData, MapNode } from "@/lib/map-types";
 import { WarRoomMap } from "./war-room-map";
 import { MarkdownLite } from "./markdown-lite";
 import { ContextBar, Timeline, type NodeEvent } from "./war-room-context";
-import { WarRoomSurface, ElapsedClock, StatusPulse } from "./war-room-chrome";
+import { ElapsedClock, StatusPulse } from "./war-room-chrome";
 import { sevHue } from "@/lib/severity";
 
 interface Step {
@@ -379,169 +380,172 @@ export function WarRoomView({
           : incident.status;
 
   return (
-    <WarRoomSurface hue={sevHue(incident.severity)}>
-      <div className="motion-stagger mx-auto max-w-[1600px] space-y-5">
-        {/* Command bar. The old header repeated "War Room" as an H1 above the incident name — the
-            page title and the thing you're looking at were competing. Now the incident IS the
-            title, and the room's identity comes from the surface itself. */}
-        <div className="flex flex-wrap items-start justify-between gap-4 pt-2">
-          <div className="min-w-0 space-y-2">
-            <Link
-              href="/war-room"
-              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <ArrowLeft className="size-3.5" /> All incidents
-            </Link>
-            <div className="flex items-center gap-2.5">
-              <StatusPulse live={!terminal} hue={sevHue(incident.severity)} />
-              <span
-                className="text-[0.7rem] font-medium uppercase tracking-[0.16em]"
-                style={{ color: `hsl(${sevHue(incident.severity)})` }}
-              >
-                {incident.severity ?? "unknown"} · {statusLabel}
-              </span>
-            </div>
-            <h1 className="text-balance text-[clamp(1.4rem,3vw,2rem)] font-semibold leading-[1.05] tracking-[-0.02em]">
-              {label}
-            </h1>
-          </div>
-
-          <div className="flex items-center gap-5">
-            {/* The clock, again the largest number — consistent with the board. */}
-            <div className="flex flex-col items-end">
-              <ElapsedClock
-                since={incident.openedAt}
-                until={terminal ? incident.updatedAt : null}
-                className="text-2xl font-semibold sm:text-3xl"
-              />
-              <span className="text-[0.65rem] uppercase tracking-[0.14em] text-muted-foreground">
-                {terminal ? "duration" : "elapsed"}
-              </span>
-            </div>
-            {!terminal ? (
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => close("dismissed")}
+    <div className="motion-stagger space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <Link
+            href="/war-room"
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-3.5" /> All incidents
+          </Link>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+            <Crosshair className="size-6 text-danger" /> War Room
+          </h1>
+          <p className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+            <StatusPulse live={!terminal} hue={sevHue(incident.severity)} />
+            <span className="font-medium text-foreground">{label}</span>
+            {incident.severity ? (
+              <>
+                <span>·</span>
+                <span
+                  className="font-medium"
+                  style={{ color: `hsl(${sevHue(incident.severity)})` }}
                 >
-                  Dismiss
-                </Button>
-                <Button size="sm" disabled={busy} onClick={() => close("resolved")}>
-                  Mark resolved
-                </Button>
-              </div>
+                  {incident.severity}
+                </span>
+              </>
             ) : null}
-          </div>
+            <span>·</span>
+            <span className="capitalize">{statusLabel}</span>
+          </p>
         </div>
 
-        {/* Verdict hero — the answer FIRST (a non-expert reads this line and gets it; an SRE triages fast). */}
-        <VerdictHero
-          verdict={verdict}
-          confidence={heroConfidence}
-          sending={inProgress}
-          diagnosed={diagnosed}
-          node={focalNode}
-          impactCount={impactCount}
-          lastChange={lastChange}
-        />
-
-        <div className="grid gap-4 lg:h-[72vh] lg:grid-cols-[1.35fr_1fr]">
-          {/* Left: the evidence — dependency chain (map) + what changed (timeline) */}
-          <div className="flex min-h-0 flex-col gap-4">
-            <div className="flex min-h-[300px] flex-1 flex-col overflow-hidden rounded-xl border border-border/70 bg-[hsl(0_0%_8.5%)]">
-              <div className="border-b border-border px-4 py-3">
-                <h2 className="text-sm font-semibold">Dependency chain</h2>
-                <p className="text-xs text-muted-foreground">
-                  The culprit path is red · lit nodes are what the trace examined.
-                </p>
-              </div>
-              <div className="min-h-0 flex-1">
-                <WarRoomMap
-                  full={map}
-                  focusId={incident.nodeId}
-                  activeIds={activeIds}
-                  citedEdgeIds={citedEdgeIds}
-                />
-              </div>
-            </div>
-            <div className="h-[220px] shrink-0 overflow-hidden rounded-xl border border-border/70 bg-[hsl(0_0%_8.5%)]">
-              <Timeline events={events} />
-            </div>
+        <div className="flex items-center gap-4">
+          <div className="flex flex-col items-end">
+            <ElapsedClock
+              since={incident.openedAt}
+              until={terminal ? incident.updatedAt : null}
+              className="text-xl font-semibold"
+            />
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              {terminal ? "duration" : "elapsed"}
+            </span>
           </div>
-
-          {/* Right: the investigation — the full write-up + follow-up chat */}
-          <div className="flex min-h-[520px] flex-col rounded-xl border border-border/70 bg-[hsl(0_0%_8.5%)] lg:min-h-0">
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <h2 className="text-sm font-semibold">Investigation</h2>
-              {replaying ? (
-                <Button variant="ghost" size="sm" onClick={finishReplay}>
-                  <SkipForward className="mr-1.5 size-3.5" /> Skip replay
-                </Button>
-              ) : sending ? (
-                <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Loader2 className="size-3.5 animate-spin" /> Tracing…
-                </span>
-              ) : (
-                <Button variant="ghost" size="sm" onClick={rerun}>
-                  <RotateCw className="mr-1.5 size-3.5" /> Re-run
-                </Button>
-              )}
+          {!terminal ? (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() => close("dismissed")}
+              >
+                Dismiss
+              </Button>
+              <Button size="sm" disabled={busy} onClick={() => close("resolved")}>
+                Mark resolved
+              </Button>
             </div>
-
-            <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-              {turns.length === 0 && !sending ? (
-                <p className="text-sm text-muted-foreground">Starting the investigation…</p>
-              ) : null}
-              {turns.map((t, i) =>
-                t.role === "user" ? (
-                  <div key={i} className="flex justify-end">
-                    <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-muted px-3.5 py-2 text-sm">
-                      {t.text}
-                    </div>
-                  </div>
-                ) : (
-                  <AssistantTurn key={i} turn={t} />
-                ),
-              )}
-              {error ? (
-                <div className="flex items-start gap-2 text-sm text-danger">
-                  <XCircle className="mt-0.5 size-4 shrink-0" /> {error}
-                </div>
-              ) : null}
-            </div>
-
-            {!terminal ? (
-              <form onSubmit={submit} className="border-t border-border p-2.5">
-                <div className="flex items-end gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 focus-within:border-foreground/40">
-                  <textarea
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) void submit(e);
-                    }}
-                    rows={1}
-                    aria-label="Ask a follow-up question"
-                    placeholder="Ask a follow-up — e.g. “what did that PR change?”"
-                    className="max-h-28 flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                  />
-                  <button
-                    type="submit"
-                    disabled={sending || !input.trim()}
-                    className="grid size-7 shrink-0 place-items-center rounded-md bg-foreground text-background transition-opacity hover:opacity-90 disabled:opacity-40"
-                    title="Send"
-                    aria-label="Send"
-                  >
-                    <CornerDownLeft className="size-4" />
-                  </button>
-                </div>
-              </form>
-            ) : null}
-          </div>
+          ) : null}
         </div>
       </div>
-    </WarRoomSurface>
+
+      {/* Verdict hero — the answer FIRST (a non-expert reads this line and gets it; an SRE triages fast). */}
+      <VerdictHero
+        verdict={verdict}
+        confidence={heroConfidence}
+        sending={inProgress}
+        diagnosed={diagnosed}
+        node={focalNode}
+        impactCount={impactCount}
+        lastChange={lastChange}
+        hue={sevHue(incident.severity)}
+      />
+
+      <div className="grid gap-4 lg:h-[72vh] lg:grid-cols-[1.35fr_1fr]">
+        {/* Left: the evidence — dependency chain (map) + what changed (timeline) */}
+        <div className="flex min-h-0 flex-col gap-4">
+          <div className="flex min-h-[300px] flex-1 flex-col overflow-hidden rounded-xl border border-border bg-background">
+            <div className="border-b border-border px-4 py-3">
+              <h2 className="text-sm font-semibold">Dependency chain</h2>
+              <p className="text-xs text-muted-foreground">
+                The culprit path is red · lit nodes are what the trace examined.
+              </p>
+            </div>
+            <div className="min-h-0 flex-1">
+              <WarRoomMap
+                full={map}
+                focusId={incident.nodeId}
+                activeIds={activeIds}
+                citedEdgeIds={citedEdgeIds}
+              />
+            </div>
+          </div>
+          <div className="h-[220px] shrink-0 overflow-hidden rounded-xl border border-border bg-background">
+            <Timeline events={events} />
+          </div>
+        </div>
+
+        {/* Right: the investigation — the full write-up + follow-up chat */}
+        <div className="flex min-h-[520px] flex-col rounded-xl border border-border bg-background lg:min-h-0">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <h2 className="text-sm font-semibold">Investigation</h2>
+            {replaying ? (
+              <Button variant="ghost" size="sm" onClick={finishReplay}>
+                <SkipForward className="mr-1.5 size-3.5" /> Skip replay
+              </Button>
+            ) : sending ? (
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="size-3.5 animate-spin" /> Tracing…
+              </span>
+            ) : (
+              <Button variant="ghost" size="sm" onClick={rerun}>
+                <RotateCw className="mr-1.5 size-3.5" /> Re-run
+              </Button>
+            )}
+          </div>
+
+          <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+            {turns.length === 0 && !sending ? (
+              <p className="text-sm text-muted-foreground">Starting the investigation…</p>
+            ) : null}
+            {turns.map((t, i) =>
+              t.role === "user" ? (
+                <div key={i} className="flex justify-end">
+                  <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-muted px-3.5 py-2 text-sm">
+                    {t.text}
+                  </div>
+                </div>
+              ) : (
+                <AssistantTurn key={i} turn={t} />
+              ),
+            )}
+            {error ? (
+              <div className="flex items-start gap-2 text-sm text-danger">
+                <XCircle className="mt-0.5 size-4 shrink-0" /> {error}
+              </div>
+            ) : null}
+          </div>
+
+          {!terminal ? (
+            <form onSubmit={submit} className="border-t border-border p-2.5">
+              <div className="flex items-end gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 focus-within:border-foreground/40">
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) void submit(e);
+                  }}
+                  rows={1}
+                  aria-label="Ask a follow-up question"
+                  placeholder="Ask a follow-up — e.g. “what did that PR change?”"
+                  className="max-h-28 flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                />
+                <button
+                  type="submit"
+                  disabled={sending || !input.trim()}
+                  className="grid size-7 shrink-0 place-items-center rounded-md bg-foreground text-background transition-opacity hover:opacity-90 disabled:opacity-40"
+                  title="Send"
+                  aria-label="Send"
+                >
+                  <CornerDownLeft className="size-4" />
+                </button>
+              </div>
+            </form>
+          ) : null}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -555,6 +559,7 @@ function VerdictHero({
   node,
   impactCount,
   lastChange,
+  hue,
 }: {
   verdict: { type: string; cause: string } | null;
   confidence: string | null;
@@ -563,6 +568,8 @@ function VerdictHero({
   node: MapNode | undefined;
   impactCount: number;
   lastChange: NodeEvent | null;
+  /** Severity token, so the hero's wash matches the incident's severity. */
+  hue: string;
 }) {
   const meta = verdict ? (VERDICT_META[verdict.type] ?? VERDICT_META.unknown) : null;
   const headline =
@@ -573,7 +580,10 @@ function VerdictHero({
         ? "Diagnosis complete — see the investigation for detail."
         : "Preparing the investigation…");
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-border/70 bg-[hsl(0_0%_9%)] px-6 py-7 sm:px-8 sm:py-8">
+    <section
+      style={{ "--sev": hue } as React.CSSProperties}
+      className="relative overflow-hidden rounded-xl border border-border bg-card p-5"
+    >
       {/* The answer is the biggest thing in the room. Previously this was a 15px line of text inside
           a card with an icon tile beside it — visually a footnote, when it's the single thing most
           people open this page to read. */}
@@ -581,8 +591,7 @@ function VerdictHero({
         aria-hidden
         className="pointer-events-none absolute inset-0 -z-10"
         style={{
-          background:
-            "radial-gradient(70% 140% at 0% 0%, hsl(var(--room-hue) / 0.10), transparent 65%)",
+          background: "linear-gradient(100deg, hsl(var(--sev) / 0.05), transparent 45%)",
         }}
       />
       <div className="flex flex-wrap items-center gap-2.5">
@@ -597,7 +606,7 @@ function VerdictHero({
         {/* Confidence stays visible and plain — docs/09: the UI never lies about certainty, and a
             confident-looking headline over a low-confidence verdict would do exactly that. */}
         {confidence ? (
-          <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] font-medium capitalize text-muted-foreground">
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium capitalize text-muted-foreground">
             {confidence} confidence
           </span>
         ) : null}
@@ -612,7 +621,7 @@ function VerdictHero({
         {headline}
       </p>
 
-      <div className="mt-6 border-t border-border/60 pt-4">
+      <div className="mt-6 border-t border-border pt-3">
         <ContextBar node={node} impactCount={impactCount} lastChange={lastChange} />
       </div>
     </section>
