@@ -40,6 +40,14 @@ jobs:
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
 
+      # Stryker invokes vitest DIRECTLY, bypassing turbo — so nothing builds the workspace deps for
+      # it. `@atlas/inference` imports `@atlas/db`, whose package.json `exports` point at `dist/`,
+      # which doesn't exist on a fresh clone. Every nightly run since this workflow landed died in
+      # the dry run with ERR_RESOLVE_PACKAGE_ENTRY_FAIL, so the ratchet was never actually guarding
+      # anything. `pnpm run test` doesn't hit this because turbo builds dependencies first.
+      - name: Build workspace deps (Stryker bypasses turbo)
+        run: pnpm --filter @atlas/inference^... run build
+
       - name: Stryker (inference)
         run: pnpm --filter @atlas/inference run test:mutation
 
