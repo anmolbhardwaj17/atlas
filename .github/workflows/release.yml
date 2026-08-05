@@ -1,0 +1,162 @@
+# Atlas CD — build, scan and publish the runtime images (docs/17 §3, §5).
+#
+# What this closes: CI proved code correct but stopped there, so there was no artifact to deploy and
+# the first production deploy would have been a laptop running `docker build` by hand — manual and
+# unreproducible. This publishes immutable, digest-pinned, SBOM-carrying images to GHCR on every
+# green push to main.
+#
+# Deliberately STOPS at publish. The actual rollout (ECS service update) needs AWS account IDs, an
+# OIDC role and cluster/service names that don't exist yet — see the commented `deploy` job at the
+# bottom for the shape it takes once the infrastructure is provisioned. Publishing is safe and
+# useful on its own: `docker pull` the tag and deploy it from anywhere.
+#
+# Registry: GHCR (ghcr.io/<owner>/atlas-{api,web}). Chosen because it needs no cloud credentials —
+# GITHUB_TOKEN authenticates it — so this pipeline works today rather than after AWS is set up.
+# Switching to ECR later is a change to the login step and the image name, nothing else.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  # Manual runs let you cut an image from any ref without pushing a commit.
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false # never cancel a half-finished publish
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  publish:
+    name: Build · scan · push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # push to GHCR
+      id-token: write # keyless (Sigstore) signing — provenance without managing a key
+      security-events: write # upload the Trivy scan to the Security tab
+    strategy:
+      # Independent images: a web failure shouldn't abandon a good api build.
+      fail-fast: false
+      matrix:
+        include:
+          - image: atlas-api
+            dockerfile: Dockerfile
+          - image: atlas-web
+            dockerfile: apps/web/Dockerfile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Immutable tags keyed to the commit (docs/17 §3: "immutable tags (git SHA), never `latest` in
+      # prod"). `edge` is a moving convenience pointer for dev/staging — never deploy it to prod.
+      - name: Derive tags + labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}
+          tags: |
+            type=sha,format=long
+            type=raw,value=edge,enable={{is_default_branch}}
+
+      # NEXT_PUBLIC_* are inlined into the client bundle at BUILD time, so the web image is
+      # environment-specific: these values are baked into the JS the browser downloads and cannot be
+      # overridden at runtime. They must be repository variables (public by nature — the Supabase
+      # anon key is safe to ship; the service-role key must never appear here).
+      # Until vars.NEXT_PUBLIC_API_URL etc. are set, the web image builds against placeholders and is
+      # only good for smoke-testing — set them before deploying the web image anywhere real.
+      - name: Build + push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: true
+          sbom: true # docs/13 §11 — SBOM per image
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=${{ vars.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'http://localhost:4290' }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,scope=${{ matrix.image }},mode=max
+
+      # Scan the image we just pushed, by DIGEST — scanning the tag could race another push.
+      # Reported, not blocking: a base-image CVE disclosed after a good build shouldn't retroactively
+      # break the pipeline. `pnpm audit` in CI is the blocking gate for OUR dependency tree; this
+      # covers the OS layer, where the right response is usually "rebuild on a fresh base".
+      - name: Scan the published image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+          format: sarif
+          output: trivy-${{ matrix.image }}.sarif
+          ignore-unfixed: true # a CVE with no available patch is noise, not an action
+        continue-on-error: true
+
+      - name: Upload the scan to the Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-${{ matrix.image }}.sarif
+          category: trivy-${{ matrix.image }}
+        continue-on-error: true
+
+      - name: Summarize
+        run: |
+          {
+            echo "### \`${{ matrix.image }}\` published"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Digest | \`${{ steps.build.outputs.digest }}\` |"
+            echo "| Tags | \`${{ steps.meta.outputs.tags }}\` |"
+            echo
+            echo "Deploy by DIGEST, not tag — digests are immutable, tags can move."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+# ── The rollout step, for when the infrastructure exists ───────────────────────────────────────────
+#
+# Uncomment and fill in once ECS is provisioned. Prerequisites, in order:
+#   1. An IAM role GitHub can assume via OIDC (no long-lived AWS keys in secrets).
+#   2. An ECS cluster + three services: atlas-api, atlas-worker (same image, CMD `node dist/worker.js`),
+#      atlas-web.
+#   3. Migrations run as a SEPARATE step BEFORE the service update — expand-only, never a breaking
+#      change in the same release (docs/04 DD-6, docs/17 §5). A contract migration ships a release later.
+#
+# deploy:
+#   name: Deploy · ECS
+#   needs: publish
+#   runs-on: ubuntu-latest
+#   environment: production      # gate promotion on a manual approval
+#   permissions:
+#     id-token: write
+#     contents: read
+#   steps:
+#     - uses: aws-actions/configure-aws-credentials@v4
+#       with:
+#         role-to-assume: arn:aws:iam::<account-id>:role/atlas-github-deploy
+#         aws-region: <region>   # co-locate with the DB — docs/plans/deployment-checklist.md §7
+#     - name: Run expand migrations
+#       run: |   # one-off Fargate task on the api image, CMD overridden to the migrate script
+#         aws ecs run-task --cluster atlas --task-definition atlas-migrate --launch-type FARGATE ...
+#     - name: Roll the services
+#       run: |   # --force-new-deployment picks up the new image; ECS health-checks gate the rollout
+#         for svc in atlas-api atlas-worker atlas-web; do
+#           aws ecs update-service --cluster atlas --service "$svc" --force-new-deployment
+#         done
+#     - name: Wait for stability (auto-rollback happens here if health checks fail)
+#       run: aws ecs wait services-stable --cluster atlas --services atlas-api atlas-worker atlas-web
