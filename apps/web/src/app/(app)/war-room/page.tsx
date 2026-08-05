@@ -10,8 +10,9 @@ import {
   ElapsedClock,
   StatusPulse,
   RoomRule,
-  sevHue,
 } from "@/components/war-room/war-room-chrome";
+// sevHue comes from the plain lib, NOT the "use client" chrome — this page is a Server Component.
+import { sevHue } from "@/lib/severity";
 import WarRoomLoading from "./loading";
 
 export const dynamic = "force-dynamic";

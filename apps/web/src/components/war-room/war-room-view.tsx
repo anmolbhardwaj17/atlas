@@ -18,7 +18,8 @@ import type { MapData, MapNode } from "@/lib/map-types";
 import { WarRoomMap } from "./war-room-map";
 import { MarkdownLite } from "./markdown-lite";
 import { ContextBar, Timeline, type NodeEvent } from "./war-room-context";
-import { WarRoomSurface, ElapsedClock, StatusPulse, sevHue } from "./war-room-chrome";
+import { WarRoomSurface, ElapsedClock, StatusPulse } from "./war-room-chrome";
+import { sevHue } from "@/lib/severity";
 
 interface Step {
   tool: string;

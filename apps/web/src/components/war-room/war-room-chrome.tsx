@@ -7,9 +7,13 @@ import { cn } from "@/lib/cn";
  * Shared visual layer for the War Room (board U1).
  *
  * The design brief was that it "doesn't feel like a room". The fix isn't more chrome — it's that an
- * incident surface should be recognisably *not* the rest of the app. Everywhere else in Atlas is a
- * calm, light, dense reading surface. The War Room is the one place that goes dark and
- * high-contrast, so you know where you are the instant it loads, the way a NOC does.
+ * incident surface should be recognisably *not* the rest of the app.
+ *
+ * It forces the dark token set regardless of the user's theme, and goes DEEPER than the app's own
+ * dark background (4% against the theme's 7%). That margin matters: an earlier pass used 6.5%,
+ * which is invisible next to 7% — for anyone already running dark mode the "different room" effect
+ * simply didn't exist. The differentiation has to survive both themes, so it comes from depth plus
+ * the severity bloom and the rule texture, not from light-vs-dark alone.
  *
  * Three rules hold it together and keep it out of "glowing dark dashboard" territory:
  *
@@ -22,17 +26,6 @@ import { cn } from "@/lib/cn";
  *  3. **No glass, no gradient text, no neon.** The atmosphere comes from contrast, restraint and
  *     one moving element (the clock) — not from effects.
  */
-
-/** Severity → the room's accent. Maps to the existing --sev-* tokens; no new colours introduced. */
-export const SEV_HUE: Record<string, string> = {
-  high: "var(--sev-high)",
-  medium: "var(--sev-medium)",
-  low: "var(--sev-low)",
-};
-
-export function sevHue(severity: string | null | undefined): string {
-  return SEV_HUE[severity ?? ""] ?? "var(--sev-medium)";
-}
 
 /**
  * The room itself: forces the dark token set regardless of the user's theme, and lays a very low
@@ -53,7 +46,7 @@ export function WarRoomSurface({
       data-theme="dark"
       style={{ "--room-hue": hue } as React.CSSProperties}
       className={cn(
-        "dark relative isolate -mx-4 -mt-4 min-h-[calc(100dvh-4rem)] bg-[hsl(0_0%_6.5%)] px-4 pb-8 pt-4 text-foreground sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8",
+        "dark relative isolate -mx-4 -mt-4 min-h-[calc(100dvh-4rem)] bg-[hsl(0_0%_4%)] px-4 pb-8 pt-4 text-foreground sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8",
         className,
       )}
     >
@@ -72,7 +65,7 @@ export function WarRoomSurface({
         className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px]"
         style={{
           background:
-            "radial-gradient(60% 100% at 22% 0%, hsl(var(--room-hue) / 0.16), transparent 70%)",
+            "radial-gradient(60% 100% at 22% 0%, hsl(var(--room-hue) / 0.20), transparent 70%)",
         }}
       />
       {children}

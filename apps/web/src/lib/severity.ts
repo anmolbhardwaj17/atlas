@@ -54,3 +54,25 @@ export function toSeverity(s: string | null | undefined): Severity {
   if (v.startsWith("m")) return "medium";
   return "low";
 }
+
+/**
+ * Severity as the raw `--sev-*` TOKEN VALUE (e.g. "var(--sev-high)"), for places that compose a
+ * colour in inline CSS — `hsl(var(--sev) / 0.16)` glows, custom properties handed to a child.
+ * Tailwind classes can't express those, which is why this returns the token rather than a class.
+ *
+ * It lives HERE, in a plain module, and deliberately NOT in the "use client" war-room-chrome:
+ * the War Room board is a Server Component and calls this during render. A function exported from
+ * a "use client" module becomes a client reference, and calling one on the server throws at
+ * runtime ("Attempted to call sevHue() from the server but sevHue is on the client") — which
+ * neither `tsc` nor `next build` catches, because it's an RSC boundary rule, not a type error.
+ */
+export const SEVERITY_HUE: Record<Severity, string> = {
+  high: "var(--sev-high)",
+  medium: "var(--sev-medium)",
+  low: "var(--sev-low)",
+};
+
+/** Hue token for a loose severity string; unknown/absent → medium (never an invented colour). */
+export function sevHue(severity: string | null | undefined): string {
+  return severity ? SEVERITY_HUE[toSeverity(severity)] : SEVERITY_HUE.medium;
+}
