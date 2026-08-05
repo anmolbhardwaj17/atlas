@@ -19,6 +19,8 @@ const nestLogLevels = (level: string): LogLevel[] =>
   NEST_LOG_LEVELS[level] ?? ["error", "warn", "log"];
 import { AppModule } from "./app.module";
 import { registerAskSocket } from "./ai/ask-socket";
+import { registerCrashHandlers } from "./observability/crash-handlers";
+import { MetricsService } from "./observability/metrics.service";
 
 /**
  * API entrypoint (docs/02 §3). Fastify adapter per docs/02 DD-3.
@@ -67,6 +69,10 @@ async function bootstrap(): Promise<void> {
     allowedHeaders: ["authorization", "content-type", "x-atlas-org", "idempotency-key"],
   });
   app.enableShutdownHooks(); // run OnApplicationShutdown (closes the PG pool)
+  // Crash visibility: without this an unhandled rejection silently kills the task (Node's default
+  // since v15) with no structured log and no metric to alert on.
+  const metrics = app.get(MetricsService);
+  registerCrashHandlers((kind) => metrics.recordProcessError(kind));
   await app.init(); // resolve providers before registering the raw WS route below
   await registerAskSocket(app); // live Ask AI channel (WebSocket) alongside the REST/SSE API
   await app.listen({ port: env.PORT, host: "0.0.0.0" });

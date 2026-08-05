@@ -5,6 +5,8 @@ import { NestFactory } from "@nestjs/core";
 import { Logger, type LogLevel } from "@nestjs/common";
 import { loadEnv } from "@atlas/config";
 import { AppModule } from "./app.module";
+import { registerCrashHandlers } from "./observability/crash-handlers";
+import { MetricsService } from "./observability/metrics.service";
 
 /**
  * Worker entrypoint (docs/02 §5, docs/17 §3.2 — "worker and api share the build, different entry
@@ -33,6 +35,10 @@ async function bootstrap(): Promise<void> {
     logger: nestLogLevels(env.LOG_LEVEL),
   });
   app.enableShutdownHooks(); // OnApplicationShutdown: drain the queue, close the PG pool
+  // Same crash visibility as the API. It matters MORE here: the worker has no request/response to
+  // surface a failure through, so an unhandled rejection in a scheduled tick would otherwise vanish.
+  const metrics = app.get(MetricsService);
+  registerCrashHandlers((kind) => metrics.recordProcessError(kind));
   Logger.log("Atlas worker started (jobs + schedulers, no HTTP).", "WorkerBootstrap");
 }
 

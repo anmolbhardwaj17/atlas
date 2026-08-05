@@ -18,6 +18,7 @@ export class MetricsService {
   private readonly httpRequests: Counter<"method" | "route" | "status">;
   private readonly httpDuration: Histogram<"method" | "route" | "status">;
   private readonly syncJobs: Counter<"outcome">;
+  private readonly processErrors: Counter<"kind">;
   private readonly queueDepth: Gauge<"state">;
 
   constructor() {
@@ -43,6 +44,14 @@ export class MetricsService {
       labelNames: ["outcome"],
       registers: [this.registry],
     });
+    // Crash visibility (deploy-readiness P1). Alert on ANY increase: an uncaught exception means a
+    // pod died, and an unhandled rejection means a promise failed silently in the background.
+    this.processErrors = new Counter({
+      name: "atlas_process_errors_total",
+      help: "Process-level errors, by kind (unhandled_rejection | uncaught_exception).",
+      labelNames: ["kind"],
+      registers: [this.registry],
+    });
     this.queueDepth = new Gauge({
       name: "atlas_sync_queue_depth",
       help: "Sync jobs currently in the queue, by state.",
@@ -61,6 +70,11 @@ export class MetricsService {
   /** Record a finished sync job's outcome (mirrors the runner's status). */
   recordSyncJob(outcome: "succeeded" | "partial" | "failed"): void {
     this.syncJobs.inc({ outcome });
+  }
+
+  /** Record a process-level error (see observability/crash-handlers.ts). */
+  recordProcessError(kind: string): void {
+    this.processErrors.inc({ kind });
   }
 
   /** Publish the current sync-queue depth by state (waiting/active/failed). */
