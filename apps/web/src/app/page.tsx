@@ -10,6 +10,7 @@ import { AskDemo } from "@/components/landing/ask-demo";
 import { CertaintyScale } from "@/components/landing/certainty-scale";
 import { TraceDemo } from "@/components/landing/trace-demo";
 import { CloudIcon } from "@/components/cloud-icon";
+import { KIND_LOGO } from "@/lib/kind-visual";
 
 export const dynamic = "force-dynamic";
 
@@ -145,10 +146,11 @@ export default async function LandingPage() {
                   Trace exactly what broke, in minutes.
                 </h2>
                 <p className="mt-5 text-balance leading-relaxed text-neutral-600">
-                  Something starts erroring at 2am. Atlas already knows which service it is, what
+                  Your monitoring already told you something is wrong. It can&rsquo;t tell you why.
+                  Atlas picks up where the alert stops: it knows which service that is, what
                   deployed to it, which pull request was in that deploy and which ticket asked for
-                  it. Instead of five people opening five consoles, you get a ranked list of what
-                  most likely caused it - each one showing the evidence it used.
+                  it - so instead of five people opening five consoles, you get a ranked list of
+                  what most likely caused it, each showing the evidence it used.
                 </p>
                 <p className="mt-4 text-balance leading-relaxed text-neutral-600">
                   And when it genuinely can&rsquo;t tell, it says so, rather than picking the most
@@ -160,6 +162,69 @@ export default async function LandingPage() {
               {/* A trace runs BACKWARDS through time and is BUILT one edge at a time - so it plays
                   rather than sitting there. See TraceDemo. */}
               <TraceDemo />
+            </Reveal>
+          </div>
+        </section>
+
+        {/* ── Blast radius ─────────────────────────────────────────────────────────────────────
+            The mirror of the trace: backwards answers "what broke", forwards answers "what will".
+            Worth its own beat because it's the sharpest distinction from monitoring — monitoring is
+            definitionally after the fact, and this is the question you ask before you touch
+            anything. It also puts the graph itself back at the centre (P1): the answer is a
+            traversal, not a metric. */}
+        <section className="border-t border-neutral-200/70">
+          <div className="mx-auto grid max-w-6xl gap-12 px-6 py-24 lg:grid-cols-2 lg:items-center lg:gap-16">
+            <Reveal delay={80} variant="pop">
+              <div className="rounded-2xl border border-neutral-200 bg-white p-6">
+                <p className="text-sm text-neutral-400">
+                  What breaks if I retire{" "}
+                  <span className="font-medium text-neutral-700">orders-db</span>?
+                </p>
+                <div className="mt-5 space-y-2.5">
+                  {[
+                    { name: "checkout", kind: "aws.ecs.service", via: "writes on every order" },
+                    {
+                      name: "orders-webhook",
+                      kind: "aws.lambda.function",
+                      via: "writes on every event",
+                    },
+                    { name: "reports-renderer", kind: "gcp.run.service", via: "reads nightly" },
+                  ].map((d) => (
+                    <div
+                      key={d.name}
+                      className="flex items-center gap-3 rounded-xl border border-neutral-200 px-3.5 py-2.5"
+                    >
+                      <span className="grid size-7 shrink-0 place-items-center rounded-md bg-neutral-100">
+                        <CloudIcon name={KIND_LOGO[d.kind] as string} className="size-4" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">{d.name}</span>
+                        <span className="block truncate text-xs text-neutral-500">{d.via}</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-4 border-t border-neutral-100 pt-4 text-xs text-neutral-400">
+                  3 direct dependents, across 2 clouds. Nothing else in the graph touches it.
+                </p>
+              </div>
+            </Reveal>
+
+            <Reveal>
+              <div>
+                <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
+                  And what breaks if you touch it.
+                </h2>
+                <p className="mt-5 text-balance leading-relaxed text-neutral-600">
+                  The same graph runs forwards. Before you retire a bucket, resize a database or
+                  deprecate an endpoint, Atlas can tell you everything that depends on it and how -
+                  including the service in another cloud that nobody remembered was calling it.
+                </p>
+                <p className="mt-4 text-balance leading-relaxed text-neutral-600">
+                  This is the question monitoring can&rsquo;t answer, because it only knows what has
+                  already gone wrong.
+                </p>
+              </div>
             </Reveal>
           </div>
         </section>
@@ -354,37 +419,42 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* ── Read-only ────────────────────────────────────────────────────────────────────── */}
-        <section className="mx-auto max-w-6xl px-6 py-24">
-          <Reveal variant="pop">
-            <div
-              className="relative overflow-hidden rounded-2xl p-10 text-white shadow-sm sm:p-14"
-              style={{ background: HERO_BG }}
-            >
-              <AtlasLogo
-                size={440}
-                className="pointer-events-none absolute -bottom-32 -left-24 size-[440px] opacity-[0.05] [filter:invert(1)]"
-              />
-              <div className="relative max-w-2xl">
-                <ShieldCheck className="size-6 text-success" />
-                <h2 className="mt-5 text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-                  Read-only, all the way down.
-                </h2>
-                <p className="mt-5 text-balance leading-relaxed text-white/70">
-                  Every connection Atlas makes - cloud accounts, repositories, pipelines, issue
-                  trackers, chat - is granted read scopes and nothing more. That isn&rsquo;t a
-                  setting you have to trust us to honour: there is no code path in the product that
-                  writes to any of them, so the worst a bug can do is show you something wrong.
-                </p>
-                <p className="mt-4 text-balance leading-relaxed text-white/70">
-                  Which makes this an easy thing to approve. No agents in your VPC, no write
-                  credentials to rotate, no blast radius to argue about in review - and every
-                  organisation&rsquo;s data isolated at the database level, not by a filter someone
-                  remembered to add.
-                </p>
-              </div>
+        {/* ── Read-only ──────────────────────────────────────────────────────────────────────────
+            Light, deliberately. This used to be a dark card sitting immediately above the dark
+            close — two identical black slabs back to back, which flattened both. Keeping the dark
+            treatment for the close alone gives the page one held breath at the end instead of two.
+            A calm, unornamented statement also suits the content better: this is the reassurance a
+            security reviewer is looking for, and reassurance shouldn't shout. */}
+        <section className="mx-auto max-w-4xl px-6 py-24">
+          <Reveal>
+            <div className="text-center">
+              <span className="inline-grid size-11 place-items-center rounded-full border border-success/30 bg-success/10">
+                <ShieldCheck className="size-5 text-success" />
+              </span>
+              <h2 className="mt-6 text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
+                Read-only, all the way down.
+              </h2>
             </div>
           </Reveal>
+
+          <div className="mt-10 grid gap-8 sm:grid-cols-2">
+            <Reveal delay={80}>
+              <p className="leading-relaxed text-neutral-600">
+                Every connection Atlas makes - cloud accounts, repositories, pipelines, issue
+                trackers, chat - is granted read scopes and nothing more. That isn&rsquo;t a setting
+                you have to trust us to honour: there is no code path in the product that writes to
+                any of them, so the worst a bug can do is show you something wrong.
+              </p>
+            </Reveal>
+            <Reveal delay={160}>
+              <p className="leading-relaxed text-neutral-600">
+                Which makes this an easy thing to approve. No agents in your VPC, no write
+                credentials to rotate, no blast radius to argue about in review - and every
+                organisation&rsquo;s data isolated at the database level, not by a filter someone
+                remembered to add.
+              </p>
+            </Reveal>
+          </div>
         </section>
 
         {/* ── Close ───────────────────────────────────────────────────────────────────────────── */}
