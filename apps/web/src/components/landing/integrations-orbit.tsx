@@ -22,20 +22,39 @@ import { AtlasLogo } from "@/components/brand";
  * detail a visitor recognising their own stack notices first.
  *
  * Only real, bundled logos appear here — `CloudIcon` renders nothing for a name it doesn't have, so
- * an invented integration would silently become a hole in the ring.
+ * an invented integration would silently become a hole in the ring. Everything shown is a provider
+ * Atlas genuinely connects to; the ring is captioned "what you already use", so padding it with
+ * logos we don't support would be the cheapest possible lie.
+ *
+ * The rings interleave by COLOUR (see below), which is the only ordering that makes a ring of
+ * developer-tool logos legible — most of them are blue.
  */
-const INNER = ["aws-ec2", "aws-lambda", "aws-ecs", "aws-rds", "aws-s3", "aws-dynamodb"];
+/**
+ * Ordered by HUE, not by vendor. Nearly every developer-tool logo is blue, so a list picked by
+ * relevance alone produced a ring where seven of ten tiles were the same colour and nothing was
+ * distinguishable at a glance. Neighbours now alternate colour families — black, orange, blue,
+ * purple, multicolour, green, red — which is what lets the eye pick out individual tools while the
+ * ring turns. Every entry is still a provider Atlas genuinely reads.
+ */
+const INNER = [
+  "aws-lambda", // orange
+  "google-cloud", // multicolour
+  "terraform-icon", // purple
+  "aws-iam", // red
+  "jira", // blue
+  "aws-route53", // violet
+];
 const OUTER = [
-  "bitbucket",
-  "github-icon",
-  "jira",
-  "google-cloud",
-  "microsoft-azure",
-  "slack-icon",
-  "discord-icon",
-  "microsoft-teams",
-  "docker-icon",
-  "terraform-icon",
+  "github-icon", // black
+  "aws-ec2", // orange
+  "microsoft-azure", // blue
+  "discord-icon", // indigo
+  "slack-icon", // multicolour
+  "aws-ecs", // orange
+  "bitbucket", // blue
+  "microsoft-teams", // violet
+  "aws-s3", // green
+  "docker-icon", // cyan
 ];
 
 function Ring({

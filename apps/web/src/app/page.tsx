@@ -1,18 +1,28 @@
 import Link from "next/link";
-import { Plug, Waypoints, Sparkles, ShieldCheck, ScanSearch, Siren, Route } from "lucide-react";
+import { Plug, Waypoints, Sparkles, ShieldCheck, ScanSearch, Siren } from "lucide-react";
 import { getSession } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { AtlasLogo, AtlasAiMark } from "@/components/brand";
 import { Reveal } from "@/components/landing/reveal";
 import { GraphVisual } from "@/components/landing/graph-visual";
 import { IntegrationsOrbit } from "@/components/landing/integrations-orbit";
+import { AskDemo } from "@/components/landing/ask-demo";
+import { CertaintyScale } from "@/components/landing/certainty-scale";
+import { TraceDemo } from "@/components/landing/trace-demo";
 import { CloudIcon } from "@/components/cloud-icon";
-import { KIND_LOGO, kindShort } from "@/lib/kind-visual";
 
 export const dynamic = "force-dynamic";
 
 /** Matches the login screen's hero exactly — the two front doors must look like one product. */
 const HERO_BG = "radial-gradient(120% 110% at 18% 12%, #3d3d3d 0%, #1a1a1a 45%, #050505 100%)";
+
+/** Who each step belongs to: you, Atlas observing, then the AI — reusing the palette those two
+ *  already own elsewhere on the page rather than inventing decorative colour. */
+const STEP_TONE = [
+  "border-neutral-300 text-neutral-800",
+  "border-success/40 bg-success/10 text-success",
+  "border-ai-suggested/40 bg-ai-suggested/10 text-ai-suggested",
+];
 
 const STEPS = [
   {
@@ -32,38 +42,7 @@ const STEPS = [
   },
 ];
 
-/**
- * The certainty language, stated plainly. This is the section that does the most work: every tool
- * in this space will tell you it has AI, and none of them will tell you when they're guessing.
- */
-const CERTAINTY = [
-  {
-    label: "Observed",
-    tone: "bg-success/15 text-success",
-    body: "Read directly from your cloud or code. A fact, not an interpretation.",
-  },
-  {
-    label: "Inferred",
-    tone: "bg-neutral-900 text-white",
-    body: "Worked out from evidence — a matching commit, a deploy config — and labelled with how strongly.",
-  },
-  {
-    label: "AI-suggested",
-    tone: "bg-ai-suggested/15 text-ai-suggested",
-    body: "A model's proposal, waiting on you. Nothing enters your graph until you confirm it.",
-  },
-];
-
 const ALERTS = ["slack-icon", "discord-icon", "microsoft-teams"];
-
-/** Citation marker, mirroring the product's CitationLink — provenance is visible, not implied (P4). */
-function Cite({ n }: { n: number }) {
-  return (
-    <sup className="ml-0.5 inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-sm bg-white/15 px-1 align-super text-[9px] font-semibold text-white/80">
-      {n}
-    </sup>
-  );
-}
 
 /**
  * Public landing page — Atlas's front door.
@@ -115,7 +94,13 @@ export default async function LandingPage() {
         {/* ── Hero ─────────────────────────────────────────────────────────────────────────── */}
         <section className="mx-auto max-w-6xl px-6 pb-8 pt-20 sm:pt-28">
           <div className="motion-stagger max-w-3xl">
-            <p className="text-sm font-medium text-neutral-500">Engineering intelligence</p>
+            <p className="flex items-center gap-2.5 text-sm font-medium text-neutral-500">
+              <span>Live</span>
+              <span className="size-1 rounded-full bg-neutral-300" aria-hidden="true" />
+              <span>Cited</span>
+              <span className="size-1 rounded-full bg-neutral-300" aria-hidden="true" />
+              <span>Read-only</span>
+            </p>
             <h1 className="mt-4 text-balance text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
               Nobody knows how the whole system fits together.
             </h1>
@@ -151,10 +136,8 @@ export default async function LandingPage() {
               }}
             >
               <div className="relative">
-                <div className="overflow-x-auto px-8 pb-8 sm:px-12">
-                  <div className="mx-auto min-w-[760px]">
-                    <GraphVisual />
-                  </div>
+                <div className="px-8 pb-8 sm:px-12">
+                  <GraphVisual />
                 </div>
                 {/* Full-bleed white footer: a key belongs on its own ground, not floating on the
                     canvas it describes. */}
@@ -187,19 +170,37 @@ export default async function LandingPage() {
                 Three steps, then it maintains itself.
               </h2>
             </Reveal>
-            <ol className="mt-12 grid gap-5 sm:grid-cols-3">
-              {STEPS.map((s, i) => (
-                <Reveal key={s.title} delay={i * 90}>
-                  <li className="h-full rounded-2xl border border-neutral-200 bg-white p-6">
-                    <span className="grid size-9 place-items-center rounded-full bg-neutral-900 text-white">
-                      <s.icon className="size-4" />
-                    </span>
-                    <p className="mt-5 font-medium">{s.title}</p>
-                    <p className="mt-1.5 text-sm leading-relaxed text-neutral-500">{s.desc}</p>
-                  </li>
-                </Reveal>
-              ))}
-            </ol>
+
+            <div className="relative mt-16">
+              {/* The rail. Solid under the first two steps, fading past the third — the sequence
+                  ends but the product doesn't, which is the whole claim in the heading. */}
+              <div
+                className="absolute left-0 right-0 top-5 hidden h-px bg-gradient-to-r from-neutral-300 via-neutral-300 to-transparent md:block"
+                aria-hidden="true"
+              />
+              <ol className="grid gap-12 md:grid-cols-3 md:gap-8">
+                {STEPS.map((st, i) => (
+                  <Reveal key={st.title} delay={i * 110}>
+                    <li className="relative">
+                      <div className="flex items-center gap-3 md:block">
+                        <span
+                          className={`relative z-10 grid size-10 place-items-center rounded-full border bg-white shadow-sm ${STEP_TONE[i]}`}
+                        >
+                          <st.icon className="size-4" />
+                        </span>
+                        <span className="text-xs font-medium uppercase tracking-widest text-neutral-400 md:mt-5 md:block">
+                          Step {i + 1}
+                        </span>
+                      </div>
+                      <p className="mt-3 text-lg font-medium tracking-tight md:mt-2">{st.title}</p>
+                      <p className="mt-2 max-w-xs text-sm leading-relaxed text-neutral-500">
+                        {st.desc}
+                      </p>
+                    </li>
+                  </Reveal>
+                ))}
+              </ol>
+            </div>
           </div>
         </section>
 
@@ -222,20 +223,8 @@ export default async function LandingPage() {
                 </p>
               </div>
             </Reveal>
-            <div className="space-y-3">
-              {CERTAINTY.map((c, i) => (
-                <Reveal key={c.label} delay={i * 90}>
-                  <div className="flex items-start gap-4 rounded-2xl border border-neutral-200 p-5">
-                    <span
-                      className={`mt-0.5 shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${c.tone}`}
-                    >
-                      {c.label}
-                    </span>
-                    <p className="text-sm leading-relaxed text-neutral-600">{c.body}</p>
-                  </div>
-                </Reveal>
-              ))}
-            </div>
+            {/* Demonstrated, not listed — the same link drawn at each confidence. See CertaintyScale. */}
+            <CertaintyScale />
           </div>
         </section>
 
@@ -244,10 +233,7 @@ export default async function LandingPage() {
           <div className="mx-auto grid max-w-6xl gap-12 px-6 py-24 lg:grid-cols-2 lg:items-center lg:gap-16">
             <Reveal>
               <div>
-                <span className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs font-medium text-neutral-600">
-                  <Route className="size-3.5" /> Root cause
-                </span>
-                <h2 className="mt-5 text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
+                <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
                   Trace exactly what broke, in minutes.
                 </h2>
                 <p className="mt-5 text-balance leading-relaxed text-neutral-600">
@@ -263,182 +249,58 @@ export default async function LandingPage() {
               </div>
             </Reveal>
             <Reveal delay={90} variant="pop">
-              {/* A trace runs BACKWARDS through time, so draw it that way. The numbered list said
-                  "five things happened" without showing that each one was found by walking one edge
-                  further back — the timestamps and the rail are what make it read as a trace rather
-                  than a checklist, and the culprit needs to look like the end of the line. */}
-              <div className="relative">
-                <div
-                  className="absolute bottom-8 left-[102px] top-8 w-px bg-neutral-200"
-                  aria-hidden="true"
-                />
-                <ol className="space-y-1">
-                  {[
-                    {
-                      time: "02:00",
-                      icon: "aws-ecs",
-                      title: "checkout is unhealthy",
-                      detail: "5xx rate 12% · threshold 2%",
-                      alarm: true,
-                    },
-                    {
-                      time: "01:58",
-                      icon: "aws-elb",
-                      title: "Traffic still arriving",
-                      detail: "checkout-alb · target group healthy",
-                    },
-                    {
-                      time: "01:46",
-                      icon: "bitbucket",
-                      title: "deploy-production ran",
-                      detail: "14 minutes before the alarm",
-                    },
-                    {
-                      time: "01:44",
-                      icon: "bitbucket",
-                      title: "PR #1482 merged",
-                      detail: "“retry budget for orders-db”",
-                      culprit: true,
-                    },
-                    {
-                      time: "yesterday",
-                      icon: "jira",
-                      title: "PAY-318",
-                      detail: "payments board · reported by @priya",
-                    },
-                  ].map((r) => (
-                    <li key={r.title} className="flex items-start gap-4">
-                      <span className="w-[70px] shrink-0 pt-[11px] text-right text-xs tabular-nums text-neutral-400">
-                        {r.time}
-                      </span>
-                      <span
-                        className={
-                          "relative z-10 mt-1.5 grid size-8 shrink-0 place-items-center rounded-lg border bg-white " +
-                          (r.alarm
-                            ? "border-danger/40 ring-4 ring-danger/10"
-                            : "border-neutral-200")
-                        }
-                      >
-                        <CloudIcon name={r.icon} className="size-4" />
-                      </span>
-                      <span
-                        className={
-                          "min-w-0 flex-1 rounded-xl border px-4 py-2.5 " +
-                          (r.culprit ? "border-danger bg-danger/[0.04]" : "border-transparent")
-                        }
-                      >
-                        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <span className="text-sm font-medium">{r.title}</span>
-                          {r.culprit ? (
-                            <span className="rounded-full bg-danger px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-                              Most likely cause
-                            </span>
-                          ) : null}
-                        </span>
-                        <span className="mt-0.5 block text-xs text-neutral-500">{r.detail}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-              </div>
+              {/* A trace runs BACKWARDS through time and is BUILT one edge at a time — so it plays
+                  rather than sitting there. See TraceDemo. */}
+              <TraceDemo />
             </Reveal>
           </div>
         </section>
 
         {/* ── Atlas AI ───────────────────────────────────────────────────────────────────────── */}
-        <section className="mx-auto max-w-6xl px-6 py-24">
-          <Reveal variant="pop">
-            <div
-              className="relative overflow-hidden rounded-2xl p-8 text-white shadow-sm sm:p-14"
-              style={{ background: HERO_BG }}
-            >
-              <AtlasLogo
-                size={460}
-                className="pointer-events-none absolute -right-28 -top-28 size-[460px] opacity-[0.05] [filter:invert(1)]"
-              />
-              <div className="relative grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:gap-16">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <AtlasAiMark size={40} className="size-10" />
-                    <div>
-                      <p className="text-sm font-semibold">Atlas AI</p>
-                      <p className="text-xs text-white/50">Included, on your graph</p>
-                    </div>
-                  </div>
+        <section className="mx-auto max-w-6xl px-6 py-16">
+          <Reveal>
+            {/* The mark sits INSIDE the sentence — Atlas AI introducing itself by name, with its
+                own face, rather than a logo parked in a corner above a heading. */}
+            <h2 className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-center text-3xl font-semibold tracking-tight sm:text-4xl">
+              <span>Meet</span>
+              <AtlasAiMark size={36} className="size-9" />
+              <span>Atlas AI</span>
+            </h2>
+            <p className="mx-auto mt-3 max-w-lg text-balance text-center leading-relaxed text-neutral-600">
+              An agent that reads your graph, not the internet — and shows you where every answer
+              came from.
+            </p>
+          </Reveal>
 
-                  <h2 className="mt-7 text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-                    Ask it like you&rsquo;d ask the person who built it.
-                  </h2>
-                  <p className="mt-5 text-balance leading-relaxed text-white/70">
-                    Atlas AI is an agent that reads your graph, not the internet. It can follow a
-                    dependency six hops out, work out who owns a service, compare what changed
-                    between two deploys, or explain why something is exposed — then keep going when
-                    you ask the follow-up.
-                  </p>
-                  <p className="mt-4 text-balance leading-relaxed text-white/70">
-                    Every claim carries a citation to the exact resource it came from, so you can
-                    check its work in one click. When your data doesn&rsquo;t support an answer, it
-                    says so instead of inventing one.
-                  </p>
-
-                  {/* The range of questions is the point — one example only shows the format. */}
-                  <p className="mt-8 text-xs font-medium uppercase tracking-widest text-white/40">
-                    Things people actually ask
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {[
-                      "What changed before the 2am spike?",
-                      "Which services are internet-exposed?",
-                      "Who owns checkout?",
-                      "What breaks if I retire this bucket?",
-                    ].map((q) => (
-                      <span
-                        key={q}
-                        className="rounded-full border border-white/12 bg-white/[0.05] px-3 py-1.5 text-xs text-white/65"
-                      >
-                        {q}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* A worked answer, in the product's own citation style. */}
-                <div className="rounded-xl border border-white/10 bg-white/[0.04] p-5">
-                  <p className="text-sm text-white/45">What talks to orders-db, and who owns it?</p>
-                  <div className="mt-4 flex gap-3">
-                    <AtlasAiMark size={22} className="mt-0.5 size-[22px] shrink-0" />
-                    <p className="text-sm leading-relaxed text-white/85">
-                      Two services write to{" "}
-                      <span className="font-medium text-white">orders-db</span>: the{" "}
-                      <span className="font-medium text-white">checkout</span> ECS service
-                      <Cite n={1} /> and the{" "}
-                      <span className="font-medium text-white">orders-webhook</span> Lambda
-                      <Cite n={2} />. The repository behind both is owned by{" "}
-                      <span className="font-medium text-white">@payments</span>
-                      <Cite n={3} /> — five people.
-                    </p>
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-1.5 border-t border-white/10 pt-4">
-                    {["aws.rds.instance", "aws.lambda.function", "bitbucket.repository"].map(
-                      (k, i) => (
-                        <span
-                          key={k}
-                          className="inline-flex items-center gap-1.5 rounded-md bg-white/[0.07] px-2 py-1 text-[11px] text-white/60"
-                        >
-                          <span className="text-white/40">{i + 1}</span>
-                          <CloudIcon name={KIND_LOGO[k] as string} className="size-3.5" />
-                          {kindShort(k)}
-                        </span>
-                      ),
-                    )}
-                  </div>
-                  <p className="mt-4 border-t border-white/10 pt-4 text-xs text-white/40">
-                    Ask from the app, or from Slack without leaving the channel.
-                  </p>
-                </div>
-              </div>
+          <Reveal delay={100} variant="pop">
+            <div className="mx-auto mt-8 max-w-2xl">
+              <AskDemo />
             </div>
           </Reveal>
+
+          <div className="mt-10 grid gap-8 sm:grid-cols-3">
+            {[
+              {
+                title: "Grounded in your estate",
+                body: "It answers from the resources, deploys and repositories Atlas has actually read — so it can follow a dependency six hops out and still be talking about your system.",
+              },
+              {
+                title: "Cited, every claim",
+                body: "Each statement carries a link to the exact node it came from. Checking its work is one click, not a leap of faith.",
+              },
+              {
+                title: "Honest about the gaps",
+                body: "When your data doesn’t support an answer, it says so and names what it couldn’t see — rather than producing something plausible.",
+              },
+            ].map((c, i) => (
+              <Reveal key={c.title} delay={i * 90}>
+                <div>
+                  <p className="font-medium tracking-tight">{c.title}</p>
+                  <p className="mt-2 text-sm leading-relaxed text-neutral-500">{c.body}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
         </section>
 
         {/* ── Integrations + alerting ────────────────────────────────────────────────────────── */}
@@ -506,34 +368,50 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* ── Security + compliance ──────────────────────────────────────────────────────────── */}
-        <section className="mx-auto max-w-6xl px-6 py-24">
-          <Reveal>
-            <h2 className="max-w-2xl text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-              The questions that used to take an afternoon.
-            </h2>
-          </Reveal>
-          <div className="mt-12 grid gap-5 md:grid-cols-2">
-            {[
-              {
-                icon: ScanSearch,
-                title: "What’s exposed and vulnerable?",
-                body: "A known CVE matters far more when it is reachable from the internet. Atlas knows which of your dependencies are both, because it can see the package and the security group at the same time.",
-              },
-              {
-                icon: ShieldCheck,
-                title: "Are we actually compliant?",
-                body: "Continuous checks against the technical controls in PCI, CIS, NIST, ISO 27001, HIPAA and GDPR — and an honest list of the ones no tool can assess for you.",
-              },
-            ].map((c, i) => (
-              <Reveal key={c.title} delay={i * 90}>
-                <div className="h-full rounded-2xl border border-neutral-200 p-6">
-                  <c.icon className="size-5 text-neutral-400" />
-                  <p className="mt-5 font-medium leading-snug">{c.title}</p>
-                  <p className="mt-2 text-sm leading-relaxed text-neutral-500">{c.body}</p>
-                </div>
-              </Reveal>
-            ))}
+        {/* ── Security + compliance ────────────────────────────────────────────────────────── */}
+        <section className="border-t border-neutral-200/70 bg-neutral-50/60">
+          <div className="mx-auto grid max-w-6xl gap-12 px-6 py-24 lg:grid-cols-[0.85fr_1.15fr] lg:gap-16">
+            <Reveal>
+              <div>
+                <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
+                  The questions that used to take an afternoon.
+                </h2>
+                <p className="mt-5 text-balance leading-relaxed text-neutral-600">
+                  Both of these need the cloud side and the code side in the same place at the same
+                  time. That&rsquo;s the whole reason the graph exists.
+                </p>
+              </div>
+            </Reveal>
+
+            {/* Posed as questions, answered underneath — the same shape as asking Atlas, because
+                that is literally how you get these answers. Two boxed cards said "features"; this
+                says "here is what you'd ask, and here is what comes back". */}
+            <div className="space-y-8">
+              {[
+                {
+                  icon: ScanSearch,
+                  q: "Which of our vulnerabilities are actually reachable?",
+                  a: "A known CVE matters far more when the thing carrying it is open to the internet. Atlas sees the package and the security group at once, so it can tell you which handful of your findings are both — instead of a list of nine hundred sorted by severity.",
+                },
+                {
+                  icon: ShieldCheck,
+                  q: "Are we actually compliant?",
+                  a: "Continuous checks against the technical controls in PCI, CIS, NIST, ISO 27001, HIPAA and GDPR — plus an explicit list of the ones no tool can assess for you, so nobody mistakes a green dashboard for an audit.",
+                },
+              ].map((c, i) => (
+                <Reveal key={c.q} delay={i * 100}>
+                  <div className="flex gap-4">
+                    <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg border border-neutral-200 bg-white">
+                      <c.icon className="size-4 text-neutral-500" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-base font-medium tracking-tight">{c.q}</p>
+                      <p className="mt-2 text-sm leading-relaxed text-neutral-500">{c.a}</p>
+                    </div>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -551,17 +429,19 @@ export default async function LandingPage() {
               <div className="relative max-w-2xl">
                 <ShieldCheck className="size-6 text-white/60" />
                 <h2 className="mt-5 text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-                  Atlas cannot change anything.
+                  Read-only, all the way down.
                 </h2>
                 <p className="mt-5 text-balance leading-relaxed text-white/70">
-                  Not by policy — by construction. The AWS role we ask for grants reads and nothing
-                  else, the repository app is scoped the same way, and there is no code path in the
-                  product that writes to your infrastructure. The worst thing a bug in Atlas can do
-                  is show you something wrong.
+                  Every connection Atlas makes — cloud accounts, repositories, pipelines, issue
+                  trackers, chat — is granted read scopes and nothing more. That isn&rsquo;t a
+                  setting you have to trust us to honour: there is no code path in the product that
+                  writes to any of them, so the worst a bug can do is show you something wrong.
                 </p>
                 <p className="mt-4 text-balance leading-relaxed text-white/70">
-                  Every organisation&rsquo;s data is isolated at the database level, not by a filter
-                  someone remembered to add.
+                  Which makes this an easy thing to approve. No agents in your VPC, no write
+                  credentials to rotate, no blast radius to argue about in review — and every
+                  organisation&rsquo;s data isolated at the database level, not by a filter someone
+                  remembered to add.
                 </p>
               </div>
             </div>
@@ -590,20 +470,69 @@ export default async function LandingPage() {
         </section>
       </main>
 
-      {/* ── Footer ───────────────────────────────────────────────────────────────────────────── */}
+      {/* ── Footer ───────────────────────────────────────────────────────────────────────────────
+          Deliberately thin. A footer that lists the product's features and its integrations is just
+          repeating the page to someone who has already read it — the page above covers both, at
+          length, with pictures. What belongs here is what a footer is actually for: who this is,
+          how to reach them, and the legal links. The layout has room for more columns when there
+          is genuinely more to say (docs, changelog, careers). */}
       <footer className="border-t border-neutral-200/70">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-8 text-sm text-neutral-500 sm:flex-row">
-          <div className="flex items-center gap-2.5">
-            <AtlasLogo size={20} className="size-5 opacity-60" />
-            <span>&copy; {new Date().getFullYear()} Atlas</span>
+        <div className="mx-auto max-w-6xl px-6 py-14">
+          <div className="flex flex-col gap-10 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2.5">
+                <AtlasLogo size={26} spin className="size-[26px]" />
+                <span className="text-base font-semibold tracking-tight">Atlas</span>
+              </div>
+              <p className="mt-3 max-w-xs text-sm leading-relaxed text-neutral-500">
+                Engineering intelligence for people who inherited the system.
+              </p>
+            </div>
+
+            <div className="flex gap-16">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">
+                  Legal
+                </p>
+                <ul className="mt-4 space-y-2.5">
+                  <li>
+                    <Link
+                      href="/legal/privacy"
+                      className="text-sm text-neutral-600 transition-colors hover:text-neutral-900"
+                    >
+                      Privacy
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/legal/terms"
+                      className="text-sm text-neutral-600 transition-colors hover:text-neutral-900"
+                    >
+                      Terms
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">
+                  Contact
+                </p>
+                <ul className="mt-4 space-y-2.5">
+                  <li>
+                    <a
+                      href="mailto:hello@atlas.dev"
+                      className="text-sm text-neutral-600 transition-colors hover:text-neutral-900"
+                    >
+                      hello@atlas.dev
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-6">
-            <Link href="/legal/privacy" className="transition-colors hover:text-neutral-900">
-              Privacy
-            </Link>
-            <Link href="/legal/terms" className="transition-colors hover:text-neutral-900">
-              Terms
-            </Link>
+
+          <div className="mt-12 border-t border-neutral-200 pt-6">
+            <p className="text-xs text-neutral-400">&copy; {new Date().getFullYear()} Atlas</p>
           </div>
         </div>
       </footer>

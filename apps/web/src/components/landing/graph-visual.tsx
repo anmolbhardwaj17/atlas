@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { CloudIcon } from "@/components/cloud-icon";
 import { kindIcon, kindStyle, kindShort, KIND_LOGO } from "@/lib/kind-visual";
@@ -41,6 +41,8 @@ const CANVAS_H = 376;
 /** Lane headings sit above the first row — the live map frames nodes into lanes; so does this. */
 const LANE_Y = 0;
 const ROW0 = 34;
+/** Below this the node labels stop being readable, so we scroll rather than shrink further. */
+const MIN_SCALE = 0.62;
 
 /** Mirrors resource-node.tsx CERTAINTY exactly — solid = observed, faded = inferred, ring = low. */
 const CERTAINTY_DOT: Record<string, string> = {
@@ -196,6 +198,7 @@ function stackPath(a: LNode, b: LNode): string {
 
 export function GraphVisual() {
   const [active, setActive] = useState<string | null>(null);
+  const [hoverEdge, setHoverEdge] = useState<number | null>(null);
 
   // Everything the hovered node touches, so the rest can recede — the map's blast-radius focus.
   const related = new Set<string>();
@@ -206,131 +209,196 @@ export function GraphVisual() {
       if (e.to === active) related.add(e.from);
     }
   }
-  const dimmed = (id: string): boolean => active !== null && !related.has(id);
-  const edgeActive = (e: LEdge): boolean =>
-    active !== null && (e.from === active || e.to === active);
+  // An edge hover pins exactly its two endpoints, so the rest recedes the same way a node hover does.
+  const he = hoverEdge !== null ? (EDGES[hoverEdge] as LEdge) : null;
+  if (he) {
+    related.clear();
+    related.add(he.from);
+    related.add(he.to);
+  }
+  const focused = active !== null || he !== null;
+  const dimmed = (id: string): boolean => focused && !related.has(id);
+  const edgeActive = (e: LEdge, i: number): boolean =>
+    i === hoverEdge || (active !== null && (e.from === active || e.to === active));
+
+  // Scale the whole canvas to whatever width it's given, down to a floor. Below the floor the text
+  // would stop being readable, so past that point it scrolls instead — shrinking further would
+  // "fit" while making the diagram useless.
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([entry]) => {
+      const w = entry?.contentRect.width ?? CANVAS_W;
+      setScale(Math.min(1, Math.max(MIN_SCALE, w / CANVAS_W)));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   return (
-    <div
-      className="relative mx-auto select-none"
-      style={{ width: CANVAS_W, height: CANVAS_H }}
-      onMouseLeave={() => setActive(null)}
-    >
-      <svg
-        viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
-        className="absolute inset-0 h-full w-full overflow-visible"
-        aria-hidden="true"
-      >
-        <defs>
-          <marker
-            id="lg-arrow"
-            viewBox="0 0 8 8"
-            refX="7"
-            refY="4"
-            markerWidth="5"
-            markerHeight="5"
-            orient="auto"
-          >
-            <path d="M0 0 L8 4 L0 8 z" fill="currentColor" />
-          </marker>
-        </defs>
-        {EDGES.map((e, i) => {
-          const a = byId(e.from);
-          const b = byId(e.to);
-          const vertical = a.x === b.x;
-          const on = edgeActive(e);
-          const off = active !== null && !on;
-          return (
-            <g
-              key={`${e.from}-${e.to}`}
-              className={cn(
-                "lg-edge transition-[opacity,color] duration-200",
-                on ? "text-foreground/75" : "text-muted-foreground/55",
-                off && "opacity-25",
-              )}
-              style={{ ["--d" as string]: `${0.1 + i * 0.08}s` }}
-            >
-              <path
-                d={vertical ? stackPath(a, b) : edgePath(a, b)}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={on ? 1.75 : 1.25}
-                strokeDasharray={e.inferred ? "5 4" : undefined}
-                markerEnd="url(#lg-arrow)"
-              />
-              {on ? (
-                <text
-                  x={vertical ? a.x + 34 : a.x + W + (b.x - (a.x + W)) / 2}
-                  y={vertical ? a.y + H + (b.y - (a.y + H)) / 2 + 3 : (a.y + b.y) / 2 + H / 2 - 9}
-                  textAnchor={vertical ? "start" : "middle"}
-                  fill="currentColor"
-                  fontSize="9.5"
-                  className="fill-muted-foreground font-medium tracking-wide"
-                >
-                  {e.label}
-                </text>
-              ) : null}
-            </g>
-          );
-        })}
-      </svg>
-
-      {LANES.map((l) => (
+    <div ref={wrapRef} className="w-full overflow-x-auto">
+      <div style={{ height: CANVAS_H * scale, width: CANVAS_W * scale }} className="mx-auto">
         <div
-          key={l.label}
-          className="absolute text-[10px] font-medium uppercase tracking-widest text-muted-foreground/70"
-          style={{ left: l.x, top: LANE_Y, width: W }}
+          style={{ transform: `scale(${scale})`, transformOrigin: "top left" }}
+          className="origin-top-left"
         >
-          {l.label}
+          {renderCanvas()}
         </div>
-      ))}
-
-      {NODES.map((n, i) => {
-        const logo = KIND_LOGO[n.kind];
-        const Icon = kindIcon(n.kind);
-        const on = active === n.id;
-        return (
-          <button
-            key={n.id}
-            type="button"
-            tabIndex={-1}
-            onMouseEnter={() => setActive(n.id)}
-            onFocus={() => setActive(n.id)}
-            className={cn(
-              "lg-node absolute flex items-center gap-2.5 rounded-lg border bg-card px-3 py-2 text-left shadow-sm",
-              "transition-[transform,box-shadow,border-color,opacity] duration-200",
-              on
-                ? "-translate-y-0.5 border-foreground shadow-md ring-1 ring-foreground"
-                : "border-border hover:border-foreground/40",
-              dimmed(n.id) && "opacity-30",
-            )}
-            style={{ left: n.x, top: n.y, width: W, ["--d" as string]: `${0.2 + i * 0.09}s` }}
-          >
-            <span
-              className={cn(
-                "grid size-7 shrink-0 place-items-center rounded-md",
-                logo ? "bg-muted/60" : kindStyle(n.kind),
-              )}
-            >
-              {logo ? (
-                <CloudIcon name={logo} className="size-[18px]" />
-              ) : (
-                <Icon className="size-4" />
-              )}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-xs font-medium leading-tight">{n.name}</span>
-              <span className="block truncate text-[10px] uppercase tracking-wide text-muted-foreground">
-                {kindShort(n.kind)}
-              </span>
-            </span>
-            <span
-              className={cn("size-1.5 shrink-0 rounded-full", CERTAINTY_DOT[n.certainty])}
-              aria-hidden="true"
-            />
-          </button>
-        );
-      })}
+      </div>
     </div>
   );
+
+  function renderCanvas() {
+    return (
+      <div
+        className="relative select-none"
+        style={{ width: CANVAS_W, height: CANVAS_H }}
+        onMouseLeave={() => {
+          setActive(null);
+          setHoverEdge(null);
+        }}
+      >
+        <svg
+          viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
+          className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+          aria-hidden="true"
+        >
+          <defs>
+            <marker
+              id="lg-arrow"
+              viewBox="0 0 8 8"
+              refX="7"
+              refY="4"
+              markerWidth="5"
+              markerHeight="5"
+              orient="auto"
+            >
+              <path d="M0 0 L8 4 L0 8 z" fill="currentColor" />
+            </marker>
+          </defs>
+          {EDGES.map((e, i) => {
+            const a = byId(e.from);
+            const b = byId(e.to);
+            const vertical = a.x === b.x;
+            const on = edgeActive(e, i);
+            const off = focused && !on;
+            return (
+              <g
+                key={`${e.from}-${e.to}`}
+                className={cn(
+                  "lg-edge transition-[opacity,color] duration-200",
+                  on ? "text-foreground/80" : "text-muted-foreground/75",
+                  off && "opacity-25",
+                )}
+                style={{ ["--d" as string]: `${0.1 + i * 0.08}s` }}
+              >
+                <path
+                  d={vertical ? stackPath(a, b) : edgePath(a, b)}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={on ? 1.75 : 1.25}
+                  strokeDasharray={e.inferred ? "5 4" : undefined}
+                  className={e.inferred ? "lg-march" : undefined}
+                  markerEnd="url(#lg-arrow)"
+                />
+                {/* Flow pulse, riding the same path. Direction reads without an arrow being the only
+                  cue, and it makes a static diagram feel like something currently connected. */}
+                <path
+                  d={vertical ? stackPath(a, b) : edgePath(a, b)}
+                  fill="none"
+                  stroke="transparent"
+                  strokeWidth={14}
+                  className="pointer-events-auto cursor-default"
+                  onMouseEnter={() => setHoverEdge(i)}
+                  onMouseLeave={() => setHoverEdge(null)}
+                />
+                {!e.inferred ? (
+                  <path
+                    className="lg-flow"
+                    d={vertical ? stackPath(a, b) : edgePath(a, b)}
+                    pathLength={1}
+                    fill="none"
+                    strokeWidth={on ? 2.5 : 2}
+                    strokeLinecap="round"
+                    style={{ ["--fd" as string]: `${(i % 5) * 0.45}s` }}
+                  />
+                ) : null}
+                {on ? (
+                  <text
+                    x={vertical ? a.x + 34 : a.x + W + (b.x - (a.x + W)) / 2}
+                    y={vertical ? a.y + H + (b.y - (a.y + H)) / 2 + 3 : (a.y + b.y) / 2 + H / 2 - 9}
+                    textAnchor={vertical ? "start" : "middle"}
+                    fill="currentColor"
+                    fontSize="9.5"
+                    className="fill-foreground font-medium tracking-wide [paint-order:stroke] [stroke-linejoin:round] [stroke-width:5px] [stroke:hsl(var(--card))]"
+                  >
+                    {e.label}
+                  </text>
+                ) : null}
+              </g>
+            );
+          })}
+        </svg>
+
+        {LANES.map((l) => (
+          <div
+            key={l.label}
+            className="absolute text-[10px] font-medium uppercase tracking-widest text-muted-foreground/70"
+            style={{ left: l.x, top: LANE_Y, width: W }}
+          >
+            {l.label}
+          </div>
+        ))}
+
+        {NODES.map((n, i) => {
+          const logo = KIND_LOGO[n.kind];
+          const Icon = kindIcon(n.kind);
+          const on = active === n.id;
+          return (
+            <button
+              key={n.id}
+              type="button"
+              tabIndex={-1}
+              onMouseEnter={() => setActive(n.id)}
+              onFocus={() => setActive(n.id)}
+              className={cn(
+                "lg-node absolute flex items-center gap-2.5 rounded-lg border bg-card px-3 py-2 text-left shadow-sm",
+                "transition-[transform,box-shadow,border-color,opacity] duration-200",
+                on
+                  ? "-translate-y-0.5 border-foreground shadow-md ring-1 ring-foreground"
+                  : "border-border hover:border-foreground/40",
+                dimmed(n.id) && "opacity-30",
+              )}
+              style={{ left: n.x, top: n.y, width: W, ["--d" as string]: `${0.2 + i * 0.09}s` }}
+            >
+              <span
+                className={cn(
+                  "grid size-7 shrink-0 place-items-center rounded-md",
+                  logo ? "bg-muted/60" : kindStyle(n.kind),
+                )}
+              >
+                {logo ? (
+                  <CloudIcon name={logo} className="size-[18px]" />
+                ) : (
+                  <Icon className="size-4" />
+                )}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-xs font-medium leading-tight">{n.name}</span>
+                <span className="block truncate text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {kindShort(n.kind)}
+                </span>
+              </span>
+              <span
+                className={cn("size-1.5 shrink-0 rounded-full", CERTAINTY_DOT[n.certainty])}
+                aria-hidden="true"
+              />
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
 }

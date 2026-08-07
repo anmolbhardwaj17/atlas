@@ -502,51 +502,65 @@
   color: hsl(var(--muted-foreground));
 }
 
-/* ── Landing hero graph ─────────────────────────────────────────────────────────────────────────
-   The hero diagram draws itself on load: edges stroke in, then each node arrives after the edge
-   that leads to it (ordering comes from `--d`, set per element in graph-visual.tsx). Kept here with
-   the rest of the motion vocabulary rather than inlined, so there is still exactly one place that
-   defines how things move.
+/* ── Landing graph edges ────────────────────────────────────────────────────────────────────────
+   Two kinds of motion, both saying "this is a live connection, and here is which way it runs".
 
-   Mount-based, like every other entrance in the app — NOT scroll-triggered. The hero is above the
-   fold, so an observer would fire in the same frame anyway, and the state round-trip risks painting
-   the finished diagram for a frame before hiding it to animate. This also keeps the component free
-   of client JavaScript entirely.
+   `.lg-march` — inferred edges keep their dashes and the dashes THEMSELVES travel along the path.
+   The dash pattern is `5 4`, so shifting the offset by exactly -9px per cycle loops seamlessly;
+   any other value would visibly jump at the wrap.
 
-   Outside `prefers-reduced-motion: no-preference` these rules don't exist, so the un-animated
-   default IS the finished diagram: reduced-motion users see it drawn, and nothing is ever hidden
-   without a guarantee that it will be shown again. */
+   `.lg-flow` — observed edges carry a short bright segment that runs their length. It is drawn in
+   the foreground ink rather than `currentColor`: the first version inherited the edge's own colour,
+   so the pulse was moving the whole time and was simply invisible against the line it rode.
+   `pathLength="1"` normalises every path to one unit, which is what makes the pulse travel at the
+   same apparent speed on a 60px hop and a 700px run.
+
+   Both are confined to motion-safe, and neither is load-bearing: with motion reduced the edges are
+   just drawn, which is the finished state. */
 @media (prefers-reduced-motion: no-preference) {
-  .lg-edge {
-    stroke-dasharray: 320;
-    stroke-dashoffset: 320;
-    animation: lg-draw 0.75s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-    animation-delay: var(--d, 0s);
+  .lg-march {
+    animation: lg-march 1.1s linear infinite;
   }
-  /* An inferred edge keeps its dashes, so it can't animate dashoffset — fade it in instead. */
-  .lg-edge.lg-inferred {
-    stroke-dasharray: 5 4;
-    stroke-dashoffset: 0;
-    animation: motion-fade 0.5s ease-out both;
-    animation-delay: var(--d, 0s);
-  }
-  .lg-node {
-    animation: lg-node-in 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-    animation-delay: var(--d, 0s);
+  .lg-flow {
+    stroke-dasharray: 0.08 0.92;
+    stroke: hsl(var(--foreground));
+    opacity: 0.55;
+    animation: lg-flow 2.4s linear infinite;
+    animation-delay: var(--fd, 0s);
   }
 }
-@keyframes lg-draw {
+/* Without motion the pulse must not paint at all — a static 8% segment would read as a stray mark. */
+.lg-flow {
+  stroke-dasharray: 0 1;
+}
+@keyframes lg-march {
   to {
-    stroke-dashoffset: 0;
+    stroke-dashoffset: -9;
   }
 }
-@keyframes lg-node-in {
+@keyframes lg-flow {
   from {
-    opacity: 0;
-    transform: translateY(6px);
+    stroke-dashoffset: 1;
   }
   to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* The "found it" pulse on the trace's culprit row: a ring that expands slightly and fades, once.
+   Deliberately a single shot with `forwards` rather than an infinite loop — a row that keeps
+   throbbing reads as an unattended alarm, where this is a conclusion being reached. */
+@keyframes trace-found {
+  0% {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  35% {
     opacity: 1;
-    transform: none;
+    transform: scale(1.015);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.03);
   }
 }
