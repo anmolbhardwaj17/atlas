@@ -69,14 +69,7 @@ export default async function LandingPage() {
         {/* ── Hero ─────────────────────────────────────────────────────────────────────────── */}
         <section className="mx-auto max-w-6xl px-6 pb-8 pt-20 sm:pt-28">
           <div className="motion-stagger max-w-3xl">
-            <p className="flex items-center gap-2.5 text-sm font-medium text-neutral-500">
-              <span>Live</span>
-              <span className="size-1 rounded-full bg-neutral-300" aria-hidden="true" />
-              <span>Cited</span>
-              <span className="size-1 rounded-full bg-neutral-300" aria-hidden="true" />
-              <span>Read-only</span>
-            </p>
-            <h1 className="mt-4 text-balance text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
+            <h1 className="text-balance text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
               Nobody knows how the whole system fits together.
             </h1>
             <p className="mt-5 max-w-xl text-balance leading-relaxed text-neutral-600">
@@ -91,9 +84,7 @@ export default async function LandingPage() {
               <Button asChild size="lg" className="h-11 px-7">
                 <Link href={cta.href}>{cta.label}</Link>
               </Button>
-              <span className="text-sm text-neutral-500">
-                Free while in beta. Read-only access, no agents to deploy.
-              </span>
+              <span className="text-sm text-neutral-500">Free while in beta.</span>
             </div>
           </div>
         </section>
@@ -410,7 +401,7 @@ export default async function LandingPage() {
                 alignment instead of switching from centred to left halfway down. */}
             <div>
               <ShieldCheck className="size-8 text-success" />
-              <h2 className="mt-6 text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
+              <h2 className="mt-6 text-balance text-5xl font-semibold leading-[1.02] tracking-tight sm:text-7xl">
                 It can read everything.
                 <br />
                 It can change nothing.

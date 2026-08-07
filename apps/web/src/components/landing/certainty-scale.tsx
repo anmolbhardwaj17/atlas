@@ -102,40 +102,42 @@ export function CertaintyScale() {
             <div
               key={t.label}
               className={cn(
-                "flex flex-wrap items-center gap-x-3 gap-y-2 transition-opacity duration-300",
+                "flex flex-col items-start gap-2 transition-opacity duration-300 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-2",
                 rejected && "opacity-40",
               )}
             >
-              <svg
-                viewBox="0 0 60 8"
-                className={cn(
-                  "h-2 w-14 shrink-0 transition-colors duration-300",
-                  confirmed ? "text-neutral-800" : t.strokeClass,
-                )}
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                <line
-                  x1="0"
-                  y1="4"
-                  x2="54"
-                  y2="4"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeDasharray={confirmed ? undefined : t.dash}
-                  vectorEffect="non-scaling-stroke"
-                />
-                <path d="M54 1 L60 4 L54 7 z" fill="currentColor" />
-              </svg>
-              <span
-                className={cn(
-                  "shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors duration-300",
-                  confirmed ? "bg-success/15 text-success" : t.labelClass,
-                )}
-              >
-                {confirmed ? "Observed" : t.label}
+              <span className="flex shrink-0 items-center gap-3">
+                <svg
+                  viewBox="0 0 60 8"
+                  className={cn(
+                    "h-2 w-14 shrink-0 transition-colors duration-300",
+                    confirmed ? "text-neutral-800" : t.strokeClass,
+                  )}
+                  preserveAspectRatio="none"
+                  aria-hidden="true"
+                >
+                  <line
+                    x1="0"
+                    y1="4"
+                    x2="54"
+                    y2="4"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeDasharray={confirmed ? undefined : t.dash}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <path d="M54 1 L60 4 L54 7 z" fill="currentColor" />
+                </svg>
+                <span
+                  className={cn(
+                    "shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors duration-300",
+                    confirmed ? "bg-success/15 text-success" : t.labelClass,
+                  )}
+                >
+                  {confirmed ? "Observed" : t.label}
+                </span>
               </span>
-              <p className="min-w-0 flex-1 text-sm text-neutral-500">
+              <p className="w-full text-sm text-neutral-500 sm:w-auto sm:min-w-0 sm:flex-1">
                 {confirmed
                   ? "Confirmed by you. It's part of the graph now."
                   : rejected
