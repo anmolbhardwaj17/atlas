@@ -95,12 +95,13 @@ export class SyncWorkerBootstrap implements OnModuleInit, OnApplicationShutdown 
           .catch(() => undefined);
       };
       poll();
-      // 60s, not 15s. Each tick is several Redis commands (getJobCounts fans out per state), so at
-      // 15s this alone was ~29k commands/day per instance — the single largest consumer on an idle
-      // deployment, and Upstash bills per command. Nothing is lost: the only consumer is the
-      // `atlas_sync_queue_depth` gauge, whose alert fires on a 15-minute window
-      // (deploy/prometheus-alerts.yml), so 60s resolution is four times finer than it needs to be.
-      this.depthTimer = setInterval(poll, 60_000);
+      // 5 minutes, down from 15 SECONDS. Each tick is several Redis commands (getJobCounts fans out
+      // per state), so at 15s this alone was ~29k commands/day per instance — the single largest
+      // consumer on an idle deployment, on a Redis that bills per command. Nothing is lost: the only
+      // consumer is the `atlas_sync_queue_depth` gauge, and its alert fires on a 15-minute window
+      // (deploy/prometheus-alerts.yml), so a 5-minute sample is still three times finer than the
+      // thing that reads it.
+      this.depthTimer = setInterval(poll, 300_000);
       this.depthTimer.unref?.();
     }
   }

@@ -69,6 +69,11 @@ export class BullMQQueue implements JobQueue {
         // enqueueing writes that marker — which wakes the blocked client immediately. drainDelay
         // only governs how often an idle worker re-asks when nothing has arrived.
         drainDelay: 30,
+        // How often the worker scans for jobs whose lock expired because a worker died mid-job.
+        // The default 30s is another ~3k commands/day doing nothing. At our volume (a handful of
+        // syncs a day, one worker) a crashed job being reclaimed within 5 minutes instead of 30
+        // seconds is not a meaningful difference — and jobs are still reclaimed, just less eagerly.
+        stalledInterval: 300_000,
       },
     );
     // Terminal failure (BullMQ retries internally up to `attempts`; this fires on the last one).
