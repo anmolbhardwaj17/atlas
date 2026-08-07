@@ -65,7 +65,7 @@ const EXCHANGES: Exchange[] = [
       { t: ", fourteen minutes before the alarm. It shipped " },
       { b: "PR #1482" },
       { c: 2 },
-      { t: " - “retry budget for orders-db” - the only change touching " },
+      { t: " - “retry budget for orders-db”, by @marcus - the only change touching " },
       { b: "checkout" },
       { c: 3 },
       { t: " in that window." },

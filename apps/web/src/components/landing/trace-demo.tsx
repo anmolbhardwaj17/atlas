@@ -51,7 +51,7 @@ const STEPS: Step[] = [
     time: "01:44",
     icon: "bitbucket",
     title: "PR #1482 merged",
-    detail: "“retry budget for orders-db”",
+    detail: "“retry budget for orders-db” · @marcus",
     culprit: true,
   },
   {

@@ -564,3 +564,31 @@
     transform: scale(1.03);
   }
 }
+
+/* ── Landing texture ────────────────────────────────────────────────────────────────────────────
+   Two surfaces, both colour-agnostic on purpose: the brand palette isn't decided yet, and anything
+   built on a hue would have to be redone once it is.
+
+   `.grain` — a fractal-noise overlay for the large dark card. A 600px black rectangle rendered as
+   flat CSS reads as an absence rather than a material; ~3% noise gives it a surface without
+   announcing itself. Inlined as a data URI so it costs no request and can't 404.
+
+   `.rule-dotted` — a divider drawn in the graph's INFERRED-edge notation. The page already teaches
+   that dashes mean "worked out rather than observed", so reusing it for structure makes the layout
+   speak the product's own language instead of importing generic ornament. */
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.rule-dotted {
+  height: 1px;
+  background-image: repeating-linear-gradient(
+    to right,
+    hsl(var(--muted-foreground) / 0.35) 0 3px,
+    transparent 3px 8px
+  );
+}

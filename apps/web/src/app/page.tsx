@@ -84,6 +84,10 @@ export default async function LandingPage() {
               who were there. Atlas reads your cloud and your code and keeps one live map of what
               you actually run - so the answer is a question away, not an afternoon.
             </p>
+            <p className="mt-5 max-w-xl text-balance text-lg leading-relaxed text-neutral-900">
+              And the tools that promise to fix it mostly guess, confidently, and let you find out
+              later.
+            </p>
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <Button asChild size="lg" className="h-11 px-7">
                 <Link href={cta.href}>{cta.label}</Link>
@@ -143,7 +147,7 @@ export default async function LandingPage() {
             <Reveal>
               <div>
                 <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-                  Trace exactly what broke, in minutes.
+                  Your alert says what broke. Atlas says why.
                 </h2>
                 <p className="mt-5 text-balance leading-relaxed text-neutral-600">
                   Your monitoring already told you something is wrong. It can&rsquo;t tell you why.
@@ -395,15 +399,18 @@ export default async function LandingPage() {
             treatment for the close alone gives the page one held breath at the end instead of two.
             A calm, unornamented statement also suits the content better: this is the reassurance a
             security reviewer is looking for, and reassurance shouldn't shout. */}
-        <section className="mx-auto max-w-4xl px-6 py-20">
+        <section className="mx-auto max-w-4xl px-6 py-28">
+          <div className="rule-dotted mb-20" aria-hidden="true" />
           <Reveal>
             {/* No circle around the shield: a ringed icon reads as a status chip, and this is a
                 statement, not a badge. Heading and mark share a line so the section keeps one
                 alignment instead of switching from centred to left halfway down. */}
-            <div className="flex items-center gap-3.5">
-              <ShieldCheck className="size-8 shrink-0 text-success" />
-              <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-                Read-only, all the way down.
+            <div>
+              <ShieldCheck className="size-8 text-success" />
+              <h2 className="mt-6 text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
+                It can read everything.
+                <br />
+                It can change nothing.
               </h2>
             </div>
           </Reveal>
@@ -432,7 +439,7 @@ export default async function LandingPage() {
         <section className="mx-auto max-w-6xl px-6 pb-24 pt-8">
           <Reveal variant="pop">
             <div
-              className="relative overflow-hidden rounded-3xl px-8 py-20 text-center text-white shadow-sm sm:px-16"
+              className="grain relative overflow-hidden rounded-3xl px-8 py-20 text-center text-white shadow-sm sm:px-16"
               style={{ background: HERO_BG }}
             >
               <AtlasLogo
