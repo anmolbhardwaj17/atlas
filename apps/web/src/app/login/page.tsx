@@ -113,7 +113,7 @@ export default function LoginPage() {
       </aside>
 
       {/* ── Right: full-height sign-in ── */}
-      <section className="relative flex min-h-dvh flex-col items-center justify-center p-8">
+      <section className="relative flex flex-col items-center justify-center p-8 md:min-h-dvh">
         <div className="w-full max-w-sm text-center">
           {/* Liquid-metal Atlas mark above the sign-in. Transparent back (page is white already) so
               it never paints an opaque box over the heading; grey tint reads on white. */}
@@ -139,7 +139,7 @@ export default function LoginPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
             Sign in to Atlas
           </h1>
-          <p className="mt-1.5 text-sm text-neutral-500">Sign in to continue.</p>
+          <p className="mt-1.5 text-sm text-neutral-500">Your whole system, in one place.</p>
 
           <Button onClick={signInWithGoogle} disabled={busy} className="mt-8 h-12 w-full gap-2.5">
             <span className="grid size-6 shrink-0 place-items-center rounded-full bg-white">
@@ -151,7 +151,7 @@ export default function LoginPage() {
         </div>
 
         {/* Legal links, anchored to the bottom of the panel. */}
-        <div className="absolute inset-x-0 bottom-6 flex justify-center gap-5 text-xs text-neutral-400">
+        <div className="mt-10 flex justify-center gap-5 text-xs text-neutral-400 md:absolute md:inset-x-0 md:bottom-6 md:mt-0">
           <Link href="/legal/terms" className="transition-colors hover:text-neutral-700">
             Terms of Service
           </Link>

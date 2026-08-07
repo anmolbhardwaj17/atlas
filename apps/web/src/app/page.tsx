@@ -8,7 +8,6 @@ import { GraphVisual } from "@/components/landing/graph-visual";
 import { IntegrationsOrbit } from "@/components/landing/integrations-orbit";
 import { AskDemo } from "@/components/landing/ask-demo";
 import { CertaintyScale } from "@/components/landing/certainty-scale";
-import { FooterMark } from "@/components/landing/footer-mark";
 import { BlastDemo } from "@/components/landing/blast-demo";
 import { TraceDemo } from "@/components/landing/trace-demo";
 import { CloudIcon } from "@/components/cloud-icon";
@@ -475,9 +474,8 @@ export default async function LandingPage() {
           length, with pictures. What belongs here is what a footer is actually for: who this is,
           how to reach them, and the legal links. The layout has room for more columns when there
           is genuinely more to say (docs, changelog, careers). */}
-      <footer className="relative overflow-hidden border-t border-neutral-200/70">
-        <FooterMark />
-        <div className="relative mx-auto max-w-6xl px-6 py-14">
+      <footer className="border-t border-neutral-200/70">
+        <div className="mx-auto max-w-6xl px-6 py-14">
           <div className="flex flex-col gap-10 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <div className="flex items-center gap-2.5">
@@ -485,7 +483,8 @@ export default async function LandingPage() {
                 <span className="text-base font-semibold tracking-tight">Atlas</span>
               </div>
               <p className="mt-3 max-w-xs text-sm leading-relaxed text-neutral-500">
-                Engineering intelligence for people who inherited the system.
+                One live map of everything you run and ship, built from read-only access to the
+                tools you already use.
               </p>
             </div>
 
