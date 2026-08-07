@@ -59,12 +59,20 @@ const HEARTBEAT_MS = 60_000;
 
 /** Best-effort liveness bump so a slow-but-alive scope isn't false-reaped. The trigger stamps
  *  updated_at; the `status='running'` guard makes a heartbeat on an already-reaped run a harmless
- *  no-op, and any failure here must never break the sync. */
-async function heartbeat(db: Db, run: SyncRunRecord): Promise<void> {
+ *  no-op, and any failure here must never break the sync.
+ *
+ *  It also publishes the running totals. `stats` used to be written once, at finalize, which meant
+ *  the UI could say nothing about a first sync beyond "syncing…" for its entire duration — the
+ *  longest, least-reassuring wait in the product, right after a customer hands over cloud
+ *  credentials. Since this UPDATE already runs on a timer with the right guard, carrying the
+ *  counters costs one extra jsonb parameter and no additional round-trip. The values are a
+ *  monotonically-growing snapshot, never read back by the runner, so a lost write is harmless. */
+async function heartbeat(db: Db, run: SyncRunRecord, stats: SyncStats): Promise<void> {
   await withOrgScope(db, run.orgId, (c) =>
-    c.query("UPDATE sync_runs SET updated_at = now() WHERE id = $1 AND status = 'running'", [
-      run.id,
-    ]),
+    c.query(
+      "UPDATE sync_runs SET updated_at = now(), stats = $2::jsonb WHERE id = $1 AND status = 'running'",
+      [run.id, JSON.stringify(stats)],
+    ),
   ).catch(() => undefined);
 }
 
@@ -156,7 +164,7 @@ export async function runStagedSync(
         // replacement could then interleave). Touch updated_at periodically — well under the 15-min
         // reap threshold — so a legitimately-slow scope is never mistaken for an orphaned one.
         if (Date.now() - lastBeat > HEARTBEAT_MS) {
-          await heartbeat(db, run);
+          await heartbeat(db, run, stats);
           lastBeat = Date.now();
         }
         const raw = await connector.fetchDetail(ref, ctx);
@@ -192,10 +200,14 @@ export async function runStagedSync(
       });
       completed.add(scope.key);
       stats.scopesOk++;
+      // Publish the checkpoint AND the running totals. Most scopes finish well inside one heartbeat
+      // interval, so without this the counters would only move once a minute — the progress would
+      // look stalled on exactly the fast, healthy syncs. Same statement, one more parameter.
       await withOrgScope(db, run.orgId, (c) =>
-        c.query("UPDATE sync_runs SET checkpoint = $2 WHERE id = $1", [
+        c.query("UPDATE sync_runs SET checkpoint = $2, stats = $3::jsonb WHERE id = $1", [
           run.id,
           JSON.stringify({ completedScopes: [...completed] }),
+          JSON.stringify(stats),
         ]),
       );
     } catch (err) {

@@ -418,6 +418,14 @@ export interface LastSyncSummary {
   skippedScopes?: string[];
 }
 
+/** Progress of a run still in flight. Grows within a run; resets when the next one starts. */
+export interface SyncProgress {
+  discovered: number;
+  resources: number;
+  edges: number;
+  scopesOk: number;
+}
+
 export interface ConnectionSummary {
   id: string;
   provider: string;
@@ -430,6 +438,8 @@ export interface ConnectionSummary {
   health?: { missingPermissions?: string[]; errorKind?: string };
   /** A sync run is queued/running right now. */
   syncing?: boolean;
+  /** Live counters for the in-flight run (republished each heartbeat + scope boundary). */
+  syncProgress?: SyncProgress | null;
   /** Most recent finished run, or null if none has completed yet. */
   lastSync?: LastSyncSummary | null;
 }

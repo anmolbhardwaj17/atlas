@@ -11,6 +11,7 @@ import type {
   ConnectionDto,
   CreateConnectionBody,
   LastSyncDto,
+  SyncProgressDto,
   SyncTriggerDto,
   VerifyConnectionBody,
 } from "./dto";
@@ -130,12 +131,27 @@ export class ConnectionService {
     );
     for (const r of reaped.rows) this.logger.warn(`reaped orphaned sync_run ${r.id}`);
 
-    const inflight = await c.query<{ connection_id: string }>(
-      `SELECT connection_id FROM sync_runs
+    // The running totals come along for free — this row is already being read to decide `syncing`.
+    // The runner republishes `stats` on every heartbeat and at each scope boundary, so these are
+    // live counters, not the finalized ones. `status='queued'` rows have an empty `stats`, which
+    // correctly reads as "nothing found yet" rather than as a bogus zero.
+    const inflight = await c.query<{ connection_id: string; stats: Record<string, unknown> }>(
+      `SELECT connection_id, stats FROM sync_runs
          WHERE connection_id = ANY($1::uuid[]) AND status IN ('queued', 'running')`,
       [ids],
     );
     const syncingIds = new Set(inflight.rows.map((r) => r.connection_id));
+    const progressByConn = new Map<string, SyncProgressDto>(
+      inflight.rows.map((r) => [
+        r.connection_id,
+        {
+          discovered: Number(r.stats["discovered"] ?? 0),
+          resources: Number(r.stats["persisted"] ?? 0),
+          edges: Number(r.stats["edges"] ?? 0),
+          scopesOk: Number(r.stats["scopesOk"] ?? 0),
+        },
+      ]),
+    );
 
     const finished = await c.query<{
       connection_id: string;
@@ -170,6 +186,7 @@ export class ConnectionService {
     return dtos.map((d) => ({
       ...d,
       syncing: syncingIds.has(d.id),
+      syncProgress: progressByConn.get(d.id) ?? null,
       lastSync: lastByConn.get(d.id) ?? null,
     }));
   }
@@ -542,6 +559,7 @@ function toDto(row: ConnectionRow | undefined): ConnectionDto {
     lastSyncedAt: row.last_synced_at?.toISOString() ?? null,
     // Filled by attachSyncInfo on read paths; mutation returns are refreshed by the client.
     syncing: false,
+    syncProgress: null,
     lastSync: null,
     createdAt: row.created_at.toISOString(),
   };

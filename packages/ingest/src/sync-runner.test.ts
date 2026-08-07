@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
-import type { Connection } from "@atlas/connector-sdk";
+import type { Connection, Scope, ResourceRef } from "@atlas/connector-sdk";
 import {
   runStagedSync,
   reconcileStaleNodes,
@@ -348,5 +348,47 @@ suite("F2 staged sync runner", () => {
 
     expect(retired).toBe(0);
     expect(await edgeStatus(edge)).toBe("active");
+  });
+
+  /**
+   * The Integrations hub narrates a running sync ("Found 43 resources · 388 relationships") from
+   * `sync_runs.stats`. That only works if the runner publishes the counters DURING the run — they
+   * used to be written once, at finalize, so the UI could say nothing until the run was already
+   * over. Asserting on the finalized row would pass either way, so this reads `stats` from a
+   * *second* scope's discover(): if scope 1's totals are visible there, they were published at the
+   * scope boundary, mid-run, which is exactly what the UI polls for.
+   */
+  it("publishes running totals mid-run, not only at finalize", async () => {
+    let midRun: Record<string, unknown> | null = null;
+    let runId = "";
+
+    class PeekingConnector extends MockConnector {
+      override async *discover(scope: Scope): AsyncIterable<ResourceRef> {
+        // Scope 2 runs only after scope 1 has fully persisted and checkpointed.
+        if (scope.key === "s2") {
+          const { rows } = await admin.query<{ stats: Record<string, unknown> }>(
+            "SELECT stats FROM sync_runs WHERE id = $1",
+            [runId],
+          );
+          midRun = one(rows).stats;
+        }
+        yield* super.discover(scope);
+      }
+    }
+
+    const mock = new PeekingConnector([
+      { key: "s1", resources: [r1, r2] },
+      { key: "s2", resources: [] },
+    ]);
+    const run = await newRun();
+    runId = run.id;
+    const res = await runStagedSync(deps(), mock, conn(), run);
+    expect(res.status).toBe("succeeded");
+
+    // Scope 1's work was already on the row while scope 2 was still discovering.
+    expect(midRun).not.toBeNull();
+    expect(Number(midRun?.["persisted"] ?? 0)).toBe(2);
+    expect(Number(midRun?.["edges"] ?? 0)).toBe(1);
+    expect(Number(midRun?.["scopesOk"] ?? 0)).toBe(1);
   });
 });

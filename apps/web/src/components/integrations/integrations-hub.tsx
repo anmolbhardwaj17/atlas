@@ -66,6 +66,7 @@ import {
   disconnectSlackAsk,
   disconnectDiscordAsk,
   type ConnectionSummary,
+  type SyncProgress,
   type ChannelSummary,
   type ChannelKind,
   type SlackAskStatus,
@@ -738,6 +739,37 @@ function AlertManageSheet({
 /** One integration as a list row: logo + name + category + a one-line state, and an action on the
  *  right. When connected the whole row (and the "Connected" pill) opens a Manage slide-over that
  *  lists the account(s) as readable blocks — so the list itself stays clean and aligned. */
+/**
+ * Live sync narration. Reads the in-flight counters and says what Atlas has actually found so far,
+ * escalating through the three honest states of a run rather than showing a zero it can't justify:
+ *
+ *   queued / nothing yet  → "Starting — connecting to your estate…"
+ *   discovering, 0 saved  → "Reading your estate — 43 resources found so far…"
+ *   persisting            → "Found 43 resources · 388 relationships · 6 scopes read"
+ *
+ * `discovered` deliberately leads once it exists: it moves first and fastest (discover precedes
+ * persist), so it's what makes the wait feel alive. Relationships only appear once there are any —
+ * a hard "0 relationships" during the phase that hasn't run yet reads as a failure, not as progress.
+ */
+function SyncProgressLine({ progress }: { progress: SyncProgress | null | undefined }) {
+  const p = progress;
+  if (!p || p.discovered === 0) return <>Starting — connecting to your estate…</>;
+  if (p.resources === 0)
+    return (
+      <>
+        Reading your estate — {formatCount(p.discovered)} {plural(p.discovered, "resource")} found
+        so far…
+      </>
+    );
+  return (
+    <>
+      Found {formatCount(p.resources)} {plural(p.resources, "resource")}
+      {p.edges > 0 ? ` · ${formatCount(p.edges)} ${plural(p.edges, "relationship")}` : ""}
+      {p.scopesOk > 0 ? ` · ${p.scopesOk} ${plural(p.scopesOk, "scope")} read` : ""}
+    </>
+  );
+}
+
 function ProviderRow({
   provider,
   connections,
@@ -1030,17 +1062,18 @@ function ConnectionBlock({
       {/* Sync status. */}
       <p className="mt-2">
         {syncing ? (
-          // Expectation-setting, not just a spinner. This is the highest-anxiety moment in the
-          // product — the user has just handed over cloud credentials and has no evidence anything
-          // worked — and it used to say only "pulling the latest data…" with no sense of how long
-          // or what happens next. The row self-refreshes every 4s, so they can safely leave.
+          // The highest-anxiety moment in the product: credentials just handed over, no evidence
+          // anything worked. It used to be a bare spinner reading "pulling the latest data…" for
+          // the entire run. Now the counters are live (the runner republishes them on every
+          // heartbeat and at each scope boundary), so the wait shows the product doing its job
+          // instead of asking for blind patience. The row self-refreshes every 4s.
           <span className="flex flex-col gap-0.5 text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              <Loader2 className="size-3.5 animate-spin" /> Syncing — reading your estate…
+              <Loader2 className="size-3.5 animate-spin" />
+              <SyncProgressLine progress={conn.syncProgress} />
             </span>
             <span className="text-xs">
-              A first sync usually takes a few minutes. You can leave this page — it keeps running,
-              and the graph fills in as it goes.
+              You can leave this page — the sync keeps running and the graph fills in as it goes.
             </span>
           </span>
         ) : conn.lastSync ? (

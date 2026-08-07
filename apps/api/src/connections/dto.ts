@@ -42,6 +42,23 @@ export interface LastSyncDto {
   skippedScopes: string[];
 }
 
+/**
+ * Live counters for a run that is still in flight (FR-1.5). Present only while `syncing` is true;
+ * `null` otherwise. These are republished by the runner on each heartbeat and at every scope
+ * boundary, so they grow monotonically within a run and reset when the next one starts — they are
+ * progress, never a total. A queued-but-not-started run reports all zeros, which is the honest
+ * answer ("nothing found yet"), not a claim that the estate is empty.
+ */
+export interface SyncProgressDto {
+  /** Resource refs the connector has walked — runs ahead of `resources` (discover precedes persist). */
+  discovered: number;
+  /** Resources committed to the graph so far. */
+  resources: number;
+  edges: number;
+  /** Scopes (service/region pairs) finished so far. */
+  scopesOk: number;
+}
+
 /** Response DTO - secrets are NEVER present (docs/08 §4 DD-2; secret_ref is internal). */
 export interface ConnectionDto {
   id: string;
@@ -56,6 +73,8 @@ export interface ConnectionDto {
   lastSyncedAt: string | null;
   /** A sync run is queued/running right now (one in flight max, BR-SYNC-1). */
   syncing: boolean;
+  /** Live counters for that in-flight run; null when nothing is running. */
+  syncProgress: SyncProgressDto | null;
   /** Most recent finished run, or null if none has completed yet. */
   lastSync: LastSyncDto | null;
   createdAt: string;
