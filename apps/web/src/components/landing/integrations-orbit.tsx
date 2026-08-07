@@ -21,6 +21,10 @@ import { AtlasLogo } from "@/components/brand";
  * invert to stay legible, which means showing every partner's mark in the wrong colour — the one
  * detail a visitor recognising their own stack notices first.
  *
+ * Every entry is a provider Atlas actually CONNECTS to. Docker and Terraform used to be here and
+ * are gone: both appear inside the graph (as images, as IaC) but neither is something you connect,
+ * and under a heading that reads "what you already use" a logo is a promise of an integration.
+ *
  * Only real, bundled logos appear here — `CloudIcon` renders nothing for a name it doesn't have, so
  * an invented integration would silently become a hole in the ring. Everything shown is a provider
  * Atlas genuinely connects to; the ring is captioned "what you already use", so padding it with
@@ -39,7 +43,7 @@ import { AtlasLogo } from "@/components/brand";
 const INNER = [
   "aws-lambda", // orange
   "google-cloud", // multicolour
-  "terraform-icon", // purple
+  "aws-elb", // violet
   "aws-iam", // red
   "jira", // blue
   "aws-route53", // violet
@@ -54,7 +58,6 @@ const OUTER = [
   "bitbucket", // blue
   "microsoft-teams", // violet
   "aws-s3", // green
-  "docker-icon", // cyan
 ];
 
 function Ring({

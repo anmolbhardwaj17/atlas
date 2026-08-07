@@ -149,8 +149,7 @@ export default async function LandingPage() {
                   Your alert says what broke. Atlas says why.
                 </h2>
                 <p className="mt-5 text-balance leading-relaxed text-neutral-600">
-                  Your monitoring already told you something is wrong. It can&rsquo;t tell you why.
-                  Atlas picks up where the alert stops: it knows which service that is, what
+                  Atlas picks up where the alert stops. It knows which service that is, what
                   deployed to it, which pull request was in that deploy and which ticket asked for
                   it - so instead of five people opening five consoles, you get a ranked list of
                   what most likely caused it, each showing the evidence it used.
@@ -213,8 +212,8 @@ export default async function LandingPage() {
               <span>Atlas AI</span>
             </h2>
             <p className="mx-auto mt-3 max-w-lg text-balance text-center leading-relaxed text-neutral-600">
-              An agent that reads your graph, not the internet - and shows you where every answer
-              came from.
+              An agent that answers from your graph rather than the open web - and shows you exactly
+              where every answer came from.
             </p>
           </Reveal>
 
@@ -256,7 +255,7 @@ export default async function LandingPage() {
               <Reveal className="lg:order-2">
                 <div>
                   <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">
-                    The part nobody else will promise
+                    The part that is hard to promise
                   </p>
                   <h2 className="mt-4 text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
                     It tells you when it isn&rsquo;t sure.
@@ -288,7 +287,7 @@ export default async function LandingPage() {
               <Reveal>
                 <div>
                   <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-                    It reads what you already use.
+                    Your whole stack, on one graph.
                   </h2>
                   <p className="mt-5 text-balance leading-relaxed text-neutral-600">
                     Cloud accounts, repositories, pipelines, issue trackers. Atlas pulls them into
@@ -299,7 +298,7 @@ export default async function LandingPage() {
                   <div className="mt-8 overflow-hidden rounded-2xl border border-neutral-200 bg-white">
                     <div className="flex items-center gap-2.5 border-b border-neutral-200 px-5 py-3">
                       <Siren className="size-4 text-neutral-400" />
-                      <p className="text-sm font-medium">It tells you where you already look</p>
+                      <p className="text-sm font-medium">Alerts land where your team already is</p>
                     </div>
 
                     {/* A real alert, in the shape Atlas actually sends: what broke, how far past
@@ -424,7 +423,7 @@ export default async function LandingPage() {
               <p className="leading-relaxed text-neutral-600">
                 Every connection Atlas makes - cloud accounts, repositories, pipelines, issue
                 trackers, chat - is granted read scopes and nothing more. That isn&rsquo;t a setting
-                you have to trust us to honour: there is no code path in the product that writes to
+                you have to trust us to honor: there is no code path in the product that writes to
                 any of them, so the worst a bug can do is show you something wrong.
               </p>
             </Reveal>
@@ -432,7 +431,7 @@ export default async function LandingPage() {
               <p className="leading-relaxed text-neutral-600">
                 Which makes this an easy thing to approve. No agents in your VPC, no write
                 credentials to rotate, no blast radius to argue about in review - and every
-                organisation&rsquo;s data isolated at the database level, not by a filter someone
+                organization&rsquo;s data isolated at the database level, not by a filter someone
                 remembered to add.
               </p>
             </Reveal>
@@ -471,7 +470,7 @@ export default async function LandingPage() {
                   </Button>
                 </div>
                 <p className="mt-6 text-xs text-white/40">
-                  Read-only access. No agents to deploy. Nothing to uninstall if you walk away.
+                  Nothing to install. Nothing to uninstall if you walk away.
                 </p>
               </div>
             </div>
@@ -499,7 +498,7 @@ export default async function LandingPage() {
               </p>
             </div>
 
-            <div className="flex gap-16">
+            <div>
               <div>
                 <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">
                   Legal
@@ -520,21 +519,6 @@ export default async function LandingPage() {
                     >
                       Terms
                     </Link>
-                  </li>
-                </ul>
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">
-                  Contact
-                </p>
-                <ul className="mt-4 space-y-2.5">
-                  <li>
-                    <a
-                      href="mailto:hello@atlas.dev"
-                      className="text-sm text-neutral-600 transition-colors hover:text-neutral-900"
-                    >
-                      hello@atlas.dev
-                    </a>
                   </li>
                 </ul>
               </div>

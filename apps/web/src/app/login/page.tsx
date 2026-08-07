@@ -18,7 +18,7 @@ const STEPS = [
   {
     icon: Plug,
     title: "Connect in minutes",
-    desc: "Read-only access to AWS and your repositories.",
+    desc: "Read-only access to your cloud, repositories and issue tracker.",
   },
   {
     icon: Waypoints,
