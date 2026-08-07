@@ -59,7 +59,17 @@ export class BullMQQueue implements JobQueue {
       async (job) => {
         await handler({ id: String(job.id), name, data: job.data });
       },
-      { connection: this.connection },
+      {
+        connection: this.connection,
+        // Seconds an IDLE worker long-polls before re-issuing its blocking read. The default of 5
+        // costs ~17k Redis commands/day per worker doing nothing, which matters on a per-command
+        // billed Redis (Upstash) and is pure waste on any of them.
+        //
+        // This does NOT delay job pickup. The worker blocks on `bzpopmin(marker, drainDelay)`, and
+        // enqueueing writes that marker — which wakes the blocked client immediately. drainDelay
+        // only governs how often an idle worker re-asks when nothing has arrived.
+        drainDelay: 30,
+      },
     );
     // Terminal failure (BullMQ retries internally up to `attempts`; this fires on the last one).
     worker.on("failed", (job, err) => {

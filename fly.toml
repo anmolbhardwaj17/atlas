@@ -48,6 +48,10 @@ primary_region = "syd" # MUST match the Supabase region — this is the latency 
   # request you made by hand while quietly doing nothing in between.
   auto_stop_machines = "off"
   auto_start_machines = true
+  # ONE machine. Fly defaults to two for zero-downtime deploys, which is safe here (the schedulers
+  # are leader-locked, so they don't double-fire) — but every instance independently long-polls
+  # Redis and polls queue depth, so two machines doubled a per-command Redis bill for an MVP with
+  # no traffic to speak of. Raise this when request volume, not deploy smoothness, justifies it.
   min_machines_running = 1
   processes = ["app"]
 
