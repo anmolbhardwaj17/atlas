@@ -37,7 +37,7 @@ export function SampleDataBanner({ orgId }: { orgId: string }) {
         <span>
           <span className="font-medium">You&rsquo;re exploring sample data.</span>{" "}
           <span className="text-muted-foreground">
-            A demo estate built through the real pipeline — clear it anytime to connect your own.
+            A demo estate built through the real pipeline - clear it anytime to connect your own.
           </span>
         </span>
       </div>

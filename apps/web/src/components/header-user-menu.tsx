@@ -109,7 +109,7 @@ export function HeaderUserMenu({
 
         <DropdownMenuSeparator />
 
-        {/* Dark mode — keep the menu open on click so the toggle feels live. */}
+        {/* Dark mode - keep the menu open on click so the toggle feels live. */}
         <DropdownMenuItem
           role="menuitemcheckbox"
           aria-checked={dark}

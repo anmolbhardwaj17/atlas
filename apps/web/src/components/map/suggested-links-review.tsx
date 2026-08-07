@@ -151,7 +151,7 @@ export function SuggestedLinksReview({
         toast.success(action === "confirm" ? `Confirmed ${okIds.size}` : `Dismissed ${okIds.size}`);
         onChange?.();
       }
-      if (failed > 0) toast.error(`${failed} of ${ids.length} didn't update — try again.`);
+      if (failed > 0) toast.error(`${failed} of ${ids.length} didn't update - try again.`);
     } finally {
       setBulkBusy(false);
     }
@@ -216,7 +216,7 @@ export function SuggestedLinksReview({
             </p>
           ) : items && items.length > 0 ? (
             <>
-              {/* Select-all + bulk bar — review many at once (honest partial-failure, like Insights). */}
+              {/* Select-all + bulk bar - review many at once (honest partial-failure, like Insights). */}
               <div className="mb-1.5 flex items-center justify-between gap-2 px-1 pb-1.5">
                 <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                   <input
@@ -321,7 +321,7 @@ export function SuggestedLinksReview({
                 No links to review.
               </p>
               <p className="mt-1">
-                Atlas can propose repo → runtime links that the naming/tags don’t reveal — you
+                Atlas can propose repo → runtime links that the naming/tags don’t reveal - you
                 confirm or reject each.
               </p>
               <button

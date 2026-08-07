@@ -116,7 +116,7 @@ export function OrgCard({
         </CardTitle>
       </CardHeader>
       {/* One Edit control, floated top-right so the header (and its title) stays identical to the
-          profile card's — toggles editing both the logo and the name together. */}
+          profile card's - toggles editing both the logo and the name together. */}
       {canEdit ? (
         <div className="absolute right-6 top-5">
           {editing ? (

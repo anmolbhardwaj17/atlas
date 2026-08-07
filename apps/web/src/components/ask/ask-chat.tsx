@@ -486,7 +486,7 @@ function AssistantBubble({
           </div>
         ) : message.text.length === 0 && !message.streaming ? (
           <p className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
-            The model returned no answer — it may be rate-limited or unavailable. Try a different
+            The model returned no answer - it may be rate-limited or unavailable. Try a different
             model in Settings.
           </p>
         ) : (
@@ -513,7 +513,7 @@ function AssistantBubble({
           </ul>
         )}
 
-        {/* Referenced resources — the cited nodes as rich cards (icon, name, kind · region, health),
+        {/* Referenced resources - the cited nodes as rich cards (icon, name, kind · region, health),
             click to peek without leaving the chat. */}
         {showExtras && nodeCites.length > 0 ? (
           <div className="space-y-1.5 pt-0.5">
@@ -858,7 +858,7 @@ function EmptyState({
           <h2 className="text-3xl font-semibold text-foreground">Ask Atlas</h2>
           <p className="mx-auto mt-1.5 max-w-md text-sm text-muted-foreground">
             Ask about your infrastructure, code, and deploys. Every answer is grounded in your graph
-            — cited, confidence-tiered, and honest when it doesn’t know.
+            - cited, confidence-tiered, and honest when it doesn’t know.
           </p>
         </div>
       </div>

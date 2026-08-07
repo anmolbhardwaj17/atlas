@@ -32,7 +32,7 @@ export default function DashboardLoading() {
           </Card>
         ))}
 
-        {/* Needs attention — tall rail spanning both rows. */}
+        {/* Needs attention - tall rail spanning both rows. */}
         <div className="lg:row-span-2">
           <Card className="h-full">
             <CardContent className="p-5">
@@ -69,7 +69,7 @@ export default function DashboardLoading() {
         </div>
       </div>
 
-      {/* Infrastructure / Code / Posture — three equal cards. */}
+      {/* Infrastructure / Code / Posture - three equal cards. */}
       <div className="grid gap-4 lg:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (
           <Card key={i} className="shadow-sm">
@@ -124,7 +124,7 @@ export default function DashboardLoading() {
         </div>
       </div>
 
-      {/* Recent activity — full-width card, single-column rows. */}
+      {/* Recent activity - full-width card, single-column rows. */}
       <Card>
         <CardContent className="p-5">
           <Skeleton className="mb-3 h-5 w-32" />

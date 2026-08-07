@@ -89,7 +89,7 @@ export function Timeline({ events }: { events: NodeEvent[] }) {
       <div className="flex-1 overflow-y-auto px-4 py-3">
         {events.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No recorded changes on this resource — so a recent deploy or config change is unlikely
+            No recorded changes on this resource - so a recent deploy or config change is unlikely
             to be the cause.
           </p>
         ) : (

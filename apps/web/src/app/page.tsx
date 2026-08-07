@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plug, Waypoints, Sparkles, ShieldCheck, ScanSearch, Siren } from "lucide-react";
+import { ShieldCheck, ScanSearch, Siren } from "lucide-react";
 import { getSession } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { AtlasLogo, AtlasAiMark } from "@/components/brand";
@@ -13,34 +13,8 @@ import { CloudIcon } from "@/components/cloud-icon";
 
 export const dynamic = "force-dynamic";
 
-/** Matches the login screen's hero exactly — the two front doors must look like one product. */
+/** Matches the login screen's hero exactly - the front doors must look like one product. */
 const HERO_BG = "radial-gradient(120% 110% at 18% 12%, #3d3d3d 0%, #1a1a1a 45%, #050505 100%)";
-
-/** Who each step belongs to: you, Atlas observing, then the AI — reusing the palette those two
- *  already own elsewhere on the page rather than inventing decorative colour. */
-const STEP_TONE = [
-  "border-neutral-300 text-neutral-800",
-  "border-success/40 bg-success/10 text-success",
-  "border-ai-suggested/40 bg-ai-suggested/10 text-ai-suggested",
-];
-
-const STEPS = [
-  {
-    icon: Plug,
-    title: "Connect in minutes",
-    desc: "A read-only role for AWS, an app for your repositories. Nothing to install, nothing to run.",
-  },
-  {
-    icon: Waypoints,
-    title: "Atlas builds the map",
-    desc: "Services, databases, repositories, deploys and the links between them — kept current on its own.",
-  },
-  {
-    icon: Sparkles,
-    title: "Ask anything",
-    desc: "Plain questions, answered from your real system, with a source on every claim.",
-  },
-];
 
 const ALERTS = ["slack-icon", "discord-icon", "microsoft-teams"];
 
@@ -78,7 +52,7 @@ export default async function LandingPage() {
       <header className="sticky top-0 z-40 border-b border-neutral-200/70 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <Link href="/" className="flex items-center gap-2.5">
-            {/* Spins, exactly as it does in the app sidebar — same mark, same behaviour. */}
+            {/* Spins, exactly as it does in the app sidebar - same mark, same behaviour. */}
             <AtlasLogo size={28} spin className="size-7" />
             <span className="text-lg font-semibold tracking-tight">Atlas</span>
           </Link>
@@ -107,7 +81,7 @@ export default async function LandingPage() {
             <p className="mt-6 max-w-xl text-balance text-lg leading-relaxed text-neutral-600">
               It lives in a dozen consoles, a wiki nobody trusts, and the heads of the three people
               who were there. Atlas reads your cloud and your code and keeps one live map of what
-              you actually run — so the answer is a question away, not an afternoon.
+              you actually run - so the answer is a question away, not an afternoon.
             </p>
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <Button asChild size="lg" className="h-11 px-7">
@@ -124,7 +98,7 @@ export default async function LandingPage() {
         <section className="mx-auto max-w-6xl px-6 pb-24">
           <Reveal variant="pop">
             {/* The live map's canvas: a light surface with React Flow's dotted background. Denser
-                and fainter than the product's own (gap 16 vs 22, ~0.16 alpha vs 0.25) — the map is
+                and fainter than the product's own (gap 16 vs 22, ~0.16 alpha vs 0.25) - the map is
                 viewed at varying zoom where a sparser grid reads correctly, but at this fixed size
                 the product values rendered as scattered specks rather than as paper texture. */}
             <div
@@ -162,72 +136,6 @@ export default async function LandingPage() {
           </Reveal>
         </section>
 
-        {/* ── How it works ─────────────────────────────────────────────────────────────────── */}
-        <section className="border-t border-neutral-200/70 bg-neutral-50/60">
-          <div className="mx-auto max-w-6xl px-6 py-24">
-            <Reveal>
-              <h2 className="max-w-xl text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-                Three steps, then it maintains itself.
-              </h2>
-            </Reveal>
-
-            <div className="relative mt-16">
-              {/* The rail. Solid under the first two steps, fading past the third — the sequence
-                  ends but the product doesn't, which is the whole claim in the heading. */}
-              <div
-                className="absolute left-0 right-0 top-5 hidden h-px bg-gradient-to-r from-neutral-300 via-neutral-300 to-transparent md:block"
-                aria-hidden="true"
-              />
-              <ol className="grid gap-12 md:grid-cols-3 md:gap-8">
-                {STEPS.map((st, i) => (
-                  <Reveal key={st.title} delay={i * 110}>
-                    <li className="relative">
-                      <div className="flex items-center gap-3 md:block">
-                        <span
-                          className={`relative z-10 grid size-10 place-items-center rounded-full border bg-white shadow-sm ${STEP_TONE[i]}`}
-                        >
-                          <st.icon className="size-4" />
-                        </span>
-                        <span className="text-xs font-medium uppercase tracking-widest text-neutral-400 md:mt-5 md:block">
-                          Step {i + 1}
-                        </span>
-                      </div>
-                      <p className="mt-3 text-lg font-medium tracking-tight md:mt-2">{st.title}</p>
-                      <p className="mt-2 max-w-xs text-sm leading-relaxed text-neutral-500">
-                        {st.desc}
-                      </p>
-                    </li>
-                  </Reveal>
-                ))}
-              </ol>
-            </div>
-          </div>
-        </section>
-
-        {/* ── Certainty ────────────────────────────────────────────────────────────────────── */}
-        <section className="mx-auto max-w-6xl px-6 py-24">
-          <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
-            <Reveal>
-              <div>
-                <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-                  It tells you when it isn&rsquo;t sure.
-                </h2>
-                <p className="mt-5 text-balance leading-relaxed text-neutral-600">
-                  A map you can&rsquo;t trust is worse than no map, because you&rsquo;ll act on it.
-                  So every fact in Atlas carries where it came from and how confident it is, and
-                  &ldquo;I don&rsquo;t know&rdquo; is a real answer the product is allowed to give.
-                </p>
-                <p className="mt-4 text-balance leading-relaxed text-neutral-600">
-                  When two readings conflict, you get both, marked uncertain — never one confident
-                  guess.
-                </p>
-              </div>
-            </Reveal>
-            {/* Demonstrated, not listed — the same link drawn at each confidence. See CertaintyScale. */}
-            <CertaintyScale />
-          </div>
-        </section>
-
         {/* ── Trace it back ──────────────────────────────────────────────────────────────── */}
         <section className="border-t border-neutral-200/70 bg-neutral-50/60">
           <div className="mx-auto grid max-w-6xl gap-12 px-6 py-24 lg:grid-cols-2 lg:items-center lg:gap-16">
@@ -240,7 +148,7 @@ export default async function LandingPage() {
                   Something starts erroring at 2am. Atlas already knows which service it is, what
                   deployed to it, which pull request was in that deploy and which ticket asked for
                   it. Instead of five people opening five consoles, you get a ranked list of what
-                  most likely caused it — each one showing the evidence it used.
+                  most likely caused it - each one showing the evidence it used.
                 </p>
                 <p className="mt-4 text-balance leading-relaxed text-neutral-600">
                   And when it genuinely can&rsquo;t tell, it says so, rather than picking the most
@@ -249,7 +157,7 @@ export default async function LandingPage() {
               </div>
             </Reveal>
             <Reveal delay={90} variant="pop">
-              {/* A trace runs BACKWARDS through time and is BUILT one edge at a time — so it plays
+              {/* A trace runs BACKWARDS through time and is BUILT one edge at a time - so it plays
                   rather than sitting there. See TraceDemo. */}
               <TraceDemo />
             </Reveal>
@@ -259,7 +167,7 @@ export default async function LandingPage() {
         {/* ── Atlas AI ───────────────────────────────────────────────────────────────────────── */}
         <section className="mx-auto max-w-6xl px-6 py-16">
           <Reveal>
-            {/* The mark sits INSIDE the sentence — Atlas AI introducing itself by name, with its
+            {/* The mark sits INSIDE the sentence - Atlas AI introducing itself by name, with its
                 own face, rather than a logo parked in a corner above a heading. */}
             <h2 className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-center text-3xl font-semibold tracking-tight sm:text-4xl">
               <span>Meet</span>
@@ -267,7 +175,7 @@ export default async function LandingPage() {
               <span>Atlas AI</span>
             </h2>
             <p className="mx-auto mt-3 max-w-lg text-balance text-center leading-relaxed text-neutral-600">
-              An agent that reads your graph, not the internet — and shows you where every answer
+              An agent that reads your graph, not the internet - and shows you where every answer
               came from.
             </p>
           </Reveal>
@@ -282,7 +190,7 @@ export default async function LandingPage() {
             {[
               {
                 title: "Grounded in your estate",
-                body: "It answers from the resources, deploys and repositories Atlas has actually read — so it can follow a dependency six hops out and still be talking about your system.",
+                body: "It answers from the resources, deploys and repositories Atlas has actually read - so it can follow a dependency six hops out and still be talking about your system.",
               },
               {
                 title: "Cited, every claim",
@@ -290,7 +198,7 @@ export default async function LandingPage() {
               },
               {
                 title: "Honest about the gaps",
-                body: "When your data doesn’t support an answer, it says so and names what it couldn’t see — rather than producing something plausible.",
+                body: "When your data doesn’t support an answer, it says so and names what it couldn’t see - rather than producing something plausible.",
               },
             ].map((c, i) => (
               <Reveal key={c.title} delay={i * 90}>
@@ -303,8 +211,35 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* ── Integrations + alerting ────────────────────────────────────────────────────────── */}
+        {/* ── Certainty ────────────────────────────────────────────────────────────────────── */}
         <section className="border-t border-neutral-200/70 bg-neutral-50/60">
+          <div className="mx-auto max-w-6xl px-6 py-24">
+            <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
+              <Reveal>
+                <div>
+                  <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
+                    It tells you when it isn&rsquo;t sure.
+                  </h2>
+                  <p className="mt-5 text-balance leading-relaxed text-neutral-600">
+                    A map you can&rsquo;t trust is worse than no map, because you&rsquo;ll act on
+                    it. So every fact in Atlas carries where it came from and how confident it is,
+                    and &ldquo;I don&rsquo;t know&rdquo; is a real answer the product is allowed to
+                    give.
+                  </p>
+                  <p className="mt-4 text-balance leading-relaxed text-neutral-600">
+                    When two readings conflict, you get both, marked uncertain - never one confident
+                    guess.
+                  </p>
+                </div>
+              </Reveal>
+              {/* Demonstrated, not listed - the same link drawn at each confidence. See CertaintyScale. */}
+              <CertaintyScale />
+            </div>
+          </div>
+        </section>
+
+        {/* ── Integrations + alerting ────────────────────────────────────────────────────────── */}
+        <section className="border-t border-neutral-200/70">
           <div className="mx-auto max-w-6xl px-6 py-24">
             <div className="grid gap-14 lg:grid-cols-[1fr_1.1fr] lg:items-center lg:gap-8">
               <Reveal>
@@ -314,7 +249,7 @@ export default async function LandingPage() {
                   </h2>
                   <p className="mt-5 text-balance leading-relaxed text-neutral-600">
                     Cloud accounts, repositories, pipelines, issue trackers. Atlas pulls them into
-                    one graph so the boundaries between them stop being your problem — the ticket,
+                    one graph so the boundaries between them stop being your problem - the ticket,
                     the pull request and the running container are finally the same story.
                   </p>
 
@@ -370,8 +305,8 @@ export default async function LandingPage() {
 
         {/* ── Security + compliance ────────────────────────────────────────────────────────── */}
         <section className="border-t border-neutral-200/70 bg-neutral-50/60">
-          <div className="mx-auto grid max-w-6xl gap-12 px-6 py-24 lg:grid-cols-[0.85fr_1.15fr] lg:gap-16">
-            <Reveal>
+          <div className="mx-auto grid max-w-6xl gap-12 px-6 py-24 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16">
+            <Reveal className="lg:order-2">
               <div>
                 <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
                   The questions that used to take an afternoon.
@@ -383,26 +318,30 @@ export default async function LandingPage() {
               </div>
             </Reveal>
 
-            {/* Posed as questions, answered underneath — the same shape as asking Atlas, because
+            {/* Posed as questions, answered underneath - the same shape as asking Atlas, because
                 that is literally how you get these answers. Two boxed cards said "features"; this
                 says "here is what you'd ask, and here is what comes back". */}
-            <div className="space-y-8">
+            <div className="space-y-8 lg:order-1">
               {[
                 {
                   icon: ScanSearch,
+                  tone: "border-danger/30 bg-danger/10 text-danger",
                   q: "Which of our vulnerabilities are actually reachable?",
-                  a: "A known CVE matters far more when the thing carrying it is open to the internet. Atlas sees the package and the security group at once, so it can tell you which handful of your findings are both — instead of a list of nine hundred sorted by severity.",
+                  a: "A known CVE matters far more when the thing carrying it is open to the internet. Atlas sees the package and the security group at once, so it can tell you which handful of your findings are both - instead of a list of nine hundred sorted by severity.",
                 },
                 {
                   icon: ShieldCheck,
+                  tone: "border-success/30 bg-success/10 text-success",
                   q: "Are we actually compliant?",
-                  a: "Continuous checks against the technical controls in PCI, CIS, NIST, ISO 27001, HIPAA and GDPR — plus an explicit list of the ones no tool can assess for you, so nobody mistakes a green dashboard for an audit.",
+                  a: "Continuous checks against the technical controls in PCI, CIS, NIST, ISO 27001, HIPAA and GDPR - plus an explicit list of the ones no tool can assess for you, so nobody mistakes a green dashboard for an audit.",
                 },
               ].map((c, i) => (
                 <Reveal key={c.q} delay={i * 100}>
                   <div className="flex gap-4">
-                    <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg border border-neutral-200 bg-white">
-                      <c.icon className="size-4 text-neutral-500" />
+                    <span
+                      className={`mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg border ${c.tone}`}
+                    >
+                      <c.icon className="size-4" />
                     </span>
                     <div className="min-w-0">
                       <p className="text-base font-medium tracking-tight">{c.q}</p>
@@ -427,19 +366,19 @@ export default async function LandingPage() {
                 className="pointer-events-none absolute -bottom-32 -left-24 size-[440px] opacity-[0.05] [filter:invert(1)]"
               />
               <div className="relative max-w-2xl">
-                <ShieldCheck className="size-6 text-white/60" />
+                <ShieldCheck className="size-6 text-success" />
                 <h2 className="mt-5 text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
                   Read-only, all the way down.
                 </h2>
                 <p className="mt-5 text-balance leading-relaxed text-white/70">
-                  Every connection Atlas makes — cloud accounts, repositories, pipelines, issue
-                  trackers, chat — is granted read scopes and nothing more. That isn&rsquo;t a
+                  Every connection Atlas makes - cloud accounts, repositories, pipelines, issue
+                  trackers, chat - is granted read scopes and nothing more. That isn&rsquo;t a
                   setting you have to trust us to honour: there is no code path in the product that
                   writes to any of them, so the worst a bug can do is show you something wrong.
                 </p>
                 <p className="mt-4 text-balance leading-relaxed text-white/70">
                   Which makes this an easy thing to approve. No agents in your VPC, no write
-                  credentials to rotate, no blast radius to argue about in review — and every
+                  credentials to rotate, no blast radius to argue about in review - and every
                   organisation&rsquo;s data isolated at the database level, not by a filter someone
                   remembered to add.
                 </p>
@@ -448,31 +387,49 @@ export default async function LandingPage() {
           </Reveal>
         </section>
 
-        {/* ── Close ────────────────────────────────────────────────────────────────────────── */}
-        <section className="border-t border-neutral-200/70">
-          <div className="mx-auto max-w-6xl px-6 py-24 text-center">
-            <Reveal>
-              <div>
+        {/* ── Close ───────────────────────────────────────────────────────────────────────────── */}
+        <section className="mx-auto max-w-6xl px-6 pb-24 pt-8">
+          <Reveal variant="pop">
+            <div
+              className="relative overflow-hidden rounded-3xl px-8 py-20 text-center text-white shadow-sm sm:px-16"
+              style={{ background: HERO_BG }}
+            >
+              <AtlasLogo
+                size={640}
+                className="pointer-events-none absolute -right-40 -top-52 size-[640px] opacity-[0.06] [filter:invert(1)]"
+              />
+              <AtlasLogo
+                size={420}
+                className="pointer-events-none absolute -bottom-40 -left-28 size-[420px] opacity-[0.05] [filter:invert(1)]"
+              />
+              <div className="relative">
                 <h2 className="text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
                   See everything you run.
                 </h2>
-                <p className="mx-auto mt-5 max-w-md text-balance leading-relaxed text-neutral-600">
+                <p className="mx-auto mt-5 max-w-md text-balance leading-relaxed text-white/70">
                   Connect a read-only role and watch the map build itself.
                 </p>
                 <div className="mt-9 flex justify-center">
-                  <Button asChild size="lg" className="h-11 px-8">
+                  <Button
+                    asChild
+                    size="lg"
+                    className="h-12 bg-white px-8 text-neutral-900 hover:bg-white/90"
+                  >
                     <Link href={cta.href}>{cta.label}</Link>
                   </Button>
                 </div>
+                <p className="mt-6 text-xs text-white/40">
+                  Read-only access. No agents to deploy. Nothing to uninstall if you walk away.
+                </p>
               </div>
-            </Reveal>
-          </div>
+            </div>
+          </Reveal>
         </section>
       </main>
 
       {/* ── Footer ───────────────────────────────────────────────────────────────────────────────
           Deliberately thin. A footer that lists the product's features and its integrations is just
-          repeating the page to someone who has already read it — the page above covers both, at
+          repeating the page to someone who has already read it - the page above covers both, at
           length, with pictures. What belongs here is what a footer is actually for: who this is,
           how to reach them, and the legal links. The layout has room for more columns when there
           is genuinely more to say (docs, changelog, careers). */}

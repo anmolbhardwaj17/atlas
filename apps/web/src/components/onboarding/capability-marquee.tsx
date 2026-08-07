@@ -45,7 +45,7 @@ export const CAPABILITIES: Capability[] = [
   {
     icon: Lightbulb,
     title: "Insights & posture",
-    body: "Prioritized findings across the Well-Architected pillars — not a wall of alerts.",
+    body: "Prioritized findings across the Well-Architected pillars - not a wall of alerts.",
     tint: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
     Illustration: InsightsIllustration,
   },
@@ -59,14 +59,14 @@ export const CAPABILITIES: Capability[] = [
   {
     icon: Activity,
     title: "Operational intelligence",
-    body: "See what’s broken right now — with an AI root-cause, down to the PR.",
+    body: "See what’s broken right now - with an AI root-cause, down to the PR.",
     tint: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
     Illustration: OperationalIllustration,
   },
   {
     icon: MessagesSquare,
     title: "Ask Atlas",
-    body: "Cited, confidence-tiered answers over your own graph — never a guess.",
+    body: "Cited, confidence-tiered answers over your own graph - never a guess.",
     tint: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
     Illustration: AskIllustration,
   },

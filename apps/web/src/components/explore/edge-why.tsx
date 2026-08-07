@@ -145,8 +145,8 @@ export function EdgeWhy({
                   )}
                 >
                   {resolved === "confirmed"
-                    ? "✓ Confirmed — now a real link."
-                    : "Dismissed — Atlas won’t suggest this again."}
+                    ? "✓ Confirmed - now a real link."
+                    : "Dismissed - Atlas won’t suggest this again."}
                 </p>
               ) : null}
               <dl className="space-y-1">

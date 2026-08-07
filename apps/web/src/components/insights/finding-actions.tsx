@@ -84,7 +84,7 @@ export function FindingActions({
 
       const stillActive = (await getActiveFindingIds(orgId)).includes(findingId);
       if (!stillActive) {
-        toast.success("Fixed — it cleared.", {
+        toast.success("Fixed - it cleared.", {
           id: t,
           description: "This finding is no longer flagged in your latest graph.",
         });

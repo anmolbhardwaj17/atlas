@@ -226,7 +226,7 @@ export function NodeConnections({
       {edges.length === 0 && !hasBlast && !hasDeps ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            No connections — nothing points at this resource and it points at nothing (yet).
+            No connections - nothing points at this resource and it points at nothing (yet).
           </CardContent>
         </Card>
       ) : (
@@ -264,7 +264,7 @@ export function NodeConnections({
           ) : (
             <ImpactPanel
               title="Depends on"
-              subtitle="What this resource needs to work — its upstream dependencies."
+              subtitle="What this resource needs to work - its upstream dependencies."
               result={deps}
             />
           )}

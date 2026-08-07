@@ -72,7 +72,7 @@ export function FindingsDonut({ findings }: { findings: Array<{ severity: string
                     if (viewBox && "cx" in viewBox && "cy" in viewBox) {
                       return (
                         <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
-                          {/* dy=0.35em centers on the baseline — cross-browser reliable, unlike
+                          {/* dy=0.35em centers on the baseline - cross-browser reliable, unlike
                               dominantBaseline="middle" which Safari renders too high. */}
                           <tspan
                             x={viewBox.cx}

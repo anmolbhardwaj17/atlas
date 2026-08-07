@@ -156,7 +156,7 @@ export async function Dashboard({
     <div className="motion-stagger space-y-6">
       {isSampleData && canManage ? <SampleDataBanner orgId={orgId} /> : null}
 
-      {/* Hero band — a greeting with personality + the estate pulse, the way in. */}
+      {/* Hero band - a greeting with personality + the estate pulse, the way in. */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
@@ -178,16 +178,16 @@ export async function Dashboard({
       </div>
 
       {/* A source in error/degraded means the graph below is INCOMPLETE, and until now the dashboard
-          said nothing — you'd read counts, findings and an "all clear" health strip drawn from a
+          said nothing - you'd read counts, findings and an "all clear" health strip drawn from a
           partial estate and have no way to know. That's the one failure the trust model can't
           tolerate (docs/09 §7: observed vs stale is never silent), so it goes above everything. */}
       <DegradedSources connections={connections} />
 
-      {/* Live-health trust strip — the dashboard's "is anything broken right now" (op-intel Phase B).
+      {/* Live-health trust strip - the dashboard's "is anything broken right now" (op-intel Phase B).
           Renders only when the health poll has a live signal; silent otherwise (honest unknown). */}
       <HealthStrip health={s.health} />
 
-      {/* Top band — the two KPIs and the AI launcher on the left, with "Needs attention" as a
+      {/* Top band - the two KPIs and the AI launcher on the left, with "Needs attention" as a
           tall rail down the right. The rail column is a touch wider than each KPI (it's the
           actionable core, so it earns the extra room). */}
       <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1.4fr] lg:grid-rows-[auto_1fr]">
@@ -249,7 +249,7 @@ export async function Dashboard({
       </div>
 
       {/* "What changed" sits ABOVE the slower-moving panels now. For anyone past their first week
-          this is the question they actually arrived with — and it's the one thing the graph is
+          this is the question they actually arrived with - and it's the one thing the graph is
           uniquely able to answer, since it ties deploys, PRs and config changes to the resources
           they touched. It used to sit at the foot of the page, below the posture cards. */}
       <RecentActivity activity={s.activity} />
@@ -432,7 +432,7 @@ function NeedsAttention({ findings }: { findings: Finding[] }) {
             <div>
               <div className="font-medium">Nothing needs attention</div>
               <div className="text-muted-foreground">
-                Your graph looks healthy — no risks, drift, or unhealthy sources right now.
+                Your graph looks healthy - no risks, drift, or unhealthy sources right now.
               </div>
             </div>
           </div>
@@ -516,7 +516,7 @@ function DegradedSources({ connections }: { connections: ConnectionLite[] }) {
               : `${broken.length} sources aren’t syncing`}
           </span>{" "}
           <span className="text-muted-foreground">
-            — {names}. What you see below is drawn from everything else, so treat it as an
+            - {names}. What you see below is drawn from everything else, so treat it as an
             incomplete picture until this is reconnected.
           </span>
         </p>
@@ -542,7 +542,7 @@ function RecentActivity({ activity }: { activity: ActivityItem[] }) {
           What changed recently
         </h2>
         <p className="mb-3 text-xs text-muted-foreground">
-          Deploys, merged pull requests and configuration changes across your estate — the usual
+          Deploys, merged pull requests and configuration changes across your estate - the usual
           first suspects when something starts behaving differently.
         </p>
         <ul className="-mx-2 divide-y divide-border">
@@ -670,7 +670,7 @@ function Insights({ insights }: { insights: Summary["insights"] }) {
           <h2 className="text-base font-semibold">Insights</h2>
         </div>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Delivery activity over the last 30 days — who&rsquo;s shipping, what&rsquo;s active, and
+          Delivery activity over the last 30 days - who&rsquo;s shipping, what&rsquo;s active, and
           CI/CD coverage.
         </p>
       </div>

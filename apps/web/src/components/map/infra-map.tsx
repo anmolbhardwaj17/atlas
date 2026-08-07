@@ -426,7 +426,7 @@ export function InfraMap({
             type="button"
             onClick={() => startRefresh(() => router.refresh())}
             disabled={isRefreshing}
-            title="Refetch the live graph — pick up links added by a recent sync or Rebuild links"
+            title="Refetch the live graph - pick up links added by a recent sync or Rebuild links"
             className={cn(
               "inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground",
               isRefreshing && "opacity-70",
@@ -459,13 +459,13 @@ export function InfraMap({
           {full ? (
             // Already loaded the full budget and it's STILL over the cap — filtering is the only lever.
             <span>
-              Showing the first {data.nodes.length} resources — the graph is larger still. Filter to
+              Showing the first {data.nodes.length} resources - the graph is larger still. Filter to
               focus.
             </span>
           ) : (
             <>
               <span>
-                Showing the {data.nodes.length} most recent resources — the graph is larger.
+                Showing the {data.nodes.length} most recent resources - the graph is larger.
               </span>
               <Link
                 href={`/map?full=1${focusId ? `&node=${focusId}` : ""}${searchParams.get("lens") ? `&lens=${searchParams.get("lens")}` : ""}${searchParams.get("kinds") ? `&kinds=${searchParams.get("kinds")}` : ""}`}
@@ -474,7 +474,7 @@ export function InfraMap({
               >
                 <MapIcon className="size-3.5" /> Load full map
               </Link>
-              <span className="w-full text-warning/70 sm:w-auto">(larger — may render slower)</span>
+              <span className="w-full text-warning/70 sm:w-auto">(larger - may render slower)</span>
             </>
           )}
         </div>
@@ -1131,7 +1131,7 @@ function Flow({
 
   return (
     <div className="flex h-full w-full">
-      {/* Canvas column — shrinks when the chat docks so nothing hides behind it. */}
+      {/* Canvas column - shrinks when the chat docks so nothing hides behind it. */}
       <div className="relative min-w-0 flex-1">
         <ReactFlow
           nodes={nodes}
@@ -1195,7 +1195,7 @@ function Flow({
           />
         )}
       </div>
-      {/* Docked chat — the map's conversational sidekick (P4: citations light the canvas). */}
+      {/* Docked chat - the map's conversational sidekick (P4: citations light the canvas). */}
       {chatOpen ? (
         <aside className="flex shrink-0 flex-col border-l border-border bg-card max-sm:absolute max-sm:inset-y-0 max-sm:right-0 max-sm:z-20 max-sm:w-[88%] max-sm:shadow-xl sm:w-[340px] sm:max-w-[42%]">
           <MapChat
@@ -1529,7 +1529,7 @@ function AssistantTurn({
           </div>
         ) : msg.text.length === 0 ? (
           <p className="rounded-md border border-warning/30 bg-warning/10 px-2 py-1.5 text-warning">
-            No answer came back — the model may be rate-limited. Try again, or pick a model in
+            No answer came back - the model may be rate-limited. Try again, or pick a model in
             Settings.
           </p>
         ) : (
@@ -1767,7 +1767,7 @@ function MapSearch({
       </div>
       {open && q.trim() ? (
         <ul className="mt-1 max-h-72 overflow-auto rounded-lg border border-border bg-background/95 py-1 text-xs shadow-md backdrop-blur">
-          {/* Row 0 — ask Atlas the whole question. */}
+          {/* Row 0 - ask Atlas the whole question. */}
           <li>
             <button
               type="button"
@@ -1891,7 +1891,7 @@ function Legend() {
         </span>
         <span
           className="flex items-center gap-1.5"
-          title="Atlas worked this relationship out from evidence such as tags, naming or deploy config — rather than seeing it directly."
+          title="Atlas worked this relationship out from evidence such as tags, naming or deploy config - rather than seeing it directly."
         >
           <span className="h-px w-4 border-t border-dashed border-muted-foreground" /> inferred
         </span>
@@ -1907,7 +1907,7 @@ function Legend() {
         </span>
         <span
           className="flex items-center gap-1.5"
-          title="This relationship crosses a cloud or account boundary — wider blast radius, wider attack surface, and often cross-region cost."
+          title="This relationship crosses a cloud or account boundary - wider blast radius, wider attack surface, and often cross-region cost."
         >
           <span className="h-0.5 w-4 rounded" style={{ backgroundColor: CROSS_COLOR }} />
           cross-boundary
@@ -2263,7 +2263,7 @@ function LinkRow({
         </button>
       ) : (
         <span
-          title="Observed from your cloud — can’t be removed by hand"
+          title="Observed from your cloud - can’t be removed by hand"
           className="shrink-0 p-0.5"
         >
           <Lock className="size-3 text-muted-foreground/40" aria-hidden />

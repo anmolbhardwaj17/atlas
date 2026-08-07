@@ -244,7 +244,7 @@ export function InsightsView({
         toast.success(mute ? `Muted ${ok}` : `Unmuted ${ok}`, {
           id: t,
           description: mute
-            ? "Accepted as known risks — you can undo this."
+            ? "Accepted as known risks - you can undo this."
             : "Back in your active findings.",
         });
       } else {
@@ -273,23 +273,23 @@ export function InsightsView({
           ) : null}
         </div>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          What to act on — grounded findings with best-practice guidance. Open any one for the full
+          What to act on - grounded findings with best-practice guidance. Open any one for the full
           fix, evidence, and to track it. Findings are derived live from your graph, so a real fix
           clears them on the next sync.
         </p>
       </header>
 
       {/* Posture band: severity counts (rows) · how they're trending · the pillar radar. Kept compact
-          — the radar is width-capped so it doesn't make the whole band tall. */}
+          - the radar is width-capped so it doesn't make the whole band tall. */}
       <div className="grid items-stretch gap-3 lg:grid-cols-3">
-        {/* Left — the three severity counts, stacked. */}
+        {/* Left - the three severity counts, stacked. */}
         <div className="grid grid-rows-3 gap-3">
           <SeverityTile label="High" n={sevCounts.high} sev="high" hint="Fix these first" />
           <SeverityTile label="Medium" n={sevCounts.medium} sev="medium" hint="Worth addressing" />
           <SeverityTile label="Low" n={sevCounts.low} sev="low" hint="Nice to clean up" />
         </div>
 
-        {/* Middle — severity trend over time. */}
+        {/* Middle - severity trend over time. */}
         <Card>
           <CardContent className="flex h-full flex-col p-3">
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -311,7 +311,7 @@ export function InsightsView({
           </CardContent>
         </Card>
 
-        {/* Right — posture by pillar (same radar as the dashboard). Radar width-capped so the band
+        {/* Right - posture by pillar (same radar as the dashboard). Radar width-capped so the band
             stays short. */}
         <Card>
           <CardContent className="flex h-full flex-col p-3">
@@ -428,7 +428,7 @@ export function InsightsView({
         </div>
       </div>
 
-      {/* Bulk action bar — appears once you select rows. Mutes (active tab) or un-mutes (muted tab)
+      {/* Bulk action bar - appears once you select rows. Mutes (active tab) or un-mutes (muted tab)
           the whole selection in one call, so accepting a batch of known-risk findings isn't N clicks. */}
       {selectable && selected.size > 0 ? (
         <div className="motion-rise flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
@@ -474,7 +474,7 @@ export function InsightsView({
                   : filtering
                     ? "No findings match your search or filters."
                     : active.length === 0
-                      ? "Nothing needs attention right now — the graph doesn’t flag any issues. You’re in good shape."
+                      ? "Nothing needs attention right now - the graph doesn’t flag any issues. You’re in good shape."
                       : "No findings here."}
             </p>
             {filtering ? (
@@ -572,7 +572,7 @@ export function InsightsView({
                           </Link>
                           {it.regressedAt ? (
                             <span className="inline-flex items-center gap-1 text-[11px] font-medium text-warning">
-                              <RotateCcw className="size-3" /> Regressed — was fixed, came back
+                              <RotateCcw className="size-3" /> Regressed - was fixed, came back
                             </span>
                           ) : age ? (
                             <span className="text-[11px] text-muted-foreground">{age}</span>

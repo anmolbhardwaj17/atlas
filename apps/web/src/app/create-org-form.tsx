@@ -255,7 +255,7 @@ export function CreateOrgForm() {
         <>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight">Tell us about your team</h2>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            Optional — it helps us tailor Atlas to how you work. Skip anytime.
+            Optional - it helps us tailor Atlas to how you work. Skip anytime.
           </p>
 
           <div className="mt-6 space-y-6">

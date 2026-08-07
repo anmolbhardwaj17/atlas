@@ -312,7 +312,7 @@ export function CommandPalette({ orgId }: { orgId: string }) {
           ) : null}
           {items.length === 0 && !searching ? (
             <li className="px-3 py-10 text-center text-sm text-muted-foreground">
-              No matches — try a resource name, or press ↵ to ask Atlas.
+              No matches - try a resource name, or press ↵ to ask Atlas.
             </li>
           ) : (
             items.map((item, i) => {
@@ -404,7 +404,7 @@ export function CommandPalette({ orgId }: { orgId: string }) {
             <span className="flex items-center gap-1">
               <Kbd>↵</Kbd> select
             </span>
-            {/* The Shift affordance — brightens while Shift is actually held so it reads as "active". */}
+            {/* The Shift affordance - brightens while Shift is actually held so it reads as "active". */}
             <span
               className={cn(
                 "flex items-center gap-1 transition-colors",

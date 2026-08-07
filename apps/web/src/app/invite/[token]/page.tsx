@@ -75,7 +75,7 @@ export default function InviteAcceptPage() {
           <>
             <h1 className="mt-5 text-lg font-semibold tracking-tight">You&rsquo;ve been invited</h1>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              Sign in to accept — use the email the invitation was sent to.
+              Sign in to accept - use the email the invitation was sent to.
             </p>
             <Button asChild className="mt-6 w-full">
               <Link href={`/login?next=${encodeURIComponent(`/invite/${token}`)}`}>

@@ -60,7 +60,7 @@ export function AlertSettingsCard({ orgId }: { orgId: string }) {
         </CardTitle>
         <p className="text-sm text-muted-foreground">
           When a healthy resource suddenly breaks, what should Atlas do? Your existing backlog is
-          never paged — that stays a list in Insights. This is only for new regressions.
+          never paged - that stays a list in Insights. This is only for new regressions.
         </p>
       </CardHeader>
       <CardContent className="space-y-2">

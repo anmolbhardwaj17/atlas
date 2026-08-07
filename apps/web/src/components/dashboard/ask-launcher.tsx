@@ -27,7 +27,7 @@ export function AskLauncher() {
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 text-foreground shadow-sm sm:p-7">
-      {/* Brand-green glow so the AI hero still stands out on a light card (P1 — AI is the interface). */}
+      {/* Brand-green glow so the AI hero still stands out on a light card (P1 - AI is the interface). */}
       <div
         className="pointer-events-none absolute -right-16 -top-20 size-52 rounded-full bg-brand/15 blur-3xl"
         aria-hidden
@@ -54,7 +54,7 @@ export function AskLauncher() {
           <h2 className="text-base font-semibold">Ask Atlas</h2>
         </div>
         <p className="mb-4 max-w-xl text-sm text-muted-foreground">
-          Ask anything about your infrastructure and code — every answer is grounded in your live
+          Ask anything about your infrastructure and code - every answer is grounded in your live
           graph and cited back to it.
         </p>
 

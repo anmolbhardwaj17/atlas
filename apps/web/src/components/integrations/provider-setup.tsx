@@ -49,20 +49,20 @@ export function AwsSetup() {
           - the least-privilege one below, or an AWS-managed policy like{" "}
           <InlineCode>ReadOnlyAccess</InlineCode> / <InlineCode>SecurityAudit</InlineCode>. Only{" "}
           <InlineCode>Describe*</InlineCode> / <InlineCode>List*</InlineCode> /{" "}
-          <InlineCode>Get*</InlineCode> — read-only by construction.
+          <InlineCode>Get*</InlineCode> - read-only by construction.
         </Step>
         <Step title="Create an access key">
           On that user, create an access key (<strong>Access Key ID</strong> +{" "}
-          <strong>Secret Access Key</strong>). Copy them now — AWS shows the secret only once.
+          <strong>Secret Access Key</strong>). Copy them now - AWS shows the secret only once.
         </Step>
         <Step title="Paste the keys + regions and verify">
           Back in Atlas, enter the keys and the regions to crawl. Atlas stores them encrypted, then
-          runs a live permission probe — a missing permission is reported as a fixable gap, never a
+          runs a live permission probe - a missing permission is reported as a fixable gap, never a
           silent failure.
         </Step>
       </Steps>
       <p className="text-xs text-muted-foreground">
-        Tip: an assumable read-only role is more secure than long-lived keys — if your team prefers
+        Tip: an assumable read-only role is more secure than long-lived keys - if your team prefers
         that, use a role whose access keys rotate, or reach out to switch this connection to role
         auth.
       </p>
@@ -81,7 +81,7 @@ export function GithubSetup() {
         </Step>
         <Step title="Atlas indexes structure, not code">
           From each repo Atlas reads CODEOWNERS (ownership), dependency manifests (packages), and
-          workflows (deploy targets) — enough to connect code to the infrastructure it ships to,
+          workflows (deploy targets) - enough to connect code to the infrastructure it ships to,
           without storing your source.
         </Step>
         <Step title="Confirm the installation">
@@ -106,7 +106,7 @@ export function AzureSetup() {
       <Steps>
         <Step title="Create a read-only service principal">
           In Microsoft Entra ID, register an app / service principal for Atlas and assign it the
-          built-in <InlineCode>Reader</InlineCode> role at the subscription scope — read-only by
+          built-in <InlineCode>Reader</InlineCode> role at the subscription scope - read-only by
           construction.
         </Step>
         <Step title="Grant Atlas the tenant, client &amp; subscription IDs">
@@ -136,7 +136,7 @@ export function GcpSetup() {
       <Steps>
         <Step title="Create a read-only service account">
           In the GCP project, create a service account for Atlas and grant it{" "}
-          <InlineCode>roles/viewer</InlineCode> — a project-wide read-only role.
+          <InlineCode>roles/viewer</InlineCode> - a project-wide read-only role.
         </Step>
         <Step title="Connect it (key or workload identity)">
           Atlas authenticates as the service account (a key, or keyless workload-identity
@@ -165,17 +165,17 @@ export function JenkinsSetup() {
           Click your name (top-right) → <strong>Security</strong> → <strong>API Token</strong> →{" "}
           <InlineCode>Add new Token</InlineCode> → <strong>Generate</strong>, then copy it (Jenkins
           shows it only once). For least privilege, use a user with only{" "}
-          <InlineCode>Overall/Read</InlineCode> + <InlineCode>Job/Read</InlineCode> — no
+          <InlineCode>Overall/Read</InlineCode> + <InlineCode>Job/Read</InlineCode> - no
           Build/Configure needed.
         </Step>
         <Step title="Give Atlas the server URL, username + token">
-          Atlas reaches your Jenkins over HTTPS with the username + API token — read-only, it never
+          Atlas reaches your Jenkins over HTTPS with the username + API token - read-only, it never
           triggers builds.
         </Step>
         <Step title="Atlas links deploys to infrastructure">
           From each job's pipeline Atlas reads its deploy targets (ECR pushes,{" "}
           <InlineCode>aws ecs</InlineCode>/<InlineCode>lambda</InlineCode>) and connects{" "}
-          <em>what ships</em> to the running services it deploys — closing the loop from a PR to
+          <em>what ships</em> to the running services it deploys - closing the loop from a PR to
           production.
         </Step>
       </Steps>
@@ -186,7 +186,7 @@ export function JenkinsSetup() {
         </p>
         <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
           Behind a VPN or firewall? Atlas can&rsquo;t reach it until you allowlist its outbound IP.
-          Save now — your token stays stored — then hit <strong>Re-verify</strong> once that&rsquo;s
+          Save now - your token stays stored - then hit <strong>Re-verify</strong> once that&rsquo;s
           done.
         </p>
       </div>
@@ -204,11 +204,11 @@ export function SlackSetup() {
           generated webhook URL.
         </Step>
         <Step title="Paste the webhook into Atlas">
-          Atlas only ever <strong>posts</strong> messages to that URL — it&rsquo;s write-only and
+          Atlas only ever <strong>posts</strong> messages to that URL - it&rsquo;s write-only and
           never reads your workspace. The URL is stored encrypted and never shown again.
         </Step>
         <Step title="What Atlas sends">
-          A heads-up the moment a resource breaks, recovers, or gets exposed — plus a short daily
+          A heads-up the moment a resource breaks, recovers, or gets exposed - plus a short daily
           digest of what changed. Send a test after connecting to see it land.
         </Step>
       </Steps>
@@ -226,11 +226,11 @@ export function DiscordSetup() {
           <InlineCode>Copy Webhook URL</InlineCode>.
         </Step>
         <Step title="Paste the webhook into Atlas">
-          Atlas only <strong>posts</strong> to that URL — write-only, stored encrypted, and never
+          Atlas only <strong>posts</strong> to that URL - write-only, stored encrypted, and never
           shown again.
         </Step>
         <Step title="What Atlas sends">
-          A heads-up when a resource breaks, recovers, or gets exposed — plus a short daily digest.
+          A heads-up when a resource breaks, recovers, or gets exposed - plus a short daily digest.
           Send a test after connecting to confirm it works.
         </Step>
       </Steps>
@@ -248,11 +248,11 @@ export function TeamsSetup() {
           and copy the URL.
         </Step>
         <Step title="Paste the webhook into Atlas">
-          Atlas only <strong>posts</strong> to that URL — write-only, stored encrypted, and never
+          Atlas only <strong>posts</strong> to that URL - write-only, stored encrypted, and never
           shown again.
         </Step>
         <Step title="What Atlas sends">
-          A heads-up when a resource breaks, recovers, or gets exposed — plus a short daily digest.
+          A heads-up when a resource breaks, recovers, or gets exposed - plus a short daily digest.
           Send a test after connecting to confirm it works.
         </Step>
       </Steps>
@@ -281,8 +281,8 @@ export function JiraSetup() {
           your <InlineCode>&lt;company&gt;.atlassian.net</InlineCode> address.
         </Step>
         <Step title="Atlas reads intent, not code">
-          It indexes each project&rsquo;s issues — the summary, description (acceptance criteria),
-          subtasks, and comments — so it can later check whether a PR actually implemented what the
+          It indexes each project&rsquo;s issues - the summary, description (acceptance criteria),
+          subtasks, and comments - so it can later check whether a PR actually implemented what the
           ticket asked. It never gets write access.
         </Step>
       </Steps>
@@ -302,11 +302,11 @@ export function BitbucketSetup() {
         </Step>
         <Step title="Give Atlas your email + the token">
           Atlas authenticates with your Atlassian <strong>account email</strong> as the username and
-          the <strong>API token</strong> as the password (read-only — it never gets write access).
+          the <strong>API token</strong> as the password (read-only - it never gets write access).
         </Step>
         <Step title="Atlas indexes structure, not code">
           From each repo Atlas reads ownership, dependency manifests, and Pipelines (deploy targets)
-          — enough to connect code to the infrastructure it ships to, without storing your source.
+          - enough to connect code to the infrastructure it ships to, without storing your source.
         </Step>
       </Steps>
       <CodeBlock label="Required read scopes" code={BITBUCKET_SCOPES} />

@@ -26,7 +26,7 @@ export function AlertsIllustration() {
           </div>
           <p className="mt-1.5 text-[9px] leading-snug">
             <span className="font-semibold text-rose-600 dark:text-rose-400">checkout-api</span>{" "}
-            went down — p95 latency 2.4s
+            went down - p95 latency 2.4s
           </p>
           <p className="mt-0.5 text-[8px] leading-snug text-muted-foreground">
             Atlas looked into it: likely PR #4127

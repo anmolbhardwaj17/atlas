@@ -63,18 +63,18 @@ export default function PrivacyPage() {
         <p>We rely on a small set of vetted providers to run the Service:</p>
         <ul className="ml-5 mt-2 list-disc space-y-1">
           <li>
-            <strong>Supabase</strong> — managed Postgres database, authentication, and file storage.
+            <strong>Supabase</strong> - managed Postgres database, authentication, and file storage.
           </li>
           <li>
-            <strong>Amazon Web Services</strong> — cloud hosting and infrastructure.
+            <strong>Amazon Web Services</strong> - cloud hosting and infrastructure.
           </li>
           <li>
-            <strong>Anthropic</strong> — the AI model that powers cited answers and diagnosis.
+            <strong>Anthropic</strong> - the AI model that powers cited answers and diagnosis.
             Relevant graph context (which can include the personal data in section 2) is sent to
             answer your questions.
           </li>
           <li>
-            <strong>Resend</strong> — transactional and notification email delivery.
+            <strong>Resend</strong> - transactional and notification email delivery.
           </li>
         </ul>
         <p className="mt-2">
@@ -89,7 +89,7 @@ export default function PrivacyPage() {
         via our model provider. Where personal data is transferred across borders, we rely on
         appropriate safeguards as required by applicable law.{" "}
         <em className="text-warning">
-          [Legal to confirm the transfer mechanism — e.g. Standard Contractual Clauses — and data-
+          [Legal to confirm the transfer mechanism - e.g. Standard Contractual Clauses - and data-
           residency commitments.]
         </em>
       </Section>
@@ -98,7 +98,7 @@ export default function PrivacyPage() {
         We keep your data for as long as your account is active. Raw source snapshots are kept on a
         rolling window (typically 30 days) and activity history for a limited period; older records
         are automatically purged. <strong>Disconnecting a source</strong> removes the data derived
-        from it — including the stored credential and the raw snapshots — and{" "}
+        from it - including the stored credential and the raw snapshots - and{" "}
         <strong>closing your account</strong> deletes your organization&rsquo;s data, including
         files in storage, subject to legal requirements.
       </Section>

@@ -25,12 +25,12 @@ import { seedDemo } from "@/lib/browser-api";
 const STEPS: Array<{ title: string; body: string; Illustration: React.ComponentType }> = [
   {
     title: "Connect",
-    body: "Read-only access — Atlas can never change your cloud or code.",
+    body: "Read-only access - Atlas can never change your cloud or code.",
     Illustration: ConnectIllustration,
   },
   {
     title: "Atlas builds your graph",
-    body: "Your estate is crawled and wired together — usually just a few minutes.",
+    body: "Your estate is crawled and wired together - usually just a few minutes.",
     Illustration: MapIllustration,
   },
   {
@@ -64,7 +64,7 @@ export function Onboarding({
       </div>
 
       <div className="relative z-10 max-w-3xl space-y-10 duration-700 animate-in fade-in slide-in-from-bottom-2">
-        {/* Hero — short + personal; they already chose Atlas, so no re-pitch. */}
+        {/* Hero - short + personal; they already chose Atlas, so no re-pitch. */}
         <header className="space-y-3">
           <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
             Welcome to Atlas
@@ -76,11 +76,11 @@ export function Onboarding({
           </h1>
           <p className="max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
             Connect a source and Atlas turns your cloud and code into one live, cited graph you can
-            explore, search, and ask — or explore a sample estate first.
+            explore, search, and ask - or explore a sample estate first.
           </p>
         </header>
 
-        {/* Get started — the whole point of the screen, front and centre. */}
+        {/* Get started - the whole point of the screen, front and centre. */}
         <section className="space-y-4">
           <SectionLabel>Get started</SectionLabel>
           <ConnectSource />
@@ -92,7 +92,7 @@ export function Onboarding({
           <SampleDataCard orgId={orgId} canSeed={canSeed} />
         </section>
 
-        {/* What happens next — expectation-setting (illustrated) so a slow first sync never feels
+        {/* What happens next - expectation-setting (illustrated) so a slow first sync never feels
             broken: connect (read-only) → Atlas builds the graph → explore & ask. */}
         <section className="space-y-4">
           <SectionLabel>What happens next</SectionLabel>
@@ -189,8 +189,8 @@ function SampleDataCard({ orgId, canSeed }: { orgId: string; canSeed: boolean })
               </span>
             </div>
             <p className="mt-1 max-w-md text-sm text-background/70">
-              See it working in seconds. Seed a realistic e-commerce estate — services, databases,
-              repos, deploys — built through the real ingest &amp; inference pipeline. No
+              See it working in seconds. Seed a realistic e-commerce estate - services, databases,
+              repos, deploys - built through the real ingest &amp; inference pipeline. No
               credentials needed.
             </p>
             {error ? (
@@ -273,7 +273,7 @@ function ConnectSource() {
             <ArrowRight className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
           </button>
         ))}
-        {/* Full-catalog tile — dashed to read as "more", with a few logos peeking. */}
+        {/* Full-catalog tile - dashed to read as "more", with a few logos peeking. */}
         <button
           type="button"
           onClick={() => router.push("/integrations")}
@@ -294,7 +294,7 @@ function ConnectSource() {
         </button>
       </div>
       <p className="mt-4 text-xs text-muted-foreground">
-        Cloud, code, CI/CD, observability, and alerts — pick one to open its guided setup, or browse
+        Cloud, code, CI/CD, observability, and alerts - pick one to open its guided setup, or browse
         the full catalog on <span className="font-medium text-foreground">Integrations</span>.
         Read-only access, always.
       </p>

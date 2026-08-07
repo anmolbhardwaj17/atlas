@@ -33,7 +33,7 @@ function askHref(node: NodeDetail, unhealthy: boolean): string {
   const label = node.name ?? node.kind;
   const q = unhealthy
     ? `Why is ${label} unhealthy right now? Diagnose the likely cause, what changed recently, and what depends on it.`
-    : `Tell me about ${label} — what it is, what it connects to, what depends on it, and anything I should know.`;
+    : `Tell me about ${label} - what it is, what it connects to, what depends on it, and anything I should know.`;
   return `/ask?q=${encodeURIComponent(q)}`;
 }
 
@@ -170,7 +170,7 @@ export function NodeDetailView({
             >
               {health?.state}
               {health?.reason ? (
-                <span className="font-normal text-foreground"> — {health.reason}</span>
+                <span className="font-normal text-foreground"> - {health.reason}</span>
               ) : null}
             </p>
             {healthSince ? (
@@ -194,7 +194,7 @@ export function NodeDetailView({
       {/* ── Intent coverage (PRs only): did this PR build its linked ticket? (IV-3) ── */}
       {PR_KINDS.has(node.kind) ? <IntentCoverage orgId={orgId} prId={node.id} /> : null}
 
-      {/* ── Key facts + Timeline — side by side, equal height ──── */}
+      {/* ── Key facts + Timeline - side by side, equal height ──── */}
       <div className="grid items-stretch gap-6 lg:grid-cols-2">
         {facts.length > 0 ? (
           <Card className={cn("h-full", events.length === 0 && "lg:col-span-2")}>
@@ -234,7 +234,7 @@ export function NodeDetailView({
             </CardHeader>
             <CardBody>
               {/* What changed, when, by whom (Phase C): deploys · PR merges (incl. those from repos
-                that deploy here) · config changes · health transitions — one cited, kind-filterable
+                that deploy here) · config changes · health transitions - one cited, kind-filterable
                 feed, newest first. See change-timeline.tsx. */}
               <ChangeTimeline events={events} />
             </CardBody>
@@ -267,7 +267,7 @@ export function NodeDetailView({
             </dl>
           ) : (
             <p className="text-sm text-muted-foreground">
-              No provenance recorded — this node was derived, not directly observed.
+              No provenance recorded - this node was derived, not directly observed.
             </p>
           )}
         </Disclosure>

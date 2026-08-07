@@ -152,7 +152,7 @@ export function OrgPanel({
           {
             description: emailed
               ? `They'll join as ${invitedRole} once they accept.`
-              : `Email couldn't be delivered — share the invite link below.`,
+              : `Email couldn't be delivered - share the invite link below.`,
           },
         );
         void load();
@@ -173,7 +173,7 @@ export function OrgPanel({
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error("Couldn’t copy — select the link and copy it manually.");
+      toast.error("Couldn’t copy - select the link and copy it manually.");
     }
   }
 
@@ -392,7 +392,7 @@ export function OrgPanel({
               </Button>
             </div>
             {note ? <p className="text-sm text-muted-foreground">{note}</p> : null}
-            {/* After an invite: confirm it emailed, OR — when delivery failed / isn't configured —
+            {/* After an invite: confirm it emailed, OR - when delivery failed / isn't configured —
                 fall back to the copyable accept link (which always works). Honest either way. */}
             {lastInvite ? (
               <div className="space-y-2 rounded-md border bg-muted/40 p-3">
@@ -406,7 +406,7 @@ export function OrgPanel({
                     </p>
                   ) : (
                     <p className="text-xs text-muted-foreground">
-                      Email couldn&rsquo;t be delivered — send this link to{" "}
+                      Email couldn&rsquo;t be delivered - send this link to{" "}
                       <span className="font-medium text-foreground">{lastInvite.email}</span> so
                       they can join:
                     </p>

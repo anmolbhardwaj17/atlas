@@ -73,7 +73,7 @@ export function PostureRadar({ posture }: { posture: Posture }) {
           />
         );
       })}
-      {/* Data polygon — a lighter green than the brand mark so the area reads soft; grows in on load. */}
+      {/* Data polygon - a lighter green than the brand mark so the area reads soft; grows in on load. */}
       <g className="chart-grow">
         <polygon
           points={dataPolygon}
@@ -85,7 +85,7 @@ export function PostureRadar({ posture }: { posture: Posture }) {
           <circle key={i} cx={p.x} cy={p.y} r={2.5} className="fill-emerald-500" />
         ))}
       </g>
-      {/* Axis labels — name over score, stacked so long names never clip. */}
+      {/* Axis labels - name over score, stacked so long names never clip. */}
       {AXES.map((ax, i) => {
         const p = coord(i, 1.12);
         const cos = Math.cos(angle(i));

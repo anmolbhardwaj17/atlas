@@ -177,7 +177,7 @@ export function ComplianceView({ report }: { report: ComplianceReport | null }) 
         </p>
       </header>
 
-      {/* Framework selector — the app's segmented control (matches the Insights pillar filter). */}
+      {/* Framework selector - the app's segmented control (matches the Insights pillar filter). */}
       <SegmentedControl className="max-w-full overflow-x-auto">
         {frameworks.map((f) => {
           const on = f.framework.key === active;
@@ -283,7 +283,7 @@ export function ComplianceView({ report }: { report: ComplianceReport | null }) 
             </CardContent>
           </Card>
 
-          {/* Controls table — dense + columnar, matching Insights. */}
+          {/* Controls table - dense + columnar, matching Insights. */}
           <Card className="overflow-hidden">
             <Table>
               <TableHeader>
@@ -314,7 +314,7 @@ export function ComplianceView({ report }: { report: ComplianceReport | null }) 
             </Table>
           </Card>
 
-          {/* Not assessable — Atlas's crawl gaps, not the user's action items. Kept quiet + separate
+          {/* Not assessable - Atlas's crawl gaps, not the user's action items. Kept quiet + separate
               (a collapsible) so it never dilutes the controls that actually need fixing. */}
           {notAssessable.length > 0 ? (
             <NotAssessable rows={notAssessable} framework={active} />
@@ -325,7 +325,7 @@ export function ComplianceView({ report }: { report: ComplianceReport | null }) 
           <CardContent className="py-14 text-center">
             <ShieldCheck className="mx-auto mb-3 size-7 text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground">
-              No compliance data yet — connect a cloud source to start assessing controls.
+              No compliance data yet - connect a cloud source to start assessing controls.
             </p>
           </CardContent>
         </Card>
@@ -352,8 +352,8 @@ function NotAssessable({ rows, framework }: { rows: ControlResult[]; framework: 
         </span>
         <span className="ml-1 hidden text-xs text-muted-foreground sm:inline">
           {rows.some((r) => r.missingActions?.length)
-            ? "some just need an AWS permission — grant it and they light up"
-            : "controls that need data Atlas doesn’t crawl yet — not a pass or a fail"}
+            ? "some just need an AWS permission - grant it and they light up"
+            : "controls that need data Atlas doesn’t crawl yet - not a pass or a fail"}
         </span>
         <ChevronRight
           className={cn(
@@ -364,7 +364,7 @@ function NotAssessable({ rows, framework }: { rows: ControlResult[]; framework: 
       </button>
       {open ? (
         <ul className="divide-y divide-border border-t border-border">
-          {/* Permission gaps first — they're one grant away from being assessed. */}
+          {/* Permission gaps first - they're one grant away from being assessed. */}
           {[...rows]
             .sort((a, b) => (b.missingActions?.length ?? 0) - (a.missingActions?.length ?? 0))
             .map((r) => {
@@ -465,7 +465,7 @@ function ControlRow({
         </span>
       </td>
       <td className="px-4 py-3.5">
-        {/* Severity as plain coloured text (donut heat-ramp), shown regardless of status — the
+        {/* Severity as plain coloured text (donut heat-ramp), shown regardless of status - the
             control's inherent weight, not an alarm. */}
         <span className={cn("text-xs font-medium capitalize", SEV_TEXT[r.severity])}>
           {r.severity}

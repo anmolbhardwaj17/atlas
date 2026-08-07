@@ -81,7 +81,7 @@ function CriterionRow({ c }: { c: CoverageCriterion }) {
                   target="_blank"
                   rel="noreferrer"
                   className={cn(className, "transition-colors hover:text-foreground")}
-                  title={`${cite.marker} — open source`}
+                  title={`${cite.marker} - open source`}
                 >
                   {inner}
                 </a>
@@ -152,7 +152,7 @@ function Assessment({
           <Layers className="size-4 shrink-0 text-primary" />
           <span className="min-w-0 flex-1 text-xs text-muted-foreground">
             This ticket is built across{" "}
-            <strong className="text-foreground">{a.ticketPrCount} PRs</strong> — this review covers
+            <strong className="text-foreground">{a.ticketPrCount} PRs</strong> - this review covers
             only this one, so gaps may be handled in a sibling PR.
           </span>
           <Button
@@ -256,7 +256,7 @@ export function IntentCoverage({ orgId, prId }: { orgId: string; prId: string })
         <div className="px-5 py-4">
           <p className="mb-3 text-sm text-muted-foreground">
             Atlas reads the linked Jira ticket (its acceptance criteria, subtasks, and comments) and
-            checks the diff against each — as questions for you to confirm, not a code review.
+            checks the diff against each - as questions for you to confirm, not a code review.
           </p>
           <Button size="sm" onClick={run} className="gap-1.5">
             <AtlasAiMark size={14} className="size-3.5" />

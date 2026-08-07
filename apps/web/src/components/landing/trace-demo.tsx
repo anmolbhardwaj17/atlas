@@ -144,7 +144,7 @@ export function TraceDemo() {
                 r.culprit && isMarked ? "border-danger bg-danger/[0.04]" : "border-transparent",
               )}
             >
-              {/* A single outward pulse on the moment of the find — the visual equivalent of
+              {/* A single outward pulse on the moment of the find - the visual equivalent of
                   "…there it is". Fires once per loop, not continuously; a permanently throbbing
                   row would read as an unattended alarm rather than a conclusion. */}
               {r.culprit && isMarked ? (

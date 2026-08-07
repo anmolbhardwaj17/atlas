@@ -94,7 +94,7 @@ export function SeverityTrend({ data }: { data: TrendPoint[] }) {
             </g>
           );
         })}
-        {/* Date axis — first date … today (right end). */}
+        {/* Date axis - first date … today (right end). */}
         {(n <= 2 ? [0, n - 1] : [0, Math.floor((n - 1) / 2), n - 1])
           .filter((i, idx, a) => a.indexOf(i) === idx)
           .map((i) => {

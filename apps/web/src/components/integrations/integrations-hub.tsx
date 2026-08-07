@@ -161,7 +161,7 @@ export function IntegrationsHub({
         {
           description:
             r.suggested > 0
-              ? "Review them in the graph — confirm the good ones, reject the rest."
+              ? "Review them in the graph - confirm the good ones, reject the rest."
               : `Checked ${r.scannedRuntimes} unlinked runtime${r.scannedRuntimes === 1 ? "" : "s"}.`,
         },
       );
@@ -187,7 +187,7 @@ export function IntegrationsHub({
         {
           description:
             r.suggested > 0
-              ? "Review them in the graph — confirm the good ones, reject the rest."
+              ? "Review them in the graph - confirm the good ones, reject the rest."
               : r.scannedIssues === 0
                 ? "No Jira issues are synced yet."
                 : `Checked ${r.scannedPrs} unlinked PR${r.scannedPrs === 1 ? "" : "s"}.`,
@@ -214,7 +214,7 @@ export function IntegrationsHub({
             ? `${s.upserted} link${s.upserted === 1 ? "" : "s"} refreshed` +
               (s.retired ? `, ${s.retired} stale removed` : "") +
               "."
-            : "No changes — the graph was already up to date.",
+            : "No changes - the graph was already up to date.",
       });
     } catch (e) {
       toast.error("Couldn’t rebuild links", {
@@ -327,7 +327,7 @@ export function IntegrationsHub({
         </div>
       </div>
 
-      {/* Ask Atlas from chat — the INBOUND integrations (grounded /atlas answers in-channel),
+      {/* Ask Atlas from chat - the INBOUND integrations (grounded /atlas answers in-channel),
           distinct from the outbound Slack/Discord/Teams alert channels in the list below. Always
           shown as a two-card section; each card is live ("Add to …") where configured, else a quiet
           "Coming soon". */}
@@ -335,7 +335,7 @@ export function IntegrationsHub({
         <div className="space-y-0.5">
           <h2 className="text-sm font-semibold tracking-tight">Ask Atlas from chat</h2>
           <p className="text-sm text-muted-foreground">
-            Bring Atlas into your team&rsquo;s chat — ask{" "}
+            Bring Atlas into your team&rsquo;s chat - ask{" "}
             <code className="rounded bg-muted px-1 py-0.5 text-xs">/atlas</code> and get a grounded,
             cited answer in-channel.
           </p>
@@ -370,7 +370,7 @@ export function IntegrationsHub({
         </div>
       </section>
 
-      {/* Category tabs (segmented control) + search — the row list below filters live. */}
+      {/* Category tabs (segmented control) + search - the row list below filters live. */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <SegmentedControl>
           {TABS.map((t) => (
@@ -753,11 +753,11 @@ function AlertManageSheet({
  */
 function SyncProgressLine({ progress }: { progress: SyncProgress | null | undefined }) {
   const p = progress;
-  if (!p || p.discovered === 0) return <>Starting — connecting to your estate…</>;
+  if (!p || p.discovered === 0) return <>Starting - connecting to your estate…</>;
   if (p.resources === 0)
     return (
       <>
-        Reading your estate — {formatCount(p.discovered)} {plural(p.discovered, "resource")} found
+        Reading your estate - {formatCount(p.discovered)} {plural(p.discovered, "resource")} found
         so far…
       </>
     );
@@ -809,7 +809,7 @@ function ProviderRow({
   if (connected) {
     const only = connections.length === 1 ? connections[0] : undefined;
     if (anySyncing) {
-      freshLabel = "Syncing — pulling the latest data…";
+      freshLabel = "Syncing - pulling the latest data…";
     } else if (only?.lastSync && only.lastSync.status === "failed") {
       freshLabel = `Last sync failed ${timeAgo(only.lastSync.finishedAt)}`;
       freshTone = "text-danger";
@@ -1046,7 +1046,7 @@ function ConnectionBlock({
 
   return (
     <div className="rounded-lg border border-border p-3.5 text-sm">
-      {/* Header — name + live status. */}
+      {/* Header - name + live status. */}
       <div className="flex items-center justify-between gap-2">
         <span className="min-w-0 truncate font-medium">{conn.displayName}</span>
         <span className="flex shrink-0 items-center gap-2">
@@ -1073,7 +1073,7 @@ function ConnectionBlock({
               <SyncProgressLine progress={conn.syncProgress} />
             </span>
             <span className="text-xs">
-              You can leave this page — the sync keeps running and the graph fills in as it goes.
+              You can leave this page - the sync keeps running and the graph fills in as it goes.
             </span>
           </span>
         ) : conn.lastSync ? (
@@ -1104,7 +1104,7 @@ function ConnectionBlock({
       (conn.lastSync.skippedScopes?.length ?? 0) > 0 ? (
         <div className="mt-3 rounded-md border border-warning/30 bg-warning/5 p-3">
           <p className="text-xs font-medium text-warning">
-            Skipped this sync — usually a missing read permission on the token:
+            Skipped this sync - usually a missing read permission on the token:
           </p>
           <div className="mt-2 flex flex-wrap gap-1">
             {(conn.lastSync.skippedScopes ?? []).map((s) => (
@@ -1119,13 +1119,13 @@ function ConnectionBlock({
         </div>
       ) : null}
 
-      {/* Reachability failure — we couldn't reach the target at all (firewall / IP allowlist / VPN).
+      {/* Reachability failure - we couldn't reach the target at all (firewall / IP allowlist / VPN).
           The fix is to whitelist Atlas's egress IP, so surface it right here on the failing card. */}
       {conn.status !== "connected" && conn.health?.errorKind === "unreachable" ? (
         <div className="mt-3 rounded-md border border-warning/30 bg-warning/5 p-3">
           <p className="flex items-center gap-1.5 text-xs font-medium text-warning">
             <Network className="size-3.5 shrink-0" />
-            Couldn&rsquo;t reach {conn.provider} — likely a firewall, IP allowlist, or VPN
+            Couldn&rsquo;t reach {conn.provider} - likely a firewall, IP allowlist, or VPN
           </p>
           <p className="mt-1.5 text-xs text-muted-foreground">
             Atlas connects from {egressIps().length > 1 ? "these fixed IPs" : "a fixed IP"}; add{" "}
@@ -1147,12 +1147,12 @@ function ConnectionBlock({
         </div>
       ) : null}
 
-      {/* Missing permissions — the detail, with room to breathe. */}
+      {/* Missing permissions - the detail, with room to breathe. */}
       {conn.status === "degraded" && missingPerms.length > 0 ? (
         <div className="mt-3 rounded-md border border-warning/30 bg-warning/5 p-3">
           <p className="flex items-center gap-1.5 text-xs font-medium text-warning">
             <ShieldAlert className="size-3.5 shrink-0" />
-            {missingPerms.length} permission{missingPerms.length === 1 ? "" : "s"} missing — grant
+            {missingPerms.length} permission{missingPerms.length === 1 ? "" : "s"} missing - grant
             these for full coverage
           </p>
           <div className="mt-2 flex flex-wrap gap-1">
@@ -1212,7 +1212,7 @@ function ConnectionBlock({
             <AlertDialogTitle>Disconnect {conn.displayName}?</AlertDialogTitle>
             <AlertDialogDescription>
               This removes the connection and{" "}
-              <strong>purges everything Atlas learned from it</strong> — its resources, edges, and
+              <strong>purges everything Atlas learned from it</strong> - its resources, edges, and
               signals disappear from your graph, map, and Ask AI answers. Reconnecting later starts
               a fresh sync. This can&rsquo;t be undone.
             </AlertDialogDescription>
@@ -1319,7 +1319,7 @@ function ConnectSheet({
           apiToken: token.trim(),
         });
         if (verified.status === "error") {
-          setError("Bitbucket rejected the credentials — check the email, token, and its scopes.");
+          setError("Bitbucket rejected the credentials - check the email, token, and its scopes.");
           setBusy(false);
           return;
         }
@@ -1346,7 +1346,7 @@ function ConnectSheet({
         });
         if (verified.status === "error") {
           setError(
-            "AWS rejected the credentials — check the Access Key ID, Secret Access Key, and that the IAM user has read access.",
+            "AWS rejected the credentials - check the Access Key ID, Secret Access Key, and that the IAM user has read access.",
           );
           setBusy(false);
           return;
@@ -1369,7 +1369,7 @@ function ConnectSheet({
         });
         if (verified.status === "error") {
           setError(
-            "Jenkins rejected the credentials — check the server URL, username, and API token.",
+            "Jenkins rejected the credentials - check the server URL, username, and API token.",
           );
           setBusy(false);
           return;
@@ -1391,7 +1391,7 @@ function ConnectSheet({
           apiToken: token.trim(),
         });
         if (verified.status === "error") {
-          setError("Jira rejected the credentials — check the site, email, token, and its scope.");
+          setError("Jira rejected the credentials - check the site, email, token, and its scope.");
           setBusy(false);
           return;
         }
@@ -1460,7 +1460,7 @@ function ConnectSheet({
                         id="bb-workspace"
                         value={workspace}
                         onChange={(e) => setWorkspace(e.target.value)}
-                        placeholder="e.g. siemba — leave blank to auto-detect"
+                        placeholder="e.g. siemba - leave blank to auto-detect"
                         autoComplete="off"
                       />
                     </div>
@@ -1490,7 +1490,7 @@ function ConnectSheet({
                         autoComplete="off"
                       />
                       <p className="text-xs text-muted-foreground">
-                        Sent once to verify + stored encrypted in the secrets broker — never saved
+                        Sent once to verify + stored encrypted in the secrets broker - never saved
                         in the database or shown again.
                       </p>
                     </div>
@@ -1536,7 +1536,7 @@ function ConnectSheet({
                         spellCheck={false}
                       />
                       <p className="text-xs text-muted-foreground">
-                        Sent once to verify + stored encrypted in the secrets broker — never saved
+                        Sent once to verify + stored encrypted in the secrets broker - never saved
                         in the database or shown again. Use an IAM user with a read-only policy.
                       </p>
                     </div>
@@ -1581,7 +1581,7 @@ function ConnectSheet({
                         autoComplete="off"
                       />
                       <p className="text-xs text-muted-foreground">
-                        Sent once to verify + stored encrypted in the secrets broker — never saved
+                        Sent once to verify + stored encrypted in the secrets broker - never saved
                         in the database or shown again. Use a user with Overall/Read + Job/Read
                         only.
                       </p>
@@ -1628,7 +1628,7 @@ function ConnectSheet({
                         autoComplete="off"
                       />
                       <p className="text-xs text-muted-foreground">
-                        Sent once to verify + stored encrypted in the secrets broker — never saved
+                        Sent once to verify + stored encrypted in the secrets broker - never saved
                         in the database or shown again.
                       </p>
                     </div>

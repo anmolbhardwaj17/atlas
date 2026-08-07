@@ -37,7 +37,7 @@ export function AppShell({
 }) {
   return (
     <SidebarProvider>
-      {/* Skip link — first tab stop; lets keyboard users bypass the sidebar nav to the page content. */}
+      {/* Skip link - first tab stop; lets keyboard users bypass the sidebar nav to the page content. */}
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-50 focus:rounded-md focus:border focus:border-border focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:shadow-md focus:ring-2 focus:ring-ring"
@@ -52,11 +52,11 @@ export function AppShell({
         <BreadcrumbProvider>
           <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
             <SidebarTrigger className="-ml-1" />
-            {/* Org switcher (multi-org) lives top-left, next to the toggle — the standard spot. */}
+            {/* Org switcher (multi-org) lives top-left, next to the toggle - the standard spot. */}
             {orgId && <OrgSwitcher initialOrgs={orgs} initialCurrentId={orgId} />}
             {/* Page breadcrumb (published per-page); falls back to an optional title. It renders its
                 own leading divider when present, so we don't add one here (avoids a double rule).
-                Hidden on phones — the sidebar + the page's own H1 give context, and it would crowd the
+                Hidden on phones - the sidebar + the page's own H1 give context, and it would crowd the
                 header against the right-side controls. */}
             <div className="hidden min-w-0 items-center gap-2 sm:flex">
               <HeaderBreadcrumbs />

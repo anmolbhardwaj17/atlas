@@ -140,7 +140,7 @@ export function ProfileCard({
           <UserRound className="size-4" /> Your profile
         </CardTitle>
       </CardHeader>
-      {/* One Edit control, floated top-right — same pattern as the Organization card. */}
+      {/* One Edit control, floated top-right - same pattern as the Organization card. */}
       <div className="absolute right-6 top-5">
         {editing ? (
           <div className="flex items-center gap-1.5">
@@ -223,7 +223,7 @@ export function ProfileCard({
                   <UserAvatar value={opt.value} name={currentName} email={email} size={40} />
                 </button>
               ))}
-              {/* Upload a photo from your computer — same 40px footprint, outlined. */}
+              {/* Upload a photo from your computer - same 40px footprint, outlined. */}
               <input
                 ref={photoRef}
                 type="file"

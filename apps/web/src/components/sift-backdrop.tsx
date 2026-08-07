@@ -113,13 +113,13 @@ export function SiftContributionGrid({
 export function SiftBackdrop() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      {/* Left — contribution grid */}
+      {/* Left - contribution grid */}
       <SiftContributionGrid
         className="absolute inset-y-0 left-0 w-[42%]"
         style={{ maskImage: GRID_MASK, WebkitMaskImage: GRID_MASK }}
       />
 
-      {/* Right — infra-map slice (dotted canvas + dashed, flowing edges + real resource cards) */}
+      {/* Right - infra-map slice (dotted canvas + dashed, flowing edges + real resource cards) */}
       <div
         className="absolute inset-y-0 right-0 w-[42%] overflow-hidden"
         style={{ maskImage: NET_MASK, WebkitMaskImage: NET_MASK }}

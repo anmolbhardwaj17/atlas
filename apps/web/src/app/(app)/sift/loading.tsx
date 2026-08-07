@@ -13,7 +13,7 @@ export default function SiftLoading() {
       <Skeleton className="absolute right-4 top-4 h-6 w-28 rounded-full md:right-6 md:top-6" />
 
       <div className="grid items-start gap-10 pt-9 lg:grid-cols-2">
-        {/* LEFT — Sift × Atlas hero + title + subtext, then three guided steps. */}
+        {/* LEFT - Sift × Atlas hero + title + subtext, then three guided steps. */}
         <div className="space-y-7">
           <div className="space-y-4">
             <div className="flex items-center gap-3">
@@ -42,7 +42,7 @@ export default function SiftLoading() {
           </div>
         </div>
 
-        {/* RIGHT — Configure Sift: header + step badge, then the choice grids and continue. */}
+        {/* RIGHT - Configure Sift: header + step badge, then the choice grids and continue. */}
         <div className="space-y-5">
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-2">
@@ -52,7 +52,7 @@ export default function SiftLoading() {
             <Skeleton className="h-5 w-16 rounded-full" />
           </div>
 
-          {/* Model + Review effort — two 3-up choice grids. */}
+          {/* Model + Review effort - two 3-up choice grids. */}
           {Array.from({ length: 2 }).map((_, g) => (
             <div key={g} className="space-y-2">
               <Skeleton className="h-4 w-24" />
@@ -65,7 +65,7 @@ export default function SiftLoading() {
             </div>
           ))}
 
-          {/* Test depth — a 2-up choice grid. */}
+          {/* Test depth - a 2-up choice grid. */}
           <div className="space-y-2">
             <Skeleton className="h-4 w-24" />
             <div className="grid grid-cols-2 gap-1.5">
@@ -76,7 +76,7 @@ export default function SiftLoading() {
             <Skeleton className="h-3 w-44" />
           </div>
 
-          {/* Continue button — half width, right-aligned. */}
+          {/* Continue button - half width, right-aligned. */}
           <div className="flex justify-end">
             <Skeleton className="h-9 w-1/2 rounded-md" />
           </div>

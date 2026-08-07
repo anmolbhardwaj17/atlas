@@ -107,7 +107,7 @@ export function HealthStrip({ health }: { health: EstateHealth }) {
         </div>
       </div>
 
-      {/* The worst-first sample, each deep-linked to its resource — turns "3 unhealthy" into the
+      {/* The worst-first sample, each deep-linked to its resource - turns "3 unhealthy" into the
           specific things a responder should open. */}
       {health.top.length > 0 ? (
         <ul className="mt-2.5 flex flex-wrap gap-1.5">

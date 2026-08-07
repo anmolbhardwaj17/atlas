@@ -80,7 +80,7 @@ export function SettingsView({
 
       {isAdmin ? <AlertSettingsCard orgId={orgId} /> : null}
 
-      {/* Per-user email prefs — self-scoped, so every member sees this (not admin-gated). */}
+      {/* Per-user email prefs - self-scoped, so every member sees this (not admin-gated). */}
       <EmailPrefsCard orgId={orgId} />
 
       <OrgPanel
@@ -91,12 +91,12 @@ export function SettingsView({
         initialInvites={invites}
       />
 
-      {/* DSAR admin surface (export + person erasure) — Admin-only, matching the API. */}
+      {/* DSAR admin surface (export + person erasure) - Admin-only, matching the API. */}
       {isAdmin ? <PrivacyDataCard orgId={orgId} /> : null}
 
       {isAdmin ? securitySlot : null}
 
-      {/* Deleting the org is Owner-only — the most destructive action, kept at the very bottom. */}
+      {/* Deleting the org is Owner-only - the most destructive action, kept at the very bottom. */}
       {isOwner ? <DangerZoneCard orgId={orgId} orgName={orgName} /> : null}
     </div>
   );

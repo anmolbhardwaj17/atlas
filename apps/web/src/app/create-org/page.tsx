@@ -26,7 +26,7 @@ export default async function CreateOrgPage() {
 
   return (
     <main className="relative flex min-h-dvh flex-col bg-background">
-      {/* A soft brand glow at the top — a hint of the Atlas AI green, tasteful, both themes. */}
+      {/* A soft brand glow at the top - a hint of the Atlas AI green, tasteful, both themes. */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-72"
@@ -45,7 +45,7 @@ export default async function CreateOrgPage() {
         </Link>
       ) : null}
 
-      {/* Brand — top, centered. */}
+      {/* Brand - top, centered. */}
       <div className="relative flex justify-center pt-14">
         <div className="flex items-center gap-2.5">
           <AtlasLogo size={30} className="size-[30px] dark:invert" />
@@ -53,7 +53,7 @@ export default async function CreateOrgPage() {
         </div>
       </div>
 
-      {/* Wizard — wider (fewer chip rows → less scroll), with clear space below the brand. */}
+      {/* Wizard - wider (fewer chip rows → less scroll), with clear space below the brand. */}
       <div className="relative mx-auto w-full max-w-2xl px-6 pb-20 pt-14">
         <CreateOrgForm />
       </div>

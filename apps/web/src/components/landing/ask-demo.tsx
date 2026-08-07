@@ -52,7 +52,7 @@ const EXCHANGES: Exchange[] = [
       { t: ". The repository behind both is owned by " },
       { b: "@payments" },
       { c: 3 },
-      { t: " — five people." },
+      { t: " - five people." },
     ],
     cites: ["aws.rds.instance", "aws.lambda.function", "bitbucket.repository"],
   },
@@ -65,7 +65,7 @@ const EXCHANGES: Exchange[] = [
       { t: ", fourteen minutes before the alarm. It shipped " },
       { b: "PR #1482" },
       { c: 2 },
-      { t: " — “retry budget for orders-db” — the only change touching " },
+      { t: " - “retry budget for orders-db” - the only change touching " },
       { b: "checkout" },
       { c: 3 },
       { t: " in that window." },
@@ -94,7 +94,7 @@ const EXCHANGES: Exchange[] = [
       { b: "checkout" },
       { c: 1 },
       {
-        t: " reads from it on every render. Nothing else in the graph references it — though I can't see inside container images, so a hard-coded URL wouldn't show up here.",
+        t: " reads from it on every render. Nothing else in the graph references it - though I can't see inside container images, so a hard-coded URL wouldn't show up here.",
       },
     ],
     cites: ["aws.s3.bucket", "aws.ecs.service"],
@@ -269,7 +269,7 @@ export function AskDemo() {
         ) : null}
       </div>
 
-      {/* Composer — where the question types itself before it is sent. */}
+      {/* Composer - where the question types itself before it is sent. */}
       <div className="border-t border-neutral-200 p-4">
         <div className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2.5">
           <p className="min-w-0 flex-1 truncate text-sm text-neutral-700">

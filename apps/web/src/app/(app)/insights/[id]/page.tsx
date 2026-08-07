@@ -117,7 +117,7 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
         <SetBreadcrumbs items={[{ label: "Insights", href: "/insights" }, { label: "Finding" }]} />
         <ErrorState
           title="This finding cleared"
-          description="It’s no longer flagged in your latest graph — either it was fixed and auto-resolved, or the resource went away. Nice."
+          description="It’s no longer flagged in your latest graph - either it was fixed and auto-resolved, or the resource went away. Nice."
           actions={
             <Link
               href="/insights"
@@ -194,7 +194,7 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
             <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">{subtitle}</p>
           ) : null}
 
-          {/* Freshness / lifecycle — a quiet strip. */}
+          {/* Freshness / lifecycle - a quiet strip. */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
             {firstSeen ? (
               <span className="inline-flex items-center gap-1.5">
@@ -204,7 +204,7 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
             {ageDays !== null && ageDays >= 1 ? <span>Open {ageDays}d</span> : null}
           </div>
 
-          {/* Actions — up top, where a stuck reader reaches for them. */}
+          {/* Actions - up top, where a stuck reader reaches for them. */}
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <Link
               href={askHref}
@@ -236,7 +236,7 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
               {impact.downstream} {impact.downstream === 1 ? "resource" : "resources"}
             </span>{" "}
             {impact.downstream === 1 ? "depends" : "depend"} on the affected{" "}
-            {affected.length === 1 ? "resource" : "resources"} — so this reaches further than the{" "}
+            {affected.length === 1 ? "resource" : "resources"} - so this reaches further than the{" "}
             {finding.count ?? affected.length} named below.
           </p>
           {impact.sample.length > 0 ? (
@@ -301,7 +301,7 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
                 );
               })()}
               <p className="text-[11px] text-muted-foreground">
-                General guidance — ask Atlas above for the exact steps on your resources.
+                General guidance - ask Atlas above for the exact steps on your resources.
               </p>
             </CardContent>
           </Card>
@@ -424,7 +424,7 @@ export default async function FindingDetailPage({ params }: { params: Promise<{ 
         </div>
       ) : null}
 
-      {/* ── Provenance — where/when Atlas observed this (trust is visible) ───────── */}
+      {/* ── Provenance - where/when Atlas observed this (trust is visible) ───────── */}
       <p className="border-t border-border pt-4 text-xs text-muted-foreground/70">
         Observed from your latest sync
         {lastSyncedAt ? ` · ${timeAgo(lastSyncedAt)}` : ""}

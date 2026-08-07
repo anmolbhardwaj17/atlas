@@ -169,7 +169,7 @@ export function WarRoomView({
   }, [turns]);
 
   const label = incident.nodeName ?? incident.nodeKind ?? "this resource";
-  const diagnoseQuestion = `Why is ${label} unhealthy or at risk right now? Diagnose the most likely cause, what changed recently (deploys, config changes, merged PRs), and what depends on it. If nothing correlates, say so plainly. End your reply with ONE final line exactly in this format: "VERDICT: <type> — <one concise sentence naming the likely cause>", where <type> is one of code-change, config-change, dependency, capacity, chronic, or unknown (use "unknown" if nothing correlates).`;
+  const diagnoseQuestion = `Why is ${label} unhealthy or at risk right now? Diagnose the most likely cause, what changed recently (deploys, config changes, merged PRs), and what depends on it. If nothing correlates, say so plainly. End your reply with ONE final line exactly in this format: "VERDICT: <type> - <one concise sentence naming the likely cause>", where <type> is one of code-change, config-change, dependency, capacity, chronic, or unknown (use "unknown" if nothing correlates).`;
 
   const light = React.useCallback((ids: Iterable<string>) => {
     let changed = false;
@@ -252,7 +252,7 @@ export function WarRoomView({
       setError(null);
 
       if (!convRef.current) {
-        convRef.current = await createConversation(orgId, `War Room — ${label}`, "map");
+        convRef.current = await createConversation(orgId, `War Room - ${label}`, "map");
       }
       const convId = convRef.current;
       if (!convId) {
@@ -440,7 +440,7 @@ export function WarRoomView({
         </div>
       </div>
 
-      {/* Verdict hero — the answer FIRST (a non-expert reads this line and gets it; an SRE triages fast). */}
+      {/* Verdict hero - the answer FIRST (a non-expert reads this line and gets it; an SRE triages fast). */}
       <VerdictHero
         verdict={verdict}
         confidence={heroConfidence}
@@ -453,7 +453,7 @@ export function WarRoomView({
       />
 
       <div className="grid gap-4 lg:h-[72vh] lg:grid-cols-[1.35fr_1fr]">
-        {/* Left: the evidence — dependency chain (map) + what changed (timeline) */}
+        {/* Left: the evidence - dependency chain (map) + what changed (timeline) */}
         <div className="flex min-h-0 flex-col gap-4">
           <div className="flex min-h-[300px] flex-1 flex-col overflow-hidden rounded-xl border border-border bg-background">
             <div className="border-b border-border px-4 py-3">
@@ -476,7 +476,7 @@ export function WarRoomView({
           </div>
         </div>
 
-        {/* Right: the investigation — the full write-up + follow-up chat */}
+        {/* Right: the investigation - the full write-up + follow-up chat */}
         <div className="flex min-h-[520px] flex-col rounded-xl border border-border bg-background lg:min-h-0">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <h2 className="text-sm font-semibold">Investigation</h2>
@@ -528,7 +528,7 @@ export function WarRoomView({
                   }}
                   rows={1}
                   aria-label="Ask a follow-up question"
-                  placeholder="Ask a follow-up — e.g. “what did that PR change?”"
+                  placeholder="Ask a follow-up - e.g. “what did that PR change?”"
                   className="max-h-28 flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                 />
                 <button
@@ -577,7 +577,7 @@ function VerdictHero({
     (sending
       ? "Tracing the likely cause…"
       : diagnosed
-        ? "Diagnosis complete — see the investigation for detail."
+        ? "Diagnosis complete - see the investigation for detail."
         : "Preparing the investigation…");
   return (
     <section
@@ -585,7 +585,7 @@ function VerdictHero({
       className="relative overflow-hidden rounded-xl border border-border bg-card p-5"
     >
       {/* The answer is the biggest thing in the room. Previously this was a 15px line of text inside
-          a card with an icon tile beside it — visually a footnote, when it's the single thing most
+          a card with an icon tile beside it - visually a footnote, when it's the single thing most
           people open this page to read. */}
       <span
         aria-hidden
@@ -603,7 +603,7 @@ function VerdictHero({
             {meta.label}
           </span>
         ) : null}
-        {/* Confidence stays visible and plain — docs/09: the UI never lies about certainty, and a
+        {/* Confidence stays visible and plain - docs/09: the UI never lies about certainty, and a
             confident-looking headline over a low-confidence verdict would do exactly that. */}
         {confidence ? (
           <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium capitalize text-muted-foreground">
@@ -639,7 +639,7 @@ function AssistantTurn({ turn }: { turn: Turn }) {
           <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-success" />
           <span>
             <span className="font-medium">{toolLabel(s.tool)}</span>
-            {s.summary ? <span className="text-muted-foreground"> — {s.summary}</span> : null}
+            {s.summary ? <span className="text-muted-foreground"> - {s.summary}</span> : null}
           </span>
         </li>
       ))}

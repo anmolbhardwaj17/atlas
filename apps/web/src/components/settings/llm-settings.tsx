@@ -199,7 +199,7 @@ export function LlmSettingsCard({
     try {
       await deleteLlmSettings(orgId);
       setCurrent(null);
-      setMsg({ tone: "ok", text: "Removed — Ask AI is back on the platform default." });
+      setMsg({ tone: "ok", text: "Removed - Ask AI is back on the platform default." });
       toast.success("Model removed", { description: "Ask AI is back on the platform default." });
     } catch (e) {
       const text = e instanceof Error ? e.message : "Couldn’t remove the model.";
@@ -220,7 +220,7 @@ export function LlmSettingsCard({
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Bring your own model for Ask AI. Answers stay grounded in your graph and cited — the model
+          Bring your own model for Ask AI. Answers stay grounded in your graph and cited - the model
           only narrates. Your key is tested, stored encrypted, and never shown again.
         </p>
 
@@ -243,12 +243,12 @@ export function LlmSettingsCard({
                 )}
                 aria-hidden="true"
               />
-              Active — using <span className="font-medium">{current.model}</span> via
+              Active - using <span className="font-medium">{current.model}</span> via
               <ProviderIcon id={current.provider} className="size-3.5" />
               {providerOf(current.provider).label}.
               {isWeakModel(current.model) ? (
                 <span className="font-medium">
-                  This is a lightweight model — answers will be shallow. Switch to a stronger one
+                  This is a lightweight model - answers will be shallow. Switch to a stronger one
                   below, or Remove to use the platform default.
                 </span>
               ) : null}
@@ -322,7 +322,7 @@ export function LlmSettingsCard({
               <span className="flex items-start gap-1.5 text-[11px] leading-relaxed text-warning">
                 <AlertTriangle className="mt-px size-3 shrink-0" />
                 <span>
-                  Lightweight model — Ask Atlas answers will be shallow. Pick a{" "}
+                  Lightweight model - Ask Atlas answers will be shallow. Pick a{" "}
                   <span className="font-medium">Best reasoning</span> model for real analysis.
                 </span>
               </span>

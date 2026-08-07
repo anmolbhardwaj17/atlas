@@ -50,7 +50,7 @@ const MODELS: readonly Choice[] = [
     value: "powerful",
     label: "Powerful",
     desc: "Deepest reasoning",
-    tip: "The most thorough review — best for critical services and complex diffs. Slower and pricier.",
+    tip: "The most thorough review - best for critical services and complex diffs. Slower and pricier.",
     Icon: Brain,
   },
   {
@@ -64,7 +64,7 @@ const MODELS: readonly Choice[] = [
     value: "fast",
     label: "Fast",
     desc: "Quick & light",
-    tip: "Lightweight passes for high pull-request volume — catches the obvious issues fast.",
+    tip: "Lightweight passes for high pull-request volume - catches the obvious issues fast.",
     Icon: Zap,
   },
 ];
@@ -88,7 +88,7 @@ const EFFORTS: readonly Choice[] = [
     value: "high",
     label: "High",
     desc: "Deep dive",
-    tip: "Sift works hard on every review — maximum depth, higher cost.",
+    tip: "Sift works hard on every review - maximum depth, higher cost.",
     Icon: Flame,
   },
 ];
@@ -164,7 +164,7 @@ export function SiftSetup({ repos }: { repos: RepoOption[] }) {
             Reviewed by Sift, mapped by Atlas.
           </h1>
           <p className="mt-4 text-[15px] leading-relaxed text-muted-foreground text-pretty">
-            Every pull request gets a deep, whole-codebase review — real issues caught before they
+            Every pull request gets a deep, whole-codebase review - real issues caught before they
             merge, each one tracked across the pipeline it moves through, so nothing slips past your
             team.
           </p>
@@ -178,7 +178,7 @@ export function SiftSetup({ repos }: { repos: RepoOption[] }) {
 
   return (
     <div className="relative -m-4 min-h-[calc(100dvh-3.5rem)] overflow-hidden p-4 md:-m-6 md:p-6">
-      {/* Contribution backdrop — anchored to the bottom-left corner and fanning out toward the
+      {/* Contribution backdrop - anchored to the bottom-left corner and fanning out toward the
           center, masked with a radial gradient (solid at the corner → transparent by ~three-quarters)
           so it reads as a diagonal glow rather than a full band, keeping the copy and form clean. */}
       <SiftContributionGrid
@@ -192,7 +192,7 @@ export function SiftSetup({ repos }: { repos: RepoOption[] }) {
       />
 
       <div className="relative z-10 animate-in fade-in fill-mode-both duration-500">
-        {/* Top: the preserved "Coming soon" link — absolute so it doesn't push the content down. */}
+        {/* Top: the preserved "Coming soon" link - absolute so it doesn't push the content down. */}
         <button
           onClick={() => setView("soon")}
           className="absolute right-0 top-0 z-20 inline-flex items-center gap-1.5 rounded-full border border-border bg-background/60 px-2.5 py-1 text-[11px] font-medium text-muted-foreground backdrop-blur transition-colors hover:border-foreground/40 hover:text-foreground"
@@ -201,7 +201,7 @@ export function SiftSetup({ repos }: { repos: RepoOption[] }) {
         </button>
 
         <div className="grid items-start gap-10 pt-9 lg:grid-cols-2">
-          {/* LEFT — the "coming soon" title + subtext, then the guided steps. */}
+          {/* LEFT - the "coming soon" title + subtext, then the guided steps. */}
           <div className="space-y-7">
             <div className="space-y-4">
               <div className="flex items-center gap-3">
@@ -213,7 +213,7 @@ export function SiftSetup({ repos }: { repos: RepoOption[] }) {
                 Reviewed by Sift, mapped by Atlas.
               </h1>
               <p className="max-w-md text-[15px] leading-relaxed text-muted-foreground text-pretty">
-                Every pull request gets a deep, whole-codebase review — real issues caught before
+                Every pull request gets a deep, whole-codebase review - real issues caught before
                 they merge, each one tracked across the pipeline it moves through, so nothing slips
                 past your team.
               </p>
@@ -224,18 +224,18 @@ export function SiftSetup({ repos }: { repos: RepoOption[] }) {
                 hard it looks at every pull request.
               </Step>
               <Step title="Pick your repositories">
-                Select which repos Sift reviews — across Bitbucket, GitHub, or GitLab, wherever your
+                Select which repos Sift reviews - across Bitbucket, GitHub, or GitLab, wherever your
                 code lives.
               </Step>
               <Step title="See reviews in context">
                 Sift’s findings appear on each pull request and inside the War Room trace, right
-                next to the ticket intent Atlas already checks — code correctness and intent
+                next to the ticket intent Atlas already checks - code correctness and intent
                 coverage, together.
               </Step>
             </Steps>
           </div>
 
-          {/* RIGHT — the two-step review-configuration wizard. Card-less to match the open left
+          {/* RIGHT - the two-step review-configuration wizard. Card-less to match the open left
               column. */}
           <div className="relative z-10 space-y-5">
             <div className="flex items-start justify-between gap-3">
@@ -287,7 +287,7 @@ export function SiftSetup({ repos }: { repos: RepoOption[] }) {
                     setSubmitted(true);
                   }}
                 >
-                  {/* Carry the step-1 picks forward — a compact recap that jumps back to edit. */}
+                  {/* Carry the step-1 picks forward - a compact recap that jumps back to edit. */}
                   <button
                     type="button"
                     onClick={() => setStep("config")}
@@ -307,7 +307,7 @@ export function SiftSetup({ repos }: { repos: RepoOption[] }) {
                     </span>
                   </button>
 
-                  {/* Repositories — every repo Atlas knows, host-agnostic; searchable, select-all
+                  {/* Repositories - every repo Atlas knows, host-agnostic; searchable, select-all
                         or pick individually. */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -323,7 +323,7 @@ export function SiftSetup({ repos }: { repos: RepoOption[] }) {
                       ) : null}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Every repository Atlas has discovered — pick what Sift reviews.
+                      Every repository Atlas has discovered - pick what Sift reviews.
                     </p>
 
                     {repos.length === 0 ? (
@@ -392,7 +392,7 @@ export function SiftSetup({ repos }: { repos: RepoOption[] }) {
 
                   {submitted ? (
                     <p className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-                      Sift onboarding isn&rsquo;t wired up yet — this is the layout. We&rsquo;ll
+                      Sift onboarding isn&rsquo;t wired up yet - this is the layout. We&rsquo;ll
                       connect it to the backend next.
                     </p>
                   ) : null}

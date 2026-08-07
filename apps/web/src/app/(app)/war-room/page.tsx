@@ -69,7 +69,7 @@ async function WarRoomContent() {
         )}
       </div>
       <p className="-mt-4 max-w-2xl text-sm text-muted-foreground">
-        Investigate what&rsquo;s broken — a live, cited trace from the failing resource to the
+        Investigate what&rsquo;s broken - a live, cited trace from the failing resource to the
         likely cause. Start one from a red node on the map or a finding in Insights.
       </p>
 

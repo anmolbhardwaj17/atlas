@@ -156,7 +156,7 @@ export function ConnectNodeDialog({
           </span>
         </div>
 
-        {/* Search the target — works for any node, flow or shelf. */}
+        {/* Search the target - works for any node, flow or shelf. */}
         <div className="relative mt-3">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           {searching ? (

@@ -68,7 +68,7 @@ export function DangerZoneCard({ orgId, orgName }: { orgId: string; orgName: str
         <div>
           <p className="text-sm font-medium">Delete this organization</p>
           <p className="mt-0.5 max-w-md text-sm text-muted-foreground">
-            Permanently removes {orgName} and all of its data — the graph, connections, members, and
+            Permanently removes {orgName} and all of its data - the graph, connections, members, and
             history. This can&rsquo;t be undone.
           </p>
         </div>
@@ -103,7 +103,7 @@ export function DangerZoneCard({ orgId, orgName }: { orgId: string; orgName: str
               </AlertDialogHeader>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {[
-                  "The entire knowledge graph — every resource, dependency, and finding",
+                  "The entire knowledge graph - every resource, dependency, and finding",
                   "All connected sources (AWS, GitHub, …) and their stored credentials",
                   "Members, invitations, AI history, alerts, and settings",
                 ].map((line) => (

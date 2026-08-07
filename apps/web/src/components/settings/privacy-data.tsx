@@ -108,7 +108,7 @@ function ErasePerson({ orgId }: { orgId: string }) {
     setErasing(true);
     try {
       const n = await erasePerson(orgId, target.id);
-      toast.success(`Erased — redacted ${n} record${n === 1 ? "" : "s"}.`);
+      toast.success(`Erased - redacted ${n} record${n === 1 ? "" : "s"}.`);
       setTarget(null);
       setQuery("");
       setResults([]);
@@ -123,7 +123,7 @@ function ErasePerson({ orgId }: { orgId: string }) {
     <div className="rounded-lg border border-border px-3.5 py-3">
       <div className="text-sm font-medium">Erase a person</div>
       <div className="mt-0.5 text-xs text-muted-foreground">
-        Redacts their identity and scrubs their name from authorship across the graph — and keeps it
+        Redacts their identity and scrubs their name from authorship across the graph - and keeps it
         scrubbed after future syncs. This can&rsquo;t be undone.
       </div>
 

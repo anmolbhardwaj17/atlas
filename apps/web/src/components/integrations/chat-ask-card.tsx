@@ -118,8 +118,8 @@ export function ChatAskCard({
             </div>
             <p className="max-w-md text-sm text-muted-foreground">
               Add Atlas to your {platform.label} so anyone can ask{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">/atlas</code> — e.g.{" "}
-              <em>&ldquo;what depends on orders-db?&rdquo;</em> — right in a {platform.surface}.
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">/atlas</code> - e.g.{" "}
+              <em>&ldquo;what depends on orders-db?&rdquo;</em> - right in a {platform.surface}.
             </p>
           </div>
         </div>

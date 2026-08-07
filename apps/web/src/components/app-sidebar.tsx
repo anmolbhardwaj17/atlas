@@ -217,7 +217,7 @@ export function AppSidebar({ orgId }: { orgId?: string }) {
                           <AtlasAiMark size={20} className="size-5 shrink-0" />
                         )}
                         <span>{item.label}</span>
-                        {/* War Room is the only item that earns a live count — see WarRoomCount. */}
+                        {/* War Room is the only item that earns a live count - see WarRoomCount. */}
                         {orgId && item.href === "/war-room" ? <WarRoomCount orgId={orgId} /> : null}
                       </Link>
                     </SidebarMenuButton>
