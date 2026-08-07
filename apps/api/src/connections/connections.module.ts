@@ -103,8 +103,19 @@ const snapshotStoreProvider: Provider = {
       const client = createServiceClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
       return new SupabaseStorageSnapshotStore(client, RAW_SNAPSHOT_BUCKET);
     }
+    // In production this must be a hard stop, not a warning. The in-memory store accepts every
+    // write, returns a `mem://…` ref, and drops the payload — so provenance records evidence that
+    // was never kept, and nothing downstream can tell the difference (P4). A boot failure naming
+    // the missing variable is recoverable in a minute; silently-unsourced claims are not, because
+    // the loss is only discovered when someone asks to see the evidence.
+    if (env.NODE_ENV === "production") {
+      throw new Error(
+        "SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are required in production: without them raw " +
+          "snapshots are discarded and provenance would cite payloads that do not exist.",
+      );
+    }
     new Logger("SnapshotStore").warn(
-      "Supabase Storage unset - using in-memory snapshot store (dev).",
+      "Supabase Storage unset - using in-memory snapshot store (dev). Raw snapshots are NOT retained.",
     );
     return new InMemorySnapshotStore();
   },

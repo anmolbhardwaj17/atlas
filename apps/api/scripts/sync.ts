@@ -22,6 +22,9 @@ import {
   createSyncHandler,
   DbSecretBroker,
   InMemorySnapshotStore,
+  SupabaseStorageSnapshotStore,
+  createServiceClient,
+  RAW_SNAPSHOT_BUCKET,
   consoleLogger,
   type SecretBroker,
 } from "@atlas/ingest";
@@ -146,9 +149,27 @@ async function main(): Promise<void> {
     ["bitbucket", createBitbucketConnector({ secrets })],
   ]);
 
+  // Raw snapshots must go to the SAME durable store the API uses. This previously hardcoded the
+  // in-memory store, which silently discarded every payload and wrote `mem://…` provenance refs
+  // into whatever database the script pointed at — including production, where 1132 of them
+  // accumulated as references to evidence that no longer exists (P4: no un-sourced claims). The
+  // docstring above promised "the SAME code path production runs"; the store was the one place it
+  // wasn't, and the fallback was silent, so nothing ever said so.
+  const supaUrl = process.env.SUPABASE_URL;
+  const supaKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const snapshots =
+    supaUrl && supaKey
+      ? new SupabaseStorageSnapshotStore(createServiceClient(supaUrl, supaKey), RAW_SNAPSHOT_BUCKET)
+      : (console.warn(
+          "⚠  SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY unset — raw snapshots will NOT be retained.\n" +
+            "   Provenance will record refs to payloads that don't exist. Fine for a scratch database;\n" +
+            "   never run this against a database you care about.",
+        ),
+        new InMemorySnapshotStore());
+
   const handler = createSyncHandler({
     db,
-    snapshots: new InMemorySnapshotStore(),
+    snapshots,
     secrets,
     logger: consoleLogger,
     resolveConnector: (provider) => registry.get(provider),
