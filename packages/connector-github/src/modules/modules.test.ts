@@ -124,4 +124,26 @@ describe("leaf node modules", () => {
     );
     expect(packageModule.observedEdges({ ecosystem: "npm", name: "react" })).toEqual([]);
   });
+
+  // US-10. `team` is no longer a pure leaf: once membership is resolved it owns HAS_MEMBER edges.
+  it("team emits HAS_MEMBER per resolved member, and records the count", () => {
+    const payload = { owner: "acme", data: { slug: "payments" }, members: ["ada", "grace"] };
+    const edges = teamModule.observedEdges(payload);
+
+    expect(edges).toHaveLength(2);
+    expect(edges[0]).toMatchObject({
+      type: "HAS_MEMBER",
+      fromUrn: "github:acme:team:payments",
+      toUrn: "github:user:ada",
+    });
+    expect(edges[1]?.toUrn).toBe("github:user:grace");
+    expect(teamModule.normalize(payload).attributes.memberCount).toBe(2);
+  });
+
+  it("team emits nothing when membership couldn't be read (P3: no edge beats a wrong edge)", () => {
+    const unresolved = { owner: "acme", data: { slug: "payments" } };
+    expect(teamModule.observedEdges(unresolved)).toEqual([]);
+    // undefined, NOT 0 — an unreadable team must never be presented as an empty one.
+    expect(teamModule.normalize(unresolved).attributes.memberCount).toBeUndefined();
+  });
 });

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { Connection, CrawlContext, SecretAccessor, SyncRun } from "@atlas/connector-sdk";
 import type { GithubClient } from "./client";
-import { crawlRepo, listInstallationRepos } from "./crawl";
+import { crawlRepo, listInstallationRepos, listTeamMembers } from "./crawl";
 import { GithubConnector } from "../github-connector";
 import type { InstallationTokenProvider } from "../auth";
 
@@ -52,6 +52,10 @@ function fakeClient(): GithubClient {
     },
     async *paginate(path: string) {
       if (path === "/installation/repositories") yield { name: "svc", owner: { login: "acme" } };
+      if (path === "/orgs/acme/teams/payments/members") {
+        yield { login: "ada" };
+        yield { login: "grace" };
+      }
     },
   };
   return client as unknown as GithubClient;
@@ -76,6 +80,48 @@ describe("crawlRepo", () => {
 
   it("listInstallationRepos returns installed repos", async () => {
     expect(await listInstallationRepos(fakeClient())).toEqual([{ owner: "acme", repo: "svc" }]);
+  });
+
+  // US-10: a CODEOWNERS team is a label until it resolves to people. These prove the members reach
+  // the graph as real user nodes AND ride on the team payload (which is what emits HAS_MEMBER).
+  it("resolves a CODEOWNERS team to its members (US-10)", async () => {
+    const out: Array<{ kind: string; externalId: string; payload: unknown }> = [];
+    for await (const d of crawlRepo(fakeClient(), "acme", "svc", "repo:acme/svc")) {
+      out.push({ kind: d.ref.kind, externalId: d.ref.externalId, payload: d.payload });
+    }
+    // Each member becomes a user node, so the HAS_MEMBER edges resolve inside this scope.
+    expect(out).toContainEqual(
+      expect.objectContaining({ kind: "github.user", externalId: "user:ada" }),
+    );
+    expect(out).toContainEqual(
+      expect.objectContaining({ kind: "github.user", externalId: "user:grace" }),
+    );
+    const team = out.find((d) => d.externalId === "team:acme/payments");
+    expect((team?.payload as { members?: string[] })?.members).toEqual(["ada", "grace"]);
+  });
+
+  it("degrades to no members when members:read is declined, without failing the scope", async () => {
+    // An org-level permission a customer can decline while granting everything else. A 403 must not
+    // cost us the repo/PR/workflow data — a missing edge beats a wrong one, and beats no data (P3).
+    const client = fakeClient();
+    const denied = {
+      ...client,
+      async *paginate(path: string) {
+        if (path.includes("/members")) throw new Error("GitHub 403: Resource not accessible");
+        yield* client.paginate(path);
+      },
+    } as unknown as GithubClient;
+
+    expect(await listTeamMembers(denied, "acme", "payments")).toEqual([]);
+
+    const out: Array<{ kind: string; externalId: string; payload: unknown }> = [];
+    for await (const d of crawlRepo(denied, "acme", "svc", "repo:acme/svc")) {
+      out.push({ kind: d.ref.kind, externalId: d.ref.externalId, payload: d.payload });
+    }
+    // The repo still crawled, and the team is still a node — just without membership.
+    expect(out).toContainEqual(expect.objectContaining({ kind: "github.repository" }));
+    const team = out.find((d) => d.externalId === "team:acme/payments");
+    expect((team?.payload as { members?: string[] })?.members).toEqual([]);
   });
 });
 

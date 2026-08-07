@@ -200,7 +200,8 @@ sequenceDiagram
 ### 7.2 CODEOWNERS → ownership (FR-3.3, R5, observed)
 - Parse `CODEOWNERS` (root/`.github`/`docs`). Map path patterns → owning teams/users.
 - Emit **observed** `OWNED_BY` edges: repo (and via R4, the derived `atlas.service`) → `github.team`/`github.user`. (The repo→team mapping is *parsed* hence observed; propagating ownership to the service is the `inferred-high` step, `05` R5.)
-- Resolve team membership (App members/teams read) so "who owns checkout?" (US-10) returns people, not just a team handle.
+- **Resolve team membership** (App `members:read`) so "who owns checkout?" (US-10) returns people, not just a team handle. Each CODEOWNERS team is expanded via `GET /orgs/{org}/teams/{slug}/members`; the members ride on the team payload and are emitted as `github.user` nodes in the same scope, so the resulting **observed `HAS_MEMBER`** edges (team → user) resolve without a forward reference. The team node also carries `memberCount`.
+  - `members:read` is an **org-level** permission a customer can decline while granting every repo-level one. That case degrades honestly: no members, no `HAS_MEMBER` edges, `memberCount` **undefined** (never `0` — an unreadable team must not present as an empty one), and the scope still completes with its repo/PR/workflow data intact. The gap surfaces through the existing `missingPermissions` → connection `degraded` path (§2, §8). A missing edge beats a wrong one (P3).
 
 ### 7.3 Dependency manifests → package edges (FR-3.5, `DEPENDS_ON_PKG`, observed)
 - Parse ecosystem manifests/lockfiles on the default branch:

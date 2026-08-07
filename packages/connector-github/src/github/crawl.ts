@@ -37,6 +37,37 @@ export async function listInstallationRepos(
   return out;
 }
 
+/**
+ * Resolve a CODEOWNERS team to its members (US-10, docs/07 §7.2).
+ *
+ * Without this, CODEOWNERS gives you "this repo is owned by @acme/platform" — a label, not a set of
+ * people. During an incident the question is "who do I actually talk to", and a team name doesn't
+ * answer it. Membership turns ownership into contactable humans.
+ *
+ * Returns [] rather than throwing when the read isn't possible. `members:read` is an ORG-level
+ * permission a customer can decline while still granting everything else, so a 403 here is a
+ * legitimate configuration, not a failure — and failing the scope would throw away the repo, PR and
+ * workflow data we did get. Missing membership is surfaced honestly through the existing
+ * `missingPermissions` path (connection → `degraded`), and a missing edge beats a wrong one (P3).
+ */
+export async function listTeamMembers(
+  client: GithubClient,
+  org: string,
+  slug: string,
+): Promise<string[]> {
+  const logins: string[] = [];
+  try {
+    for await (const m of client.paginate<{ login?: string }>(
+      `/orgs/${org}/teams/${slug}/members`,
+    )) {
+      if (m.login) logins.push(m.login);
+    }
+  } catch {
+    return [];
+  }
+  return logins;
+}
+
 export async function* crawlRepo(
   client: GithubClient,
   owner: string,
@@ -86,10 +117,17 @@ export async function* crawlRepo(
   // Target nodes for the repo's observed edges (so they resolve in-scope).
   for (const o of distinctOwners(parseCodeowners(codeowners ?? ""))) {
     if (o.type === "team") {
+      // Resolve the team to its people (US-10). The members ride on the team payload so its module
+      // can emit HAS_MEMBER, and each member is also yielded as a user node so those edges resolve
+      // in-scope — the same pattern the repo's OWNED_BY targets follow.
+      const members = await listTeamMembers(client, o.org, o.slug);
       yield {
         ref: ref(`team:${o.org}/${o.slug}`, "github.team"),
-        payload: { owner: o.org, data: { slug: o.slug } },
+        payload: { owner: o.org, data: { slug: o.slug }, members },
       };
+      for (const login of members) {
+        yield { ref: ref(`user:${login}`, "github.user"), payload: { data: { login } } };
+      }
     } else {
       yield { ref: ref(`user:${o.login}`, "github.user"), payload: { data: { login: o.login } } };
     }
