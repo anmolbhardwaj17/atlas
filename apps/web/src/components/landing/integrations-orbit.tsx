@@ -117,7 +117,11 @@ function Ring({
 
 export function IntegrationsOrbit() {
   return (
-    <div className="relative mx-auto aspect-square w-full max-w-[520px]">
+    // `overflow-hidden` is load-bearing: each icon rides a full-size layer that gets ROTATED, and a
+    // rotated square's bounding box is up to 1.41x its side. Those boxes stuck out past the viewport
+    // and gave the whole page a horizontal scrollbar on phones. Clipping costs nothing visually —
+    // the icons themselves sit well inside the container; only the invisible boxes are trimmed.
+    <div className="relative mx-auto aspect-square w-full max-w-[520px] overflow-hidden">
       {/* Insets leave room for the icons, which straddle their border by half their own size. */}
       <Ring names={OUTER} inset="8%" duration={62} sizeClass="size-8 sm:size-[50px]" reverse />
       <Ring names={INNER} inset="32%" duration={38} sizeClass="size-7 sm:size-11" />

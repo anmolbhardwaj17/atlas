@@ -117,7 +117,7 @@ export default function LoginPage() {
         <div className="w-full max-w-sm text-center">
           {/* Liquid-metal Atlas mark above the sign-in. Transparent back (page is white already) so
               it never paints an opaque box over the heading; grey tint reads on white. */}
-          <div className="-mb-4 flex justify-center [filter:drop-shadow(0_14px_34px_rgba(0,0,0,0.12))] md:-mb-3 md:[&>*]:size-[224px]">
+          <div className="-mb-4 flex max-w-full justify-center overflow-hidden [filter:drop-shadow(0_14px_34px_rgba(0,0,0,0.12))] md:-mb-3 md:[&>*]:size-[224px]">
             <LiquidMetal
               width={300}
               height={300}
