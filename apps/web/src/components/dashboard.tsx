@@ -242,9 +242,13 @@ export async function Dashboard({
         <PostureCard posture={s.insights.posture} />
       </div>
 
-      <Insights insights={s.insights} />
-
+      {/* "What changed" sits ABOVE the slower-moving panels now. For anyone past their first week
+          this is the question they actually arrived with — and it's the one thing the graph is
+          uniquely able to answer, since it ties deploys, PRs and config changes to the resources
+          they touched. It used to sit at the foot of the page, below the posture cards. */}
       <RecentActivity activity={s.activity} />
+
+      <Insights insights={s.insights} />
 
       <MapPreview inv={inv} cross={s.crossBoundary} orgId={orgId} />
     </div>
@@ -480,17 +484,20 @@ function FindingRow({ f }: { f: Finding }) {
   return <li>{f.href ? <Link href={f.href}>{body}</Link> : body}</li>;
 }
 
-/** Recent activity — a full-width card at the foot of the page. Low-signal, so it lives at the
- *  bottom, but keeps the familiar row list; the rows flow into columns to use the full width. */
+/** What changed — a full-width card, promoted above the posture panels (see the render order). */
 function RecentActivity({ activity }: { activity: ActivityItem[] }) {
   if (activity.length === 0) return null;
   return (
     <Card>
       <CardContent className="p-5">
-        <h2 className="mb-3 flex items-center gap-2 text-base font-semibold">
+        <h2 className="mb-1 flex items-center gap-2 text-base font-semibold">
           <Activity className="size-4 text-muted-foreground" />
-          Recent activity
+          What changed recently
         </h2>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Deploys, merged pull requests and configuration changes across your estate — the usual
+          first suspects when something starts behaving differently.
+        </p>
         <ul className="-mx-2 divide-y divide-border">
           {activity.map((a, i) => (
             <ActivityRow key={i} a={a} />

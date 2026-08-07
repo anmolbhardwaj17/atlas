@@ -1830,10 +1830,31 @@ function MapSearch({
   );
 }
 
-/** Legend — floats top-right. Collapsed to a small pill by default (it ate real estate); click to
- *  expand the full edge + node key. */
+/**
+ * Legend — floats top-right.
+ *
+ * OPEN on a user's first maps, collapsed once they dismiss it. It used to be collapsed by default
+ * because it ate real estate — correct for someone fluent in the visual language, but it meant a
+ * first-time user faced a canvas of coloured, iconed nodes and dashed lines with no key at all. The
+ * dismissal is remembered, so the cost is paid only by people who still need it.
+ */
 function Legend() {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    try {
+      setOpen(window.localStorage.getItem("atlas.map.legendDismissed") !== "1");
+    } catch {
+      /* storage blocked (private mode) — stay collapsed rather than break the map */
+    }
+  }, []);
+  const dismiss = () => {
+    setOpen(false);
+    try {
+      window.localStorage.setItem("atlas.map.legendDismissed", "1");
+    } catch {
+      /* ignore */
+    }
+  };
   if (!open) {
     return (
       <button
@@ -1847,10 +1868,10 @@ function Legend() {
     );
   }
   return (
-    <div className="absolute right-3 top-3 z-10 flex w-44 flex-col gap-2 rounded-lg border border-border bg-background/80 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur">
+    <div className="absolute right-3 top-3 z-10 flex w-52 flex-col gap-2 rounded-lg border border-border bg-background/80 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur">
       <button
         type="button"
-        onClick={() => setOpen(false)}
+        onClick={dismiss}
         className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
       >
         Legend
@@ -1860,20 +1881,34 @@ function Legend() {
         <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           Edges
         </span>
-        <span className="flex items-center gap-1.5">
+        {/* The `title`s carry the same explanations as the certainty badges: the line style IS the
+            claim about how much Atlas actually knows, and it was unlabelled until now. */}
+        <span
+          className="flex items-center gap-1.5"
+          title="Atlas read this relationship directly from your cloud or code. A fact, not a guess."
+        >
           <span className="h-px w-4 bg-foreground" /> observed
         </span>
-        <span className="flex items-center gap-1.5">
+        <span
+          className="flex items-center gap-1.5"
+          title="Atlas worked this relationship out from evidence such as tags, naming or deploy config — rather than seeing it directly."
+        >
           <span className="h-px w-4 border-t border-dashed border-muted-foreground" /> inferred
         </span>
-        <span className="flex items-center gap-1.5">
+        <span
+          className="flex items-center gap-1.5"
+          title="A model proposed this link because deterministic matching couldn't find it. It stays out of your graph until you confirm it."
+        >
           <span
             className="h-0 w-4 border-t border-dotted"
             style={{ borderColor: AI_SUGGESTED_COLOR }}
           />
           AI-suggested
         </span>
-        <span className="flex items-center gap-1.5">
+        <span
+          className="flex items-center gap-1.5"
+          title="This relationship crosses a cloud or account boundary — wider blast radius, wider attack surface, and often cross-region cost."
+        >
           <span className="h-0.5 w-4 rounded" style={{ backgroundColor: CROSS_COLOR }} />
           cross-boundary
         </span>

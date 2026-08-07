@@ -1030,8 +1030,18 @@ function ConnectionBlock({
       {/* Sync status. */}
       <p className="mt-2">
         {syncing ? (
-          <span className="flex items-center gap-1.5 text-muted-foreground">
-            <Loader2 className="size-3.5 animate-spin" /> Syncing — pulling the latest data…
+          // Expectation-setting, not just a spinner. This is the highest-anxiety moment in the
+          // product — the user has just handed over cloud credentials and has no evidence anything
+          // worked — and it used to say only "pulling the latest data…" with no sense of how long
+          // or what happens next. The row self-refreshes every 4s, so they can safely leave.
+          <span className="flex flex-col gap-0.5 text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <Loader2 className="size-3.5 animate-spin" /> Syncing — reading your estate…
+            </span>
+            <span className="text-xs">
+              A first sync usually takes a few minutes. You can leave this page — it keeps running,
+              and the graph fills in as it goes.
+            </span>
           </span>
         ) : conn.lastSync ? (
           <span
