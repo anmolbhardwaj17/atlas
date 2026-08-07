@@ -92,7 +92,7 @@ export default async function LandingPage() {
                 <Link href={cta.href}>{cta.label}</Link>
               </Button>
               <span className="text-sm text-neutral-500">
-                Read-only access. No agents to deploy.
+                Free while in beta. Read-only access, no agents to deploy.
               </span>
             </div>
           </div>
@@ -498,7 +498,7 @@ export default async function LandingPage() {
               </p>
             </div>
 
-            <div>
+            <div className="flex gap-16">
               <div>
                 <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">
                   Legal
@@ -519,6 +519,21 @@ export default async function LandingPage() {
                     >
                       Terms
                     </Link>
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">
+                  Contact
+                </p>
+                <ul className="mt-4 space-y-2.5">
+                  <li>
+                    <a
+                      href="mailto:anmolbhardwaj17@gmail.com"
+                      className="text-sm text-neutral-600 transition-colors hover:text-neutral-900"
+                    >
+                      Email us
+                    </a>
                   </li>
                 </ul>
               </div>
