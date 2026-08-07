@@ -212,7 +212,7 @@ export function AskDemo() {
   });
 
   return (
-    <div className="flex min-h-[420px] flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-lg">
+    <div className="flex min-h-[460px] flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-lg sm:min-h-[320px]">
       {/* Conversation */}
       <div className="flex-1 space-y-4 p-5">
         {sent ? (

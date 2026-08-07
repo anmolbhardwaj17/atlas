@@ -110,8 +110,8 @@ export function TraceDemo() {
     <div className="relative">
       {/* The rail grows with the reveal, so the trace extends rather than sitting pre-drawn. */}
       <div
-        className="absolute left-[102px] top-8 w-px bg-neutral-200 transition-[height] duration-500 ease-out"
-        style={{ height: visible > 1 ? `${(visible - 1) * 68}px` : "0px" }}
+        className="absolute bottom-8 left-[42px] top-8 w-px origin-top bg-neutral-200 transition-transform duration-500 ease-out sm:left-[102px]"
+        style={{ transform: `scaleY(${Math.max(0, (visible - 1) / (STEPS.length - 1))})` }}
         aria-hidden="true"
       />
       <ol className="space-y-1">
@@ -125,7 +125,7 @@ export function TraceDemo() {
                 "motion-safe:animate-[motion-rise_0.4s_cubic-bezier(0.2,0.8,0.2,1)_both]",
             )}
           >
-            <span className="w-[70px] shrink-0 pt-[11px] text-right text-xs tabular-nums text-neutral-400">
+            <span className="hidden w-[70px] shrink-0 pt-[11px] text-right text-xs tabular-nums text-neutral-400 sm:block">
               {r.time}
             </span>
             <span
@@ -140,7 +140,7 @@ export function TraceDemo() {
                 onto the end of the title; ml-auto pushes it to the right edge of the row. */}
             <span
               className={cn(
-                "relative flex min-w-0 flex-1 items-center gap-3 rounded-xl border px-4 py-2.5 transition-colors duration-500",
+                "relative flex min-w-0 flex-1 flex-col items-start gap-1.5 rounded-xl border px-4 py-2.5 transition-colors duration-500 sm:flex-row sm:items-center sm:gap-3",
                 r.culprit && isMarked ? "border-danger bg-danger/[0.04]" : "border-transparent",
               )}
             >
@@ -154,9 +154,19 @@ export function TraceDemo() {
                 />
               ) : null}
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium">{r.title}</span>
+                <span className="block text-sm font-medium">
+                  {r.title}
+                  <span className="ml-2 text-xs font-normal tabular-nums text-neutral-400 sm:hidden">
+                    {r.time}
+                  </span>
+                </span>
                 <span className="mt-0.5 block text-xs text-neutral-500">{r.detail}</span>
               </span>
+              {/* Reserve the badge's line so the row height never changes when it lands - a row
+                  that grows mid-animation shoves everything below it and scrolls the page. */}
+              {r.culprit && !showBadge ? (
+                <span className="h-[18px] shrink-0" aria-hidden="true" />
+              ) : null}
               {r.culprit && showBadge ? (
                 <span className="shrink-0 rounded-full bg-danger px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white motion-safe:animate-[motion-pop_0.3s_cubic-bezier(0.2,0.8,0.2,1)_both]">
                   Most likely cause

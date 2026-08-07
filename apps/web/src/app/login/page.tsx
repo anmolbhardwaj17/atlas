@@ -117,10 +117,10 @@ export default function LoginPage() {
         <div className="w-full max-w-sm text-center">
           {/* Liquid-metal Atlas mark above the sign-in. Transparent back (page is white already) so
               it never paints an opaque box over the heading; grey tint reads on white. */}
-          <div className="-mb-3 flex justify-center [filter:drop-shadow(0_14px_34px_rgba(0,0,0,0.12))]">
+          <div className="-mb-4 flex justify-center [filter:drop-shadow(0_14px_34px_rgba(0,0,0,0.12))] md:-mb-3 md:[&>*]:size-[224px]">
             <LiquidMetal
-              width={224}
-              height={224}
+              width={300}
+              height={300}
               image="/atlas-logo.png"
               colorBack="#00000000"
               colorTint="#999999"
@@ -151,7 +151,7 @@ export default function LoginPage() {
         </div>
 
         {/* Legal links, anchored to the bottom of the panel. */}
-        <div className="mt-10 flex justify-center gap-5 text-xs text-neutral-400 md:absolute md:inset-x-0 md:bottom-6 md:mt-0">
+        <div className="mt-auto flex w-full justify-center gap-5 pt-12 text-xs text-neutral-400 md:absolute md:inset-x-0 md:bottom-6 md:mt-0 md:pt-0">
           <Link href="/legal/terms" className="transition-colors hover:text-neutral-700">
             Terms of Service
           </Link>

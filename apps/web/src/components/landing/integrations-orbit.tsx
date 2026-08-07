@@ -64,14 +64,16 @@ function Ring({
   names,
   inset,
   duration,
-  size,
+  sizeClass,
   reverse,
 }: {
   names: string[];
   /** Distance from the container edge — sets the orbit radius for the border AND its icons. */
   inset: string;
   duration: number;
-  size: number;
+  /** Tile size classes. Smaller on phones: the ring shrinks with the viewport but a fixed tile
+   *  doesn't, so at ~390px the circumference ran out of room and neighbours overlapped. */
+  sizeClass: string;
   reverse?: boolean;
 }) {
   const spin = reverse
@@ -100,8 +102,7 @@ function Ring({
               {/* Counter-rotation keeps the logo upright while the ring turns. */}
               <div className={counter} style={{ ["--dur" as string]: `${duration}s` }}>
                 <div
-                  className="grid place-items-center rounded-2xl border border-neutral-200 bg-white shadow-sm"
-                  style={{ width: size, height: size }}
+                  className={`grid place-items-center rounded-2xl border border-neutral-200 bg-white shadow-sm ${sizeClass}`}
                 >
                   <CloudIcon name={name} className="size-1/2" />
                 </div>
@@ -118,13 +119,13 @@ export function IntegrationsOrbit() {
   return (
     <div className="relative mx-auto aspect-square w-full max-w-[520px]">
       {/* Insets leave room for the icons, which straddle their border by half their own size. */}
-      <Ring names={OUTER} inset="6%" duration={62} size={50} reverse />
-      <Ring names={INNER} inset="30%" duration={38} size={44} />
+      <Ring names={OUTER} inset="8%" duration={62} sizeClass="size-8 sm:size-[50px]" reverse />
+      <Ring names={INNER} inset="32%" duration={38} sizeClass="size-7 sm:size-11" />
 
       {/* The centre: Atlas itself, spinning like the mark does everywhere else in the product. */}
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-        <div className="grid size-24 place-items-center rounded-full border border-neutral-200 bg-white shadow-lg">
-          <AtlasLogo size={52} spin className="size-[52px]" />
+        <div className="grid size-16 place-items-center rounded-full border border-neutral-200 bg-white shadow-lg sm:size-24">
+          <AtlasLogo size={52} spin className="size-9 sm:size-[52px]" />
         </div>
       </div>
     </div>
