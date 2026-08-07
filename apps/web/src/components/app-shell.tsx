@@ -44,7 +44,7 @@ export function AppShell({
       >
         Skip to content
       </a>
-      <AppSidebar />
+      <AppSidebar {...(orgId ? { orgId } : {})} />
       {/* min-w-0: this is a flex item; without it, a page with intrinsically-wide content (e.g. the
           onboarding carousel's marquee row) forces <main> to grow to its content width and spills a
           page-wide horizontal scroll. min-w-0 lets it shrink so children's overflow-hidden clips. */}

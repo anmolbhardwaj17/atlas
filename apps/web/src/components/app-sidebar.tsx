@@ -15,6 +15,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { AtlasLogo, AtlasAiMark } from "@/components/brand";
+import { WarRoomCount } from "@/components/war-room-count";
 // import { CloudIcon } from "@/components/cloud-icon"; // used by ConnectAppsCard (disabled for now)
 // import { Button } from "@/components/ui/button";
 import {
@@ -158,7 +159,7 @@ function ConnectAppsCard() {
 }
 */
 
-export function AppSidebar() {
+export function AppSidebar({ orgId }: { orgId?: string }) {
   const pathname = usePathname();
   // Prefetched loading boundaries (next.config `staleTimes`) make the URL + destination skeleton
   // commit instantly, so this is just honest in-flight feedback: the clicked item shows a spinner
@@ -216,6 +217,8 @@ export function AppSidebar() {
                           <AtlasAiMark size={20} className="size-5 shrink-0" />
                         )}
                         <span>{item.label}</span>
+                        {/* War Room is the only item that earns a live count — see WarRoomCount. */}
+                        {orgId && item.href === "/war-room" ? <WarRoomCount orgId={orgId} /> : null}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

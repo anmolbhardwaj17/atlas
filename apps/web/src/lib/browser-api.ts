@@ -1211,6 +1211,26 @@ export interface Incident {
   resolvedAt: string | null;
 }
 
+/**
+ * How many incidents are currently open — for the War Room nav badge.
+ *
+ * Returns 0 rather than throwing on any failure (no session, offline, mid-deploy): a nav badge
+ * must never surface an error, and "silent" is the correct failure mode for an ambient indicator.
+ * `limit` caps the payload because the badge saturates at 9+, so transferring more is wasted bytes.
+ */
+export async function countOpenIncidents(orgId: string, limit = 10): Promise<number> {
+  const token = await getClientToken();
+  if (!token) return 0;
+  const res = await fetch(`${apiUrl()}/incidents?status=open&limit=${limit}`, {
+    headers: { Authorization: `Bearer ${token}`, "X-Atlas-Org": orgId },
+  });
+  if (!res.ok) return 0;
+  const body = (await res.json().catch(() => null)) as {
+    data?: { incidents?: unknown[] };
+  } | null;
+  return body?.data?.incidents?.length ?? 0;
+}
+
 /** Open (or reuse) a War Room investigation for a node, returning the incident. */
 export async function openIncident(
   orgId: string,
