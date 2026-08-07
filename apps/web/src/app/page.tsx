@@ -79,14 +79,13 @@ export default async function LandingPage() {
             <h1 className="mt-4 text-balance text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
               Nobody knows how the whole system fits together.
             </h1>
-            <p className="mt-6 max-w-xl text-balance text-lg leading-relaxed text-neutral-600">
+            <p className="mt-5 max-w-xl text-balance leading-relaxed text-neutral-600">
               It lives in a dozen consoles, a wiki nobody trusts, and the heads of the three people
-              who were there. The tools that promise to fix it mostly guess, confidently, and let
-              you find out later.
+              who were there. Atlas reads your cloud and your code and keeps one live map of what
+              you actually run.
             </p>
-            <p className="mt-5 max-w-xl text-balance text-lg leading-relaxed text-neutral-900">
-              Atlas reads your cloud and your code and keeps one live map of what you actually run,
-              and tells you how sure it is about every line of it.
+            <p className="mt-4 max-w-md text-balance text-sm italic leading-relaxed text-neutral-500">
+              Most tools guess confidently. This one tells you how sure it is.
             </p>
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <Button asChild size="lg" className="h-11 px-7">
