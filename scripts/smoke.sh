@@ -141,8 +141,15 @@ echo "Web  $WEB_URL"
 # frontend from the load-balancer pool.
 check "health endpoint returns 200 (not a redirect)" expect_status "$WEB_URL/api/health" 200
 
-# An anonymous visitor must be bounced to login — proves middleware runs and sessions are enforced.
-check "anonymous root redirects to login" expect_redirect_to "$WEB_URL/" "/login"
+# `/` is the public landing page — it must serve, NOT redirect. It previously bounced anonymous
+# visitors to /login, and this check asserted that; the assertion is inverted now that Atlas has a
+# front door. Keeping it as a positive check means an accidental re-introduction of the redirect
+# (or a landing page that fails to render) is caught rather than silently tolerated.
+check "landing page serves at the root" expect_status "$WEB_URL/" 200
+check "landing page renders" body_contains "$WEB_URL/" "Atlas"
+
+# The real auth boundary: an app route must still bounce an anonymous visitor to login. This is the
+# check that proves middleware runs and sessions are enforced — it must never be relaxed.
 check "anonymous dashboard redirects to login" expect_redirect_to "$WEB_URL/dashboard" "/login"
 
 # The login page must actually RENDER, not just 200. A blank 200 is what a broken RSC boundary or a

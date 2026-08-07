@@ -6,7 +6,7 @@ import { ACTIVE_ORG_COOKIE } from "@/lib/active-org";
 
 /**
  * Server-side guard for authenticated, org-scoped pages (Explore, Ask, Settings).
- * No session → /login. Signed in but no org → home (which shows the create-org card).
+ * No session → /login. Signed in but no org → /create-org.
  * Returns everything the AppShell + org-scoped `apiGet` calls need.
  */
 export interface Shell {
@@ -54,7 +54,10 @@ export const requireShell = cache(async (): Promise<Shell> => {
     me?.memberships.find((m) => m.orgId === picked) ??
     me?.memberships.find((m) => m.orgId === me.defaultOrgId) ??
     me?.memberships[0];
-  if (!me || !active) redirect("/");
+  // Signed in but with no org → the create-org surface, directly. This used to redirect to `/`,
+  // which forwarded onward; now `/` is the public landing page, so that would have parked an
+  // org-less member on marketing copy with no route into the product.
+  if (!me || !active) redirect("/create-org");
 
   return {
     token: session.token,

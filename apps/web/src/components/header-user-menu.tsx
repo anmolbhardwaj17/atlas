@@ -57,6 +57,12 @@ export function HeaderUserMenu({
 
   async function signOut() {
     await createClient().auth.signOut();
+    // Go to /login explicitly. A bare refresh used to work only because `/` bounced signed-out
+    // users to the login screen; now `/` is a public landing page, so relying on a redirect would
+    // leave the destination up to whichever route you happened to sign out from.
+    // `replace` + `refresh`: replace keeps the signed-in page out of history (Back must not appear
+    // to restore a session), and refresh clears the cached server render it left behind.
+    router.replace("/login");
     router.refresh();
   }
 

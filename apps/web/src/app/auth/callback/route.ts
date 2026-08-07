@@ -7,7 +7,11 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: Request): Promise<NextResponse> {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/";
+  // Default to the app, not `/`. `/` used to be a router that forwarded signed-in users onward;
+  // now it's the public landing page, so landing there after sign-in would strand the user on a
+  // marketing page having just logged in. An explicit `next` (an /invite/<token> deep link) still
+  // wins. An org-less user is picked up by requireShell and sent to /create-org.
+  const next = searchParams.get("next") ?? "/dashboard";
 
   if (code) {
     const supabase = await createClient();
