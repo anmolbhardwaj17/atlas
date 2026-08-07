@@ -8,7 +8,13 @@
  * (observed / inferred-high / inferred-low / stale) so trust is always legible.
  */
 @layer base {
-  :root {
+  /* `.theme-light` re-uses this exact block so a subtree can opt out of dark mode without
+     duplicating (and eventually drifting from) forty token values. Custom properties resolve to the
+     nearest ancestor that declares them, so a wrapper carrying `.theme-light` beats `.dark` on
+     <html> for everything inside it. Used by the public pages — landing and login — which are
+     designed light and sit outside the app shell where the theme toggle lives. */
+  :root,
+  .theme-light {
     /* Monochrome (black & white). Neutral grayscale - no hue anywhere. */
     --background: 0 0% 100%;
     --foreground: 0 0% 9%;
@@ -494,4 +500,53 @@
 .dark .react-flow__attribution {
   background: transparent;
   color: hsl(var(--muted-foreground));
+}
+
+/* ── Landing hero graph ─────────────────────────────────────────────────────────────────────────
+   The hero diagram draws itself on load: edges stroke in, then each node arrives after the edge
+   that leads to it (ordering comes from `--d`, set per element in graph-visual.tsx). Kept here with
+   the rest of the motion vocabulary rather than inlined, so there is still exactly one place that
+   defines how things move.
+
+   Mount-based, like every other entrance in the app — NOT scroll-triggered. The hero is above the
+   fold, so an observer would fire in the same frame anyway, and the state round-trip risks painting
+   the finished diagram for a frame before hiding it to animate. This also keeps the component free
+   of client JavaScript entirely.
+
+   Outside `prefers-reduced-motion: no-preference` these rules don't exist, so the un-animated
+   default IS the finished diagram: reduced-motion users see it drawn, and nothing is ever hidden
+   without a guarantee that it will be shown again. */
+@media (prefers-reduced-motion: no-preference) {
+  .lg-edge {
+    stroke-dasharray: 320;
+    stroke-dashoffset: 320;
+    animation: lg-draw 0.75s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    animation-delay: var(--d, 0s);
+  }
+  /* An inferred edge keeps its dashes, so it can't animate dashoffset — fade it in instead. */
+  .lg-edge.lg-inferred {
+    stroke-dasharray: 5 4;
+    stroke-dashoffset: 0;
+    animation: motion-fade 0.5s ease-out both;
+    animation-delay: var(--d, 0s);
+  }
+  .lg-node {
+    animation: lg-node-in 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    animation-delay: var(--d, 0s);
+  }
+}
+@keyframes lg-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes lg-node-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
