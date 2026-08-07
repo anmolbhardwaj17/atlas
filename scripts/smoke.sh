@@ -158,6 +158,14 @@ check "anonymous dashboard redirects to login" expect_redirect_to "$WEB_URL/dash
 check "login page renders" body_contains "$WEB_URL/login" "<html"
 check "login page is really the login page" body_contains "$WEB_URL/login" "Atlas"
 
+# The OAuth callback must send people back to the PUBLIC host. It builds that URL server-side, and
+# the obvious source - the incoming request URL - is the container's own bind address once there's
+# a proxy in front. That shipped: sign-in redirected to https://0.0.0.0:4291/dashboard, which is
+# nothing on a user's device, and every check above still passed because the pages themselves were
+# fine. Anything that isn't our own hostname here means nobody can log in.
+check "auth callback redirects back to the public host" \
+  expect_redirect_to "$WEB_URL/auth/callback" "$(echo "$WEB_URL" | sed 's#^https\?://##')"
+
 # --- verdict ---------------------------------------------------------------
 echo
 printf '%s passed, %s failed\n' "$pass" "$fail"
