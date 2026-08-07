@@ -177,6 +177,12 @@ export async function Dashboard({
         </div>
       </div>
 
+      {/* A source in error/degraded means the graph below is INCOMPLETE, and until now the dashboard
+          said nothing — you'd read counts, findings and an "all clear" health strip drawn from a
+          partial estate and have no way to know. That's the one failure the trust model can't
+          tolerate (docs/09 §7: observed vs stale is never silent), so it goes above everything. */}
+      <DegradedSources connections={connections} />
+
       {/* Live-health trust strip — the dashboard's "is anything broken right now" (op-intel Phase B).
           Renders only when the health poll has a live signal; silent otherwise (honest unknown). */}
       <HealthStrip health={s.health} />
@@ -482,6 +488,47 @@ function FindingRow({ f }: { f: Finding }) {
     </div>
   );
   return <li>{f.href ? <Link href={f.href}>{body}</Link> : body}</li>;
+}
+
+/**
+ * Incomplete-data warning. A connector in `error`/`revoked` has stopped feeding the graph, and
+ * `degraded` means it's only partly succeeding — in both cases every number on this page is drawn
+ * from less than the whole estate. Silence here is the most expensive lie the product can tell:
+ * an "all clear" over a half-read estate is worse than no dashboard at all, because it's trusted.
+ *
+ * Deliberately not a `danger` banner — nothing is *broken in production*, the picture is just
+ * partial — and it names the sources so the fix is one click away rather than a hunt.
+ */
+function DegradedSources({ connections }: { connections: ConnectionLite[] }) {
+  const broken = connections.filter(
+    (c) => c.status === "error" || c.status === "revoked" || c.status === "degraded",
+  );
+  if (broken.length === 0) return null;
+  const names = broken.map((c) => c.displayName || c.provider).join(", ");
+  return (
+    <Card className="border-warning/40 bg-warning/5">
+      <CardContent className="flex flex-wrap items-center gap-x-3 gap-y-1.5 p-4">
+        <TriangleAlert className="size-4 shrink-0 text-warning" />
+        <p className="min-w-0 flex-1 text-sm">
+          <span className="font-medium">
+            {broken.length === 1
+              ? "A source isn’t syncing"
+              : `${broken.length} sources aren’t syncing`}
+          </span>{" "}
+          <span className="text-muted-foreground">
+            — {names}. What you see below is drawn from everything else, so treat it as an
+            incomplete picture until this is reconnected.
+          </span>
+        </p>
+        <Link
+          href="/integrations"
+          className="shrink-0 text-sm font-medium text-primary hover:underline"
+        >
+          Fix in Integrations →
+        </Link>
+      </CardContent>
+    </Card>
+  );
 }
 
 /** What changed — a full-width card, promoted above the posture panels (see the render order). */
