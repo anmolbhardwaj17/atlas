@@ -34,6 +34,14 @@ interface LNode {
   y: number;
 }
 
+const W = 200;
+const H = 56;
+const CANVAS_W = 965;
+const CANVAS_H = 376;
+/** Lane headings sit above the first row — the live map frames nodes into lanes; so does this. */
+const LANE_Y = 0;
+const ROW0 = 34;
+
 /** Mirrors resource-node.tsx CERTAINTY exactly — solid = observed, faded = inferred, ring = low. */
 const CERTAINTY_DOT: Record<string, string> = {
   observed: "bg-foreground",
@@ -42,15 +50,15 @@ const CERTAINTY_DOT: Record<string, string> = {
 };
 
 const NODES: LNode[] = [
-  // Plan → code → build. The left spine: where a change starts.
-  { id: "ticket", name: "PAY-318", kind: "jira.issue", certainty: "observed", x: 0, y: 0 },
+  // Lane 1 — plan & code: where a change starts.
+  { id: "ticket", name: "PAY-318", kind: "jira.issue", certainty: "observed", x: 0, y: ROW0 },
   {
     id: "repo",
     name: "checkout-api",
     kind: "bitbucket.repository",
     certainty: "observed",
     x: 0,
-    y: 92,
+    y: ROW0 + 84,
   },
   {
     id: "pipe",
@@ -58,7 +66,7 @@ const NODES: LNode[] = [
     kind: "bitbucket.pipeline",
     certainty: "observed",
     x: 0,
-    y: 184,
+    y: ROW0 + 168,
   },
   {
     id: "repo2",
@@ -66,65 +74,81 @@ const NODES: LNode[] = [
     kind: "bitbucket.repository",
     certainty: "observed",
     x: 0,
-    y: 300,
+    y: ROW0 + 252,
   },
 
-  // How traffic actually arrives.
+  // Lane 2 — how traffic reaches you.
   {
     id: "dns",
     name: "api.acme.com",
     kind: "aws.route53.record",
     certainty: "observed",
-    x: 245,
-    y: 0,
+    x: 255,
+    y: ROW0,
   },
-  { id: "alb", name: "checkout-alb", kind: "aws.elb", certainty: "observed", x: 245, y: 92 },
+  { id: "alb", name: "checkout-alb", kind: "aws.elb", certainty: "observed", x: 255, y: ROW0 + 84 },
 
-  // Compute.
-  { id: "svc", name: "checkout", kind: "aws.ecs.service", certainty: "observed", x: 490, y: 46 },
+  // Lane 3 — what runs.
+  {
+    id: "svc",
+    name: "checkout",
+    kind: "aws.ecs.service",
+    certainty: "observed",
+    x: 510,
+    y: ROW0 + 42,
+  },
   {
     id: "fn",
     name: "orders-webhook",
     kind: "aws.lambda.function",
     certainty: "inferred-high",
-    x: 490,
-    y: 148,
+    x: 510,
+    y: ROW0 + 126,
   },
   {
     id: "run",
     name: "reports-renderer",
     kind: "gcp.run.service",
     certainty: "inferred-low",
-    x: 490,
-    y: 300,
+    x: 510,
+    y: ROW0 + 252,
   },
 
-  // State.
-  { id: "db", name: "orders-db", kind: "aws.rds.instance", certainty: "observed", x: 735, y: 0 },
+  // Lane 4 — what it keeps.
+  { id: "db", name: "orders-db", kind: "aws.rds.instance", certainty: "observed", x: 765, y: ROW0 },
   {
     id: "ddb",
     name: "orders-events",
     kind: "aws.dynamodb.table",
     certainty: "observed",
-    x: 735,
-    y: 92,
+    x: 765,
+    y: ROW0 + 84,
   },
   {
     id: "cache",
     name: "checkout-sessions",
     kind: "aws.elasticache.cluster",
     certainty: "observed",
-    x: 735,
-    y: 184,
+    x: 765,
+    y: ROW0 + 168,
   },
   {
     id: "s3",
     name: "checkout-assets",
     kind: "aws.s3.bucket",
     certainty: "observed",
-    x: 735,
-    y: 276,
+    x: 765,
+    y: ROW0 + 252,
   },
+];
+
+/** Lane headings. Without them the four columns are just columns; with them the canvas reads
+ *  left-to-right as a sentence — a change ships to something that runs and keeps state. */
+const LANES: Array<{ label: string; x: number }> = [
+  { label: "Plan & code", x: 0 },
+  { label: "Traffic", x: 255 },
+  { label: "Compute", x: 510 },
+  { label: "Data", x: 765 },
 ];
 
 interface LEdge {
@@ -150,11 +174,6 @@ const EDGES: LEdge[] = [
   { from: "fn", to: "db", label: "STORES_IN" },
   { from: "svc", to: "run", label: "CALLS", inferred: true },
 ];
-
-const W = 190;
-const H = 56;
-const CANVAS_W = 925;
-const CANVAS_H = 356;
 
 const byId = (id: string): LNode => NODES.find((n) => n.id === id) as LNode;
 
@@ -226,7 +245,7 @@ export function GraphVisual() {
               key={`${e.from}-${e.to}`}
               className={cn(
                 "lg-edge transition-[opacity,color] duration-200",
-                on ? "text-foreground/70" : "text-muted-foreground/35",
+                on ? "text-foreground/75" : "text-muted-foreground/55",
                 off && "opacity-25",
               )}
               style={{ ["--d" as string]: `${0.1 + i * 0.08}s` }}
@@ -255,6 +274,16 @@ export function GraphVisual() {
           );
         })}
       </svg>
+
+      {LANES.map((l) => (
+        <div
+          key={l.label}
+          className="absolute text-[10px] font-medium uppercase tracking-widest text-muted-foreground/70"
+          style={{ left: l.x, top: LANE_Y, width: W }}
+        >
+          {l.label}
+        </div>
+      ))}
 
       {NODES.map((n, i) => {
         const logo = KIND_LOGO[n.kind];

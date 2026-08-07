@@ -138,24 +138,27 @@ export default async function LandingPage() {
         {/* The graph, on the dark inset card the login page established. */}
         <section className="mx-auto max-w-6xl px-6 pb-24">
           <Reveal variant="pop">
-            {/* The live map's own canvas: a light surface with React Flow's dotted background at the
-                same gap (22) and dot size (1.6) the product draws. The hero should look like the
-                screen you actually land on, not a dark marketing rendition of it. */}
+            {/* The live map's canvas: a light surface with React Flow's dotted background. Denser
+                and fainter than the product's own (gap 16 vs 22, ~0.16 alpha vs 0.25) — the map is
+                viewed at varying zoom where a sparser grid reads correctly, but at this fixed size
+                the product values rendered as scattered specks rather than as paper texture. */}
             <div
-              className="relative overflow-hidden rounded-2xl border border-neutral-200 bg-white p-8 shadow-sm sm:p-12"
+              className="relative overflow-hidden rounded-2xl border border-neutral-200 bg-white pt-8 shadow-sm sm:pt-12"
               style={{
                 backgroundImage:
-                  "radial-gradient(hsl(var(--muted-foreground) / 0.25) 1.6px, transparent 1.6px)",
-                backgroundSize: "22px 22px",
+                  "radial-gradient(hsl(var(--muted-foreground) / 0.16) 1.3px, transparent 1.3px)",
+                backgroundSize: "16px 16px",
               }}
             >
               <div className="relative">
-                <div className="-mx-1 overflow-x-auto px-1 pb-1">
+                <div className="overflow-x-auto px-8 pb-8 sm:px-12">
                   <div className="mx-auto min-w-[760px]">
                     <GraphVisual />
                   </div>
                 </div>
-                <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-neutral-200 pt-5 text-xs text-neutral-500">
+                {/* Full-bleed white footer: a key belongs on its own ground, not floating on the
+                    canvas it describes. */}
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-neutral-200 bg-white px-8 py-4 text-xs text-neutral-500 sm:px-12">
                   <span className="flex items-center gap-2">
                     <span className="h-px w-6 bg-neutral-400" /> Observed
                   </span>
@@ -260,35 +263,84 @@ export default async function LandingPage() {
               </div>
             </Reveal>
             <Reveal delay={90} variant="pop">
-              <ol className="space-y-2.5">
-                {[
-                  { t: "Alarm fires", d: "checkout · 5xx rate above threshold", tone: "danger" },
-                  { t: "Service identified", d: "aws.ecs.service / checkout · us-east-1" },
-                  { t: "Deploy correlated", d: "deploy-production · 14 minutes earlier" },
-                  { t: "Change found", d: "PR #1482 — “retry budget for orders-db”" },
-                  { t: "Ticket linked", d: "PAY-318 · payments board" },
-                ].map((r, i) => (
-                  <li
-                    key={r.t}
-                    className="flex items-start gap-3.5 rounded-xl border border-neutral-200 bg-white p-4"
-                  >
-                    <span
-                      className={
-                        "mt-0.5 grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-semibold " +
-                        (r.tone === "danger"
-                          ? "bg-danger/12 text-danger"
-                          : "bg-neutral-900 text-white")
-                      }
-                    >
-                      {i + 1}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-sm font-medium">{r.t}</span>
-                      <span className="block truncate text-xs text-neutral-500">{r.d}</span>
-                    </span>
-                  </li>
-                ))}
-              </ol>
+              {/* A trace runs BACKWARDS through time, so draw it that way. The numbered list said
+                  "five things happened" without showing that each one was found by walking one edge
+                  further back — the timestamps and the rail are what make it read as a trace rather
+                  than a checklist, and the culprit needs to look like the end of the line. */}
+              <div className="relative">
+                <div
+                  className="absolute bottom-8 left-[102px] top-8 w-px bg-neutral-200"
+                  aria-hidden="true"
+                />
+                <ol className="space-y-1">
+                  {[
+                    {
+                      time: "02:00",
+                      icon: "aws-ecs",
+                      title: "checkout is unhealthy",
+                      detail: "5xx rate 12% · threshold 2%",
+                      alarm: true,
+                    },
+                    {
+                      time: "01:58",
+                      icon: "aws-elb",
+                      title: "Traffic still arriving",
+                      detail: "checkout-alb · target group healthy",
+                    },
+                    {
+                      time: "01:46",
+                      icon: "bitbucket",
+                      title: "deploy-production ran",
+                      detail: "14 minutes before the alarm",
+                    },
+                    {
+                      time: "01:44",
+                      icon: "bitbucket",
+                      title: "PR #1482 merged",
+                      detail: "“retry budget for orders-db”",
+                      culprit: true,
+                    },
+                    {
+                      time: "yesterday",
+                      icon: "jira",
+                      title: "PAY-318",
+                      detail: "payments board · reported by @priya",
+                    },
+                  ].map((r) => (
+                    <li key={r.title} className="flex items-start gap-4">
+                      <span className="w-[70px] shrink-0 pt-[11px] text-right text-xs tabular-nums text-neutral-400">
+                        {r.time}
+                      </span>
+                      <span
+                        className={
+                          "relative z-10 mt-1.5 grid size-8 shrink-0 place-items-center rounded-lg border bg-white " +
+                          (r.alarm
+                            ? "border-danger/40 ring-4 ring-danger/10"
+                            : "border-neutral-200")
+                        }
+                      >
+                        <CloudIcon name={r.icon} className="size-4" />
+                      </span>
+                      <span
+                        className={
+                          "min-w-0 flex-1 rounded-xl border px-4 py-2.5 " +
+                          (r.culprit ? "border-danger bg-danger/[0.04]" : "border-transparent")
+                        }
+                      >
+                        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="text-sm font-medium">{r.title}</span>
+                          {r.culprit ? (
+                            <span className="rounded-full bg-danger px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                              Most likely cause
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-neutral-500">{r.detail}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
             </Reveal>
           </div>
         </section>
@@ -304,23 +356,53 @@ export default async function LandingPage() {
                 size={460}
                 className="pointer-events-none absolute -right-28 -top-28 size-[460px] opacity-[0.05] [filter:invert(1)]"
               />
-              <div className="relative grid gap-10 lg:grid-cols-2 lg:items-center lg:gap-16">
+              <div className="relative grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:gap-16">
                 <div>
-                  <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium text-white/70">
-                    <AtlasAiMark size={14} className="size-3.5" /> Atlas AI
-                  </span>
-                  <h2 className="mt-5 text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
+                  <div className="flex items-center gap-3">
+                    <AtlasAiMark size={40} className="size-10" />
+                    <div>
+                      <p className="text-sm font-semibold">Atlas AI</p>
+                      <p className="text-xs text-white/50">Included, on your graph</p>
+                    </div>
+                  </div>
+
+                  <h2 className="mt-7 text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
                     Ask it like you&rsquo;d ask the person who built it.
                   </h2>
                   <p className="mt-5 text-balance leading-relaxed text-white/70">
-                    Atlas AI answers from your graph, not from the internet. Every claim carries a
-                    citation to the exact resource, deploy or pull request it came from, so you can
-                    check its work in one click — and it will tell you when your data doesn&rsquo;t
-                    support an answer instead of inventing one.
+                    Atlas AI is an agent that reads your graph, not the internet. It can follow a
+                    dependency six hops out, work out who owns a service, compare what changed
+                    between two deploys, or explain why something is exposed — then keep going when
+                    you ask the follow-up.
                   </p>
+                  <p className="mt-4 text-balance leading-relaxed text-white/70">
+                    Every claim carries a citation to the exact resource it came from, so you can
+                    check its work in one click. When your data doesn&rsquo;t support an answer, it
+                    says so instead of inventing one.
+                  </p>
+
+                  {/* The range of questions is the point — one example only shows the format. */}
+                  <p className="mt-8 text-xs font-medium uppercase tracking-widest text-white/40">
+                    Things people actually ask
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {[
+                      "What changed before the 2am spike?",
+                      "Which services are internet-exposed?",
+                      "Who owns checkout?",
+                      "What breaks if I retire this bucket?",
+                    ].map((q) => (
+                      <span
+                        key={q}
+                        className="rounded-full border border-white/12 bg-white/[0.05] px-3 py-1.5 text-xs text-white/65"
+                      >
+                        {q}
+                      </span>
+                    ))}
+                  </div>
                 </div>
 
-                {/* A sample answer, in the product's own citation style. */}
+                {/* A worked answer, in the product's own citation style. */}
                 <div className="rounded-xl border border-white/10 bg-white/[0.04] p-5">
                   <p className="text-sm text-white/45">What talks to orders-db, and who owns it?</p>
                   <div className="mt-4 flex gap-3">
@@ -350,6 +432,9 @@ export default async function LandingPage() {
                       ),
                     )}
                   </div>
+                  <p className="mt-4 border-t border-white/10 pt-4 text-xs text-white/40">
+                    Ask from the app, or from Slack without leaving the channel.
+                  </p>
                 </div>
               </div>
             </div>
@@ -415,9 +500,7 @@ export default async function LandingPage() {
               </Reveal>
 
               <Reveal delay={120} variant="pop">
-                <div className="relative overflow-hidden rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm sm:p-8">
-                  <IntegrationsOrbit />
-                </div>
+                <IntegrationsOrbit />
               </Reveal>
             </div>
           </div>

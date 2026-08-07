@@ -4,25 +4,27 @@ import { AtlasLogo } from "@/components/brand";
 /**
  * The integrations orbit: everything Atlas reads, circling the mark that reads it.
  *
- * Two counter-rotating rings around the Atlas globe. Each icon sits on a ring via a rotate →
- * translate → counter-rotate transform chain, so it rides the orbit while staying upright — the
- * detail that separates this from a spinning sticker sheet. Depth comes from the inner ring being
- * smaller, brighter and faster than the outer one, which is how parallax reads to the eye.
+ * Two counter-rotating rings around the Atlas globe. The ring's dashed border and the icons that
+ * ride it are the SAME element, so an icon always sits exactly on its track — the first version
+ * drew the tracks with percentage insets and placed the icons at fixed pixel radii, which meant the
+ * two only lined up at one container width and drifted apart at every other.
+ *
+ * Each icon is positioned by rotating a full-size layer, pinning the icon to the top of it, and
+ * counter-rotating the icon itself so it stays upright while its ring turns. Depth comes from the
+ * inner ring being smaller, faster and lighter than the outer one.
  *
  * Pure CSS on a server component: no JS, no 3D library, no WebGL. A marketing flourish should not
- * be the heaviest thing on the page, and `rotate` on a composited layer costs nothing. The whole
- * animation is inside `motion-safe:`, so reduced-motion visitors get a still, legible arrangement
- * rather than a stopped-mid-frame mess.
+ * be the heaviest thing on the page, and `rotate` on a composited layer costs nothing. All motion
+ * is inside `motion-safe:`, so reduced-motion visitors get a still, legible arrangement.
  *
- * Light surface: brand logos are drawn for white. On the dark card they needed a tint or an invert
- * to stay legible, which meant showing every partner's mark in the wrong colour — the one detail a
- * visitor recognising their own stack would notice first.
+ * Light surface on purpose: brand logos are drawn for white. On a dark card they need a tint or an
+ * invert to stay legible, which means showing every partner's mark in the wrong colour — the one
+ * detail a visitor recognising their own stack notices first.
  *
  * Only real, bundled logos appear here — `CloudIcon` renders nothing for a name it doesn't have, so
- * an invented integration would silently become a hole. That constraint is doing useful work: the
- * ring can only ever show things that actually exist.
+ * an invented integration would silently become a hole in the ring.
  */
-const INNER = ["aws-ec2", "aws-lambda", "aws-rds", "aws-s3", "aws-ecs"];
+const INNER = ["aws-ec2", "aws-lambda", "aws-ecs", "aws-rds", "aws-s3", "aws-dynamodb"];
 const OUTER = [
   "bitbucket",
   "github-icon",
@@ -38,13 +40,14 @@ const OUTER = [
 
 function Ring({
   names,
-  radius,
+  inset,
   duration,
   size,
   reverse,
 }: {
   names: string[];
-  radius: number;
+  /** Distance from the container edge — sets the orbit radius for the border AND its icons. */
+  inset: string;
   duration: number;
   size: number;
   reverse?: boolean;
@@ -55,35 +58,31 @@ function Ring({
   const counter = reverse
     ? "motion-safe:animate-[spin_var(--dur)_linear_infinite]"
     : "motion-safe:animate-[spin_var(--dur)_linear_infinite_reverse]";
+
   return (
     <div
-      className={`absolute inset-0 ${spin}`}
-      style={{ ["--dur" as string]: `${duration}s` }}
+      className={`absolute rounded-full border border-dashed border-neutral-200 ${spin}`}
+      style={{ inset, ["--dur" as string]: `${duration}s` }}
       aria-hidden="true"
     >
       {names.map((name, i) => {
         const angle = (360 / names.length) * i;
         return (
-          <div
-            key={name}
-            className="absolute left-1/2 top-1/2 size-0"
-            style={{ transform: `rotate(${angle}deg) translateY(-${radius}px)` }}
-          >
-            {/* Counter-rotation keeps each logo upright while its parent ring turns. */}
+          // A full-size layer rotated to the icon's angle; the icon pins to the top of it, which is
+          // exactly on the dashed border above.
+          <div key={name} className="absolute inset-0" style={{ transform: `rotate(${angle}deg)` }}>
             <div
-              className={counter}
-              style={{
-                ["--dur" as string]: `${duration}s`,
-                transform: `rotate(-${angle}deg)`,
-                marginLeft: -size / 2,
-                marginTop: -size / 2,
-              }}
+              className="absolute left-1/2 top-0"
+              style={{ transform: `translate(-50%, -50%) rotate(${-angle}deg)` }}
             >
-              <div
-                className="grid place-items-center rounded-2xl border border-neutral-200 bg-white shadow-sm"
-                style={{ width: size, height: size }}
-              >
-                <CloudIcon name={name} className="size-1/2" />
+              {/* Counter-rotation keeps the logo upright while the ring turns. */}
+              <div className={counter} style={{ ["--dur" as string]: `${duration}s` }}>
+                <div
+                  className="grid place-items-center rounded-2xl border border-neutral-200 bg-white shadow-sm"
+                  style={{ width: size, height: size }}
+                >
+                  <CloudIcon name={name} className="size-1/2" />
+                </div>
               </div>
             </div>
           </div>
@@ -96,13 +95,9 @@ function Ring({
 export function IntegrationsOrbit() {
   return (
     <div className="relative mx-auto aspect-square w-full max-w-[520px]">
-      {/* Orbit paths — faint, so the rings read as paths the icons travel rather than as rings drawn
-          for their own sake. Dashed: a solid circle reads as a container, a dashed one as a track. */}
-      <div className="absolute inset-[22%] rounded-full border border-dashed border-neutral-200" />
-      <div className="absolute inset-[2%] rounded-full border border-dashed border-neutral-200/80" />
-
-      <Ring names={INNER} radius={112} duration={38} size={46} />
-      <Ring names={OUTER} radius={224} duration={62} size={52} reverse />
+      {/* Insets leave room for the icons, which straddle their border by half their own size. */}
+      <Ring names={OUTER} inset="6%" duration={62} size={50} reverse />
+      <Ring names={INNER} inset="30%" duration={38} size={44} />
 
       {/* The centre: Atlas itself, spinning like the mark does everywhere else in the product. */}
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
