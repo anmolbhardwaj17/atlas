@@ -85,7 +85,7 @@ export default async function LandingPage() {
               you actually run.
             </p>
             <p className="mt-4 max-w-md text-balance text-sm italic leading-relaxed text-neutral-500">
-              Most tools guess confidently. This one tells you how sure it is.
+              Sure about what it knows. Honest about what it doesn&rsquo;t.
             </p>
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <Button asChild size="lg" className="h-11 px-7">
