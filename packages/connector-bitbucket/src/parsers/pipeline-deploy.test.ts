@@ -134,4 +134,93 @@ pipelines:
     expect(r.ecrImages).toEqual([]);
     expect(r.targets).toEqual([]);
   });
+
+  // ── Atlassian AWS Pipes ────────────────────────────────────────────────────────────────────
+  // Drawn from a real customer pipeline. The pipe form never writes a full
+  // `<acct>.dkr.ecr.<region>.amazonaws.com/<repo>` URI, so the ECR regex had nothing to match and
+  // this entire deploy style produced no evidence at all — verified against their file: zero
+  // occurrences of "dkr.ecr" across every pipeline they have.
+  it("reassembles an ECR image from aws-ecr-push-image (account from the OIDC role ARN)", () => {
+    const yml = `
+    - step: &push-to-ecr
+        script:
+          - docker build -t $IMAGE_NAME .
+          - pipe: atlassian/aws-ecr-push-image:1.5.0
+            variables:
+              AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+              AWS_OIDC_ROLE_ARN: 'arn:aws:iam::436061880215:role/Bitbucket-ECR-Pipeline-Role'
+              IMAGE_NAME: \${IMAGE_NAME}
+              TAGS: "latest"
+`;
+    const r = parsePipelineDeploys(yml, [
+      {
+        environment: "production-build",
+        vars: { AWS_DEFAULT_REGION: "us-east-1", IMAGE_NAME: "siemba-backend" },
+      },
+    ]);
+    expect(r.ecrImages).toEqual([
+      { account: "436061880215", region: "us-east-1", repository: "siemba-backend" },
+    ]);
+  });
+
+  it("reads aws-lambda-deploy and aws-ecs-deploy pipe variables", () => {
+    const yml = `
+        script:
+          - pipe: atlassian/aws-lambda-deploy:1.9.0
+            variables:
+              FUNCTION_NAME: image-resizer
+              COMMAND: 'update'
+          - pipe: atlassian/aws-ecs-deploy:1.12.0
+            variables:
+              CLUSTER_NAME: prod-cluster
+              SERVICE_NAME: checkout
+`;
+    const r = parsePipelineDeploys(yml);
+    expect(r.targets).toEqual([
+      { kind: "lambda", function: "image-resizer", environment: null },
+      { kind: "ecs", cluster: "prod-cluster", service: "checkout", environment: null },
+    ]);
+  });
+
+  it("drops a pipe ECR image when any part is unresolved — all three or nothing (P3)", () => {
+    // Region never resolves. A half-known image would point at the wrong ECR repository, so the
+    // whole reference is discarded rather than partially trusted.
+    const yml = `
+          - pipe: atlassian/aws-ecr-push-image:1.5.0
+            variables:
+              AWS_DEFAULT_REGION: $UNKNOWN_REGION
+              AWS_OIDC_ROLE_ARN: 'arn:aws:iam::436061880215:role/R'
+              IMAGE_NAME: svc
+`;
+    expect(parsePipelineDeploys(yml).ecrImages).toEqual([]);
+  });
+
+  it("does not leak variables across sibling pipes (indentation scopes the block)", () => {
+    // The second pipe must not inherit FUNCTION_NAME from the first, which would invent a target.
+    const yml = `
+          - pipe: atlassian/aws-lambda-deploy:1.9.0
+            variables:
+              FUNCTION_NAME: only-mine
+          - pipe: atlassian/aws-ecs-deploy:1.12.0
+            variables:
+              SERVICE_NAME: checkout
+`;
+    const r = parsePipelineDeploys(yml);
+    expect(r.targets).toEqual([
+      { kind: "lambda", function: "only-mine", environment: null },
+      { kind: "ecs", cluster: null, service: "checkout", environment: null },
+    ]);
+  });
+
+  it("ignores non-Atlassian and non-AWS pipes", () => {
+    const yml = `
+          - pipe: sonarsource/sonarqube-scan:1.0.0
+            variables:
+              SONAR_TOKEN: \${SONAR_TOKEN}
+              FUNCTION_NAME: not-a-deploy
+`;
+    const r = parsePipelineDeploys(yml);
+    expect(r.targets).toEqual([]);
+    expect(r.ecrImages).toEqual([]);
+  });
 });

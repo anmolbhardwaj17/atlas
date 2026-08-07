@@ -36,6 +36,17 @@ Derive `repo —DEPLOYS_TO→ service` with tiered confidence (docs/05 disciplin
 | Evidence | Tier |
 |---|---|
 | ECS task-def image URI → ECR repo whose name matches a crawled repo slug **and** that repo's `bitbucket-pipelines.yml` pushes to that ECR URI | high (two independent witnesses) |
+
+> **ECR-push evidence comes in two forms, and only one was being read.** A raw image URI
+> (`<acct>.dkr.ecr.<region>.amazonaws.com/<repo>`) *or* Atlassian's `aws-ecr-push-image` pipe, which
+> never writes that URI — it names the account (inside `AWS_OIDC_ROLE_ARN`), region and `IMAGE_NAME`
+> as separate pipe variables. The parser matched only the URI form, so the pipe style — the
+> idiomatic Bitbucket one — yielded **no evidence at all**. Confirmed against production: zero
+> occurrences of `dkr.ecr` across every pipeline file in the estate, while `aws-ecr-push-image`
+> appears in each one that deploys. The parser now reassembles the reference from the pipe
+> variables, and reads `aws-lambda-deploy` (`FUNCTION_NAME`) and `aws-ecs-deploy`
+> (`CLUSTER_NAME`/`SERVICE_NAME`) the same way. All-or-nothing per reference: if account, region or
+> repository fails to resolve to a literal, the whole thing is dropped rather than half-trusted (P3).
 | Image-URI ↔ repo-slug match alone | medium |
 | Name/tag convention only (`repo`/`service`/`aws:cloudformation:stack-name` tags, Lambda naming) | low, shown as such |
 
