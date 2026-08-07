@@ -8,9 +8,10 @@ import { GraphVisual } from "@/components/landing/graph-visual";
 import { IntegrationsOrbit } from "@/components/landing/integrations-orbit";
 import { AskDemo } from "@/components/landing/ask-demo";
 import { CertaintyScale } from "@/components/landing/certainty-scale";
+import { FooterMark } from "@/components/landing/footer-mark";
+import { BlastDemo } from "@/components/landing/blast-demo";
 import { TraceDemo } from "@/components/landing/trace-demo";
 import { CloudIcon } from "@/components/cloud-icon";
-import { KIND_LOGO } from "@/lib/kind-visual";
 
 export const dynamic = "force-dynamic";
 
@@ -175,39 +176,9 @@ export default async function LandingPage() {
         <section className="border-t border-neutral-200/70">
           <div className="mx-auto grid max-w-6xl gap-12 px-6 py-24 lg:grid-cols-2 lg:items-center lg:gap-16">
             <Reveal delay={80} variant="pop">
-              <div className="rounded-2xl border border-neutral-200 bg-white p-6">
-                <p className="text-sm text-neutral-400">
-                  What breaks if I retire{" "}
-                  <span className="font-medium text-neutral-700">orders-db</span>?
-                </p>
-                <div className="mt-5 space-y-2.5">
-                  {[
-                    { name: "checkout", kind: "aws.ecs.service", via: "writes on every order" },
-                    {
-                      name: "orders-webhook",
-                      kind: "aws.lambda.function",
-                      via: "writes on every event",
-                    },
-                    { name: "reports-renderer", kind: "gcp.run.service", via: "reads nightly" },
-                  ].map((d) => (
-                    <div
-                      key={d.name}
-                      className="flex items-center gap-3 rounded-xl border border-neutral-200 px-3.5 py-2.5"
-                    >
-                      <span className="grid size-7 shrink-0 place-items-center rounded-md bg-neutral-100">
-                        <CloudIcon name={KIND_LOGO[d.kind] as string} className="size-4" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">{d.name}</span>
-                        <span className="block truncate text-xs text-neutral-500">{d.via}</span>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <p className="mt-4 border-t border-neutral-100 pt-4 text-xs text-neutral-400">
-                  3 direct dependents, across 2 clouds. Nothing else in the graph touches it.
-                </p>
-              </div>
+              {/* Propagation, played out - see BlastDemo. A static list states the answer but not
+                  the idea, which is that impact travels. */}
+              <BlastDemo />
             </Reveal>
 
             <Reveal>
@@ -425,19 +396,20 @@ export default async function LandingPage() {
             treatment for the close alone gives the page one held breath at the end instead of two.
             A calm, unornamented statement also suits the content better: this is the reassurance a
             security reviewer is looking for, and reassurance shouldn't shout. */}
-        <section className="mx-auto max-w-4xl px-6 py-24">
+        <section className="mx-auto max-w-4xl px-6 py-20">
           <Reveal>
-            <div className="text-center">
-              <span className="inline-grid size-11 place-items-center rounded-full border border-success/30 bg-success/10">
-                <ShieldCheck className="size-5 text-success" />
-              </span>
-              <h2 className="mt-6 text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
+            {/* No circle around the shield: a ringed icon reads as a status chip, and this is a
+                statement, not a badge. Heading and mark share a line so the section keeps one
+                alignment instead of switching from centred to left halfway down. */}
+            <div className="flex items-center gap-3.5">
+              <ShieldCheck className="size-8 shrink-0 text-success" />
+              <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
                 Read-only, all the way down.
               </h2>
             </div>
           </Reveal>
 
-          <div className="mt-10 grid gap-8 sm:grid-cols-2">
+          <div className="mt-8 grid gap-8 sm:grid-cols-2">
             <Reveal delay={80}>
               <p className="leading-relaxed text-neutral-600">
                 Every connection Atlas makes - cloud accounts, repositories, pipelines, issue
@@ -503,8 +475,9 @@ export default async function LandingPage() {
           length, with pictures. What belongs here is what a footer is actually for: who this is,
           how to reach them, and the legal links. The layout has room for more columns when there
           is genuinely more to say (docs, changelog, careers). */}
-      <footer className="border-t border-neutral-200/70">
-        <div className="mx-auto max-w-6xl px-6 py-14">
+      <footer className="relative overflow-hidden border-t border-neutral-200/70">
+        <FooterMark />
+        <div className="relative mx-auto max-w-6xl px-6 py-14">
           <div className="flex flex-col gap-10 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <div className="flex items-center gap-2.5">

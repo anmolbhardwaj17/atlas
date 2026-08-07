@@ -1,4 +1,8 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { Check, X } from "lucide-react";
+import { cn } from "@/lib/cn";
 import { CloudIcon } from "@/components/cloud-icon";
 import { KIND_LOGO } from "@/lib/kind-visual";
 
@@ -14,6 +18,11 @@ import { KIND_LOGO } from "@/lib/kind-visual";
  * than describing it. The confirm/reject pair is kept because it's the actual differentiator:
  * plenty of tools have a model guessing at links; the question is whether the guess is presented
  * as a fact.
+ *
+ * Confirm and Reject actually work. Reading "nothing enters your graph until you confirm it" and
+ * then clicking the button that does it is worth more than the sentence alone - the promise becomes
+ * a thing you just did. It reverts after a few seconds so the next visitor (and the same one,
+ * scrolling back) finds the illustration where they left it.
  */
 interface Tier {
   label: string;
@@ -59,7 +68,20 @@ function Chip({ name, kind }: { name: string; kind: string }) {
   );
 }
 
+type Decision = "pending" | "confirmed" | "rejected";
+
+/** Long enough to register the outcome, short enough that the page doesn't stay in a used state. */
+const REVERT_MS = 6000;
+
 export function CertaintyScale() {
+  const [decision, setDecision] = useState<Decision>("pending");
+
+  useEffect(() => {
+    if (decision === "pending") return;
+    const t = setTimeout(() => setDecision("pending"), REVERT_MS);
+    return () => clearTimeout(t);
+  }, [decision]);
+
   return (
     <div className="rounded-2xl border border-neutral-200 bg-white p-6">
       {/* The pair, stated once. Everything below varies only the line between them. */}
@@ -72,44 +94,79 @@ export function CertaintyScale() {
       </div>
 
       <div className="mt-6 space-y-4 border-t border-neutral-100 pt-5">
-        {TIERS.map((t) => (
-          <div key={t.label} className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <svg
-              viewBox="0 0 60 8"
-              className={`h-2 w-14 shrink-0 ${t.strokeClass}`}
-              preserveAspectRatio="none"
-              aria-hidden="true"
+        {TIERS.map((t) => {
+          const ai = Boolean(t.pending);
+          const confirmed = ai && decision === "confirmed";
+          const rejected = ai && decision === "rejected";
+          return (
+            <div
+              key={t.label}
+              className={cn(
+                "flex flex-wrap items-center gap-x-3 gap-y-2 transition-opacity duration-300",
+                rejected && "opacity-40",
+              )}
             >
-              <line
-                x1="0"
-                y1="4"
-                x2="54"
-                y2="4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeDasharray={t.dash}
-                vectorEffect="non-scaling-stroke"
-              />
-              <path d="M54 1 L60 4 L54 7 z" fill="currentColor" />
-            </svg>
-            <span
-              className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${t.labelClass}`}
-            >
-              {t.label}
-            </span>
-            <p className="min-w-0 flex-1 text-sm text-neutral-500">{t.meaning}</p>
-            {t.pending ? (
-              <span className="flex shrink-0 items-center gap-1.5">
-                <span className="inline-flex items-center gap-1 rounded-md border border-neutral-200 px-2 py-1 text-xs font-medium text-neutral-700">
-                  <Check className="size-3" /> Confirm
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-md border border-neutral-200 px-2 py-1 text-xs font-medium text-neutral-400">
-                  <X className="size-3" /> Reject
-                </span>
+              <svg
+                viewBox="0 0 60 8"
+                className={cn(
+                  "h-2 w-14 shrink-0 transition-colors duration-300",
+                  confirmed ? "text-neutral-800" : t.strokeClass,
+                )}
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <line
+                  x1="0"
+                  y1="4"
+                  x2="54"
+                  y2="4"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeDasharray={confirmed ? undefined : t.dash}
+                  vectorEffect="non-scaling-stroke"
+                />
+                <path d="M54 1 L60 4 L54 7 z" fill="currentColor" />
+              </svg>
+              <span
+                className={cn(
+                  "shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors duration-300",
+                  confirmed ? "bg-success/15 text-success" : t.labelClass,
+                )}
+              >
+                {confirmed ? "Observed" : t.label}
               </span>
-            ) : null}
-          </div>
-        ))}
+              <p className="min-w-0 flex-1 text-sm text-neutral-500">
+                {confirmed
+                  ? "Confirmed by you. It's part of the graph now."
+                  : rejected
+                    ? "Rejected. Atlas won't propose it again."
+                    : t.meaning}
+              </p>
+              {ai && decision === "pending" ? (
+                <span className="flex shrink-0 items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setDecision("confirmed")}
+                    className="inline-flex items-center gap-1 rounded-md border border-neutral-200 px-2 py-1 text-xs font-medium text-neutral-700 transition-colors hover:border-success/50 hover:bg-success/10 hover:text-success"
+                  >
+                    <Check className="size-3" /> Confirm
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDecision("rejected")}
+                    className="inline-flex items-center gap-1 rounded-md border border-neutral-200 px-2 py-1 text-xs font-medium text-neutral-400 transition-colors hover:border-neutral-300 hover:text-neutral-600"
+                  >
+                    <X className="size-3" /> Reject
+                  </button>
+                </span>
+              ) : ai ? (
+                <span className="shrink-0 text-xs text-neutral-400 motion-safe:animate-[motion-pop_0.3s_cubic-bezier(0.2,0.8,0.2,1)_both]">
+                  {confirmed ? "Added to your graph" : "Dismissed"}
+                </span>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
