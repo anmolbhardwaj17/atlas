@@ -180,6 +180,14 @@ export const KIND_LOGO: Record<string, string> = {
   "bitbucket.project": "bitbucket",
   "bitbucket.pipeline": "bitbucket",
   "bitbucket.pullrequest": "bitbucket",
+  // Jira + GCP. These kinds already existed in the graph but had no logo mapping, so they fell back
+  // to a generic lucide glyph — while `bitbucket.*` mapped to a logo that wasn't bundled at all,
+  // which renders an EMPTY chip (CloudIcon returns null for an unknown name). Both fixed together.
+  "jira.issue": "jira",
+  "jira.project": "jira",
+  "gcp.run.service": "google-cloud-run",
+  "gcp.function": "google-cloud-functions",
+  "gcp.project": "google-cloud",
 };
 
 export function kindCategory(kind: string): string {
