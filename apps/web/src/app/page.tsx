@@ -253,10 +253,13 @@ export default async function LandingPage() {
         {/* ── Certainty ────────────────────────────────────────────────────────────────────── */}
         <section className="border-t border-neutral-200/70 bg-neutral-50/60">
           <div className="mx-auto max-w-6xl px-6 py-24">
-            <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
-              <Reveal>
+            <div className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16">
+              <Reveal className="lg:order-2">
                 <div>
-                  <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
+                  <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">
+                    The part nobody else will promise
+                  </p>
+                  <h2 className="mt-4 text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
                     It tells you when it isn&rsquo;t sure.
                   </h2>
                   <p className="mt-5 text-balance leading-relaxed text-neutral-600">
@@ -272,7 +275,9 @@ export default async function LandingPage() {
                 </div>
               </Reveal>
               {/* Demonstrated, not listed - the same link drawn at each confidence. See CertaintyScale. */}
-              <CertaintyScale />
+              <div className="lg:order-1">
+                <CertaintyScale />
+              </div>
             </div>
           </div>
         </section>
