@@ -187,16 +187,20 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
 
-      - name: Verify the API is serving
-        run: |
-          url="${API_URL:-https://atlas-api-v1.fly.dev}/health/ready"
-          for i in $(seq 1 10); do
-            if curl -fsS "$url" | grep -q '"db":"up"'; then
-              echo "Ready: $url"; exit 0
-            fi
-            echo "attempt $i: not ready yet"; sleep 10
-          done
-          echo "::error::API did not report ready after deploy — check \`fly logs -a atlas-api-v1\`"
-          exit 1
+      # Post-deploy smoke test — the only gate that exercises a REAL deployment over real HTTP.
+      # Every other check (unit, integration, web-build, images) runs against source or a container,
+      # and all of them were green on the deploy that took production down: the web health check
+      # pointed at `/`, which always redirect()s and so could never return 200, and Fly pulled the
+      # machine out of rotation while Next was serving perfectly. That class of bug only exists once
+      # the app is behind a proxy answering real requests.
+      #
+      # It waits for readiness itself (replacing the old inline curl loop), then asserts the whole
+      # user-visible contract: liveness, DB, a 401 on a protected route, security headers, the web
+      # health endpoint, the anonymous→login redirects, and that the login page actually renders.
+      # Deliberately NOT a deploy gate — push-to-main always ships — but it fails the workflow, so a
+      # broken production announces itself here instead of waiting to be clicked on.
+      - name: Smoke-test the live deployment
+        run: ./scripts/smoke.sh
         env:
           API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          WEB_URL: ${{ vars.WEB_URL }}

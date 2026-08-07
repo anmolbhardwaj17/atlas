@@ -126,6 +126,15 @@ if $DEPLOY_WEB; then
   done
 fi
 
+# Both liveness probes above only prove each app answers *something*. Run the full smoke test so a
+# manual deploy gets exactly the same verdict CI gives an automated one — otherwise the path a human
+# uses under pressure is the one with the weaker check. Only meaningful when both halves went out.
+if $DEPLOY_API && $DEPLOY_WEB; then
+  say "Smoke-testing the live deployment"
+  API_URL="$API_URL" WEB_URL="$WEB_URL" bash "$(dirname "$0")/smoke.sh" \
+    || die "Deploy completed but production is serving incorrectly (see the failures above)."
+fi
+
 say "Done"
 $DEPLOY_API && echo "  API  $API_URL"
 $DEPLOY_WEB && echo "  Web  $WEB_URL"
