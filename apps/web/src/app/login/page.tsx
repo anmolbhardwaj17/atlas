@@ -63,7 +63,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-dvh bg-white md:grid md:grid-cols-2">
+    <main className="flex min-h-dvh flex-col bg-white md:grid md:grid-cols-2">
       {/* ── Left: branded hero as an inset dark card floating on the white page ── */}
       <aside
         className="relative m-2.5 hidden flex-col justify-end overflow-hidden rounded-2xl p-8 text-white shadow-sm md:m-3 md:flex"
@@ -113,7 +113,7 @@ export default function LoginPage() {
       </aside>
 
       {/* ── Right: full-height sign-in ── */}
-      <section className="relative flex flex-col items-center justify-center p-8 md:min-h-dvh">
+      <section className="relative flex flex-1 flex-col items-center justify-center p-8 md:min-h-dvh md:flex-none">
         <div className="w-full max-w-sm text-center">
           {/* Liquid-metal Atlas mark above the sign-in. Transparent back (page is white already) so
               it never paints an opaque box over the heading; grey tint reads on white. */}
