@@ -16,7 +16,7 @@ export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://atlas-web.
 export const SITE_NAME = "Atlas";
 
 /** The one-line answer to "what is this", used as the meta description and the card subtitle. */
-export const SITE_TAGLINE = "One live map of everything you run and ship";
+export const SITE_TAGLINE = "Stop guessing how your system fits together";
 
 /**
  * Deliberately concrete rather than keyword soup. This string is what someone sees under the link

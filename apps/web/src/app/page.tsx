@@ -526,8 +526,8 @@ export default async function LandingPage() {
                 <span className="text-base font-semibold tracking-tight">Atlas</span>
               </div>
               <p className="mt-3 max-w-xs text-sm leading-relaxed text-neutral-500">
-                One live map of everything you run and ship, built from read-only access to the
-                tools you already use.
+                Stop guessing how your system fits together. Built from read-only access to the
+                cloud accounts, repositories and trackers you already use.
               </p>
             </div>
 

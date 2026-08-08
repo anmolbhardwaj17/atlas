@@ -1,7 +1,8 @@
 # Atlas
 
-> Atlas connects to your cloud accounts, repositories, pipelines and issue tracker with
-> read-only access and builds one live map of everything you run and ship.
+> Stop guessing how your system fits together. Atlas connects to your cloud accounts,
+> repositories, pipelines and issue tracker with read-only access and builds one live map
+> of everything you run and ship.
 
 Atlas is an engineering intelligence platform. It reads AWS, Bitbucket, GitHub, Jira and your
 CI pipelines, then maintains a continuously-updated graph of the resources, deploys and code
