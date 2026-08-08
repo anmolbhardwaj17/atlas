@@ -166,6 +166,19 @@ check "login page is really the login page" body_contains "$WEB_URL/login" "Atla
 check "auth callback redirects back to the public host" \
   expect_redirect_to "$WEB_URL/auth/callback" "$(echo "$WEB_URL" | sed 's#^https\?://##')"
 
+# Share cards and crawlability. These fail silently and invisibly — a page renders perfectly while
+# its link preview is blank, and nobody notices until it's pasted into a customer's Slack. Absolute
+# URLs matter specifically: every unfurler drops a relative og:image on the floor.
+check "og:image is an absolute URL" body_contains "$WEB_URL/" 'og:image" content="http'
+check "share card image is served" expect_status "$WEB_URL/og.png" 200
+check "square share card is served" expect_status "$WEB_URL/og-square.png" 200
+check "structured data present" body_contains "$WEB_URL/" "application/ld+json"
+check "robots.txt is served" expect_status "$WEB_URL/robots.txt" 200
+check "sitemap is served" expect_status "$WEB_URL/sitemap.xml" 200
+check "llms.txt is served" expect_status "$WEB_URL/llms.txt" 200
+# Signed-in routes must stay out of search results.
+check "robots keeps the app private" body_contains "$WEB_URL/robots.txt" "/dashboard"
+
 # --- verdict ---------------------------------------------------------------
 echo
 printf '%s passed, %s failed\n' "$pass" "$fail"

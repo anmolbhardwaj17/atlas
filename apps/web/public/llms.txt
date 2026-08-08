@@ -1,0 +1,49 @@
+# Atlas
+
+> Atlas connects to your cloud accounts, repositories, pipelines and issue tracker with
+> read-only access and builds one live map of everything you run and ship.
+
+Atlas is an engineering intelligence platform. It reads AWS, Bitbucket, GitHub, Jira and your
+CI pipelines, then maintains a continuously-updated graph of the resources, deploys and code
+that make up a company's system — and answers questions about it in plain language.
+
+## What it does
+
+- **Infrastructure map.** A live canvas of services, databases, queues, buckets, repositories,
+  pipelines and the relationships between them, across more than one cloud.
+- **Root-cause tracing.** When something degrades, Atlas walks backwards from the alarm to the
+  service, the deploy, the pull request and the ticket that asked for the change.
+- **Blast radius.** Before you retire, resize or deprecate something, Atlas lists everything that
+  depends on it and how — including services in other clouds.
+- **Atlas AI.** A grounded agent that answers from the graph rather than the open web. Every claim
+  carries a citation to the exact resource it came from.
+- **Security and compliance.** Which known vulnerabilities are actually reachable from the
+  internet, and continuous checks against the technical controls in PCI, CIS, NIST, ISO 27001,
+  HIPAA and GDPR.
+- **Alerting.** Health changes and new findings delivered to Slack, Discord, Microsoft Teams or
+  email, naming the affected resources and what changed.
+
+## How it is different
+
+- **Read-only by construction.** Every connection is granted read scopes and nothing more. There
+  is no code path in the product that writes to a customer's infrastructure, so the worst a bug
+  can do is display something incorrect. No agents are installed in the customer's network.
+- **Certainty is explicit.** Every fact carries where it came from and how confident Atlas is:
+  *observed* (read directly from the source), *inferred* (worked out from evidence, with the
+  evidence attached), or *AI-suggested* (a model's proposal that does not enter the graph until a
+  human confirms it). When two readings conflict, both are shown and marked uncertain rather than
+  one being presented as settled.
+- **It says when it does not know.** "I don't know" is a designed answer, not a failure state.
+  Atlas will name what it could not see rather than produce a plausible guess.
+- **Tenant isolation at the database level**, not by an application filter.
+
+## Status
+
+Free while in beta.
+
+## Links
+
+- Product: https://atlas-web.fly.dev/
+- Sign in: https://atlas-web.fly.dev/login
+- Privacy: https://atlas-web.fly.dev/legal/privacy
+- Terms: https://atlas-web.fly.dev/legal/terms

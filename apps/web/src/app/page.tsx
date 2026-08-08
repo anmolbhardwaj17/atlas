@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ShieldCheck, ScanSearch, Siren } from "lucide-react";
 import { getSession } from "@/lib/api";
+import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site";
 import { Button } from "@/components/ui/button";
 import { AtlasLogo, AtlasAiMark } from "@/components/brand";
 import { Reveal } from "@/components/landing/reveal";
@@ -45,10 +46,51 @@ export default async function LandingPage() {
   // "Continue with Google" anyway.
   const cta = session
     ? { href: "/dashboard", label: "Go to dashboard" }
-    : { href: "/login", label: "Get started" };
+    : { href: "/login", label: "Explore Atlas" };
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        name: SITE_NAME,
+        applicationCategory: "DeveloperApplication",
+        operatingSystem: "Web",
+        url: SITE_URL,
+        description: SITE_DESCRIPTION,
+        image: `${SITE_URL}/og.png`,
+        // Truthful while in beta. Omitting price entirely reads as "contact us", which is the
+        // opposite of what's on the page.
+        offers: {
+          "@type": "Offer",
+          price: "0",
+          priceCurrency: "USD",
+          description: "Free while in beta",
+        },
+        featureList: [
+          "Live infrastructure map across clouds",
+          "Root-cause tracing from alarm to pull request",
+          "Blast-radius analysis before a change",
+          "Cited answers from your own graph",
+          "Reachable-vulnerability and compliance checks",
+        ],
+      },
+      {
+        "@type": "Organization",
+        name: SITE_NAME,
+        url: SITE_URL,
+        logo: `${SITE_URL}/icon.png`,
+      },
+    ],
+  };
 
   return (
     <div className="theme-light min-h-dvh bg-white text-neutral-900">
+      <script
+        type="application/ld+json"
+        // Static, self-authored object - no user input reaches this.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* ── Header ─────────────────────────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-40 border-b border-neutral-200/70 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
